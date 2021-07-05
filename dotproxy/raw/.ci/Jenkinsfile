@@ -1,0 +1,190 @@
+pipeline {
+    agent {
+        dockerfile {
+            dir '.ci'
+            label 'docker-executor'
+        }
+    }
+
+    options {
+        withAWS(
+            endpointUrl: 'https://storage.kevinlin.info',
+            credentials: 'storage-internal',
+        )
+    }
+
+    stages {
+        stage('Install') {
+            steps {
+                sh 'go mod download -x'
+            }
+        }
+        stage('Generate') {
+            steps {
+                sh 'make generate'
+            }
+        }
+        stage('Lint') {
+            steps {
+               sh 'make lint'
+            }
+        }
+        stage('Build') {
+            environment {
+                CGO_ENABLED = 0
+                VERSION_SHA = "${GIT_COMMIT}"
+            }
+            parallel {
+                stage('linux/386') {
+                    environment {
+                        GOOS = 'linux'
+                        GOARCH = '386'
+                    }
+                    steps {
+                        sh 'make'
+                    }
+                }
+                stage('linux/amd64') {
+                    environment {
+                        GOOS = 'linux'
+                        GOARCH = 'amd64'
+                    }
+                    steps {
+                        sh 'make'
+                    }
+                }
+                stage('linux/arm') {
+                    environment {
+                        GOOS = 'linux'
+                        GOARCH = 'arm'
+                    }
+                    steps {
+                        sh 'make'
+                    }
+                }
+                stage('linux/arm64') {
+                    environment {
+                        GOOS = 'linux'
+                        GOARCH = 'arm64'
+                    }
+                    steps {
+                        sh 'make'
+                    }
+                }
+            }
+        }
+        stage('Release') {
+            environment {
+                RELEASE_WORKDIR = sh(
+                    script: 'mktemp -d',
+                    returnStdout: true,
+                ).trim()
+            }
+            steps {
+                // Binary
+                sh 'tar -cvzf release.tar.gz bin/ init/'
+                s3Upload(
+                    bucket: 'internal',
+                    path: "deploy/${env.JOB_NAME}/${env.GIT_COMMIT}/",
+                    file: 'release.tar.gz',
+                )
+
+                // Static site
+                script {
+                    deleteDir()
+                }
+                git(
+                    url: env.GIT_URL - '.git',
+                    branch: 'static',
+                )
+                // Download release archive
+                s3Download(
+                    bucket: 'internal',
+                    path: "deploy/${env.JOB_NAME}/${env.GIT_COMMIT}/release.tar.gz",
+                    file: 'release.tar.gz',
+                )
+                sh "tar -C ${RELEASE_WORKDIR} -xvf release.tar.gz"
+                sh 'rm release.tar.gz'
+                // Create release directory
+                sh "mkdir -pv releases/${GIT_COMMIT}/"
+                sh "ln -sTfv ${GIT_COMMIT} releases/latest"
+                sh "mv -v ${RELEASE_WORKDIR}/bin/* releases/${GIT_COMMIT}/"
+                // Generate page index
+                sh 'apindex . .git,CNAME,release'
+                // Create release
+                sh "tar -cvzf release.tar.gz index.html releases/index.html releases/${GIT_COMMIT}/ releases/latest/"
+                s3Upload(
+                    bucket: 'internal',
+                    path: "deploy/${env.JOB_NAME}-static/${env.GIT_COMMIT}/",
+                    file: 'release.tar.gz',
+                )
+            }
+        }
+        stage('Deploy') {
+            steps {
+                build(
+                    job: 'task--static-deploy',
+                    parameters: [
+                        string(name: 'RELEASE_ARTIFACT', value: "${env.JOB_NAME}-static"),
+                        string(name: 'RELEASE_VERSION', value: "${env.GIT_COMMIT}"),
+                        string(name: 'DOMAIN', value: 'dotproxy.static.kevinlin.info'),
+                        string(name: 'GIT_REMOTE_INTERNAL', value: "${env.GIT_URL}"),
+                        string(name: 'GIT_REMOTE_GITHUB', value: 'git@github.com:LINKIWI/dotproxy-static.git'),
+                        booleanParam(name: 'CLEAN_DEPLOY', value: false),
+                    ],
+                    wait: true,
+                )
+            }
+        }
+        stage('Publish') {
+            environment {
+                PACKAGE_VERSION = sh(
+                    script: 'git show ' +
+                            '--no-patch ' +
+                            '--no-notes ' +
+                            "--date=format:\"%Y.%m.%d-%H.%M.%S-\$(echo ${GIT_COMMIT} | cut -c -8)\" " +
+                            "--pretty=format:'%cd' ${GIT_COMMIT}",
+                    returnStdout: true,
+                ).trim()
+            }
+            parallel {
+                stage('linux/amd64') {
+                    steps {
+                        build(
+                            job: 'task--package',
+                            parameters: [
+                                string(name: 'RELEASE_ARTIFACT', value: "${env.JOB_NAME}"),
+                                string(name: 'RELEASE_VERSION', value: "${env.GIT_COMMIT}"),
+                                string(name: 'PACKAGE_NAME', value: "${env.JOB_NAME}"),
+                                string(name: 'PACKAGE_VERSION', value: "${env.PACKAGE_VERSION}"),
+                                string(name: 'PACKAGE_DESCRIPTION', value: 'High performance DNS-over-TLS proxy'),
+                                string(name: 'PACKAGE_ARCHITECTURE', value: 'amd64'),
+                                string(name: 'BINARY_SPEC', value: 'dotproxy:bin/dotproxy-linux-amd64'),
+                                string(name: 'SYSTEMD_SERVICES', value: 'init/dotproxy.service'),
+                            ],
+                            wait: true,
+                        )
+                    }
+                }
+                stage('linux/arm') {
+                    steps {
+                        build(
+                            job: 'task--package',
+                            parameters: [
+                                string(name: 'RELEASE_ARTIFACT', value: "${env.JOB_NAME}"),
+                                string(name: 'RELEASE_VERSION', value: "${env.GIT_COMMIT}"),
+                                string(name: 'PACKAGE_NAME', value: "${env.JOB_NAME}"),
+                                string(name: 'PACKAGE_VERSION', value: "${env.PACKAGE_VERSION}"),
+                                string(name: 'PACKAGE_DESCRIPTION', value: 'High performance DNS-over-TLS proxy'),
+                                string(name: 'PACKAGE_ARCHITECTURE', value: 'armhf'),
+                                string(name: 'BINARY_SPEC', value: 'dotproxy:bin/dotproxy-linux-arm'),
+                                string(name: 'SYSTEMD_SERVICES', value: 'init/dotproxy.service'),
+                            ],
+                            wait: true,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}

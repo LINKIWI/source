@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/metrics: Metrics hook interface, ConnectionLifecycleHook - dotproxy - High performance DNS-over-TLS proxy</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="dotproxy Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="dotproxy Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>dotproxy</h1><span class="desc">High performance DNS-over-TLS proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/dotproxy.git">https://source.static.kevinlin.info/dotproxy.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a>
+<b>parent</b> <a href="../commit/9c398c133748281643ec511dcf3a5d6784193a34">9c398c133748281643ec511dcf3a5d6784193a34</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sat,  2 Mar 2019 14:33:52 -0800
+
+internal/metrics: Metrics hook interface, ConnectionLifecycleHook
+
+<b>Diffstat:</b>
+<table><tr><td class="A">A</td><td><a href="#h0">internal/metrics/hook.go</a></td><td> | </td><td class="num">101</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+</table></pre><pre>1 file changed, 101 insertions(+), 0 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/metrics/hook.go">internal/metrics/hook.go</a> b/<a href="../file/internal/metrics/hook.go">internal/metrics/hook.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -0,0 +1,101 @@
+</a><a href="#h0-0-0" id="h0-0-0" class="i">+package metrics
+</a><a href="#h0-0-1" id="h0-0-1" class="i">+
+</a><a href="#h0-0-2" id="h0-0-2" class="i">+import (
+</a><a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;fmt&quot;
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+	&quot;net&quot;
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+	&quot;os&quot;
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+)
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+
+</a><a href="#h0-0-8" id="h0-0-8" class="i">+// ConnectionLifecycleHook is a metrics hook interface for reporting events that occur during a TCP
+</a><a href="#h0-0-9" id="h0-0-9" class="i">+// connection lifecycle. Note that it is not pertinent to UDP transports, since it is an inherently
+</a><a href="#h0-0-10" id="h0-0-10" class="i">+// connectionless protocol.
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+type ConnectionLifecycleHook interface {
+</a><a href="#h0-0-12" id="h0-0-12" class="i">+	// EmitConnectionOpen reports the event that a connection was successfully opened.
+</a><a href="#h0-0-13" id="h0-0-13" class="i">+	EmitConnectionOpen(addr net.Addr)
+</a><a href="#h0-0-14" id="h0-0-14" class="i">+
+</a><a href="#h0-0-15" id="h0-0-15" class="i">+	// EmitConnectionClose reports the event that a connection was closed.
+</a><a href="#h0-0-16" id="h0-0-16" class="i">+	EmitConnectionClose(addr net.Addr)
+</a><a href="#h0-0-17" id="h0-0-17" class="i">+
+</a><a href="#h0-0-18" id="h0-0-18" class="i">+	// EmitConnectionError reports occurrence of an error establishing a connection.
+</a><a href="#h0-0-19" id="h0-0-19" class="i">+	EmitConnectionError()
+</a><a href="#h0-0-20" id="h0-0-20" class="i">+}
+</a><a href="#h0-0-21" id="h0-0-21" class="i">+
+</a><a href="#h0-0-22" id="h0-0-22" class="i">+// AsyncStatsdConnectionLifecycleHook is an implementation of ConnectionLifecycleHook that outputs
+</a><a href="#h0-0-23" id="h0-0-23" class="i">+// metrics asynchronously to statsd.
+</a><a href="#h0-0-24" id="h0-0-24" class="i">+type AsyncStatsdConnectionLifecycleHook struct {
+</a><a href="#h0-0-25" id="h0-0-25" class="i">+	client *StatsdClient
+</a><a href="#h0-0-26" id="h0-0-26" class="i">+	source string
+</a><a href="#h0-0-27" id="h0-0-27" class="i">+}
+</a><a href="#h0-0-28" id="h0-0-28" class="i">+
+</a><a href="#h0-0-29" id="h0-0-29" class="i">+// NewAsyncStatsdConnectionLifecycleHook creates a new client with the specified source, statsd
+</a><a href="#h0-0-30" id="h0-0-30" class="i">+// address, and statsd sample rate. The source denotes the entity with whom the server is opening
+</a><a href="#h0-0-31" id="h0-0-31" class="i">+// and closing TCP connections.
+</a><a href="#h0-0-32" id="h0-0-32" class="i">+func NewAsyncStatsdConnectionLifecycleHook(source string, addr string, sampleRate float32) (ConnectionLifecycleHook, error) {
+</a><a href="#h0-0-33" id="h0-0-33" class="i">+	client, err := statsdClientFactory(addr, sampleRate)
+</a><a href="#h0-0-34" id="h0-0-34" class="i">+	if err != nil {
+</a><a href="#h0-0-35" id="h0-0-35" class="i">+		return nil, err
+</a><a href="#h0-0-36" id="h0-0-36" class="i">+	}
+</a><a href="#h0-0-37" id="h0-0-37" class="i">+
+</a><a href="#h0-0-38" id="h0-0-38" class="i">+	return &amp;AsyncStatsdConnectionLifecycleHook{
+</a><a href="#h0-0-39" id="h0-0-39" class="i">+		client: client,
+</a><a href="#h0-0-40" id="h0-0-40" class="i">+		source: source,
+</a><a href="#h0-0-41" id="h0-0-41" class="i">+	}, nil
+</a><a href="#h0-0-42" id="h0-0-42" class="i">+}
+</a><a href="#h0-0-43" id="h0-0-43" class="i">+
+</a><a href="#h0-0-44" id="h0-0-44" class="i">+func (h *AsyncStatsdConnectionLifecycleHook) EmitConnectionOpen(addr net.Addr) {
+</a><a href="#h0-0-45" id="h0-0-45" class="i">+	go h.client.Count(fmt.Sprintf(&quot;event.%s.cx_open&quot;, h.source), 1, map[string]string{
+</a><a href="#h0-0-46" id="h0-0-46" class="i">+		&quot;addr&quot;:      ipFromAddr(addr),
+</a><a href="#h0-0-47" id="h0-0-47" class="i">+		&quot;transport&quot;: transportFromAddr(addr),
+</a><a href="#h0-0-48" id="h0-0-48" class="i">+	})
+</a><a href="#h0-0-49" id="h0-0-49" class="i">+}
+</a><a href="#h0-0-50" id="h0-0-50" class="i">+
+</a><a href="#h0-0-51" id="h0-0-51" class="i">+func (h *AsyncStatsdConnectionLifecycleHook) EmitConnectionClose(addr net.Addr) {
+</a><a href="#h0-0-52" id="h0-0-52" class="i">+	go h.client.Count(fmt.Sprintf(&quot;event.%s.cx_close&quot;, h.source), 1, map[string]string{
+</a><a href="#h0-0-53" id="h0-0-53" class="i">+		&quot;addr&quot;:      ipFromAddr(addr),
+</a><a href="#h0-0-54" id="h0-0-54" class="i">+		&quot;transport&quot;: transportFromAddr(addr),
+</a><a href="#h0-0-55" id="h0-0-55" class="i">+	})
+</a><a href="#h0-0-56" id="h0-0-56" class="i">+}
+</a><a href="#h0-0-57" id="h0-0-57" class="i">+
+</a><a href="#h0-0-58" id="h0-0-58" class="i">+func (h *AsyncStatsdConnectionLifecycleHook) EmitConnectionError() {
+</a><a href="#h0-0-59" id="h0-0-59" class="i">+	go h.client.Count(fmt.Sprintf(&quot;event.%s.cx_error&quot;, h.source), 1, nil)
+</a><a href="#h0-0-60" id="h0-0-60" class="i">+}
+</a><a href="#h0-0-61" id="h0-0-61" class="i">+
+</a><a href="#h0-0-62" id="h0-0-62" class="i">+// statsdClientFactory creates a configured StatsdClient with reasonable defaults for the given
+</a><a href="#h0-0-63" id="h0-0-63" class="i">+// statsd server address and sample rate.
+</a><a href="#h0-0-64" id="h0-0-64" class="i">+func statsdClientFactory(addr string, sampleRate float32) (*StatsdClient, error) {
+</a><a href="#h0-0-65" id="h0-0-65" class="i">+	hostname, err := os.Hostname()
+</a><a href="#h0-0-66" id="h0-0-66" class="i">+	if err != nil {
+</a><a href="#h0-0-67" id="h0-0-67" class="i">+		return nil, err
+</a><a href="#h0-0-68" id="h0-0-68" class="i">+	}
+</a><a href="#h0-0-69" id="h0-0-69" class="i">+
+</a><a href="#h0-0-70" id="h0-0-70" class="i">+	defaultTags := map[string]string{
+</a><a href="#h0-0-71" id="h0-0-71" class="i">+		&quot;host&quot;: hostname,
+</a><a href="#h0-0-72" id="h0-0-72" class="i">+	}
+</a><a href="#h0-0-73" id="h0-0-73" class="i">+
+</a><a href="#h0-0-74" id="h0-0-74" class="i">+	return NewStatsdClient(addr, &quot;dotproxy&quot;, defaultTags, sampleRate)
+</a><a href="#h0-0-75" id="h0-0-75" class="i">+}
+</a><a href="#h0-0-76" id="h0-0-76" class="i">+
+</a><a href="#h0-0-77" id="h0-0-77" class="i">+// ipFromAddr returns the IP address from a full net.Addr, or null if unavailable.
+</a><a href="#h0-0-78" id="h0-0-78" class="i">+func ipFromAddr(addr net.Addr) string {
+</a><a href="#h0-0-79" id="h0-0-79" class="i">+	switch networkAddr := addr.(type) {
+</a><a href="#h0-0-80" id="h0-0-80" class="i">+	case *net.UDPAddr:
+</a><a href="#h0-0-81" id="h0-0-81" class="i">+		return networkAddr.IP.String()
+</a><a href="#h0-0-82" id="h0-0-82" class="i">+	case *net.TCPAddr:
+</a><a href="#h0-0-83" id="h0-0-83" class="i">+		return networkAddr.IP.String()
+</a><a href="#h0-0-84" id="h0-0-84" class="i">+	default:
+</a><a href="#h0-0-85" id="h0-0-85" class="i">+		return &quot;null&quot;
+</a><a href="#h0-0-86" id="h0-0-86" class="i">+	}
+</a><a href="#h0-0-87" id="h0-0-87" class="i">+}
+</a><a href="#h0-0-88" id="h0-0-88" class="i">+
+</a><a href="#h0-0-89" id="h0-0-89" class="i">+// transportFromAddr returns the transport protocol (as a string) behind a net.Addr, or null if
+</a><a href="#h0-0-90" id="h0-0-90" class="i">+// unavailable.
+</a><a href="#h0-0-91" id="h0-0-91" class="i">+func transportFromAddr(addr net.Addr) string {
+</a><a href="#h0-0-92" id="h0-0-92" class="i">+	switch addr.(type) {
+</a><a href="#h0-0-93" id="h0-0-93" class="i">+	case *net.UDPAddr:
+</a><a href="#h0-0-94" id="h0-0-94" class="i">+		return &quot;udp&quot;
+</a><a href="#h0-0-95" id="h0-0-95" class="i">+	case *net.TCPAddr:
+</a><a href="#h0-0-96" id="h0-0-96" class="i">+		return &quot;tcp&quot;
+</a><a href="#h0-0-97" id="h0-0-97" class="i">+	default:
+</a><a href="#h0-0-98" id="h0-0-98" class="i">+		return &quot;null&quot;
+</a><a href="#h0-0-99" id="h0-0-99" class="i">+	}
+</a><a href="#h0-0-100" id="h0-0-100" class="i">+}
+</a></pre>
+</div>
+</body>
+</html>

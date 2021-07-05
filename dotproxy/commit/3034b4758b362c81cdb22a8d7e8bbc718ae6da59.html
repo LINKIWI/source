@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/network: Enable TCP Fast Open on Linux - dotproxy - High performance DNS-over-TLS proxy</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="dotproxy Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="dotproxy Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>dotproxy</h1><span class="desc">High performance DNS-over-TLS proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/dotproxy.git">https://source.static.kevinlin.info/dotproxy.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/3034b4758b362c81cdb22a8d7e8bbc718ae6da59">3034b4758b362c81cdb22a8d7e8bbc718ae6da59</a>
+<b>parent</b> <a href="../commit/3dbeedfb7873566cd52de8003fea55d26e3f1075">3dbeedfb7873566cd52de8003fea55d26e3f1075</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Tue,  5 Mar 2019 10:06:56 -0800
+
+internal/network: Enable TCP Fast Open on Linux
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/network/client.go</a></td><td> | </td><td class="num">36</td><td><span class="i">++++++++++++++++++++++++++++++</span><span class="d">------</span></td></tr>
+</table></pre><pre>1 file changed, 30 insertions(+), 6 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/network/client.go">internal/network/client.go</a> b/<a href="../file/internal/network/client.go">internal/network/client.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -5,6 +5,7 @@ import (
+</a> 	&quot;fmt&quot;
+ 	&quot;net&quot;
+ 	&quot;sync&quot;
+<a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;syscall&quot;
+</a> 	&quot;time&quot;
+ 
+ 	&quot;dotproxy/internal/metrics&quot;
+<a href="#h0-1" id="h0-1" class="h">@@ -51,19 +52,42 @@ type TLSClientOpts struct {
+</a> 	WriteTimeout time.Duration
+ }
+ 
+<a href="#h0-1-3" id="h0-1-3" class="i">+const (
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+	// tcpFastOpenConnect is the TCP socket option constant (defined in the kernel)
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+	// controlling whether outgoing connections should use TCP Fast Open to reduce the number of
+</a><a href="#h0-1-6" id="h0-1-6" class="i">+	// round trips, and thus overall latency, when re-establishing a TCP connection to a server.
+</a><a href="#h0-1-7" id="h0-1-7" class="i">+	// It is not yet present in the syscall standard library for platform-agnostic usage.
+</a><a href="#h0-1-8" id="h0-1-8" class="i">+	// https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/include/uapi/linux/tcp.h?h=v4.20#n120
+</a><a href="#h0-1-9" id="h0-1-9" class="i">+	tcpFastOpenConnect = 30
+</a><a href="#h0-1-10" id="h0-1-10" class="i">+)
+</a><a href="#h0-1-11" id="h0-1-11" class="i">+
+</a> // NewTLSClient creates a TLSClient pool, connected to a specified remote address.
+ // This procedure will establish the initial connections, perform TLS handshakes, and validate the
+ // server identity.
+ func NewTLSClient(addr string, serverName string, cxHook metrics.ConnectionLifecycleHook, opts TLSClientOpts) (*TLSClient, error) {
+<a href="#h0-1-16" id="h0-1-16" class="d">-	cache := tls.NewLRUClientSessionCache(opts.PoolOpts.Capacity)
+</a><a href="#h0-1-17" id="h0-1-17" class="i">+	// Use a custom dialer that sets the TCP Fast Open socket option and a connection timeout.
+</a><a href="#h0-1-18" id="h0-1-18" class="i">+	dialer := &amp;net.Dialer{
+</a><a href="#h0-1-19" id="h0-1-19" class="i">+		Timeout: opts.ConnectTimeout,
+</a><a href="#h0-1-20" id="h0-1-20" class="i">+		Control: func(network string, addr string, rc syscall.RawConn) error {
+</a><a href="#h0-1-21" id="h0-1-21" class="i">+			return rc.Control(func(fd uintptr) {
+</a><a href="#h0-1-22" id="h0-1-22" class="i">+				syscall.SetsockoptInt(
+</a><a href="#h0-1-23" id="h0-1-23" class="i">+					int(fd),
+</a><a href="#h0-1-24" id="h0-1-24" class="i">+					syscall.IPPROTO_TCP,
+</a><a href="#h0-1-25" id="h0-1-25" class="i">+					tcpFastOpenConnect,
+</a><a href="#h0-1-26" id="h0-1-26" class="i">+					1,
+</a><a href="#h0-1-27" id="h0-1-27" class="i">+				)
+</a><a href="#h0-1-28" id="h0-1-28" class="i">+			})
+</a><a href="#h0-1-29" id="h0-1-29" class="i">+		},
+</a><a href="#h0-1-30" id="h0-1-30" class="i">+	}
+</a><a href="#h0-1-31" id="h0-1-31" class="i">+
+</a> 	conf := &amp;tls.Config{
+ 		ServerName:         serverName,
+<a href="#h0-1-34" id="h0-1-34" class="d">-		ClientSessionCache: cache,
+</a><a href="#h0-1-35" id="h0-1-35" class="i">+		ClientSessionCache: tls.NewLRUClientSessionCache(opts.PoolOpts.Capacity),
+</a> 	}
+ 
+<a href="#h0-1-38" id="h0-1-38" class="d">-	// The dialer wraps a standard TLS dial with R/W timeouts.
+</a><a href="#h0-1-39" id="h0-1-39" class="d">-	dialer := func() (net.Conn, error) {
+</a><a href="#h0-1-40" id="h0-1-40" class="d">-		conn, err := net.DialTimeout(&quot;tcp&quot;, addr, opts.ConnectTimeout)
+</a><a href="#h0-1-41" id="h0-1-41" class="i">+	// The TLS dialer wraps the custom TCP dialer with a TLS encryption layer and R/W timeouts.
+</a><a href="#h0-1-42" id="h0-1-42" class="i">+	tlsDialer := func() (net.Conn, error) {
+</a><a href="#h0-1-43" id="h0-1-43" class="i">+		conn, err := dialer.Dial(&quot;tcp&quot;, addr)
+</a> 		if err != nil {
+ 			return nil, fmt.Errorf(&quot;client: error establishing connection: err=%v&quot;, err)
+ 		}
+<a href="#h0-2" id="h0-2" class="h">@@ -76,7 +100,7 @@ func NewTLSClient(addr string, serverName string, cxHook metrics.ConnectionLifec
+</a> 		return NewTCPConn(tlsConn, opts.ReadTimeout, opts.WriteTimeout), nil
+ 	}
+ 
+<a href="#h0-2-3" id="h0-2-3" class="d">-	pool := NewPersistentConnPool(dialer, cxHook, opts.PoolOpts)
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+	pool := NewPersistentConnPool(tlsDialer, cxHook, opts.PoolOpts)
+</a> 
+ 	return &amp;TLSClient{
+ 		addr:  addr,
+</pre>
+</div>
+</body>
+</html>

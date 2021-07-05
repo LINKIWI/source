@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/metrics: Proxy process counter and sequence ID gauge - dotproxy - High performance DNS-over-TLS proxy</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="dotproxy Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="dotproxy Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>dotproxy</h1><span class="desc">High performance DNS-over-TLS proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/dotproxy.git">https://source.static.kevinlin.info/dotproxy.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6">dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6</a>
+<b>parent</b> <a href="../commit/a56ef7772cef072136f9fa505568e1f230692109">a56ef7772cef072136f9fa505568e1f230692109</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sat, 23 Jan 2021 16:47:32 -0800
+
+internal/metrics: Proxy process counter and sequence ID gauge
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/metrics/hook.go</a></td><td> | </td><td class="num">31</td><td><span class="i">+++++++++++++++++++++++++++++</span><span class="d">--</span></td></tr>
+</table></pre><pre>1 file changed, 29 insertions(+), 2 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/metrics/hook.go">internal/metrics/hook.go</a> b/<a href="../file/internal/metrics/hook.go">internal/metrics/hook.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -3,6 +3,7 @@ package metrics
+</a> import (
+ 	&quot;fmt&quot;
+ 	&quot;net&quot;
+<a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;sync/atomic&quot;
+</a> 	&quot;time&quot;
+ 
+ 	&quot;lib.kevinlin.info/aperture&quot;
+<a href="#h0-1" id="h0-1" class="h">@@ -59,6 +60,9 @@ type ProxyHook interface {
+</a> 	// to serve a single request.
+ 	EmitUpstreamLatency(latency time.Duration, client net.Addr, upstream net.Addr)
+ 
+<a href="#h0-1-3" id="h0-1-3" class="i">+	// EmitProcess reports the occurrence of a processed proxy request.
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+	EmitProcess(client net.Addr, upstream net.Addr)
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+
+</a> 	// EmitError reports the occurrence of a critical error in the proxy lifecycle that causes
+ 	// the request to not be correctly served.
+ 	EmitError()
+<a href="#h0-2" id="h0-2" class="h">@@ -81,7 +85,8 @@ type AsyncStatsdConnectionIOHook struct {
+</a> // AsyncStatsdProxyHook is an implementation of ProxyHook that outputs metrics asynchronously to
+ // statsd.
+ type AsyncStatsdProxyHook struct {
+<a href="#h0-2-3" id="h0-2-3" class="d">-	client aperture.Statsd
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+	client     aperture.Statsd
+</a><a href="#h0-2-5" id="h0-2-5" class="i">+	sequenceID int64
+</a> }
+ 
+ // NoopConnectionLifecycleHook implements the ConnectionLifecycleHook interface but noops on all
+<a href="#h0-3" id="h0-3" class="h">@@ -243,7 +248,7 @@ func NewAsyncStatsdProxyHook(addr string, sampleRate float64, version string) (P
+</a> 		return nil, err
+ 	}
+ 
+<a href="#h0-3-3" id="h0-3-3" class="d">-	return &amp;AsyncStatsdProxyHook{client}, nil
+</a><a href="#h0-3-4" id="h0-3-4" class="i">+	return &amp;AsyncStatsdProxyHook{client: client}, nil
+</a> }
+ 
+ // EmitRequestSize statsd implementation
+<a href="#h0-4" id="h0-4" class="h">@@ -277,6 +282,25 @@ func (h *AsyncStatsdProxyHook) EmitUpstreamLatency(latency time.Duration, client
+</a> 	})
+ }
+ 
+<a href="#h0-4-3" id="h0-4-3" class="i">+// EmitProcess statsd implementation
+</a><a href="#h0-4-4" id="h0-4-4" class="i">+func (h *AsyncStatsdProxyHook) EmitProcess(client net.Addr, upstream net.Addr) {
+</a><a href="#h0-4-5" id="h0-4-5" class="i">+	go func() {
+</a><a href="#h0-4-6" id="h0-4-6" class="i">+		tags := map[string]interface{}{
+</a><a href="#h0-4-7" id="h0-4-7" class="i">+			&quot;client&quot;:   ipFromAddr(client),
+</a><a href="#h0-4-8" id="h0-4-8" class="i">+			&quot;upstream&quot;: ipFromAddr(upstream),
+</a><a href="#h0-4-9" id="h0-4-9" class="i">+		}
+</a><a href="#h0-4-10" id="h0-4-10" class="i">+
+</a><a href="#h0-4-11" id="h0-4-11" class="i">+		h.client.Count(&quot;event.proxy.process&quot;, 1, tags)
+</a><a href="#h0-4-12" id="h0-4-12" class="i">+		h.client.Gauge(
+</a><a href="#h0-4-13" id="h0-4-13" class="i">+			&quot;gauge.proxy.sequence_id&quot;,
+</a><a href="#h0-4-14" id="h0-4-14" class="i">+			float64(atomic.LoadInt64(&amp;h.sequenceID)),
+</a><a href="#h0-4-15" id="h0-4-15" class="i">+			tags,
+</a><a href="#h0-4-16" id="h0-4-16" class="i">+		)
+</a><a href="#h0-4-17" id="h0-4-17" class="i">+
+</a><a href="#h0-4-18" id="h0-4-18" class="i">+		atomic.AddInt64(&amp;h.sequenceID, 1)
+</a><a href="#h0-4-19" id="h0-4-19" class="i">+	}()
+</a><a href="#h0-4-20" id="h0-4-20" class="i">+}
+</a><a href="#h0-4-21" id="h0-4-21" class="i">+
+</a> // EmitError statsd implementation
+ func (h *AsyncStatsdProxyHook) EmitError() {
+ 	go h.client.Count(&quot;event.proxy.error&quot;, 1, nil)
+<a href="#h0-5" id="h0-5" class="h">@@ -300,6 +324,9 @@ func (h *NoopProxyHook) EmitRTT(latency time.Duration, client net.Addr, upstream
+</a> func (h *NoopProxyHook) EmitUpstreamLatency(latency time.Duration, client net.Addr, upstream net.Addr) {
+ }
+ 
+<a href="#h0-5-3" id="h0-5-3" class="i">+// EmitProcess noops.
+</a><a href="#h0-5-4" id="h0-5-4" class="i">+func (h *NoopProxyHook) EmitProcess(client net.Addr, upstream net.Addr) {}
+</a><a href="#h0-5-5" id="h0-5-5" class="i">+
+</a> // EmitError noops.
+ func (h *NoopProxyHook) EmitError() {}
+ 
+</pre>
+</div>
+</body>
+</html>

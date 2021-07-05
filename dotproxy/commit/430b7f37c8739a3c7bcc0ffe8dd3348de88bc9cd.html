@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/meta, internal/metrics: Migrate to Aperture statsd client - dotproxy - High performance DNS-over-TLS proxy</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="dotproxy Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="dotproxy Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>dotproxy</h1><span class="desc">High performance DNS-over-TLS proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/dotproxy.git">https://source.static.kevinlin.info/dotproxy.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd">430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd</a>
+<b>parent</b> <a href="../commit/0d19d6933b61b73458eaa7fe76610a923fd5fa10">0d19d6933b61b73458eaa7fe76610a923fd5fa10</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sat, 28 Dec 2019 17:50:12 -0800
+
+internal/meta, internal/metrics: Migrate to Aperture statsd client
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">go.mod</a></td><td> | </td><td class="num">2</td><td><span class="i">+</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">internal/meta/config.go</a></td><td> | </td><td class="num">2</td><td><span class="i">+</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">internal/metrics/hook.go</a></td><td> | </td><td class="num">60</td><td><span class="i">+++++++++++++++++++++++++++++</span><span class="d">-------------------------------</span></td></tr>
+<tr><td class="D">D</td><td><a href="#h3">internal/metrics/statsd.go</a></td><td> | </td><td class="num">91</td><td><span class="i"></span><span class="d">-------------------------------------------------------------------------------</span></td></tr>
+</table></pre><pre>4 files changed, 31 insertions(+), 124 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/go.mod">go.mod</a> b/<a href="../file/go.mod">go.mod</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -3,9 +3,9 @@ module dotproxy
+</a> go 1.13
+ 
+ require (
+<a href="#h0-0-3" id="h0-0-3" class="d">-	github.com/cactus/go-statsd-client/statsd v0.0.0-20190125104250-82b7a1700102
+</a> 	github.com/certifi/gocertifi v0.0.0-20190105021004-abcd57078448 // indirect
+ 	github.com/getsentry/raven-go v0.2.0
+ 	github.com/pkg/errors v0.8.1 // indirect
+ 	gopkg.in/yaml.v3 v3.0.0-20191120175047-4206685974f2
+<a href="#h0-0-8" id="h0-0-8" class="i">+	lib.kevinlin.info/aperture v0.0.0-20191229014409-1086497fddd8
+</a> )
+<b>diff --git a/<a id="h1" href="../file/internal/meta/config.go">internal/meta/config.go</a> b/<a href="../file/internal/meta/config.go">internal/meta/config.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -19,7 +19,7 @@ type ApplicationConfig struct {
+</a> type MetricsConfig struct {
+ 	Statsd *struct {
+ 		Address    string  `yaml:&quot;addr&quot;`
+<a href="#h1-0-3" id="h1-0-3" class="d">-		SampleRate float32 `yaml:&quot;sample_rate&quot;`
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+		SampleRate float64 `yaml:&quot;sample_rate&quot;`
+</a> 	} `yaml:&quot;statsd&quot;`
+ }
+ 
+<b>diff --git a/<a id="h2" href="../file/internal/metrics/hook.go">internal/metrics/hook.go</a> b/<a href="../file/internal/metrics/hook.go">internal/metrics/hook.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -3,8 +3,9 @@ package metrics
+</a> import (
+ 	&quot;fmt&quot;
+ 	&quot;net&quot;
+<a href="#h2-0-3" id="h2-0-3" class="d">-	&quot;os&quot;
+</a> 	&quot;time&quot;
+<a href="#h2-0-5" id="h2-0-5" class="i">+
+</a><a href="#h2-0-6" id="h2-0-6" class="i">+	&quot;lib.kevinlin.info/aperture&quot;
+</a> )
+ 
+ // ConnectionLifecycleHook is a metrics hook interface for reporting events that occur during a TCP
+<a href="#h2-1" id="h2-1" class="h">@@ -66,21 +67,21 @@ type ProxyHook interface {
+</a> // AsyncStatsdConnectionLifecycleHook is an implementation of ConnectionLifecycleHook that outputs
+ // metrics asynchronously to statsd.
+ type AsyncStatsdConnectionLifecycleHook struct {
+<a href="#h2-1-3" id="h2-1-3" class="d">-	client *StatsdClient
+</a><a href="#h2-1-4" id="h2-1-4" class="i">+	client aperture.Statsd
+</a> 	source string
+ }
+ 
+ // AsyncStatsdConnectionIOHook is an implementation of ConnectionIOHook that outputs metrics
+ // asynchronously to statsd.
+ type AsyncStatsdConnectionIOHook struct {
+<a href="#h2-1-11" id="h2-1-11" class="d">-	client *StatsdClient
+</a><a href="#h2-1-12" id="h2-1-12" class="i">+	client aperture.Statsd
+</a> 	source string
+ }
+ 
+ // AsyncStatsdProxyHook is an implementation of ProxyHook that outputs metrics asynchronously to
+ // statsd.
+ type AsyncStatsdProxyHook struct {
+<a href="#h2-1-19" id="h2-1-19" class="d">-	client *StatsdClient
+</a><a href="#h2-1-20" id="h2-1-20" class="i">+	client aperture.Statsd
+</a> }
+ 
+ // NoopConnectionLifecycleHook implements the ConnectionLifecycleHook interface but noops on all
+<a href="#h2-2" id="h2-2" class="h">@@ -96,7 +97,7 @@ type NoopProxyHook struct{}
+</a> // NewAsyncStatsdConnectionLifecycleHook creates a new client with the specified source, statsd
+ // address, and statsd sample rate. The source denotes the entity with whom the server is opening
+ // and closing TCP connections.
+<a href="#h2-2-3" id="h2-2-3" class="d">-func NewAsyncStatsdConnectionLifecycleHook(source string, addr string, sampleRate float32, version string) (ConnectionLifecycleHook, error) {
+</a><a href="#h2-2-4" id="h2-2-4" class="i">+func NewAsyncStatsdConnectionLifecycleHook(source string, addr string, sampleRate float64, version string) (ConnectionLifecycleHook, error) {
+</a> 	client, err := statsdClientFactory(addr, sampleRate, version)
+ 	if err != nil {
+ 		return nil, err
+<a href="#h2-3" id="h2-3" class="h">@@ -111,7 +112,7 @@ func NewAsyncStatsdConnectionLifecycleHook(source string, addr string, sampleRat
+</a> // EmitConnectionOpen statsd implementation
+ func (h *AsyncStatsdConnectionLifecycleHook) EmitConnectionOpen(latency time.Duration, addr net.Addr) {
+ 	go func() {
+<a href="#h2-3-3" id="h2-3-3" class="d">-		tags := map[string]string{
+</a><a href="#h2-3-4" id="h2-3-4" class="i">+		tags := map[string]interface{}{
+</a> 			&quot;addr&quot;:      ipFromAddr(addr),
+ 			&quot;transport&quot;: transportFromAddr(addr),
+ 		}
+<a href="#h2-4" id="h2-4" class="h">@@ -126,7 +127,7 @@ func (h *AsyncStatsdConnectionLifecycleHook) EmitConnectionOpen(latency time.Dur
+</a> 
+ // EmitConnectionClose statsd implementation
+ func (h *AsyncStatsdConnectionLifecycleHook) EmitConnectionClose(addr net.Addr) {
+<a href="#h2-4-3" id="h2-4-3" class="d">-	go h.client.Count(fmt.Sprintf(&quot;event.%s.cx_close&quot;, h.source), 1, map[string]string{
+</a><a href="#h2-4-4" id="h2-4-4" class="i">+	go h.client.Count(fmt.Sprintf(&quot;event.%s.cx_close&quot;, h.source), 1, map[string]interface{}{
+</a> 		&quot;addr&quot;:      ipFromAddr(addr),
+ 		&quot;transport&quot;: transportFromAddr(addr),
+ 	})
+<a href="#h2-5" id="h2-5" class="h">@@ -153,7 +154,7 @@ func (h *NoopConnectionLifecycleHook) EmitConnectionError() {}
+</a> 
+ // NewAsyncStatsdConnectionIOHook creates a new client with the specified source, statsd address,
+ // and statsd sample rate. The source denotes the entity with whom the server is performing I/O.
+<a href="#h2-5-3" id="h2-5-3" class="d">-func NewAsyncStatsdConnectionIOHook(source string, addr string, sampleRate float32, version string) (ConnectionIOHook, error) {
+</a><a href="#h2-5-4" id="h2-5-4" class="i">+func NewAsyncStatsdConnectionIOHook(source string, addr string, sampleRate float64, version string) (ConnectionIOHook, error) {
+</a> 	client, err := statsdClientFactory(addr, sampleRate, version)
+ 	if err != nil {
+ 		return nil, err
+<a href="#h2-6" id="h2-6" class="h">@@ -168,7 +169,7 @@ func NewAsyncStatsdConnectionIOHook(source string, addr string, sampleRate float
+</a> // EmitRead statsd implementation.
+ func (h *AsyncStatsdConnectionIOHook) EmitRead(latency time.Duration, addr net.Addr) {
+ 	go func() {
+<a href="#h2-6-3" id="h2-6-3" class="d">-		tags := map[string]string{
+</a><a href="#h2-6-4" id="h2-6-4" class="i">+		tags := map[string]interface{}{
+</a> 			&quot;addr&quot;:      ipFromAddr(addr),
+ 			&quot;transport&quot;: transportFromAddr(addr),
+ 		}
+<a href="#h2-7" id="h2-7" class="h">@@ -180,7 +181,7 @@ func (h *AsyncStatsdConnectionIOHook) EmitRead(latency time.Duration, addr net.A
+</a> 
+ // EmitReadError statsd implementation.
+ func (h *AsyncStatsdConnectionIOHook) EmitReadError(addr net.Addr) {
+<a href="#h2-7-3" id="h2-7-3" class="d">-	go h.client.Count(fmt.Sprintf(&quot;event.%s.cx_read_error&quot;, h.source), 1, map[string]string{
+</a><a href="#h2-7-4" id="h2-7-4" class="i">+	go h.client.Count(fmt.Sprintf(&quot;event.%s.cx_read_error&quot;, h.source), 1, map[string]interface{}{
+</a> 		&quot;addr&quot;:      ipFromAddr(addr),
+ 		&quot;transport&quot;: transportFromAddr(addr),
+ 	})
+<a href="#h2-8" id="h2-8" class="h">@@ -189,7 +190,7 @@ func (h *AsyncStatsdConnectionIOHook) EmitReadError(addr net.Addr) {
+</a> // EmitWrite statsd implementation.
+ func (h *AsyncStatsdConnectionIOHook) EmitWrite(latency time.Duration, addr net.Addr) {
+ 	go func() {
+<a href="#h2-8-3" id="h2-8-3" class="d">-		tags := map[string]string{
+</a><a href="#h2-8-4" id="h2-8-4" class="i">+		tags := map[string]interface{}{
+</a> 			&quot;addr&quot;:      ipFromAddr(addr),
+ 			&quot;transport&quot;: transportFromAddr(addr),
+ 		}
+<a href="#h2-9" id="h2-9" class="h">@@ -201,7 +202,7 @@ func (h *AsyncStatsdConnectionIOHook) EmitWrite(latency time.Duration, addr net.
+</a> 
+ // EmitWriteError statsd implementation.
+ func (h *AsyncStatsdConnectionIOHook) EmitWriteError(addr net.Addr) {
+<a href="#h2-9-3" id="h2-9-3" class="d">-	go h.client.Count(fmt.Sprintf(&quot;event.%s.cx_write_error&quot;, h.source), 1, map[string]string{
+</a><a href="#h2-9-4" id="h2-9-4" class="i">+	go h.client.Count(fmt.Sprintf(&quot;event.%s.cx_write_error&quot;, h.source), 1, map[string]interface{}{
+</a> 		&quot;addr&quot;:      ipFromAddr(addr),
+ 		&quot;transport&quot;: transportFromAddr(addr),
+ 	})
+<a href="#h2-10" id="h2-10" class="h">@@ -209,7 +210,7 @@ func (h *AsyncStatsdConnectionIOHook) EmitWriteError(addr net.Addr) {
+</a> 
+ // EmitRetry statsd implementation.
+ func (h *AsyncStatsdConnectionIOHook) EmitRetry(addr net.Addr) {
+<a href="#h2-10-3" id="h2-10-3" class="d">-	go h.client.Count(fmt.Sprintf(&quot;event.%s.cx_io_retry&quot;, h.source), 1, map[string]string{
+</a><a href="#h2-10-4" id="h2-10-4" class="i">+	go h.client.Count(fmt.Sprintf(&quot;event.%s.cx_io_retry&quot;, h.source), 1, map[string]interface{}{
+</a> 		&quot;addr&quot;:      ipFromAddr(addr),
+ 		&quot;transport&quot;: transportFromAddr(addr),
+ 	})
+<a href="#h2-11" id="h2-11" class="h">@@ -236,7 +237,7 @@ func (h *NoopConnectionIOHook) EmitWriteError(addr net.Addr) {}
+</a> func (h *NoopConnectionIOHook) EmitRetry(addr net.Addr) {}
+ 
+ // NewAsyncStatsdProxyHook creates a new client with the specified statsd address and sample rate.
+<a href="#h2-11-3" id="h2-11-3" class="d">-func NewAsyncStatsdProxyHook(addr string, sampleRate float32, version string) (ProxyHook, error) {
+</a><a href="#h2-11-4" id="h2-11-4" class="i">+func NewAsyncStatsdProxyHook(addr string, sampleRate float64, version string) (ProxyHook, error) {
+</a> 	client, err := statsdClientFactory(addr, sampleRate, version)
+ 	if err != nil {
+ 		return nil, err
+<a href="#h2-12" id="h2-12" class="h">@@ -247,21 +248,21 @@ func NewAsyncStatsdProxyHook(addr string, sampleRate float32, version string) (P
+</a> 
+ // EmitRequestSize statsd implementation
+ func (h *AsyncStatsdProxyHook) EmitRequestSize(bytes int64, client net.Addr) {
+<a href="#h2-12-3" id="h2-12-3" class="d">-	go h.client.Size(&quot;size.proxy.request&quot;, bytes, map[string]string{
+</a><a href="#h2-12-4" id="h2-12-4" class="i">+	go h.client.Size(&quot;size.proxy.request&quot;, bytes, map[string]interface{}{
+</a> 		&quot;addr&quot;: ipFromAddr(client),
+ 	})
+ }
+ 
+ // EmitResponseSize statsd implementation
+ func (h *AsyncStatsdProxyHook) EmitResponseSize(bytes int64, upstream net.Addr) {
+<a href="#h2-12-11" id="h2-12-11" class="d">-	go h.client.Size(&quot;size.proxy.response&quot;, bytes, map[string]string{
+</a><a href="#h2-12-12" id="h2-12-12" class="i">+	go h.client.Size(&quot;size.proxy.response&quot;, bytes, map[string]interface{}{
+</a> 		&quot;addr&quot;: ipFromAddr(upstream),
+ 	})
+ }
+ 
+ // EmitRTT statsd implementation
+ func (h *AsyncStatsdProxyHook) EmitRTT(latency time.Duration, client net.Addr, upstream net.Addr) {
+<a href="#h2-12-19" id="h2-12-19" class="d">-	go h.client.Timing(&quot;latency.proxy.tx_rtt&quot;, latency, map[string]string{
+</a><a href="#h2-12-20" id="h2-12-20" class="i">+	go h.client.Timing(&quot;latency.proxy.tx_rtt&quot;, latency, map[string]interface{}{
+</a> 		&quot;client&quot;:    ipFromAddr(client),
+ 		&quot;upstream&quot;:  ipFromAddr(upstream),
+ 		&quot;transport&quot;: transportFromAddr(client),
+<a href="#h2-13" id="h2-13" class="h">@@ -270,7 +271,7 @@ func (h *AsyncStatsdProxyHook) EmitRTT(latency time.Duration, client net.Addr, u
+</a> 
+ // EmitUpstreamLatency statsd implementation
+ func (h *AsyncStatsdProxyHook) EmitUpstreamLatency(latency time.Duration, client net.Addr, upstream net.Addr) {
+<a href="#h2-13-3" id="h2-13-3" class="d">-	go h.client.Timing(&quot;latency.proxy.tx_upstream&quot;, latency, map[string]string{
+</a><a href="#h2-13-4" id="h2-13-4" class="i">+	go h.client.Timing(&quot;latency.proxy.tx_upstream&quot;, latency, map[string]interface{}{
+</a> 		&quot;client&quot;:   ipFromAddr(client),
+ 		&quot;upstream&quot;: ipFromAddr(upstream),
+ 	})
+<a href="#h2-14" id="h2-14" class="h">@@ -302,20 +303,17 @@ func (h *NoopProxyHook) EmitUpstreamLatency(latency time.Duration, client net.Ad
+</a> // EmitError noops.
+ func (h *NoopProxyHook) EmitError() {}
+ 
+<a href="#h2-14-3" id="h2-14-3" class="d">-// statsdClientFactory creates a configured StatsdClient with reasonable defaults for the given
+</a><a href="#h2-14-4" id="h2-14-4" class="i">+// statsdClientFactory creates a configured statsd client with reasonable defaults for the given
+</a> // statsd server address and sample rate.
+<a href="#h2-14-6" id="h2-14-6" class="d">-func statsdClientFactory(addr string, sampleRate float32, version string) (*StatsdClient, error) {
+</a><a href="#h2-14-7" id="h2-14-7" class="d">-	hostname, err := os.Hostname()
+</a><a href="#h2-14-8" id="h2-14-8" class="d">-	if err != nil {
+</a><a href="#h2-14-9" id="h2-14-9" class="d">-		return nil, err
+</a><a href="#h2-14-10" id="h2-14-10" class="d">-	}
+</a><a href="#h2-14-11" id="h2-14-11" class="d">-
+</a><a href="#h2-14-12" id="h2-14-12" class="d">-	defaultTags := map[string]string{
+</a><a href="#h2-14-13" id="h2-14-13" class="d">-		&quot;host&quot;:    hostname,
+</a><a href="#h2-14-14" id="h2-14-14" class="d">-		&quot;version&quot;: version,
+</a><a href="#h2-14-15" id="h2-14-15" class="d">-	}
+</a><a href="#h2-14-16" id="h2-14-16" class="d">-
+</a><a href="#h2-14-17" id="h2-14-17" class="d">-	return NewStatsdClient(addr, &quot;dotproxy&quot;, defaultTags, sampleRate)
+</a><a href="#h2-14-18" id="h2-14-18" class="i">+func statsdClientFactory(addr string, sampleRate float64, version string) (*aperture.Client, error) {
+</a><a href="#h2-14-19" id="h2-14-19" class="i">+	return aperture.NewClient(&amp;aperture.Config{
+</a><a href="#h2-14-20" id="h2-14-20" class="i">+		Address:    addr,
+</a><a href="#h2-14-21" id="h2-14-21" class="i">+		Prefix:     &quot;dotproxy&quot;,
+</a><a href="#h2-14-22" id="h2-14-22" class="i">+		SampleRate: sampleRate,
+</a><a href="#h2-14-23" id="h2-14-23" class="i">+		DefaultTags: map[string]interface{}{
+</a><a href="#h2-14-24" id="h2-14-24" class="i">+			&quot;version&quot;: version,
+</a><a href="#h2-14-25" id="h2-14-25" class="i">+		},
+</a><a href="#h2-14-26" id="h2-14-26" class="i">+	})
+</a> }
+ 
+ // ipFromAddr returns the IP address from a full net.Addr, or null if unavailable.
+<b>diff --git a/<a id="h3" href="../file/internal/metrics/statsd.go">internal/metrics/statsd.go</a> b/<a href="../file/internal/metrics/statsd.go">internal/metrics/statsd.go</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -1,91 +0,0 @@
+</a><a href="#h3-0-0" id="h3-0-0" class="d">-package metrics
+</a><a href="#h3-0-1" id="h3-0-1" class="d">-
+</a><a href="#h3-0-2" id="h3-0-2" class="d">-import (
+</a><a href="#h3-0-3" id="h3-0-3" class="d">-	&quot;fmt&quot;
+</a><a href="#h3-0-4" id="h3-0-4" class="d">-	&quot;net/url&quot;
+</a><a href="#h3-0-5" id="h3-0-5" class="d">-	&quot;strings&quot;
+</a><a href="#h3-0-6" id="h3-0-6" class="d">-	&quot;time&quot;
+</a><a href="#h3-0-7" id="h3-0-7" class="d">-
+</a><a href="#h3-0-8" id="h3-0-8" class="d">-	&quot;github.com/cactus/go-statsd-client/statsd&quot;
+</a><a href="#h3-0-9" id="h3-0-9" class="d">-)
+</a><a href="#h3-0-10" id="h3-0-10" class="d">-
+</a><a href="#h3-0-11" id="h3-0-11" class="d">-// StatsdClient is an abstraction over a UDP statsd emitter.
+</a><a href="#h3-0-12" id="h3-0-12" class="d">-type StatsdClient struct {
+</a><a href="#h3-0-13" id="h3-0-13" class="d">-	backend     statsd.Statter
+</a><a href="#h3-0-14" id="h3-0-14" class="d">-	defaultTags map[string]string
+</a><a href="#h3-0-15" id="h3-0-15" class="d">-	sampleRate  float32
+</a><a href="#h3-0-16" id="h3-0-16" class="d">-}
+</a><a href="#h3-0-17" id="h3-0-17" class="d">-
+</a><a href="#h3-0-18" id="h3-0-18" class="d">-// NewStatsdClient creates a new statsd client pointing the specified listener/server address with
+</a><a href="#h3-0-19" id="h3-0-19" class="d">-// an optional prefix and set of default tags to include with every metric.
+</a><a href="#h3-0-20" id="h3-0-20" class="d">-func NewStatsdClient(addr string, prefix string, defaultTags map[string]string, sampleRate float32) (*StatsdClient, error) {
+</a><a href="#h3-0-21" id="h3-0-21" class="d">-	client, err := statsd.NewClient(addr, prefix)
+</a><a href="#h3-0-22" id="h3-0-22" class="d">-	if err != nil {
+</a><a href="#h3-0-23" id="h3-0-23" class="d">-		return nil, fmt.Errorf(&quot;statsd: error creating statsd client: err=%v&quot;, err)
+</a><a href="#h3-0-24" id="h3-0-24" class="d">-	}
+</a><a href="#h3-0-25" id="h3-0-25" class="d">-
+</a><a href="#h3-0-26" id="h3-0-26" class="d">-	return &amp;StatsdClient{
+</a><a href="#h3-0-27" id="h3-0-27" class="d">-		backend:     client,
+</a><a href="#h3-0-28" id="h3-0-28" class="d">-		defaultTags: defaultTags,
+</a><a href="#h3-0-29" id="h3-0-29" class="d">-		sampleRate:  sampleRate,
+</a><a href="#h3-0-30" id="h3-0-30" class="d">-	}, nil
+</a><a href="#h3-0-31" id="h3-0-31" class="d">-}
+</a><a href="#h3-0-32" id="h3-0-32" class="d">-
+</a><a href="#h3-0-33" id="h3-0-33" class="d">-// Count emits a count metric with a configurable delta.
+</a><a href="#h3-0-34" id="h3-0-34" class="d">-func (c *StatsdClient) Count(metric string, delta int64, tags map[string]string) error {
+</a><a href="#h3-0-35" id="h3-0-35" class="d">-	return c.backend.Inc(c.formatMetric(metric, tags), delta, c.sampleRate)
+</a><a href="#h3-0-36" id="h3-0-36" class="d">-}
+</a><a href="#h3-0-37" id="h3-0-37" class="d">-
+</a><a href="#h3-0-38" id="h3-0-38" class="d">-// Gauge emits a gauge metric.
+</a><a href="#h3-0-39" id="h3-0-39" class="d">-func (c *StatsdClient) Gauge(metric string, value int64, tags map[string]string) error {
+</a><a href="#h3-0-40" id="h3-0-40" class="d">-	return c.backend.Gauge(c.formatMetric(metric, tags), value, c.sampleRate)
+</a><a href="#h3-0-41" id="h3-0-41" class="d">-}
+</a><a href="#h3-0-42" id="h3-0-42" class="d">-
+</a><a href="#h3-0-43" id="h3-0-43" class="d">-// Timing emits a time duration metric.
+</a><a href="#h3-0-44" id="h3-0-44" class="d">-func (c *StatsdClient) Timing(metric string, duration time.Duration, tags map[string]string) error {
+</a><a href="#h3-0-45" id="h3-0-45" class="d">-	return c.backend.TimingDuration(c.formatMetric(metric, tags), duration, c.sampleRate)
+</a><a href="#h3-0-46" id="h3-0-46" class="d">-}
+</a><a href="#h3-0-47" id="h3-0-47" class="d">-
+</a><a href="#h3-0-48" id="h3-0-48" class="d">-// Size emits a file size metric as the number of bytes.
+</a><a href="#h3-0-49" id="h3-0-49" class="d">-func (c *StatsdClient) Size(metric string, size int64, tags map[string]string) error {
+</a><a href="#h3-0-50" id="h3-0-50" class="d">-	// Size metrics share the same semantics with timing metrics; they are interpreted and
+</a><a href="#h3-0-51" id="h3-0-51" class="d">-	// aggregated in the same way.
+</a><a href="#h3-0-52" id="h3-0-52" class="d">-	return c.backend.Timing(c.formatMetric(metric, tags), size, c.sampleRate)
+</a><a href="#h3-0-53" id="h3-0-53" class="d">-}
+</a><a href="#h3-0-54" id="h3-0-54" class="d">-
+</a><a href="#h3-0-55" id="h3-0-55" class="d">-// formatMetric serializes a metric and a map of tags (in addition to any default tags) into a
+</a><a href="#h3-0-56" id="h3-0-56" class="d">-// single string to ship to the time-series database backend.
+</a><a href="#h3-0-57" id="h3-0-57" class="d">-func (c *StatsdClient) formatMetric(metric string, tags map[string]string) string {
+</a><a href="#h3-0-58" id="h3-0-58" class="d">-	// Some characters, like colons, are incompatible with the statsd protocol.
+</a><a href="#h3-0-59" id="h3-0-59" class="d">-	// This standardizes on URL escaping to encode such characters that may appear in the metric
+</a><a href="#h3-0-60" id="h3-0-60" class="d">-	// name or tag keys/values.
+</a><a href="#h3-0-61" id="h3-0-61" class="d">-	escapedMetric := url.QueryEscape(metric)
+</a><a href="#h3-0-62" id="h3-0-62" class="d">-
+</a><a href="#h3-0-63" id="h3-0-63" class="d">-	if tags == nil {
+</a><a href="#h3-0-64" id="h3-0-64" class="d">-		tags = make(map[string]string)
+</a><a href="#h3-0-65" id="h3-0-65" class="d">-	}
+</a><a href="#h3-0-66" id="h3-0-66" class="d">-
+</a><a href="#h3-0-67" id="h3-0-67" class="d">-	if len(c.defaultTags)+len(tags) == 0 {
+</a><a href="#h3-0-68" id="h3-0-68" class="d">-		return escapedMetric
+</a><a href="#h3-0-69" id="h3-0-69" class="d">-	}
+</a><a href="#h3-0-70" id="h3-0-70" class="d">-
+</a><a href="#h3-0-71" id="h3-0-71" class="d">-	// Merge specified tags with the default tags, if available.
+</a><a href="#h3-0-72" id="h3-0-72" class="d">-	mergedTags := make(map[string]string)
+</a><a href="#h3-0-73" id="h3-0-73" class="d">-	for key, value := range c.defaultTags {
+</a><a href="#h3-0-74" id="h3-0-74" class="d">-		mergedTags[key] = value
+</a><a href="#h3-0-75" id="h3-0-75" class="d">-	}
+</a><a href="#h3-0-76" id="h3-0-76" class="d">-	for key, value := range tags {
+</a><a href="#h3-0-77" id="h3-0-77" class="d">-		mergedTags[key] = value
+</a><a href="#h3-0-78" id="h3-0-78" class="d">-	}
+</a><a href="#h3-0-79" id="h3-0-79" class="d">-
+</a><a href="#h3-0-80" id="h3-0-80" class="d">-	// Tags are delimited InfluxDB-style.
+</a><a href="#h3-0-81" id="h3-0-81" class="d">-	var components []string
+</a><a href="#h3-0-82" id="h3-0-82" class="d">-	for key, value := range mergedTags {
+</a><a href="#h3-0-83" id="h3-0-83" class="d">-		components = append(
+</a><a href="#h3-0-84" id="h3-0-84" class="d">-			components,
+</a><a href="#h3-0-85" id="h3-0-85" class="d">-			fmt.Sprintf(&quot;%s=%s&quot;, url.QueryEscape(key), url.QueryEscape(value)),
+</a><a href="#h3-0-86" id="h3-0-86" class="d">-		)
+</a><a href="#h3-0-87" id="h3-0-87" class="d">-	}
+</a><a href="#h3-0-88" id="h3-0-88" class="d">-
+</a><a href="#h3-0-89" id="h3-0-89" class="d">-	return fmt.Sprintf(&quot;%s,%s&quot;, escapedMetric, strings.Join(components, &quot;,&quot;))
+</a><a href="#h3-0-90" id="h3-0-90" class="d">-}
+</a></pre>
+</div>
+</body>
+</html>

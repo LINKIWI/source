@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/network: Support TLS client read/write timeouts - dotproxy - High performance DNS-over-TLS proxy</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="dotproxy Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="dotproxy Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>dotproxy</h1><span class="desc">High performance DNS-over-TLS proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/dotproxy.git">https://source.static.kevinlin.info/dotproxy.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/23137886f12232a6763b5641f0eef70b85d62077">23137886f12232a6763b5641f0eef70b85d62077</a>
+<b>parent</b> <a href="../commit/230d2e494f1c71ea583e31a660da7398a7640c87">230d2e494f1c71ea583e31a660da7398a7640c87</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sat,  2 Mar 2019 11:23:09 -0800
+
+internal/network: Support TLS client read/write timeouts
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/network/client.go</a></td><td> | </td><td class="num">28</td><td><span class="i">++++++++++++++++++++++++</span><span class="d">----</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">internal/network/persistent.go</a></td><td> | </td><td class="num">16</td><td><span class="i">++++++++</span><span class="d">--------</span></td></tr>
+</table></pre><pre>2 files changed, 32 insertions(+), 12 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/network/client.go">internal/network/client.go</a> b/<a href="../file/internal/network/client.go">internal/network/client.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -8,6 +8,7 @@ import (
+</a> 	&quot;math/rand&quot;
+ 	&quot;net&quot;
+ 	&quot;strings&quot;
+<a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;time&quot;
+</a> )
+ 
+ // LoadBalancingPolicy formalizes the load balancing decision policy to apply when proxying requests
+<a href="#h0-1" id="h0-1" class="h">@@ -30,6 +31,16 @@ type TLSClient struct {
+</a> 	connections int
+ }
+ 
+<a href="#h0-1-3" id="h0-1-3" class="i">+// TLSClientOpts formalizes TLS client configuration options.
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+type TLSClientOpts struct {
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+	// PoolOpts are connection pool-specific options.
+</a><a href="#h0-1-6" id="h0-1-6" class="i">+	PoolOpts PersistentConnPoolOpts
+</a><a href="#h0-1-7" id="h0-1-7" class="i">+	// ReadTimeout is the timeout associated with each read from a remote connection.
+</a><a href="#h0-1-8" id="h0-1-8" class="i">+	ReadTimeout time.Duration
+</a><a href="#h0-1-9" id="h0-1-9" class="i">+	// WriteTimeout is the timeout associated with each write to a remote connection.
+</a><a href="#h0-1-10" id="h0-1-10" class="i">+	WriteTimeout time.Duration
+</a><a href="#h0-1-11" id="h0-1-11" class="i">+}
+</a><a href="#h0-1-12" id="h0-1-12" class="i">+
+</a> // ShardedClient is an abstraction to manage several Clients whose connections are supplied in
+ // accordance with a load balancing policy.
+ type ShardedClient struct {
+<a href="#h0-2" id="h0-2" class="h">@@ -51,15 +62,24 @@ const (
+</a> // NewTLSClient creates a TLSClient pool, connected to a specified remote address.
+ // This procedure will establish the initial connections, perform TLS handshakes, and validate the
+ // server identity.
+<a href="#h0-2-3" id="h0-2-3" class="d">-func NewTLSClient(addr string, serverName string, poolOpts PersistentConnPoolOpts) (*TLSClient, error) {
+</a><a href="#h0-2-4" id="h0-2-4" class="d">-	cache := tls.NewLRUClientSessionCache(poolOpts.Capacity)
+</a><a href="#h0-2-5" id="h0-2-5" class="i">+func NewTLSClient(addr string, serverName string, opts TLSClientOpts) (*TLSClient, error) {
+</a><a href="#h0-2-6" id="h0-2-6" class="i">+	cache := tls.NewLRUClientSessionCache(opts.PoolOpts.Capacity)
+</a> 	conf := &amp;tls.Config{
+ 		ServerName:         serverName,
+ 		ClientSessionCache: cache,
+ 	}
+ 
+<a href="#h0-2-12" id="h0-2-12" class="d">-	dialer := func() (net.Conn, error) { return tls.Dial(&quot;tcp&quot;, addr, conf) }
+</a><a href="#h0-2-13" id="h0-2-13" class="d">-	pool, err := NewPersistentConnPool(dialer, poolOpts)
+</a><a href="#h0-2-14" id="h0-2-14" class="i">+	// The dialer wraps a standard TLS dial with R/W timeouts.
+</a><a href="#h0-2-15" id="h0-2-15" class="i">+	dialer := func() (net.Conn, error) {
+</a><a href="#h0-2-16" id="h0-2-16" class="i">+		conn, err := tls.Dial(&quot;tcp&quot;, addr, conf)
+</a><a href="#h0-2-17" id="h0-2-17" class="i">+		if err != nil {
+</a><a href="#h0-2-18" id="h0-2-18" class="i">+			return nil, fmt.Errorf(&quot;client: error establishing connection: err=%v&quot;, err)
+</a><a href="#h0-2-19" id="h0-2-19" class="i">+		}
+</a><a href="#h0-2-20" id="h0-2-20" class="i">+
+</a><a href="#h0-2-21" id="h0-2-21" class="i">+		return NewTCPConn(conn, opts.ReadTimeout, opts.WriteTimeout), nil
+</a><a href="#h0-2-22" id="h0-2-22" class="i">+	}
+</a><a href="#h0-2-23" id="h0-2-23" class="i">+
+</a><a href="#h0-2-24" id="h0-2-24" class="i">+	pool, err := NewPersistentConnPool(dialer, opts.PoolOpts)
+</a> 	if err != nil {
+ 		return nil, fmt.Errorf(&quot;client: error creating connection pool: err=%v&quot;, err)
+ 	}
+<b>diff --git a/<a id="h1" href="../file/internal/network/persistent.go">internal/network/persistent.go</a> b/<a href="../file/internal/network/persistent.go">internal/network/persistent.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -18,13 +18,13 @@ type PersistentConnPool struct {
+</a> // PersistentConnPoolOpts formalizes configuration options for a persistent connection pool.
+ type PersistentConnPoolOpts struct {
+ 	// Capacity is the maximum number of cached connections that may be held open in the pool.
+<a href="#h1-0-3" id="h1-0-3" class="d">-	// Depending on client and server behaviors, the actual number of connections open at any time
+</a><a href="#h1-0-4" id="h1-0-4" class="d">-	// may be less than or greater than this capacity. For example, there may be more connections to
+</a><a href="#h1-0-5" id="h1-0-5" class="d">-	// serve a high number of concurrent clients, and there may be fewer connections if many of them
+</a><a href="#h1-0-6" id="h1-0-6" class="d">-	// have been destroyed due to timeout or error.
+</a><a href="#h1-0-7" id="h1-0-7" class="i">+	// Depending on client and server behaviors, the actual number of connections open at any
+</a><a href="#h1-0-8" id="h1-0-8" class="i">+	// time may be less than or greater than this capacity. For example, there may be more
+</a><a href="#h1-0-9" id="h1-0-9" class="i">+	// connections to serve a high number of concurrent clients, and there may be fewer
+</a><a href="#h1-0-10" id="h1-0-10" class="i">+	// connections if many of them have been destroyed due to timeout or error.
+</a> 	Capacity int
+<a href="#h1-0-12" id="h1-0-12" class="d">-	// StaleTimeout is the duration after which a cached connection should be considered stale, and
+</a><a href="#h1-0-13" id="h1-0-13" class="d">-	// thus reconnected before use. This represents the time between connection I/O events.
+</a><a href="#h1-0-14" id="h1-0-14" class="i">+	// StaleTimeout is the duration after which a cached connection should be considered stale,
+</a><a href="#h1-0-15" id="h1-0-15" class="i">+	// and thus reconnected before use. This represents the time between connection I/O events.
+</a> 	StaleTimeout time.Duration
+ }
+ 
+<a href="#h1-1" id="h1-1" class="h">@@ -77,8 +77,8 @@ func (p *PersistentConnPool) Conn() (*PersistentConn, error) {
+</a> 		}
+ 
+ 		// The connection is stale; close it and open a new connection
+<a href="#h1-1-3" id="h1-1-3" class="d">-		// We are not particularly interested in propagating errors that may occur from closing the
+</a><a href="#h1-1-4" id="h1-1-4" class="d">-		// connection; it is already stale anyways
+</a><a href="#h1-1-5" id="h1-1-5" class="i">+		// We are not particularly interested in propagating errors that may occur from
+</a><a href="#h1-1-6" id="h1-1-6" class="i">+		// closing the connection; it is already stale anyways
+</a> 		conn.Close()
+ 	}
+ 
+</pre>
+</div>
+</body>
+</html>

@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/network: Separate sharding clients, add availability-based failover load balancing policy - dotproxy - High performance DNS-over-TLS proxy</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="dotproxy Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="dotproxy Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>dotproxy</h1><span class="desc">High performance DNS-over-TLS proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/dotproxy.git">https://source.static.kevinlin.info/dotproxy.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/2fcd6319235de7fec9addf56bb4659b5ee2ce29e">2fcd6319235de7fec9addf56bb4659b5ee2ce29e</a>
+<b>parent</b> <a href="../commit/6d2dbadc1e804e1070d786789d586546a2ca8152">6d2dbadc1e804e1070d786789d586546a2ca8152</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Mon,  4 Mar 2019 08:53:07 -0800
+
+internal/network: Separate sharding clients, add availability-based failover load balancing policy
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">cmd/dotproxy/main.go</a></td><td> | </td><td class="num">2</td><td><span class="i">+</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">internal/network/client.go</a></td><td> | </td><td class="num">165</td><td><span class="i">++++++++++++++++++</span><span class="d">-------------------------------------------------------------</span></td></tr>
+<tr><td class="A">A</td><td><a href="#h2">internal/network/sharding.go</a></td><td> | </td><td class="num">265</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+</table></pre><pre>3 files changed, 304 insertions(+), 128 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/cmd/dotproxy/main.go">cmd/dotproxy/main.go</a> b/<a href="../file/cmd/dotproxy/main.go">cmd/dotproxy/main.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -148,7 +148,7 @@ func main() {
+</a> 	}
+ 
+ 	logger.Debug(&quot;main: using load balancing policy for request sharding: policy=%s&quot;, lbPolicy)
+<a href="#h0-0-3" id="h0-0-3" class="d">-	client := network.NewShardedClient(servers, lbPolicy)
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+	client, _ := network.NewShardedClient(servers, lbPolicy)
+</a> 
+ 	// Configure server listeners
+ 	h := &amp;protocol.DNSProxyHandler{
+<b>diff --git a/<a id="h1" href="../file/internal/network/client.go">internal/network/client.go</a> b/<a href="../file/internal/network/client.go">internal/network/client.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -1,37 +1,41 @@
+</a><a href="#h1-0-0" id="h1-0-0" class="d">-//go:generate stringer -type=LoadBalancingPolicy
+</a><a href="#h1-0-1" id="h1-0-1" class="d">-
+</a> package network
+ 
+ import (
+ 	&quot;crypto/tls&quot;
+ 	&quot;fmt&quot;
+<a href="#h1-0-7" id="h1-0-7" class="d">-	&quot;math/rand&quot;
+</a> 	&quot;net&quot;
+<a href="#h1-0-9" id="h1-0-9" class="d">-	&quot;strings&quot;
+</a><a href="#h1-0-10" id="h1-0-10" class="i">+	&quot;sync&quot;
+</a> 	&quot;time&quot;
+ 
+ 	&quot;dotproxy/internal/metrics&quot;
+ )
+ 
+<a href="#h1-0-16" id="h1-0-16" class="d">-// LoadBalancingPolicy formalizes the load balancing decision policy to apply when proxying requests
+</a><a href="#h1-0-17" id="h1-0-17" class="d">-// through a sharded network client.
+</a><a href="#h1-0-18" id="h1-0-18" class="d">-type LoadBalancingPolicy int
+</a><a href="#h1-0-19" id="h1-0-19" class="d">-
+</a> // Client defines the interface for a TCP network client.
+ type Client interface {
+ 	// Conn retrieves a single persistent connection.
+ 	Conn() (*PersistentConn, error)
+ 
+<a href="#h1-0-25" id="h1-0-25" class="d">-	// Connections returns the number of historical connections made by this client.
+</a><a href="#h1-0-26" id="h1-0-26" class="d">-	Connections() int
+</a><a href="#h1-0-27" id="h1-0-27" class="i">+	// Stats returns historical client stats.
+</a><a href="#h1-0-28" id="h1-0-28" class="i">+	Stats() Stats
+</a><a href="#h1-0-29" id="h1-0-29" class="i">+}
+</a><a href="#h1-0-30" id="h1-0-30" class="i">+
+</a><a href="#h1-0-31" id="h1-0-31" class="i">+// Stats formalizes stats tracked per-client.
+</a><a href="#h1-0-32" id="h1-0-32" class="i">+type Stats struct {
+</a><a href="#h1-0-33" id="h1-0-33" class="i">+	// SuccessfulConnections is the number of connections that the client has successfully
+</a><a href="#h1-0-34" id="h1-0-34" class="i">+	// provided.
+</a><a href="#h1-0-35" id="h1-0-35" class="i">+	SuccessfulConnections int
+</a><a href="#h1-0-36" id="h1-0-36" class="i">+	// FailedConnections is the number of times that the client has failed to provide a
+</a><a href="#h1-0-37" id="h1-0-37" class="i">+	// connection.
+</a><a href="#h1-0-38" id="h1-0-38" class="i">+	FailedConnections int
+</a> }
+ 
+ // TLSClient describes a TLS_secured TCP client that recycles connections in a pool.
+ type TLSClient struct {
+<a href="#h1-0-43" id="h1-0-43" class="d">-	addr        string
+</a><a href="#h1-0-44" id="h1-0-44" class="d">-	cxHook      metrics.ConnectionLifecycleHook
+</a><a href="#h1-0-45" id="h1-0-45" class="d">-	pool        *PersistentConnPool
+</a><a href="#h1-0-46" id="h1-0-46" class="d">-	connections int
+</a><a href="#h1-0-47" id="h1-0-47" class="i">+	addr       string
+</a><a href="#h1-0-48" id="h1-0-48" class="i">+	cxHook     metrics.ConnectionLifecycleHook
+</a><a href="#h1-0-49" id="h1-0-49" class="i">+	pool       *PersistentConnPool
+</a><a href="#h1-0-50" id="h1-0-50" class="i">+	stats      Stats
+</a><a href="#h1-0-51" id="h1-0-51" class="i">+	statsMutex sync.RWMutex
+</a> }
+ 
+ // TLSClientOpts formalizes TLS client configuration options.
+<a href="#h1-1" id="h1-1" class="h">@@ -47,24 +51,6 @@ type TLSClientOpts struct {
+</a> 	WriteTimeout time.Duration
+ }
+ 
+<a href="#h1-1-3" id="h1-1-3" class="d">-// ShardedClient is an abstraction to manage several Clients whose connections are supplied in
+</a><a href="#h1-1-4" id="h1-1-4" class="d">-// accordance with a load balancing policy.
+</a><a href="#h1-1-5" id="h1-1-5" class="d">-type ShardedClient struct {
+</a><a href="#h1-1-6" id="h1-1-6" class="d">-	clients  []Client
+</a><a href="#h1-1-7" id="h1-1-7" class="d">-	lbPolicy LoadBalancingPolicy
+</a><a href="#h1-1-8" id="h1-1-8" class="d">-	rrIdx    int
+</a><a href="#h1-1-9" id="h1-1-9" class="d">-}
+</a><a href="#h1-1-10" id="h1-1-10" class="d">-
+</a><a href="#h1-1-11" id="h1-1-11" class="d">-const (
+</a><a href="#h1-1-12" id="h1-1-12" class="d">-	// RoundRobin statefully iterates through each client on each connection request.
+</a><a href="#h1-1-13" id="h1-1-13" class="d">-	RoundRobin LoadBalancingPolicy = iota
+</a><a href="#h1-1-14" id="h1-1-14" class="d">-	// Random selects a client at random to provide the connection.
+</a><a href="#h1-1-15" id="h1-1-15" class="d">-	Random
+</a><a href="#h1-1-16" id="h1-1-16" class="d">-	// FewestHistoricalConnections selects the client that has, up until the time of request,
+</a><a href="#h1-1-17" id="h1-1-17" class="d">-	// provided the fewest number of connections.
+</a><a href="#h1-1-18" id="h1-1-18" class="d">-	FewestHistoricalConnections
+</a><a href="#h1-1-19" id="h1-1-19" class="d">-)
+</a><a href="#h1-1-20" id="h1-1-20" class="d">-
+</a> // NewTLSClient creates a TLSClient pool, connected to a specified remote address.
+ // This procedure will establish the initial connections, perform TLS handshakes, and validate the
+ // server identity.
+<a href="#h1-2" id="h1-2" class="h">@@ -88,114 +74,39 @@ func NewTLSClient(addr string, serverName string, cxHook metrics.ConnectionLifec
+</a> 	pool := NewPersistentConnPool(dialer, cxHook, opts.PoolOpts)
+ 
+ 	return &amp;TLSClient{
+<a href="#h1-2-3" id="h1-2-3" class="d">-		addr: addr,
+</a><a href="#h1-2-4" id="h1-2-4" class="d">-		pool: pool,
+</a><a href="#h1-2-5" id="h1-2-5" class="i">+		addr:  addr,
+</a><a href="#h1-2-6" id="h1-2-6" class="i">+		pool:  pool,
+</a><a href="#h1-2-7" id="h1-2-7" class="i">+		stats: Stats{},
+</a> 	}, nil
+ }
+ 
+ // Conn retrieves a single persistent connection from the pool.
+ func (c *TLSClient) Conn() (*PersistentConn, error) {
+<a href="#h1-2-13" id="h1-2-13" class="i">+	conn, err := c.pool.Conn()
+</a><a href="#h1-2-14" id="h1-2-14" class="i">+
+</a> 	defer func() {
+<a href="#h1-2-16" id="h1-2-16" class="d">-		c.connections++
+</a><a href="#h1-2-17" id="h1-2-17" class="i">+		c.statsMutex.Lock()
+</a><a href="#h1-2-18" id="h1-2-18" class="i">+		defer c.statsMutex.Unlock()
+</a><a href="#h1-2-19" id="h1-2-19" class="i">+
+</a><a href="#h1-2-20" id="h1-2-20" class="i">+		if err != nil {
+</a><a href="#h1-2-21" id="h1-2-21" class="i">+			c.stats.FailedConnections++
+</a><a href="#h1-2-22" id="h1-2-22" class="i">+		} else {
+</a><a href="#h1-2-23" id="h1-2-23" class="i">+			c.stats.SuccessfulConnections++
+</a><a href="#h1-2-24" id="h1-2-24" class="i">+		}
+</a> 	}()
+ 
+<a href="#h1-2-27" id="h1-2-27" class="d">-	return c.pool.Conn()
+</a><a href="#h1-2-28" id="h1-2-28" class="i">+	return conn, err
+</a> }
+ 
+<a href="#h1-2-31" id="h1-2-31" class="d">-// Connections reads the number of connections that this client has thus far provided.
+</a><a href="#h1-2-32" id="h1-2-32" class="d">-func (c *TLSClient) Connections() int {
+</a><a href="#h1-2-33" id="h1-2-33" class="d">-	return c.connections
+</a><a href="#h1-2-34" id="h1-2-34" class="i">+// Stats returns current client stats.
+</a><a href="#h1-2-35" id="h1-2-35" class="i">+func (c *TLSClient) Stats() Stats {
+</a><a href="#h1-2-36" id="h1-2-36" class="i">+	c.statsMutex.RLock()
+</a><a href="#h1-2-37" id="h1-2-37" class="i">+	defer c.statsMutex.RUnlock()
+</a><a href="#h1-2-38" id="h1-2-38" class="i">+
+</a><a href="#h1-2-39" id="h1-2-39" class="i">+	return c.stats
+</a> }
+ 
+ // String returns a string representation of the client.
+ func (c *TLSClient) String() string {
+ 	return fmt.Sprintf(&quot;TLSClient{addr: %s, connections: %d}&quot;, c.addr, c.pool.Size())
+ }
+<a href="#h1-2-46" id="h1-2-46" class="d">-
+</a><a href="#h1-2-47" id="h1-2-47" class="d">-// NewShardedClient creates a single Client that provides connections from several other Clients
+</a><a href="#h1-2-48" id="h1-2-48" class="d">-// governed by a load balancing policy.
+</a><a href="#h1-2-49" id="h1-2-49" class="d">-func NewShardedClient(clients []Client, lbPolicy LoadBalancingPolicy) *ShardedClient {
+</a><a href="#h1-2-50" id="h1-2-50" class="d">-	return &amp;ShardedClient{clients: clients, lbPolicy: lbPolicy}
+</a><a href="#h1-2-51" id="h1-2-51" class="d">-}
+</a><a href="#h1-2-52" id="h1-2-52" class="d">-
+</a><a href="#h1-2-53" id="h1-2-53" class="d">-// Conn retrieves a single persistent connection from one of the clients.
+</a><a href="#h1-2-54" id="h1-2-54" class="d">-func (c *ShardedClient) Conn() (*PersistentConn, error) {
+</a><a href="#h1-2-55" id="h1-2-55" class="d">-	return c.selectClient().Conn()
+</a><a href="#h1-2-56" id="h1-2-56" class="d">-}
+</a><a href="#h1-2-57" id="h1-2-57" class="d">-
+</a><a href="#h1-2-58" id="h1-2-58" class="d">-// Connections returns the total number of connections provided by all fanout clients.
+</a><a href="#h1-2-59" id="h1-2-59" class="d">-func (c *ShardedClient) Connections() int {
+</a><a href="#h1-2-60" id="h1-2-60" class="d">-	var connections int
+</a><a href="#h1-2-61" id="h1-2-61" class="d">-
+</a><a href="#h1-2-62" id="h1-2-62" class="d">-	for _, client := range c.clients {
+</a><a href="#h1-2-63" id="h1-2-63" class="d">-		connections += client.Connections()
+</a><a href="#h1-2-64" id="h1-2-64" class="d">-	}
+</a><a href="#h1-2-65" id="h1-2-65" class="d">-
+</a><a href="#h1-2-66" id="h1-2-66" class="d">-	return connections
+</a><a href="#h1-2-67" id="h1-2-67" class="d">-}
+</a><a href="#h1-2-68" id="h1-2-68" class="d">-
+</a><a href="#h1-2-69" id="h1-2-69" class="d">-// String returns a string representation of the sharded client.
+</a><a href="#h1-2-70" id="h1-2-70" class="d">-func (c *ShardedClient) String() string {
+</a><a href="#h1-2-71" id="h1-2-71" class="d">-	return fmt.Sprintf(&quot;ShardedClient{lbPolicy: %s, clients: %v}&quot;, c.lbPolicy, c.clients)
+</a><a href="#h1-2-72" id="h1-2-72" class="d">-}
+</a><a href="#h1-2-73" id="h1-2-73" class="d">-
+</a><a href="#h1-2-74" id="h1-2-74" class="d">-// selectClient chooses a client to provide a connection.
+</a><a href="#h1-2-75" id="h1-2-75" class="d">-func (c *ShardedClient) selectClient() Client {
+</a><a href="#h1-2-76" id="h1-2-76" class="d">-	switch c.lbPolicy {
+</a><a href="#h1-2-77" id="h1-2-77" class="d">-	case RoundRobin:
+</a><a href="#h1-2-78" id="h1-2-78" class="d">-		return c.selectRoundRobin()
+</a><a href="#h1-2-79" id="h1-2-79" class="d">-	case Random:
+</a><a href="#h1-2-80" id="h1-2-80" class="d">-		return c.selectRandom()
+</a><a href="#h1-2-81" id="h1-2-81" class="d">-	case FewestHistoricalConnections:
+</a><a href="#h1-2-82" id="h1-2-82" class="d">-		return c.selectFewestHistoricalConnections()
+</a><a href="#h1-2-83" id="h1-2-83" class="d">-	default:
+</a><a href="#h1-2-84" id="h1-2-84" class="d">-		return c.selectRoundRobin()
+</a><a href="#h1-2-85" id="h1-2-85" class="d">-	}
+</a><a href="#h1-2-86" id="h1-2-86" class="d">-}
+</a><a href="#h1-2-87" id="h1-2-87" class="d">-
+</a><a href="#h1-2-88" id="h1-2-88" class="d">-// selectRoundRobin selects the next client in line, while updating internal state to keep track of
+</a><a href="#h1-2-89" id="h1-2-89" class="d">-// which client should be selected next.
+</a><a href="#h1-2-90" id="h1-2-90" class="d">-func (c *ShardedClient) selectRoundRobin() Client {
+</a><a href="#h1-2-91" id="h1-2-91" class="d">-	defer func() {
+</a><a href="#h1-2-92" id="h1-2-92" class="d">-		c.rrIdx = (c.rrIdx + 1) % len(c.clients)
+</a><a href="#h1-2-93" id="h1-2-93" class="d">-	}()
+</a><a href="#h1-2-94" id="h1-2-94" class="d">-
+</a><a href="#h1-2-95" id="h1-2-95" class="d">-	return c.clients[c.rrIdx]
+</a><a href="#h1-2-96" id="h1-2-96" class="d">-}
+</a><a href="#h1-2-97" id="h1-2-97" class="d">-
+</a><a href="#h1-2-98" id="h1-2-98" class="d">-// selectRandom chooses a client at random.
+</a><a href="#h1-2-99" id="h1-2-99" class="d">-func (c *ShardedClient) selectRandom() Client {
+</a><a href="#h1-2-100" id="h1-2-100" class="d">-	return c.clients[rand.Intn(len(c.clients))]
+</a><a href="#h1-2-101" id="h1-2-101" class="d">-}
+</a><a href="#h1-2-102" id="h1-2-102" class="d">-
+</a><a href="#h1-2-103" id="h1-2-103" class="d">-// selectFewestHistoricalConnections selects the client that has provided the fewest connections
+</a><a href="#h1-2-104" id="h1-2-104" class="d">-// until the snapshot in time at which this method is invoked.
+</a><a href="#h1-2-105" id="h1-2-105" class="d">-func (c *ShardedClient) selectFewestHistoricalConnections() Client {
+</a><a href="#h1-2-106" id="h1-2-106" class="d">-	var client Client
+</a><a href="#h1-2-107" id="h1-2-107" class="d">-
+</a><a href="#h1-2-108" id="h1-2-108" class="d">-	for _, candidate := range c.clients {
+</a><a href="#h1-2-109" id="h1-2-109" class="d">-		if client == nil || candidate.Connections() &lt; client.Connections() {
+</a><a href="#h1-2-110" id="h1-2-110" class="d">-			client = candidate
+</a><a href="#h1-2-111" id="h1-2-111" class="d">-		}
+</a><a href="#h1-2-112" id="h1-2-112" class="d">-	}
+</a><a href="#h1-2-113" id="h1-2-113" class="d">-
+</a><a href="#h1-2-114" id="h1-2-114" class="d">-	return client
+</a><a href="#h1-2-115" id="h1-2-115" class="d">-}
+</a><a href="#h1-2-116" id="h1-2-116" class="d">-
+</a><a href="#h1-2-117" id="h1-2-117" class="d">-// ParseLoadBalancingPolicy parses a LoadBalancingPolicy constant from its stringified
+</a><a href="#h1-2-118" id="h1-2-118" class="d">-// representation in a case-insensitive manner.
+</a><a href="#h1-2-119" id="h1-2-119" class="d">-func ParseLoadBalancingPolicy(lbPolicy string) (LoadBalancingPolicy, bool) {
+</a><a href="#h1-2-120" id="h1-2-120" class="d">-	knownLbPolicies := []LoadBalancingPolicy{
+</a><a href="#h1-2-121" id="h1-2-121" class="d">-		RoundRobin,
+</a><a href="#h1-2-122" id="h1-2-122" class="d">-		Random,
+</a><a href="#h1-2-123" id="h1-2-123" class="d">-		FewestHistoricalConnections,
+</a><a href="#h1-2-124" id="h1-2-124" class="d">-	}
+</a><a href="#h1-2-125" id="h1-2-125" class="d">-
+</a><a href="#h1-2-126" id="h1-2-126" class="d">-	for _, knownLbPolicy := range knownLbPolicies {
+</a><a href="#h1-2-127" id="h1-2-127" class="d">-		if strings.ToLower(lbPolicy) == strings.ToLower(knownLbPolicy.String()) {
+</a><a href="#h1-2-128" id="h1-2-128" class="d">-			return knownLbPolicy, true
+</a><a href="#h1-2-129" id="h1-2-129" class="d">-		}
+</a><a href="#h1-2-130" id="h1-2-130" class="d">-	}
+</a><a href="#h1-2-131" id="h1-2-131" class="d">-
+</a><a href="#h1-2-132" id="h1-2-132" class="d">-	return RoundRobin, false
+</a><a href="#h1-2-133" id="h1-2-133" class="d">-}
+</a><b>diff --git a/<a id="h2" href="../file/internal/network/sharding.go">internal/network/sharding.go</a> b/<a href="../file/internal/network/sharding.go">internal/network/sharding.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -0,0 +1,265 @@
+</a><a href="#h2-0-0" id="h2-0-0" class="i">+//go:generate stringer -type=LoadBalancingPolicy
+</a><a href="#h2-0-1" id="h2-0-1" class="i">+
+</a><a href="#h2-0-2" id="h2-0-2" class="i">+package network
+</a><a href="#h2-0-3" id="h2-0-3" class="i">+
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+import (
+</a><a href="#h2-0-5" id="h2-0-5" class="i">+	&quot;fmt&quot;
+</a><a href="#h2-0-6" id="h2-0-6" class="i">+	&quot;math/rand&quot;
+</a><a href="#h2-0-7" id="h2-0-7" class="i">+	&quot;strings&quot;
+</a><a href="#h2-0-8" id="h2-0-8" class="i">+	&quot;time&quot;
+</a><a href="#h2-0-9" id="h2-0-9" class="i">+)
+</a><a href="#h2-0-10" id="h2-0-10" class="i">+
+</a><a href="#h2-0-11" id="h2-0-11" class="i">+// LoadBalancingPolicy formalizes the load balancing decision policy to apply when proxying requests
+</a><a href="#h2-0-12" id="h2-0-12" class="i">+// through a sharded network client.
+</a><a href="#h2-0-13" id="h2-0-13" class="i">+type LoadBalancingPolicy int
+</a><a href="#h2-0-14" id="h2-0-14" class="i">+
+</a><a href="#h2-0-15" id="h2-0-15" class="i">+// ShardedClientFactory is a type alias for a unary constructor function that returns a single
+</a><a href="#h2-0-16" id="h2-0-16" class="i">+// Client that abstracts operations among several child Clients.
+</a><a href="#h2-0-17" id="h2-0-17" class="i">+type ShardedClientFactory func([]Client) Client
+</a><a href="#h2-0-18" id="h2-0-18" class="i">+
+</a><a href="#h2-0-19" id="h2-0-19" class="i">+// RoundRobinShardedClient shards requests among clients fairly in round-robin order.
+</a><a href="#h2-0-20" id="h2-0-20" class="i">+type RoundRobinShardedClient struct {
+</a><a href="#h2-0-21" id="h2-0-21" class="i">+	clients []Client
+</a><a href="#h2-0-22" id="h2-0-22" class="i">+
+</a><a href="#h2-0-23" id="h2-0-23" class="i">+	// Current round robin index (not necessarily async-safe)
+</a><a href="#h2-0-24" id="h2-0-24" class="i">+	rrIdx int
+</a><a href="#h2-0-25" id="h2-0-25" class="i">+}
+</a><a href="#h2-0-26" id="h2-0-26" class="i">+
+</a><a href="#h2-0-27" id="h2-0-27" class="i">+// RandomShardedClient shards requests among clients randomly.
+</a><a href="#h2-0-28" id="h2-0-28" class="i">+type RandomShardedClient struct {
+</a><a href="#h2-0-29" id="h2-0-29" class="i">+	clients []Client
+</a><a href="#h2-0-30" id="h2-0-30" class="i">+}
+</a><a href="#h2-0-31" id="h2-0-31" class="i">+
+</a><a href="#h2-0-32" id="h2-0-32" class="i">+// HistoricalConnectionsShardedClient directs requests to the client that has, up until the time of
+</a><a href="#h2-0-33" id="h2-0-33" class="i">+// invocation, served the fewest number of successful connections. It is best used when there is a
+</a><a href="#h2-0-34" id="h2-0-34" class="i">+// need to ensure that load is distributed to all clients fairly even if one of them has failed.
+</a><a href="#h2-0-35" id="h2-0-35" class="i">+type HistoricalConnectionsShardedClient struct {
+</a><a href="#h2-0-36" id="h2-0-36" class="i">+	clients []Client
+</a><a href="#h2-0-37" id="h2-0-37" class="i">+}
+</a><a href="#h2-0-38" id="h2-0-38" class="i">+
+</a><a href="#h2-0-39" id="h2-0-39" class="i">+// AvailabilityShardedClient provides connections by dynamically adjusting its active client pool to
+</a><a href="#h2-0-40" id="h2-0-40" class="i">+// prioritize those clients that are successful in providing new connections. It automatically fails
+</a><a href="#h2-0-41" id="h2-0-41" class="i">+// over failed client connection requests to healthy clients in the pool, temporarily disabling the
+</a><a href="#h2-0-42" id="h2-0-42" class="i">+// failed client for future requests with an exponential backoff policy.
+</a><a href="#h2-0-43" id="h2-0-43" class="i">+type AvailabilityShardedClient struct {
+</a><a href="#h2-0-44" id="h2-0-44" class="i">+	clients []Client
+</a><a href="#h2-0-45" id="h2-0-45" class="i">+
+</a><a href="#h2-0-46" id="h2-0-46" class="i">+	// Tracks the timestamp at which each client last errored
+</a><a href="#h2-0-47" id="h2-0-47" class="i">+	lastError map[Client]time.Time
+</a><a href="#h2-0-48" id="h2-0-48" class="i">+	// Tracks the current duration of time to wait before a failed connection is once again
+</a><a href="#h2-0-49" id="h2-0-49" class="i">+	// available for use.
+</a><a href="#h2-0-50" id="h2-0-50" class="i">+	errorExpiry map[Client]time.Duration
+</a><a href="#h2-0-51" id="h2-0-51" class="i">+}
+</a><a href="#h2-0-52" id="h2-0-52" class="i">+
+</a><a href="#h2-0-53" id="h2-0-53" class="i">+const (
+</a><a href="#h2-0-54" id="h2-0-54" class="i">+	// RoundRobin statefully iterates through each client on every connection request.
+</a><a href="#h2-0-55" id="h2-0-55" class="i">+	RoundRobin LoadBalancingPolicy = iota
+</a><a href="#h2-0-56" id="h2-0-56" class="i">+	// Random selects a client at random to provide the connection.
+</a><a href="#h2-0-57" id="h2-0-57" class="i">+	Random
+</a><a href="#h2-0-58" id="h2-0-58" class="i">+	// HistoricalConnections selects the client that has, up until the time of request,
+</a><a href="#h2-0-59" id="h2-0-59" class="i">+	// provided the  number of connections.
+</a><a href="#h2-0-60" id="h2-0-60" class="i">+	HistoricalConnections
+</a><a href="#h2-0-61" id="h2-0-61" class="i">+	// Availability randomly selects a client to provide the connection, failing over to another
+</a><a href="#h2-0-62" id="h2-0-62" class="i">+	// client in the event that it fails to do so. The failed client is temporarily pulled out
+</a><a href="#h2-0-63" id="h2-0-63" class="i">+	// of the availability pool to prevent subsequent requests from being directed to the failed
+</a><a href="#h2-0-64" id="h2-0-64" class="i">+	// client.
+</a><a href="#h2-0-65" id="h2-0-65" class="i">+	Availability
+</a><a href="#h2-0-66" id="h2-0-66" class="i">+)
+</a><a href="#h2-0-67" id="h2-0-67" class="i">+
+</a><a href="#h2-0-68" id="h2-0-68" class="i">+// NewShardedClient creates a single Client that provides connections from several other Clients
+</a><a href="#h2-0-69" id="h2-0-69" class="i">+// governed by a load balancing policy. It returns an error if the specified load balancing policy
+</a><a href="#h2-0-70" id="h2-0-70" class="i">+// has no associated sharded client factory.
+</a><a href="#h2-0-71" id="h2-0-71" class="i">+func NewShardedClient(clients []Client, lbPolicy LoadBalancingPolicy) (Client, error) {
+</a><a href="#h2-0-72" id="h2-0-72" class="i">+	factories := map[LoadBalancingPolicy]ShardedClientFactory{
+</a><a href="#h2-0-73" id="h2-0-73" class="i">+		RoundRobin:            NewRoundRobinShardedClient,
+</a><a href="#h2-0-74" id="h2-0-74" class="i">+		Random:                NewRandomShardedClient,
+</a><a href="#h2-0-75" id="h2-0-75" class="i">+		HistoricalConnections: NewHistoricalConnectionsShardedClient,
+</a><a href="#h2-0-76" id="h2-0-76" class="i">+		Availability:          NewAvailabilityShardedClient,
+</a><a href="#h2-0-77" id="h2-0-77" class="i">+	}
+</a><a href="#h2-0-78" id="h2-0-78" class="i">+
+</a><a href="#h2-0-79" id="h2-0-79" class="i">+	factory, ok := factories[lbPolicy]
+</a><a href="#h2-0-80" id="h2-0-80" class="i">+	if !ok {
+</a><a href="#h2-0-81" id="h2-0-81" class="i">+		return nil, fmt.Errorf(
+</a><a href="#h2-0-82" id="h2-0-82" class="i">+			&quot;sharding: no factory configured for load balancing policy: policy=%s&quot;,
+</a><a href="#h2-0-83" id="h2-0-83" class="i">+			lbPolicy,
+</a><a href="#h2-0-84" id="h2-0-84" class="i">+		)
+</a><a href="#h2-0-85" id="h2-0-85" class="i">+	}
+</a><a href="#h2-0-86" id="h2-0-86" class="i">+
+</a><a href="#h2-0-87" id="h2-0-87" class="i">+	return factory(clients), nil
+</a><a href="#h2-0-88" id="h2-0-88" class="i">+}
+</a><a href="#h2-0-89" id="h2-0-89" class="i">+
+</a><a href="#h2-0-90" id="h2-0-90" class="i">+// NewRoundRobinShardedClient is a client factory for the round robin load balancing policy.
+</a><a href="#h2-0-91" id="h2-0-91" class="i">+func NewRoundRobinShardedClient(clients []Client) Client {
+</a><a href="#h2-0-92" id="h2-0-92" class="i">+	return &amp;RoundRobinShardedClient{clients: clients}
+</a><a href="#h2-0-93" id="h2-0-93" class="i">+}
+</a><a href="#h2-0-94" id="h2-0-94" class="i">+
+</a><a href="#h2-0-95" id="h2-0-95" class="i">+// Conn retrieves a connection from the next client in the round robin index.
+</a><a href="#h2-0-96" id="h2-0-96" class="i">+func (c *RoundRobinShardedClient) Conn() (*PersistentConn, error) {
+</a><a href="#h2-0-97" id="h2-0-97" class="i">+	defer func() {
+</a><a href="#h2-0-98" id="h2-0-98" class="i">+		c.rrIdx = (c.rrIdx + 1) % len(c.clients)
+</a><a href="#h2-0-99" id="h2-0-99" class="i">+	}()
+</a><a href="#h2-0-100" id="h2-0-100" class="i">+
+</a><a href="#h2-0-101" id="h2-0-101" class="i">+	return c.clients[c.rrIdx].Conn()
+</a><a href="#h2-0-102" id="h2-0-102" class="i">+}
+</a><a href="#h2-0-103" id="h2-0-103" class="i">+
+</a><a href="#h2-0-104" id="h2-0-104" class="i">+// Stats aggregates stats from all child clients.
+</a><a href="#h2-0-105" id="h2-0-105" class="i">+func (c *RoundRobinShardedClient) Stats() Stats {
+</a><a href="#h2-0-106" id="h2-0-106" class="i">+	return aggregateClientsStats(c.clients)
+</a><a href="#h2-0-107" id="h2-0-107" class="i">+}
+</a><a href="#h2-0-108" id="h2-0-108" class="i">+
+</a><a href="#h2-0-109" id="h2-0-109" class="i">+// NewRandomShardedClient is a client factory for the random load balancing policy.
+</a><a href="#h2-0-110" id="h2-0-110" class="i">+func NewRandomShardedClient(clients []Client) Client {
+</a><a href="#h2-0-111" id="h2-0-111" class="i">+	return &amp;RandomShardedClient{clients}
+</a><a href="#h2-0-112" id="h2-0-112" class="i">+}
+</a><a href="#h2-0-113" id="h2-0-113" class="i">+
+</a><a href="#h2-0-114" id="h2-0-114" class="i">+// Conn selects a client at random to provide the connection.
+</a><a href="#h2-0-115" id="h2-0-115" class="i">+func (c *RandomShardedClient) Conn() (*PersistentConn, error) {
+</a><a href="#h2-0-116" id="h2-0-116" class="i">+	return c.clients[rand.Intn(len(c.clients))].Conn()
+</a><a href="#h2-0-117" id="h2-0-117" class="i">+}
+</a><a href="#h2-0-118" id="h2-0-118" class="i">+
+</a><a href="#h2-0-119" id="h2-0-119" class="i">+// Stats aggregates stats from all child clients.
+</a><a href="#h2-0-120" id="h2-0-120" class="i">+func (c *RandomShardedClient) Stats() Stats {
+</a><a href="#h2-0-121" id="h2-0-121" class="i">+	return aggregateClientsStats(c.clients)
+</a><a href="#h2-0-122" id="h2-0-122" class="i">+}
+</a><a href="#h2-0-123" id="h2-0-123" class="i">+
+</a><a href="#h2-0-124" id="h2-0-124" class="i">+// NewHistoricalConnectionsShardedClient is a client factory for the historical connections load
+</a><a href="#h2-0-125" id="h2-0-125" class="i">+// balancing policy.
+</a><a href="#h2-0-126" id="h2-0-126" class="i">+func NewHistoricalConnectionsShardedClient(clients []Client) Client {
+</a><a href="#h2-0-127" id="h2-0-127" class="i">+	return &amp;HistoricalConnectionsShardedClient{clients}
+</a><a href="#h2-0-128" id="h2-0-128" class="i">+}
+</a><a href="#h2-0-129" id="h2-0-129" class="i">+
+</a><a href="#h2-0-130" id="h2-0-130" class="i">+// Conn selects the client that has, up until the time of invocation, provided the fewest successful
+</a><a href="#h2-0-131" id="h2-0-131" class="i">+// connections.
+</a><a href="#h2-0-132" id="h2-0-132" class="i">+func (c *HistoricalConnectionsShardedClient) Conn() (*PersistentConn, error) {
+</a><a href="#h2-0-133" id="h2-0-133" class="i">+	var client Client
+</a><a href="#h2-0-134" id="h2-0-134" class="i">+
+</a><a href="#h2-0-135" id="h2-0-135" class="i">+	for _, candidate := range c.clients {
+</a><a href="#h2-0-136" id="h2-0-136" class="i">+		if client == nil || candidate.Stats().SuccessfulConnections &lt; client.Stats().SuccessfulConnections {
+</a><a href="#h2-0-137" id="h2-0-137" class="i">+			client = candidate
+</a><a href="#h2-0-138" id="h2-0-138" class="i">+		}
+</a><a href="#h2-0-139" id="h2-0-139" class="i">+	}
+</a><a href="#h2-0-140" id="h2-0-140" class="i">+
+</a><a href="#h2-0-141" id="h2-0-141" class="i">+	return client.Conn()
+</a><a href="#h2-0-142" id="h2-0-142" class="i">+}
+</a><a href="#h2-0-143" id="h2-0-143" class="i">+
+</a><a href="#h2-0-144" id="h2-0-144" class="i">+// Stats aggregates stats from all child clients.
+</a><a href="#h2-0-145" id="h2-0-145" class="i">+func (c *HistoricalConnectionsShardedClient) Stats() Stats {
+</a><a href="#h2-0-146" id="h2-0-146" class="i">+	return aggregateClientsStats(c.clients)
+</a><a href="#h2-0-147" id="h2-0-147" class="i">+}
+</a><a href="#h2-0-148" id="h2-0-148" class="i">+
+</a><a href="#h2-0-149" id="h2-0-149" class="i">+// NewAvailabilityShardedClient is a client factory for the availability load balancing policy.
+</a><a href="#h2-0-150" id="h2-0-150" class="i">+func NewAvailabilityShardedClient(clients []Client) Client {
+</a><a href="#h2-0-151" id="h2-0-151" class="i">+	lastError := make(map[Client]time.Time)
+</a><a href="#h2-0-152" id="h2-0-152" class="i">+	errorExpiry := make(map[Client]time.Duration)
+</a><a href="#h2-0-153" id="h2-0-153" class="i">+
+</a><a href="#h2-0-154" id="h2-0-154" class="i">+	for _, client := range clients {
+</a><a href="#h2-0-155" id="h2-0-155" class="i">+		lastError[client] = time.Time{}
+</a><a href="#h2-0-156" id="h2-0-156" class="i">+		errorExpiry[client] = 0
+</a><a href="#h2-0-157" id="h2-0-157" class="i">+	}
+</a><a href="#h2-0-158" id="h2-0-158" class="i">+
+</a><a href="#h2-0-159" id="h2-0-159" class="i">+	return &amp;AvailabilityShardedClient{
+</a><a href="#h2-0-160" id="h2-0-160" class="i">+		clients:     clients,
+</a><a href="#h2-0-161" id="h2-0-161" class="i">+		lastError:   lastError,
+</a><a href="#h2-0-162" id="h2-0-162" class="i">+		errorExpiry: errorExpiry,
+</a><a href="#h2-0-163" id="h2-0-163" class="i">+	}
+</a><a href="#h2-0-164" id="h2-0-164" class="i">+}
+</a><a href="#h2-0-165" id="h2-0-165" class="i">+
+</a><a href="#h2-0-166" id="h2-0-166" class="i">+// Conn attempts to robustly provide a connection from all available client using a failover retry
+</a><a href="#h2-0-167" id="h2-0-167" class="i">+// mechanism. It is possible for this method to error if the load balancing policy determines that
+</a><a href="#h2-0-168" id="h2-0-168" class="i">+// there are no live clients eligible for providing a connection.
+</a><a href="#h2-0-169" id="h2-0-169" class="i">+func (c *AvailabilityShardedClient) Conn() (*PersistentConn, error) {
+</a><a href="#h2-0-170" id="h2-0-170" class="i">+	// Describes the amount of time that must elapse before resetting a client&#39;s error expiry
+</a><a href="#h2-0-171" id="h2-0-171" class="i">+	// timer. In other words, this is the minimum amount of time after which a client errors
+</a><a href="#h2-0-172" id="h2-0-172" class="i">+	// that it is permitted to be retried for a live connection. Otherwise, the connection is
+</a><a href="#h2-0-173" id="h2-0-173" class="i">+	// pulled out of the sharding pool for exponentially increasing durations of time.
+</a><a href="#h2-0-174" id="h2-0-174" class="i">+	failedClientExpiry := 1 * time.Minute
+</a><a href="#h2-0-175" id="h2-0-175" class="i">+
+</a><a href="#h2-0-176" id="h2-0-176" class="i">+	client, err := c.selectAvailable()
+</a><a href="#h2-0-177" id="h2-0-177" class="i">+	if err != nil {
+</a><a href="#h2-0-178" id="h2-0-178" class="i">+		return nil, err
+</a><a href="#h2-0-179" id="h2-0-179" class="i">+	}
+</a><a href="#h2-0-180" id="h2-0-180" class="i">+
+</a><a href="#h2-0-181" id="h2-0-181" class="i">+	conn, err := client.Conn()
+</a><a href="#h2-0-182" id="h2-0-182" class="i">+	if err != nil {
+</a><a href="#h2-0-183" id="h2-0-183" class="i">+		if c.lastError[client].IsZero() || time.Since(c.lastError[client]) &gt; failedClientExpiry {
+</a><a href="#h2-0-184" id="h2-0-184" class="i">+			// The client has either never errored before, or the last error is too far
+</a><a href="#h2-0-185" id="h2-0-185" class="i">+			// in the past. Start its exponential backoff timer at 1 second, indicating
+</a><a href="#h2-0-186" id="h2-0-186" class="i">+			// that this client will be marked unavailable for the next 1 second.
+</a><a href="#h2-0-187" id="h2-0-187" class="i">+			c.errorExpiry[client] = 1 * time.Second
+</a><a href="#h2-0-188" id="h2-0-188" class="i">+		} else {
+</a><a href="#h2-0-189" id="h2-0-189" class="i">+			// The most recent client failure was too recent; double the current expiry
+</a><a href="#h2-0-190" id="h2-0-190" class="i">+			// time.
+</a><a href="#h2-0-191" id="h2-0-191" class="i">+			c.errorExpiry[client] *= 2
+</a><a href="#h2-0-192" id="h2-0-192" class="i">+		}
+</a><a href="#h2-0-193" id="h2-0-193" class="i">+
+</a><a href="#h2-0-194" id="h2-0-194" class="i">+		c.lastError[client] = time.Now()
+</a><a href="#h2-0-195" id="h2-0-195" class="i">+
+</a><a href="#h2-0-196" id="h2-0-196" class="i">+		return c.Conn()
+</a><a href="#h2-0-197" id="h2-0-197" class="i">+	}
+</a><a href="#h2-0-198" id="h2-0-198" class="i">+
+</a><a href="#h2-0-199" id="h2-0-199" class="i">+	return conn, nil
+</a><a href="#h2-0-200" id="h2-0-200" class="i">+}
+</a><a href="#h2-0-201" id="h2-0-201" class="i">+
+</a><a href="#h2-0-202" id="h2-0-202" class="i">+// Stats aggregates stats from all child clients.
+</a><a href="#h2-0-203" id="h2-0-203" class="i">+func (c *AvailabilityShardedClient) Stats() Stats {
+</a><a href="#h2-0-204" id="h2-0-204" class="i">+	return aggregateClientsStats(c.clients)
+</a><a href="#h2-0-205" id="h2-0-205" class="i">+}
+</a><a href="#h2-0-206" id="h2-0-206" class="i">+
+</a><a href="#h2-0-207" id="h2-0-207" class="i">+// Select an eligible client at random. This method may error if no clients are available to
+</a><a href="#h2-0-208" id="h2-0-208" class="i">+// provide connections.
+</a><a href="#h2-0-209" id="h2-0-209" class="i">+func (c *AvailabilityShardedClient) selectAvailable() (Client, error) {
+</a><a href="#h2-0-210" id="h2-0-210" class="i">+	var eligibleClients []Client
+</a><a href="#h2-0-211" id="h2-0-211" class="i">+
+</a><a href="#h2-0-212" id="h2-0-212" class="i">+	for _, candidate := range c.clients {
+</a><a href="#h2-0-213" id="h2-0-213" class="i">+		lastError := c.lastError[candidate]
+</a><a href="#h2-0-214" id="h2-0-214" class="i">+		expiry := c.errorExpiry[candidate]
+</a><a href="#h2-0-215" id="h2-0-215" class="i">+
+</a><a href="#h2-0-216" id="h2-0-216" class="i">+		// The client is considered eligible if it has never errored or if its current
+</a><a href="#h2-0-217" id="h2-0-217" class="i">+		// failure lifetime has expired.
+</a><a href="#h2-0-218" id="h2-0-218" class="i">+		if lastError.IsZero() || time.Since(lastError) &gt; expiry {
+</a><a href="#h2-0-219" id="h2-0-219" class="i">+			eligibleClients = append(eligibleClients, candidate)
+</a><a href="#h2-0-220" id="h2-0-220" class="i">+		}
+</a><a href="#h2-0-221" id="h2-0-221" class="i">+	}
+</a><a href="#h2-0-222" id="h2-0-222" class="i">+
+</a><a href="#h2-0-223" id="h2-0-223" class="i">+	if len(eligibleClients) == 0 {
+</a><a href="#h2-0-224" id="h2-0-224" class="i">+		return nil, fmt.Errorf(&quot;sharding: no live clients are available&quot;)
+</a><a href="#h2-0-225" id="h2-0-225" class="i">+	}
+</a><a href="#h2-0-226" id="h2-0-226" class="i">+
+</a><a href="#h2-0-227" id="h2-0-227" class="i">+	return eligibleClients[rand.Intn(len(eligibleClients))], nil
+</a><a href="#h2-0-228" id="h2-0-228" class="i">+}
+</a><a href="#h2-0-229" id="h2-0-229" class="i">+
+</a><a href="#h2-0-230" id="h2-0-230" class="i">+// ParseLoadBalancingPolicy parses a LoadBalancingPolicy constant from its stringified
+</a><a href="#h2-0-231" id="h2-0-231" class="i">+// representation in a case-insensitive manner.
+</a><a href="#h2-0-232" id="h2-0-232" class="i">+func ParseLoadBalancingPolicy(lbPolicy string) (LoadBalancingPolicy, bool) {
+</a><a href="#h2-0-233" id="h2-0-233" class="i">+	knownLbPolicies := []LoadBalancingPolicy{
+</a><a href="#h2-0-234" id="h2-0-234" class="i">+		RoundRobin,
+</a><a href="#h2-0-235" id="h2-0-235" class="i">+		Random,
+</a><a href="#h2-0-236" id="h2-0-236" class="i">+		HistoricalConnections,
+</a><a href="#h2-0-237" id="h2-0-237" class="i">+		Availability,
+</a><a href="#h2-0-238" id="h2-0-238" class="i">+	}
+</a><a href="#h2-0-239" id="h2-0-239" class="i">+
+</a><a href="#h2-0-240" id="h2-0-240" class="i">+	for _, knownLbPolicy := range knownLbPolicies {
+</a><a href="#h2-0-241" id="h2-0-241" class="i">+		if strings.ToLower(lbPolicy) == strings.ToLower(knownLbPolicy.String()) {
+</a><a href="#h2-0-242" id="h2-0-242" class="i">+			return knownLbPolicy, true
+</a><a href="#h2-0-243" id="h2-0-243" class="i">+		}
+</a><a href="#h2-0-244" id="h2-0-244" class="i">+	}
+</a><a href="#h2-0-245" id="h2-0-245" class="i">+
+</a><a href="#h2-0-246" id="h2-0-246" class="i">+	return RoundRobin, false
+</a><a href="#h2-0-247" id="h2-0-247" class="i">+}
+</a><a href="#h2-0-248" id="h2-0-248" class="i">+
+</a><a href="#h2-0-249" id="h2-0-249" class="i">+// aggregateClientsStats creates a single Stats struct from those in multiple Clients.
+</a><a href="#h2-0-250" id="h2-0-250" class="i">+func aggregateClientsStats(clients []Client) Stats {
+</a><a href="#h2-0-251" id="h2-0-251" class="i">+	var multipleStats []Stats
+</a><a href="#h2-0-252" id="h2-0-252" class="i">+	var aggregatedStats Stats
+</a><a href="#h2-0-253" id="h2-0-253" class="i">+
+</a><a href="#h2-0-254" id="h2-0-254" class="i">+	for _, client := range clients {
+</a><a href="#h2-0-255" id="h2-0-255" class="i">+		multipleStats = append(multipleStats, client.Stats())
+</a><a href="#h2-0-256" id="h2-0-256" class="i">+	}
+</a><a href="#h2-0-257" id="h2-0-257" class="i">+
+</a><a href="#h2-0-258" id="h2-0-258" class="i">+	for _, stats := range multipleStats {
+</a><a href="#h2-0-259" id="h2-0-259" class="i">+		aggregatedStats.SuccessfulConnections += stats.SuccessfulConnections
+</a><a href="#h2-0-260" id="h2-0-260" class="i">+		aggregatedStats.FailedConnections += stats.FailedConnections
+</a><a href="#h2-0-261" id="h2-0-261" class="i">+	}
+</a><a href="#h2-0-262" id="h2-0-262" class="i">+
+</a><a href="#h2-0-263" id="h2-0-263" class="i">+	return aggregatedStats
+</a><a href="#h2-0-264" id="h2-0-264" class="i">+}
+</a></pre>
+</div>
+</body>
+</html>
