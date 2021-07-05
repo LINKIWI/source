@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/cli: Console table builder abstraction - wg - webgrep command line client</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="wg Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="wg Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i,
+a.line {
+	text-decoration: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>wg</h1><span class="desc">webgrep command line client</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/wg.git">https://source.static.kevinlin.info/wg.git</a></td></tr><tr><td></td><td>
+<a href="../log.html">Log</a> | <a href="../files.html">Files</a> | <a href="../refs.html">Refs</a> | <a href="../file/README.md.html">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/cb924351df4f1be8a3b10e1b46636625a3093fcd.html">cb924351df4f1be8a3b10e1b46636625a3093fcd</a>
+<b>parent</b> <a href="../commit/7116f648b908d7f8b27c3987b061f75e7bd6808f.html">7116f648b908d7f8b27c3987b061f75e7bd6808f</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Thu,  8 Aug 2019 21:09:54 -0700
+
+internal/cli: Console table builder abstraction
+
+<b>Diffstat:</b>
+<table><tr><td class="A">A</td><td><a href="#h0">internal/cli/table.go</a></td><td> | </td><td class="num">65</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+</table></pre><pre>1 file changed, 65 insertions(+), 0 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/cli/table.go.html">internal/cli/table.go</a> b/<a href="../file/internal/cli/table.go.html">internal/cli/table.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -0,0 +1,65 @@
+</a><a href="#h0-0-0" id="h0-0-0" class="i">+package cli
+</a><a href="#h0-0-1" id="h0-0-1" class="i">+
+</a><a href="#h0-0-2" id="h0-0-2" class="i">+import (
+</a><a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;fmt&quot;
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+	&quot;strings&quot;
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+)
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+// Table represents a console-printed text table.
+</a><a href="#h0-0-8" id="h0-0-8" class="i">+type Table struct {
+</a><a href="#h0-0-9" id="h0-0-9" class="i">+	grid         [][]string
+</a><a href="#h0-0-10" id="h0-0-10" class="i">+	columnWidths map[int]int
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+}
+</a><a href="#h0-0-12" id="h0-0-12" class="i">+
+</a><a href="#h0-0-13" id="h0-0-13" class="i">+// NewTable creates a new table instance with an empty grid.
+</a><a href="#h0-0-14" id="h0-0-14" class="i">+func NewTable() *Table {
+</a><a href="#h0-0-15" id="h0-0-15" class="i">+	return &amp;Table{
+</a><a href="#h0-0-16" id="h0-0-16" class="i">+		columnWidths: make(map[int]int),
+</a><a href="#h0-0-17" id="h0-0-17" class="i">+	}
+</a><a href="#h0-0-18" id="h0-0-18" class="i">+}
+</a><a href="#h0-0-19" id="h0-0-19" class="i">+
+</a><a href="#h0-0-20" id="h0-0-20" class="i">+// Add statefully adds a row to the grid.
+</a><a href="#h0-0-21" id="h0-0-21" class="i">+func (t *Table) Add(row []string) error {
+</a><a href="#h0-0-22" id="h0-0-22" class="i">+	if len(t.grid) &gt; 0 &amp;&amp; len(t.grid[0]) != len(row) {
+</a><a href="#h0-0-23" id="h0-0-23" class="i">+		return fmt.Errorf(&quot;table: column quantity in row inconsistent with existing grid&quot;)
+</a><a href="#h0-0-24" id="h0-0-24" class="i">+	}
+</a><a href="#h0-0-25" id="h0-0-25" class="i">+
+</a><a href="#h0-0-26" id="h0-0-26" class="i">+	t.grid = append(t.grid, row)
+</a><a href="#h0-0-27" id="h0-0-27" class="i">+
+</a><a href="#h0-0-28" id="h0-0-28" class="i">+	for idx, column := range row {
+</a><a href="#h0-0-29" id="h0-0-29" class="i">+		if width, ok := t.columnWidths[idx]; !ok || width &lt; len(column) {
+</a><a href="#h0-0-30" id="h0-0-30" class="i">+			t.columnWidths[idx] = len(column)
+</a><a href="#h0-0-31" id="h0-0-31" class="i">+		}
+</a><a href="#h0-0-32" id="h0-0-32" class="i">+	}
+</a><a href="#h0-0-33" id="h0-0-33" class="i">+
+</a><a href="#h0-0-34" id="h0-0-34" class="i">+	return nil
+</a><a href="#h0-0-35" id="h0-0-35" class="i">+}
+</a><a href="#h0-0-36" id="h0-0-36" class="i">+
+</a><a href="#h0-0-37" id="h0-0-37" class="i">+// IsEmpty indicates whether the table is not populated with any rows.
+</a><a href="#h0-0-38" id="h0-0-38" class="i">+func (t *Table) IsEmpty() bool {
+</a><a href="#h0-0-39" id="h0-0-39" class="i">+	return len(t.grid) == 0
+</a><a href="#h0-0-40" id="h0-0-40" class="i">+}
+</a><a href="#h0-0-41" id="h0-0-41" class="i">+
+</a><a href="#h0-0-42" id="h0-0-42" class="i">+// String returns a string representation of the grid, with some padding between columns.
+</a><a href="#h0-0-43" id="h0-0-43" class="i">+func (t *Table) String() string {
+</a><a href="#h0-0-44" id="h0-0-44" class="i">+	var table []string
+</a><a href="#h0-0-45" id="h0-0-45" class="i">+
+</a><a href="#h0-0-46" id="h0-0-46" class="i">+	for _, row := range t.grid {
+</a><a href="#h0-0-47" id="h0-0-47" class="i">+		var serializedRow []string
+</a><a href="#h0-0-48" id="h0-0-48" class="i">+
+</a><a href="#h0-0-49" id="h0-0-49" class="i">+		for idx, column := range row {
+</a><a href="#h0-0-50" id="h0-0-50" class="i">+			if idx == len(row)-1 {
+</a><a href="#h0-0-51" id="h0-0-51" class="i">+				serializedRow = append(serializedRow, column)
+</a><a href="#h0-0-52" id="h0-0-52" class="i">+			} else {
+</a><a href="#h0-0-53" id="h0-0-53" class="i">+				serializedRow = append(
+</a><a href="#h0-0-54" id="h0-0-54" class="i">+					serializedRow,
+</a><a href="#h0-0-55" id="h0-0-55" class="i">+					Pad(column, t.columnWidths[idx]+3),
+</a><a href="#h0-0-56" id="h0-0-56" class="i">+				)
+</a><a href="#h0-0-57" id="h0-0-57" class="i">+			}
+</a><a href="#h0-0-58" id="h0-0-58" class="i">+		}
+</a><a href="#h0-0-59" id="h0-0-59" class="i">+
+</a><a href="#h0-0-60" id="h0-0-60" class="i">+		table = append(table, strings.Join(serializedRow, &quot;&quot;))
+</a><a href="#h0-0-61" id="h0-0-61" class="i">+	}
+</a><a href="#h0-0-62" id="h0-0-62" class="i">+
+</a><a href="#h0-0-63" id="h0-0-63" class="i">+	return strings.Join(table, &quot;\n&quot;)
+</a><a href="#h0-0-64" id="h0-0-64" class="i">+}
+</a></pre>
+</div>
+</body>
+</html>

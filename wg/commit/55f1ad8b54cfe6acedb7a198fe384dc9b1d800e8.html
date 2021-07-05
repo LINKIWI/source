@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>cmd/wg: Main routine for printing search results - wg - webgrep command line client</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="wg Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="wg Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i,
+a.line {
+	text-decoration: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>wg</h1><span class="desc">webgrep command line client</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/wg.git">https://source.static.kevinlin.info/wg.git</a></td></tr><tr><td></td><td>
+<a href="../log.html">Log</a> | <a href="../files.html">Files</a> | <a href="../refs.html">Refs</a> | <a href="../file/README.md.html">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/55f1ad8b54cfe6acedb7a198fe384dc9b1d800e8.html">55f1ad8b54cfe6acedb7a198fe384dc9b1d800e8</a>
+<b>parent</b> <a href="../commit/cb924351df4f1be8a3b10e1b46636625a3093fcd.html">cb924351df4f1be8a3b10e1b46636625a3093fcd</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Thu,  8 Aug 2019 21:21:42 -0700
+
+cmd/wg: Main routine for printing search results
+
+<b>Diffstat:</b>
+<table><tr><td class="A">A</td><td><a href="#h0">cmd/wg/main.go</a></td><td> | </td><td class="num">121</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+</table></pre><pre>1 file changed, 121 insertions(+), 0 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/cmd/wg/main.go.html">cmd/wg/main.go</a> b/<a href="../file/cmd/wg/main.go.html">cmd/wg/main.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -0,0 +1,121 @@
+</a><a href="#h0-0-0" id="h0-0-0" class="i">+package main
+</a><a href="#h0-0-1" id="h0-0-1" class="i">+
+</a><a href="#h0-0-2" id="h0-0-2" class="i">+import (
+</a><a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;bufio&quot;
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+	&quot;flag&quot;
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+	&quot;fmt&quot;
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+	&quot;os&quot;
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+	&quot;strconv&quot;
+</a><a href="#h0-0-8" id="h0-0-8" class="i">+	&quot;strings&quot;
+</a><a href="#h0-0-9" id="h0-0-9" class="i">+
+</a><a href="#h0-0-10" id="h0-0-10" class="i">+	&quot;wg/internal/cli&quot;
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+	&quot;wg/internal/webgrep&quot;
+</a><a href="#h0-0-12" id="h0-0-12" class="i">+)
+</a><a href="#h0-0-13" id="h0-0-13" class="i">+
+</a><a href="#h0-0-14" id="h0-0-14" class="i">+var (
+</a><a href="#h0-0-15" id="h0-0-15" class="i">+	flagWebgrepURL    = flag.String(&quot;webgrep-url&quot;, &quot;&quot;, &quot;base URL of the webgrep instance&quot;)
+</a><a href="#h0-0-16" id="h0-0-16" class="i">+	flagRegex         = flag.Bool(&quot;regex&quot;, false, &quot;interpret search query as regular expression&quot;)
+</a><a href="#h0-0-17" id="h0-0-17" class="i">+	flagCaseSensitive = flag.Bool(&quot;case-sensitive&quot;, false, &quot;respect search query case sensitivity&quot;)
+</a><a href="#h0-0-18" id="h0-0-18" class="i">+	flagFile          = flag.String(&quot;file&quot;, &quot;&quot;, &quot;filter matches by file path pattern&quot;)
+</a><a href="#h0-0-19" id="h0-0-19" class="i">+	flagMaxMatches    = flag.Int(&quot;max-matches&quot;, 50, &quot;maximum number of matches in search results&quot;)
+</a><a href="#h0-0-20" id="h0-0-20" class="i">+	flagRepos         = cli.NewArrayFlag()
+</a><a href="#h0-0-21" id="h0-0-21" class="i">+	flagSearchType    = cli.NewChoicesFlag([]string{&quot;files&quot;, &quot;code&quot;}, &quot;code&quot;)
+</a><a href="#h0-0-22" id="h0-0-22" class="i">+)
+</a><a href="#h0-0-23" id="h0-0-23" class="i">+
+</a><a href="#h0-0-24" id="h0-0-24" class="i">+func init() {
+</a><a href="#h0-0-25" id="h0-0-25" class="i">+	flag.Var(flagRepos, &quot;repo&quot;, &quot;filter matches by repository name&quot;)
+</a><a href="#h0-0-26" id="h0-0-26" class="i">+	flag.Var(flagSearchType, &quot;search-type&quot;, &quot;search results type to print; one of {files, code}&quot;)
+</a><a href="#h0-0-27" id="h0-0-27" class="i">+	flag.Parse()
+</a><a href="#h0-0-28" id="h0-0-28" class="i">+
+</a><a href="#h0-0-29" id="h0-0-29" class="i">+	/* Rudimentary input validation */
+</a><a href="#h0-0-30" id="h0-0-30" class="i">+
+</a><a href="#h0-0-31" id="h0-0-31" class="i">+	if *flagWebgrepURL == &quot;&quot; {
+</a><a href="#h0-0-32" id="h0-0-32" class="i">+		panic(fmt.Errorf(&quot;main: no value specified for webgrep instance URL&quot;))
+</a><a href="#h0-0-33" id="h0-0-33" class="i">+	}
+</a><a href="#h0-0-34" id="h0-0-34" class="i">+}
+</a><a href="#h0-0-35" id="h0-0-35" class="i">+
+</a><a href="#h0-0-36" id="h0-0-36" class="i">+func main() {
+</a><a href="#h0-0-37" id="h0-0-37" class="i">+	// Instantiate a webgrep client
+</a><a href="#h0-0-38" id="h0-0-38" class="i">+	client, err := webgrep.NewClient(*flagWebgrepURL)
+</a><a href="#h0-0-39" id="h0-0-39" class="i">+	if err != nil {
+</a><a href="#h0-0-40" id="h0-0-40" class="i">+		panic(err)
+</a><a href="#h0-0-41" id="h0-0-41" class="i">+	}
+</a><a href="#h0-0-42" id="h0-0-42" class="i">+
+</a><a href="#h0-0-43" id="h0-0-43" class="i">+	// Read search query as input from stdin
+</a><a href="#h0-0-44" id="h0-0-44" class="i">+	reader := bufio.NewReader(os.Stdin)
+</a><a href="#h0-0-45" id="h0-0-45" class="i">+	input, err := reader.ReadString(&#39;\n&#39;)
+</a><a href="#h0-0-46" id="h0-0-46" class="i">+	if err != nil {
+</a><a href="#h0-0-47" id="h0-0-47" class="i">+		panic(err)
+</a><a href="#h0-0-48" id="h0-0-48" class="i">+	}
+</a><a href="#h0-0-49" id="h0-0-49" class="i">+
+</a><a href="#h0-0-50" id="h0-0-50" class="i">+	// Execute the search, respecting CLI flags as parameters
+</a><a href="#h0-0-51" id="h0-0-51" class="i">+	resp, searchErr := client.Search(&amp;webgrep.SearchQueryRequest{
+</a><a href="#h0-0-52" id="h0-0-52" class="i">+		Query:         strings.TrimSpace(input),
+</a><a href="#h0-0-53" id="h0-0-53" class="i">+		File:          *flagFile,
+</a><a href="#h0-0-54" id="h0-0-54" class="i">+		Repos:         flagRepos.Values(),
+</a><a href="#h0-0-55" id="h0-0-55" class="i">+		Regex:         *flagRegex,
+</a><a href="#h0-0-56" id="h0-0-56" class="i">+		CaseSensitive: *flagCaseSensitive,
+</a><a href="#h0-0-57" id="h0-0-57" class="i">+		MaxMatches:    *flagMaxMatches,
+</a><a href="#h0-0-58" id="h0-0-58" class="i">+	})
+</a><a href="#h0-0-59" id="h0-0-59" class="i">+	if searchErr != nil {
+</a><a href="#h0-0-60" id="h0-0-60" class="i">+		panic(searchErr)
+</a><a href="#h0-0-61" id="h0-0-61" class="i">+	}
+</a><a href="#h0-0-62" id="h0-0-62" class="i">+
+</a><a href="#h0-0-63" id="h0-0-63" class="i">+	rendered := cli.NewTable()
+</a><a href="#h0-0-64" id="h0-0-64" class="i">+
+</a><a href="#h0-0-65" id="h0-0-65" class="i">+	// Format results as requested by parameters
+</a><a href="#h0-0-66" id="h0-0-66" class="i">+	switch flagSearchType.Choice() {
+</a><a href="#h0-0-67" id="h0-0-67" class="i">+	case &quot;code&quot;:
+</a><a href="#h0-0-68" id="h0-0-68" class="i">+		for _, result := range resp.Code {
+</a><a href="#h0-0-69" id="h0-0-69" class="i">+			for _, line := range result.Lines {
+</a><a href="#h0-0-70" id="h0-0-70" class="i">+				source := line.Line
+</a><a href="#h0-0-71" id="h0-0-71" class="i">+				if len(line.Bounds) == 2 {
+</a><a href="#h0-0-72" id="h0-0-72" class="i">+					// Apply highlighting to the matching portion of the source
+</a><a href="#h0-0-73" id="h0-0-73" class="i">+					// line, if applicable
+</a><a href="#h0-0-74" id="h0-0-74" class="i">+					source = strings.Join([]string{
+</a><a href="#h0-0-75" id="h0-0-75" class="i">+						line.Line[:line.Bounds[0]],
+</a><a href="#h0-0-76" id="h0-0-76" class="i">+						cli.Highlight(line.Line[line.Bounds[0]:line.Bounds[1]]),
+</a><a href="#h0-0-77" id="h0-0-77" class="i">+						line.Line[line.Bounds[1]:],
+</a><a href="#h0-0-78" id="h0-0-78" class="i">+					}, &quot;&quot;)
+</a><a href="#h0-0-79" id="h0-0-79" class="i">+				}
+</a><a href="#h0-0-80" id="h0-0-80" class="i">+
+</a><a href="#h0-0-81" id="h0-0-81" class="i">+				row := []string{
+</a><a href="#h0-0-82" id="h0-0-82" class="i">+					result.Version,
+</a><a href="#h0-0-83" id="h0-0-83" class="i">+					result.Repo,
+</a><a href="#h0-0-84" id="h0-0-84" class="i">+					result.Path,
+</a><a href="#h0-0-85" id="h0-0-85" class="i">+					strconv.Itoa(line.Number),
+</a><a href="#h0-0-86" id="h0-0-86" class="i">+					fmt.Sprintf(&quot;|%s&quot;, source),
+</a><a href="#h0-0-87" id="h0-0-87" class="i">+				}
+</a><a href="#h0-0-88" id="h0-0-88" class="i">+
+</a><a href="#h0-0-89" id="h0-0-89" class="i">+				if err := rendered.Add(row); err != nil {
+</a><a href="#h0-0-90" id="h0-0-90" class="i">+					panic(err)
+</a><a href="#h0-0-91" id="h0-0-91" class="i">+				}
+</a><a href="#h0-0-92" id="h0-0-92" class="i">+			}
+</a><a href="#h0-0-93" id="h0-0-93" class="i">+		}
+</a><a href="#h0-0-94" id="h0-0-94" class="i">+
+</a><a href="#h0-0-95" id="h0-0-95" class="i">+	case &quot;files&quot;:
+</a><a href="#h0-0-96" id="h0-0-96" class="i">+		for _, result := range resp.Files {
+</a><a href="#h0-0-97" id="h0-0-97" class="i">+			path := strings.Join([]string{
+</a><a href="#h0-0-98" id="h0-0-98" class="i">+				result.Path[:result.Bounds[0]],
+</a><a href="#h0-0-99" id="h0-0-99" class="i">+				cli.Highlight(result.Path[result.Bounds[0]:result.Bounds[1]]),
+</a><a href="#h0-0-100" id="h0-0-100" class="i">+				result.Path[result.Bounds[1]:],
+</a><a href="#h0-0-101" id="h0-0-101" class="i">+			}, &quot;&quot;)
+</a><a href="#h0-0-102" id="h0-0-102" class="i">+
+</a><a href="#h0-0-103" id="h0-0-103" class="i">+			row := []string{
+</a><a href="#h0-0-104" id="h0-0-104" class="i">+				result.Version,
+</a><a href="#h0-0-105" id="h0-0-105" class="i">+				result.Repo,
+</a><a href="#h0-0-106" id="h0-0-106" class="i">+				path,
+</a><a href="#h0-0-107" id="h0-0-107" class="i">+			}
+</a><a href="#h0-0-108" id="h0-0-108" class="i">+
+</a><a href="#h0-0-109" id="h0-0-109" class="i">+			if err := rendered.Add(row); err != nil {
+</a><a href="#h0-0-110" id="h0-0-110" class="i">+				panic(err)
+</a><a href="#h0-0-111" id="h0-0-111" class="i">+			}
+</a><a href="#h0-0-112" id="h0-0-112" class="i">+		}
+</a><a href="#h0-0-113" id="h0-0-113" class="i">+
+</a><a href="#h0-0-114" id="h0-0-114" class="i">+	default:
+</a><a href="#h0-0-115" id="h0-0-115" class="i">+	}
+</a><a href="#h0-0-116" id="h0-0-116" class="i">+
+</a><a href="#h0-0-117" id="h0-0-117" class="i">+	if !rendered.IsEmpty() {
+</a><a href="#h0-0-118" id="h0-0-118" class="i">+		fmt.Println(rendered)
+</a><a href="#h0-0-119" id="h0-0-119" class="i">+	}
+</a><a href="#h0-0-120" id="h0-0-120" class="i">+}
+</a></pre>
+</div>
+</body>
+</html>
