@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Clipboard, source preview, single file search context menu on file results - webgrep - Web client for livegrep</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="webgrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="webgrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i,
+a.line {
+	text-decoration: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>webgrep</h1><span class="desc">Web client for livegrep</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/webgrep.git">https://source.static.kevinlin.info/webgrep.git</a></td></tr><tr><td></td><td>
+<a href="../log.html">Log</a> | <a href="../files.html">Files</a> | <a href="../refs.html">Refs</a> | <a href="../file/README.md.html">README</a> | <a href="../file/LICENSE.html">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/15ccf0cef00eec622935e1292534ddef461d5e27.html">15ccf0cef00eec622935e1292534ddef461d5e27</a>
+<b>parent</b> <a href="../commit/2046ddca0b5301be42a1f51548f3475baefcc918.html">2046ddca0b5301be42a1f51548f3475baefcc918</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sat, 18 Jul 2020 16:58:50 -0700
+
+Clipboard, source preview, single file search context menu on file results
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">src/client/app/react/components/ui/overflow-menu/index.js</a></td><td> | </td><td class="num">1</td><td><span class="i">+</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">src/client/app/react/containers/search/results/code-snippet.js</a></td><td> | </td><td class="num">2</td><td><span class="i">+</span><span class="d">-</span></td></tr>
+<tr><td class="A">A</td><td><a href="#h2">src/client/app/react/containers/search/results/file-entry.js</a></td><td> | </td><td class="num">227</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">src/client/app/react/containers/search/results/file-results.js</a></td><td> | </td><td class="num">150</td><td><span class="i">++++++++++++++++++++++++++++++++</span><span class="d">-----------------------------------------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h4">src/client/app/react/containers/search/results/index.js</a></td><td> | </td><td class="num">10</td><td><span class="i">++++++++</span><span class="d">--</span></td></tr>
+</table></pre><pre>5 files changed, 298 insertions(+), 92 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/src/client/app/react/components/ui/overflow-menu/index.js.html">src/client/app/react/components/ui/overflow-menu/index.js</a> b/<a href="../file/src/client/app/react/components/ui/overflow-menu/index.js.html">src/client/app/react/components/ui/overflow-menu/index.js</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -143,6 +143,7 @@ export default compose(
+</a>     key: &#39;isMenuVisible&#39;,
+     enable: &#39;showMenu&#39;,
+     disable: &#39;hideMenu&#39;,
+<a href="#h0-0-3" id="h0-0-3" class="i">+    allowOverride: true,
+</a>   }),
+   withToggleState({
+     key: &#39;isOverflowHover&#39;,
+<b>diff --git a/<a id="h1" href="../file/src/client/app/react/containers/search/results/code-snippet.js.html">src/client/app/react/containers/search/results/code-snippet.js</a> b/<a href="../file/src/client/app/react/containers/search/results/code-snippet.js.html">src/client/app/react/containers/search/results/code-snippet.js</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -83,8 +83,8 @@ class CodeSnippetContainer extends Component {
+</a>         handleFormChange(&#39;sourcePreviewLine&#39;)(line.number);
+       }
+ 
+<a href="#h1-0-3" id="h1-0-3" class="d">-      showSourcePreview();
+</a>       recordTelemetryEvent(TELEMETRY_ACTIONS.SOURCE_PREVIEW);
+<a href="#h1-0-5" id="h1-0-5" class="i">+      showSourcePreview();
+</a>     };
+   }
+ 
+<b>diff --git a/<a id="h2" href="../file/src/client/app/react/containers/search/results/file-entry.js.html">src/client/app/react/containers/search/results/file-entry.js</a> b/<a href="../file/src/client/app/react/containers/search/results/file-entry.js.html">src/client/app/react/containers/search/results/file-entry.js</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -0,0 +1,227 @@
+</a><a href="#h2-0-0" id="h2-0-0" class="i">+import PropTypes from &#39;prop-types&#39;;
+</a><a href="#h2-0-1" id="h2-0-1" class="i">+import React, { createRef, Component } from &#39;react&#39;;
+</a><a href="#h2-0-2" id="h2-0-2" class="i">+import { Spacing } from &#39;react-elemental&#39;;
+</a><a href="#h2-0-3" id="h2-0-3" class="i">+import { MdCode, MdContentCopy, MdSearch } from &#39;react-icons/md&#39;;
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+import { compose, withToggleState } from &#39;@linkiwi/hoc&#39;;
+</a><a href="#h2-0-5" id="h2-0-5" class="i">+import withClipboard from &#39;client/app/react/containers/hoc/with-clipboard&#39;;
+</a><a href="#h2-0-6" id="h2-0-6" class="i">+import withTelemetry from &#39;client/app/react/containers/hoc/with-telemetry&#39;;
+</a><a href="#h2-0-7" id="h2-0-7" class="i">+import withToast from &#39;client/app/react/containers/hoc/with-toast&#39;;
+</a><a href="#h2-0-8" id="h2-0-8" class="i">+import SourcePreviewContainer from &#39;client/app/react/containers/source/preview&#39;;
+</a><a href="#h2-0-9" id="h2-0-9" class="i">+import FileHeader from &#39;client/app/react/components/search/results/file-header&#39;;
+</a><a href="#h2-0-10" id="h2-0-10" class="i">+import OverflowMenu from &#39;client/app/react/components/ui/overflow-menu&#39;;
+</a><a href="#h2-0-11" id="h2-0-11" class="i">+import ButtonMenuItem from &#39;client/app/react/components/ui/overflow-menu/button-menu-item&#39;;
+</a><a href="#h2-0-12" id="h2-0-12" class="i">+import { string } from &#39;client/app/util/format&#39;;
+</a><a href="#h2-0-13" id="h2-0-13" class="i">+import { scroll } from &#39;client/app/util/navigation&#39;;
+</a><a href="#h2-0-14" id="h2-0-14" class="i">+import { transition } from &#39;client/app/util/style/transition&#39;;
+</a><a href="#h2-0-15" id="h2-0-15" class="i">+import { TELEMETRY_ACTIONS } from &#39;shared/constants/telemetry&#39;;
+</a><a href="#h2-0-16" id="h2-0-16" class="i">+import { objLookup } from &#39;shared/util/data&#39;;
+</a><a href="#h2-0-17" id="h2-0-17" class="i">+
+</a><a href="#h2-0-18" id="h2-0-18" class="i">+class FileEntry extends Component {
+</a><a href="#h2-0-19" id="h2-0-19" class="i">+  static propTypes = {
+</a><a href="#h2-0-20" id="h2-0-20" class="i">+    file: PropTypes.shape({
+</a><a href="#h2-0-21" id="h2-0-21" class="i">+      repo: PropTypes.string.isRequired,
+</a><a href="#h2-0-22" id="h2-0-22" class="i">+      version: PropTypes.string.isRequired,
+</a><a href="#h2-0-23" id="h2-0-23" class="i">+      path: PropTypes.string.isRequired,
+</a><a href="#h2-0-24" id="h2-0-24" class="i">+      bounds: PropTypes.array.isRequired,
+</a><a href="#h2-0-25" id="h2-0-25" class="i">+    }).isRequired,
+</a><a href="#h2-0-26" id="h2-0-26" class="i">+    repositories: PropTypes.object.isRequired,
+</a><a href="#h2-0-27" id="h2-0-27" class="i">+    windowWidth: PropTypes.number.isRequired,
+</a><a href="#h2-0-28" id="h2-0-28" class="i">+    onSearchQueryChange: PropTypes.func.isRequired,
+</a><a href="#h2-0-29" id="h2-0-29" class="i">+    onSearchRepositoryFilePathChange: PropTypes.func.isRequired,
+</a><a href="#h2-0-30" id="h2-0-30" class="i">+    // HOC props
+</a><a href="#h2-0-31" id="h2-0-31" class="i">+    recordTelemetryEvent: PropTypes.func.isRequired,
+</a><a href="#h2-0-32" id="h2-0-32" class="i">+    clipboard: PropTypes.shape({
+</a><a href="#h2-0-33" id="h2-0-33" class="i">+      read: PropTypes.func.isRequired,
+</a><a href="#h2-0-34" id="h2-0-34" class="i">+      write: PropTypes.func.isRequired,
+</a><a href="#h2-0-35" id="h2-0-35" class="i">+    }).isRequired,
+</a><a href="#h2-0-36" id="h2-0-36" class="i">+    toast: PropTypes.func.isRequired,
+</a><a href="#h2-0-37" id="h2-0-37" class="i">+    isOverflowMenuVisible: PropTypes.bool.isRequired,
+</a><a href="#h2-0-38" id="h2-0-38" class="i">+    showOverflowMenu: PropTypes.func.isRequired,
+</a><a href="#h2-0-39" id="h2-0-39" class="i">+    hideOverflowMenu: PropTypes.func.isRequired,
+</a><a href="#h2-0-40" id="h2-0-40" class="i">+    isSourcePreviewVisible: PropTypes.bool.isRequired,
+</a><a href="#h2-0-41" id="h2-0-41" class="i">+    showSourcePreview: PropTypes.func.isRequired,
+</a><a href="#h2-0-42" id="h2-0-42" class="i">+    hideSourcePreview: PropTypes.func.isRequired,
+</a><a href="#h2-0-43" id="h2-0-43" class="i">+    isHover: PropTypes.bool.isRequired,
+</a><a href="#h2-0-44" id="h2-0-44" class="i">+    handleMouseEnter: PropTypes.func.isRequired,
+</a><a href="#h2-0-45" id="h2-0-45" class="i">+    handleMouseLeave: PropTypes.func.isRequired,
+</a><a href="#h2-0-46" id="h2-0-46" class="i">+  };
+</a><a href="#h2-0-47" id="h2-0-47" class="i">+
+</a><a href="#h2-0-48" id="h2-0-48" class="i">+  overflow = createRef();
+</a><a href="#h2-0-49" id="h2-0-49" class="i">+
+</a><a href="#h2-0-50" id="h2-0-50" class="i">+  handlePathClick = this._handlePathClick.bind(this);
+</a><a href="#h2-0-51" id="h2-0-51" class="i">+
+</a><a href="#h2-0-52" id="h2-0-52" class="i">+  handlePathCopy = this._handlePathCopy.bind(this);
+</a><a href="#h2-0-53" id="h2-0-53" class="i">+
+</a><a href="#h2-0-54" id="h2-0-54" class="i">+  handleSourcePreview = this._handleSourcePreview.bind(this);
+</a><a href="#h2-0-55" id="h2-0-55" class="i">+
+</a><a href="#h2-0-56" id="h2-0-56" class="i">+  handleSingleFileSearch = this._handleSingleFileSearch.bind(this);
+</a><a href="#h2-0-57" id="h2-0-57" class="i">+
+</a><a href="#h2-0-58" id="h2-0-58" class="i">+  _handlePathClick() {
+</a><a href="#h2-0-59" id="h2-0-59" class="i">+    const { file, recordTelemetryEvent } = this.props;
+</a><a href="#h2-0-60" id="h2-0-60" class="i">+
+</a><a href="#h2-0-61" id="h2-0-61" class="i">+    recordTelemetryEvent(TELEMETRY_ACTIONS.CLICK_FILE_RESULT_PATH, 1, { repo: file.repo });
+</a><a href="#h2-0-62" id="h2-0-62" class="i">+  }
+</a><a href="#h2-0-63" id="h2-0-63" class="i">+
+</a><a href="#h2-0-64" id="h2-0-64" class="i">+  _handlePathCopy() {
+</a><a href="#h2-0-65" id="h2-0-65" class="i">+    const { file, clipboard, toast, recordTelemetryEvent } = this.props;
+</a><a href="#h2-0-66" id="h2-0-66" class="i">+
+</a><a href="#h2-0-67" id="h2-0-67" class="i">+    recordTelemetryEvent(TELEMETRY_ACTIONS.CLIPBOARD_WRITE);
+</a><a href="#h2-0-68" id="h2-0-68" class="i">+    clipboard.write(file.path, (err) =&gt; toast(err ?
+</a><a href="#h2-0-69" id="h2-0-69" class="i">+      &#39;There was an error writing to the system clipboard.&#39; :
+</a><a href="#h2-0-70" id="h2-0-70" class="i">+      `Copied to clipboard: ${file.path}`));
+</a><a href="#h2-0-71" id="h2-0-71" class="i">+  }
+</a><a href="#h2-0-72" id="h2-0-72" class="i">+
+</a><a href="#h2-0-73" id="h2-0-73" class="i">+  _handleSourcePreview() {
+</a><a href="#h2-0-74" id="h2-0-74" class="i">+    const { recordTelemetryEvent, showSourcePreview } = this.props;
+</a><a href="#h2-0-75" id="h2-0-75" class="i">+
+</a><a href="#h2-0-76" id="h2-0-76" class="i">+    recordTelemetryEvent(TELEMETRY_ACTIONS.SOURCE_PREVIEW);
+</a><a href="#h2-0-77" id="h2-0-77" class="i">+    showSourcePreview();
+</a><a href="#h2-0-78" id="h2-0-78" class="i">+  }
+</a><a href="#h2-0-79" id="h2-0-79" class="i">+
+</a><a href="#h2-0-80" id="h2-0-80" class="i">+  _handleSingleFileSearch() {
+</a><a href="#h2-0-81" id="h2-0-81" class="i">+    const { file, toast, onSearchRepositoryFilePathChange } = this.props;
+</a><a href="#h2-0-82" id="h2-0-82" class="i">+
+</a><a href="#h2-0-83" id="h2-0-83" class="i">+    onSearchRepositoryFilePathChange(file.repo, file.path);
+</a><a href="#h2-0-84" id="h2-0-84" class="i">+    toast(`Applied search filters: repository ${file.repo} and file path ${file.path}.`);
+</a><a href="#h2-0-85" id="h2-0-85" class="i">+    scroll();
+</a><a href="#h2-0-86" id="h2-0-86" class="i">+  }
+</a><a href="#h2-0-87" id="h2-0-87" class="i">+
+</a><a href="#h2-0-88" id="h2-0-88" class="i">+  render() {
+</a><a href="#h2-0-89" id="h2-0-89" class="i">+    const {
+</a><a href="#h2-0-90" id="h2-0-90" class="i">+      file,
+</a><a href="#h2-0-91" id="h2-0-91" class="i">+      repositories,
+</a><a href="#h2-0-92" id="h2-0-92" class="i">+      windowWidth,
+</a><a href="#h2-0-93" id="h2-0-93" class="i">+      isOverflowMenuVisible,
+</a><a href="#h2-0-94" id="h2-0-94" class="i">+      showOverflowMenu,
+</a><a href="#h2-0-95" id="h2-0-95" class="i">+      hideOverflowMenu,
+</a><a href="#h2-0-96" id="h2-0-96" class="i">+      isSourcePreviewVisible,
+</a><a href="#h2-0-97" id="h2-0-97" class="i">+      hideSourcePreview,
+</a><a href="#h2-0-98" id="h2-0-98" class="i">+      isHover,
+</a><a href="#h2-0-99" id="h2-0-99" class="i">+      handleMouseEnter,
+</a><a href="#h2-0-100" id="h2-0-100" class="i">+      handleMouseLeave,
+</a><a href="#h2-0-101" id="h2-0-101" class="i">+      onSearchQueryChange,
+</a><a href="#h2-0-102" id="h2-0-102" class="i">+    } = this.props;
+</a><a href="#h2-0-103" id="h2-0-103" class="i">+
+</a><a href="#h2-0-104" id="h2-0-104" class="i">+    const isOverflowMenuCompact = this.overflow.current &amp;&amp; (() =&gt; {
+</a><a href="#h2-0-105" id="h2-0-105" class="i">+      const { x: overflowMenuX } = this.overflow.current.getBoundingClientRect();
+</a><a href="#h2-0-106" id="h2-0-106" class="i">+      return windowWidth - overflowMenuX &lt; 170;
+</a><a href="#h2-0-107" id="h2-0-107" class="i">+    })();
+</a><a href="#h2-0-108" id="h2-0-108" class="i">+
+</a><a href="#h2-0-109" id="h2-0-109" class="i">+    const containerStyle = {
+</a><a href="#h2-0-110" id="h2-0-110" class="i">+      alignItems: &#39;center&#39;,
+</a><a href="#h2-0-111" id="h2-0-111" class="i">+      display: &#39;inline-flex&#39;,
+</a><a href="#h2-0-112" id="h2-0-112" class="i">+    };
+</a><a href="#h2-0-113" id="h2-0-113" class="i">+
+</a><a href="#h2-0-114" id="h2-0-114" class="i">+    const overflowStyle = {
+</a><a href="#h2-0-115" id="h2-0-115" class="i">+      opacity: 0,
+</a><a href="#h2-0-116" id="h2-0-116" class="i">+      transition: transition.all.DEFAULT,
+</a><a href="#h2-0-117" id="h2-0-117" class="i">+      ...(isHover || isOverflowMenuVisible) &amp;&amp; {
+</a><a href="#h2-0-118" id="h2-0-118" class="i">+        opacity: 1,
+</a><a href="#h2-0-119" id="h2-0-119" class="i">+      },
+</a><a href="#h2-0-120" id="h2-0-120" class="i">+    };
+</a><a href="#h2-0-121" id="h2-0-121" class="i">+
+</a><a href="#h2-0-122" id="h2-0-122" class="i">+    const overflowMenuStyle = {
+</a><a href="#h2-0-123" id="h2-0-123" class="i">+      // OverflowMenu sets and unsets position `left` and `right` properties to switch between
+</a><a href="#h2-0-124" id="h2-0-124" class="i">+      // mirrored and standard modes. Unfortunately, this makes transitions between the two states
+</a><a href="#h2-0-125" id="h2-0-125" class="i">+      // impossible. Since the width of the overflow menu is known in advance, the following logic
+</a><a href="#h2-0-126" id="h2-0-126" class="i">+      // overrides the overflow menu positioning in a way that is compatible with transitions.
+</a><a href="#h2-0-127" id="h2-0-127" class="i">+      left: &#39;unset&#39;,
+</a><a href="#h2-0-128" id="h2-0-128" class="i">+      right: 0,
+</a><a href="#h2-0-129" id="h2-0-129" class="i">+      width: &#39;155px&#39;,
+</a><a href="#h2-0-130" id="h2-0-130" class="i">+      marginRight: &#39;-128px&#39;,
+</a><a href="#h2-0-131" id="h2-0-131" class="i">+      ...isOverflowMenuCompact &amp;&amp; {
+</a><a href="#h2-0-132" id="h2-0-132" class="i">+        marginRight: 0,
+</a><a href="#h2-0-133" id="h2-0-133" class="i">+      },
+</a><a href="#h2-0-134" id="h2-0-134" class="i">+    };
+</a><a href="#h2-0-135" id="h2-0-135" class="i">+
+</a><a href="#h2-0-136" id="h2-0-136" class="i">+    return (
+</a><a href="#h2-0-137" id="h2-0-137" class="i">+      &lt;div
+</a><a href="#h2-0-138" id="h2-0-138" class="i">+        onMouseEnter={handleMouseEnter}
+</a><a href="#h2-0-139" id="h2-0-139" class="i">+        onMouseLeave={handleMouseLeave}
+</a><a href="#h2-0-140" id="h2-0-140" class="i">+        style={containerStyle}
+</a><a href="#h2-0-141" id="h2-0-141" class="i">+      &gt;
+</a><a href="#h2-0-142" id="h2-0-142" class="i">+        &lt;div&gt;
+</a><a href="#h2-0-143" id="h2-0-143" class="i">+          &lt;FileHeader
+</a><a href="#h2-0-144" id="h2-0-144" class="i">+            repo={file.repo}
+</a><a href="#h2-0-145" id="h2-0-145" class="i">+            path={file.path}
+</a><a href="#h2-0-146" id="h2-0-146" class="i">+            bounds={file.bounds}
+</a><a href="#h2-0-147" id="h2-0-147" class="i">+            repoHref={string(objLookup(repositories, [file.repo, &#39;url&#39;]), {
+</a><a href="#h2-0-148" id="h2-0-148" class="i">+              name: file.repo,
+</a><a href="#h2-0-149" id="h2-0-149" class="i">+              version: file.version.replace(/.*\//g, &#39;&#39;),
+</a><a href="#h2-0-150" id="h2-0-150" class="i">+              path: &#39;&#39;,
+</a><a href="#h2-0-151" id="h2-0-151" class="i">+              lno: &#39;&#39;,
+</a><a href="#h2-0-152" id="h2-0-152" class="i">+            })}
+</a><a href="#h2-0-153" id="h2-0-153" class="i">+            pathHref={string(objLookup(repositories, [file.repo, &#39;url&#39;]), {
+</a><a href="#h2-0-154" id="h2-0-154" class="i">+              name: file.repo,
+</a><a href="#h2-0-155" id="h2-0-155" class="i">+              version: file.version.replace(/.*\//g, &#39;&#39;),
+</a><a href="#h2-0-156" id="h2-0-156" class="i">+              path: file.path,
+</a><a href="#h2-0-157" id="h2-0-157" class="i">+              lno: 1,
+</a><a href="#h2-0-158" id="h2-0-158" class="i">+            })}
+</a><a href="#h2-0-159" id="h2-0-159" class="i">+            onPathClick={this.handlePathClick}
+</a><a href="#h2-0-160" id="h2-0-160" class="i">+          /&gt;
+</a><a href="#h2-0-161" id="h2-0-161" class="i">+        &lt;/div&gt;
+</a><a href="#h2-0-162" id="h2-0-162" class="i">+
+</a><a href="#h2-0-163" id="h2-0-163" class="i">+        &lt;Spacing size=&quot;small&quot; style={overflowStyle} left&gt;
+</a><a href="#h2-0-164" id="h2-0-164" class="i">+          &lt;div ref={this.overflow}&gt;
+</a><a href="#h2-0-165" id="h2-0-165" class="i">+            &lt;OverflowMenu
+</a><a href="#h2-0-166" id="h2-0-166" class="i">+              isMenuVisible={isOverflowMenuVisible}
+</a><a href="#h2-0-167" id="h2-0-167" class="i">+              showMenu={showOverflowMenu}
+</a><a href="#h2-0-168" id="h2-0-168" class="i">+              hideMenu={hideOverflowMenu}
+</a><a href="#h2-0-169" id="h2-0-169" class="i">+              buttonStyle={{ height: &#39;18px&#39; }}
+</a><a href="#h2-0-170" id="h2-0-170" class="i">+              menuStyle={overflowMenuStyle}
+</a><a href="#h2-0-171" id="h2-0-171" class="i">+              mirrored={!isOverflowMenuCompact}
+</a><a href="#h2-0-172" id="h2-0-172" class="i">+            &gt;
+</a><a href="#h2-0-173" id="h2-0-173" class="i">+              &lt;ButtonMenuItem
+</a><a href="#h2-0-174" id="h2-0-174" class="i">+                label=&quot;Copy file path&quot;
+</a><a href="#h2-0-175" id="h2-0-175" class="i">+                icon={&lt;MdContentCopy style={{ display: &#39;inherit&#39; }} /&gt;}
+</a><a href="#h2-0-176" id="h2-0-176" class="i">+                onClick={this.handlePathCopy}
+</a><a href="#h2-0-177" id="h2-0-177" class="i">+              /&gt;
+</a><a href="#h2-0-178" id="h2-0-178" class="i">+              &lt;ButtonMenuItem
+</a><a href="#h2-0-179" id="h2-0-179" class="i">+                label=&quot;Preview source&quot;
+</a><a href="#h2-0-180" id="h2-0-180" class="i">+                icon={&lt;MdCode style={{ display: &#39;inherit&#39; }} /&gt;}
+</a><a href="#h2-0-181" id="h2-0-181" class="i">+                onClick={this.handleSourcePreview}
+</a><a href="#h2-0-182" id="h2-0-182" class="i">+              /&gt;
+</a><a href="#h2-0-183" id="h2-0-183" class="i">+              &lt;ButtonMenuItem
+</a><a href="#h2-0-184" id="h2-0-184" class="i">+                label=&quot;Search this file&quot;
+</a><a href="#h2-0-185" id="h2-0-185" class="i">+                icon={&lt;MdSearch style={{ display: &#39;inherit&#39; }} /&gt;}
+</a><a href="#h2-0-186" id="h2-0-186" class="i">+                onClick={this.handleSingleFileSearch}
+</a><a href="#h2-0-187" id="h2-0-187" class="i">+              /&gt;
+</a><a href="#h2-0-188" id="h2-0-188" class="i">+            &lt;/OverflowMenu&gt;
+</a><a href="#h2-0-189" id="h2-0-189" class="i">+          &lt;/div&gt;
+</a><a href="#h2-0-190" id="h2-0-190" class="i">+        &lt;/Spacing&gt;
+</a><a href="#h2-0-191" id="h2-0-191" class="i">+
+</a><a href="#h2-0-192" id="h2-0-192" class="i">+        {isSourcePreviewVisible &amp;&amp; (
+</a><a href="#h2-0-193" id="h2-0-193" class="i">+          &lt;SourcePreviewContainer
+</a><a href="#h2-0-194" id="h2-0-194" class="i">+            repo={file.repo}
+</a><a href="#h2-0-195" id="h2-0-195" class="i">+            version={file.version}
+</a><a href="#h2-0-196" id="h2-0-196" class="i">+            path={file.path}
+</a><a href="#h2-0-197" id="h2-0-197" class="i">+            urlPattern={objLookup(repositories, [file.repo, &#39;url&#39;])}
+</a><a href="#h2-0-198" id="h2-0-198" class="i">+            onHide={hideSourcePreview}
+</a><a href="#h2-0-199" id="h2-0-199" class="i">+            onSearchQueryChange={onSearchQueryChange}
+</a><a href="#h2-0-200" id="h2-0-200" class="i">+          /&gt;
+</a><a href="#h2-0-201" id="h2-0-201" class="i">+        )}
+</a><a href="#h2-0-202" id="h2-0-202" class="i">+      &lt;/div&gt;
+</a><a href="#h2-0-203" id="h2-0-203" class="i">+    );
+</a><a href="#h2-0-204" id="h2-0-204" class="i">+  }
+</a><a href="#h2-0-205" id="h2-0-205" class="i">+}
+</a><a href="#h2-0-206" id="h2-0-206" class="i">+
+</a><a href="#h2-0-207" id="h2-0-207" class="i">+export default compose(
+</a><a href="#h2-0-208" id="h2-0-208" class="i">+  withClipboard,
+</a><a href="#h2-0-209" id="h2-0-209" class="i">+  withTelemetry,
+</a><a href="#h2-0-210" id="h2-0-210" class="i">+  withToast,
+</a><a href="#h2-0-211" id="h2-0-211" class="i">+  withToggleState({
+</a><a href="#h2-0-212" id="h2-0-212" class="i">+    key: &#39;isOverflowMenuVisible&#39;,
+</a><a href="#h2-0-213" id="h2-0-213" class="i">+    enable: &#39;showOverflowMenu&#39;,
+</a><a href="#h2-0-214" id="h2-0-214" class="i">+    disable: &#39;hideOverflowMenu&#39;,
+</a><a href="#h2-0-215" id="h2-0-215" class="i">+  }),
+</a><a href="#h2-0-216" id="h2-0-216" class="i">+  withToggleState({
+</a><a href="#h2-0-217" id="h2-0-217" class="i">+    key: &#39;isSourcePreviewVisible&#39;,
+</a><a href="#h2-0-218" id="h2-0-218" class="i">+    enable: &#39;showSourcePreview&#39;,
+</a><a href="#h2-0-219" id="h2-0-219" class="i">+    disable: &#39;hideSourcePreview&#39;,
+</a><a href="#h2-0-220" id="h2-0-220" class="i">+  }),
+</a><a href="#h2-0-221" id="h2-0-221" class="i">+  withToggleState({
+</a><a href="#h2-0-222" id="h2-0-222" class="i">+    key: &#39;isHover&#39;,
+</a><a href="#h2-0-223" id="h2-0-223" class="i">+    enable: &#39;handleMouseEnter&#39;,
+</a><a href="#h2-0-224" id="h2-0-224" class="i">+    disable: &#39;handleMouseLeave&#39;,
+</a><a href="#h2-0-225" id="h2-0-225" class="i">+  }),
+</a><a href="#h2-0-226" id="h2-0-226" class="i">+)(FileEntry);
+</a><b>diff --git a/<a id="h3" href="../file/src/client/app/react/containers/search/results/file-results.js.html">src/client/app/react/containers/search/results/file-results.js</a> b/<a href="../file/src/client/app/react/containers/search/results/file-results.js.html">src/client/app/react/containers/search/results/file-results.js</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -1,99 +1,71 @@
+</a> import PropTypes from &#39;prop-types&#39;;
+<a href="#h3-0-1" id="h3-0-1" class="d">-import React, { Component, Fragment } from &#39;react&#39;;
+</a><a href="#h3-0-2" id="h3-0-2" class="i">+import React, { Fragment } from &#39;react&#39;;
+</a> import { Spacing } from &#39;react-elemental&#39;;
+<a href="#h3-0-4" id="h3-0-4" class="d">-import { compose, withToggleState } from &#39;@linkiwi/hoc&#39;;
+</a><a href="#h3-0-5" id="h3-0-5" class="d">-import withTelemetry from &#39;client/app/react/containers/hoc/with-telemetry&#39;;
+</a><a href="#h3-0-6" id="h3-0-6" class="d">-import FileHeader from &#39;client/app/react/components/search/results/file-header&#39;;
+</a><a href="#h3-0-7" id="h3-0-7" class="i">+import { withToggleState } from &#39;@linkiwi/hoc&#39;;
+</a><a href="#h3-0-8" id="h3-0-8" class="i">+import FileEntryContainer from &#39;client/app/react/containers/search/results/file-entry&#39;;
+</a> import Spoiler from &#39;client/app/react/components/ui/spoiler&#39;;
+<a href="#h3-0-10" id="h3-0-10" class="d">-import { string } from &#39;client/app/util/format&#39;;
+</a><a href="#h3-0-11" id="h3-0-11" class="d">-import { TELEMETRY_ACTIONS } from &#39;shared/constants/telemetry&#39;;
+</a><a href="#h3-0-12" id="h3-0-12" class="d">-import { objLookup } from &#39;shared/util/data&#39;;
+</a> 
+ /**
+  * List of results for matching files.
+  */
+<a href="#h3-0-17" id="h3-0-17" class="d">-class FileResultsContainer extends Component {
+</a><a href="#h3-0-18" id="h3-0-18" class="d">-  static propTypes = {
+</a><a href="#h3-0-19" id="h3-0-19" class="d">-    files: PropTypes.array.isRequired,
+</a><a href="#h3-0-20" id="h3-0-20" class="d">-    repositories: PropTypes.object.isRequired,
+</a><a href="#h3-0-21" id="h3-0-21" class="d">-    fileResultsLimit: PropTypes.number.isRequired,
+</a><a href="#h3-0-22" id="h3-0-22" class="d">-    // HOC props
+</a><a href="#h3-0-23" id="h3-0-23" class="d">-    recordTelemetryEvent: PropTypes.func.isRequired,
+</a><a href="#h3-0-24" id="h3-0-24" class="d">-    isExpanded: PropTypes.bool.isRequired,
+</a><a href="#h3-0-25" id="h3-0-25" class="d">-    expand: PropTypes.func.isRequired,
+</a><a href="#h3-0-26" id="h3-0-26" class="d">-    contract: PropTypes.func.isRequired,
+</a><a href="#h3-0-27" id="h3-0-27" class="d">-  };
+</a><a href="#h3-0-28" id="h3-0-28" class="d">-
+</a><a href="#h3-0-29" id="h3-0-29" class="d">-  handlePathClick = this._handlePathClick.bind(this);
+</a><a href="#h3-0-30" id="h3-0-30" class="d">-
+</a><a href="#h3-0-31" id="h3-0-31" class="d">-  _handlePathClick(repo) {
+</a><a href="#h3-0-32" id="h3-0-32" class="d">-    const { recordTelemetryEvent } = this.props;
+</a><a href="#h3-0-33" id="h3-0-33" class="d">-
+</a><a href="#h3-0-34" id="h3-0-34" class="d">-    return () =&gt; recordTelemetryEvent(TELEMETRY_ACTIONS.CLICK_FILE_RESULT_PATH, 1, { repo });
+</a><a href="#h3-0-35" id="h3-0-35" class="d">-  }
+</a><a href="#h3-0-36" id="h3-0-36" class="d">-
+</a><a href="#h3-0-37" id="h3-0-37" class="d">-  render() {
+</a><a href="#h3-0-38" id="h3-0-38" class="d">-    const {
+</a><a href="#h3-0-39" id="h3-0-39" class="d">-      files,
+</a><a href="#h3-0-40" id="h3-0-40" class="d">-      repositories,
+</a><a href="#h3-0-41" id="h3-0-41" class="d">-      fileResultsLimit,
+</a><a href="#h3-0-42" id="h3-0-42" class="d">-      isExpanded,
+</a><a href="#h3-0-43" id="h3-0-43" class="d">-      expand,
+</a><a href="#h3-0-44" id="h3-0-44" class="d">-      contract,
+</a><a href="#h3-0-45" id="h3-0-45" class="d">-    } = this.props;
+</a><a href="#h3-0-46" id="h3-0-46" class="d">-
+</a><a href="#h3-0-47" id="h3-0-47" class="d">-    const threshold = !isExpanded ? fileResultsLimit : undefined;
+</a><a href="#h3-0-48" id="h3-0-48" class="d">-
+</a><a href="#h3-0-49" id="h3-0-49" class="d">-    return (
+</a><a href="#h3-0-50" id="h3-0-50" class="d">-      &lt;Fragment&gt;
+</a><a href="#h3-0-51" id="h3-0-51" class="d">-        &lt;Spacing size=&quot;small&quot; bottom&gt;
+</a><a href="#h3-0-52" id="h3-0-52" class="d">-          {files.slice(0, threshold).map((file, idx) =&gt; (
+</a><a href="#h3-0-53" id="h3-0-53" class="d">-            &lt;Spacing
+</a><a href="#h3-0-54" id="h3-0-54" class="d">-              key={`${file.repo}-${file.path}-${file.bounds[0]}-${file.bounds[1]}`}
+</a><a href="#h3-0-55" id="h3-0-55" class="d">-              size=&quot;tiny&quot;
+</a><a href="#h3-0-56" id="h3-0-56" class="d">-              bottom={idx &lt; files.length - 1}
+</a><a href="#h3-0-57" id="h3-0-57" class="d">-            &gt;
+</a><a href="#h3-0-58" id="h3-0-58" class="d">-              &lt;FileHeader
+</a><a href="#h3-0-59" id="h3-0-59" class="d">-                repo={file.repo}
+</a><a href="#h3-0-60" id="h3-0-60" class="d">-                path={file.path}
+</a><a href="#h3-0-61" id="h3-0-61" class="d">-                bounds={file.bounds}
+</a><a href="#h3-0-62" id="h3-0-62" class="d">-                repoHref={string(objLookup(repositories, [file.repo, &#39;url&#39;]), {
+</a><a href="#h3-0-63" id="h3-0-63" class="d">-                  name: file.repo,
+</a><a href="#h3-0-64" id="h3-0-64" class="d">-                  version: file.version.replace(/.*\//g, &#39;&#39;),
+</a><a href="#h3-0-65" id="h3-0-65" class="d">-                  path: &#39;&#39;,
+</a><a href="#h3-0-66" id="h3-0-66" class="d">-                  lno: &#39;&#39;,
+</a><a href="#h3-0-67" id="h3-0-67" class="d">-                })}
+</a><a href="#h3-0-68" id="h3-0-68" class="d">-                pathHref={string(objLookup(repositories, [file.repo, &#39;url&#39;]), {
+</a><a href="#h3-0-69" id="h3-0-69" class="d">-                  name: file.repo,
+</a><a href="#h3-0-70" id="h3-0-70" class="d">-                  version: file.version.replace(/.*\//g, &#39;&#39;),
+</a><a href="#h3-0-71" id="h3-0-71" class="d">-                  path: file.path,
+</a><a href="#h3-0-72" id="h3-0-72" class="d">-                  lno: 1,
+</a><a href="#h3-0-73" id="h3-0-73" class="d">-                })}
+</a><a href="#h3-0-74" id="h3-0-74" class="d">-                onPathClick={this.handlePathClick(file.repo, file.path)}
+</a><a href="#h3-0-75" id="h3-0-75" class="d">-              /&gt;
+</a><a href="#h3-0-76" id="h3-0-76" class="d">-            &lt;/Spacing&gt;
+</a><a href="#h3-0-77" id="h3-0-77" class="d">-          ))}
+</a><a href="#h3-0-78" id="h3-0-78" class="i">+const FileResultsContainer = ({
+</a><a href="#h3-0-79" id="h3-0-79" class="i">+  files,
+</a><a href="#h3-0-80" id="h3-0-80" class="i">+  repositories,
+</a><a href="#h3-0-81" id="h3-0-81" class="i">+  fileResultsLimit,
+</a><a href="#h3-0-82" id="h3-0-82" class="i">+  windowWidth,
+</a><a href="#h3-0-83" id="h3-0-83" class="i">+  isExpanded,
+</a><a href="#h3-0-84" id="h3-0-84" class="i">+  expand,
+</a><a href="#h3-0-85" id="h3-0-85" class="i">+  contract,
+</a><a href="#h3-0-86" id="h3-0-86" class="i">+  onSearchQueryChange,
+</a><a href="#h3-0-87" id="h3-0-87" class="i">+  onSearchRepositoryFilePathChange,
+</a><a href="#h3-0-88" id="h3-0-88" class="i">+}) =&gt; (
+</a><a href="#h3-0-89" id="h3-0-89" class="i">+  &lt;Fragment&gt;
+</a><a href="#h3-0-90" id="h3-0-90" class="i">+    &lt;Spacing size=&quot;small&quot; bottom={files.length &gt; fileResultsLimit}&gt;
+</a><a href="#h3-0-91" id="h3-0-91" class="i">+      {files.slice(0, !isExpanded ? fileResultsLimit : undefined).map((file, idx) =&gt; (
+</a><a href="#h3-0-92" id="h3-0-92" class="i">+        &lt;Spacing
+</a><a href="#h3-0-93" id="h3-0-93" class="i">+          key={`${file.repo}-${file.path}-${file.bounds[0]}-${file.bounds[1]}`}
+</a><a href="#h3-0-94" id="h3-0-94" class="i">+          size=&quot;tiny&quot;
+</a><a href="#h3-0-95" id="h3-0-95" class="i">+          bottom={idx &lt; files.length - 1}
+</a><a href="#h3-0-96" id="h3-0-96" class="i">+          style={{ display: &#39;flex&#39; }}
+</a><a href="#h3-0-97" id="h3-0-97" class="i">+        &gt;
+</a><a href="#h3-0-98" id="h3-0-98" class="i">+          &lt;FileEntryContainer
+</a><a href="#h3-0-99" id="h3-0-99" class="i">+            file={file}
+</a><a href="#h3-0-100" id="h3-0-100" class="i">+            repositories={repositories}
+</a><a href="#h3-0-101" id="h3-0-101" class="i">+            windowWidth={windowWidth}
+</a><a href="#h3-0-102" id="h3-0-102" class="i">+            onSearchQueryChange={onSearchQueryChange}
+</a><a href="#h3-0-103" id="h3-0-103" class="i">+            onSearchRepositoryFilePathChange={onSearchRepositoryFilePathChange}
+</a><a href="#h3-0-104" id="h3-0-104" class="i">+          /&gt;
+</a>         &lt;/Spacing&gt;
+<a href="#h3-0-106" id="h3-0-106" class="i">+      ))}
+</a><a href="#h3-0-107" id="h3-0-107" class="i">+    &lt;/Spacing&gt;
+</a><a href="#h3-0-108" id="h3-0-108" class="i">+
+</a><a href="#h3-0-109" id="h3-0-109" class="i">+    {files.length &gt; fileResultsLimit &amp;&amp; (
+</a><a href="#h3-0-110" id="h3-0-110" class="i">+      &lt;div style={{ display: &#39;inline-block&#39; }}&gt;
+</a><a href="#h3-0-111" id="h3-0-111" class="i">+        &lt;Spoiler
+</a><a href="#h3-0-112" id="h3-0-112" class="i">+          caption={isExpanded ? &#39;Show less&#39; : &#39;Show all&#39;}
+</a><a href="#h3-0-113" id="h3-0-113" class="i">+          onClick={isExpanded ? contract : expand}
+</a><a href="#h3-0-114" id="h3-0-114" class="i">+          isExpanded={isExpanded}
+</a><a href="#h3-0-115" id="h3-0-115" class="i">+        /&gt;
+</a><a href="#h3-0-116" id="h3-0-116" class="i">+      &lt;/div&gt;
+</a><a href="#h3-0-117" id="h3-0-117" class="i">+    )}
+</a><a href="#h3-0-118" id="h3-0-118" class="i">+  &lt;/Fragment&gt;
+</a><a href="#h3-0-119" id="h3-0-119" class="i">+);
+</a> 
+<a href="#h3-0-121" id="h3-0-121" class="d">-        {files.length &gt; fileResultsLimit &amp;&amp; (
+</a><a href="#h3-0-122" id="h3-0-122" class="d">-          &lt;div style={{ display: &#39;inline-block&#39; }}&gt;
+</a><a href="#h3-0-123" id="h3-0-123" class="d">-            &lt;Spoiler
+</a><a href="#h3-0-124" id="h3-0-124" class="d">-              caption={isExpanded ? &#39;Show less&#39; : &#39;Show all&#39;}
+</a><a href="#h3-0-125" id="h3-0-125" class="d">-              onClick={isExpanded ? contract : expand}
+</a><a href="#h3-0-126" id="h3-0-126" class="d">-              isExpanded={isExpanded}
+</a><a href="#h3-0-127" id="h3-0-127" class="d">-            /&gt;
+</a><a href="#h3-0-128" id="h3-0-128" class="d">-          &lt;/div&gt;
+</a><a href="#h3-0-129" id="h3-0-129" class="d">-        )}
+</a><a href="#h3-0-130" id="h3-0-130" class="d">-      &lt;/Fragment&gt;
+</a><a href="#h3-0-131" id="h3-0-131" class="d">-    );
+</a><a href="#h3-0-132" id="h3-0-132" class="d">-  }
+</a><a href="#h3-0-133" id="h3-0-133" class="d">-}
+</a><a href="#h3-0-134" id="h3-0-134" class="i">+FileResultsContainer.propTypes = {
+</a><a href="#h3-0-135" id="h3-0-135" class="i">+  files: PropTypes.array.isRequired,
+</a><a href="#h3-0-136" id="h3-0-136" class="i">+  repositories: PropTypes.object.isRequired,
+</a><a href="#h3-0-137" id="h3-0-137" class="i">+  fileResultsLimit: PropTypes.number.isRequired,
+</a><a href="#h3-0-138" id="h3-0-138" class="i">+  windowWidth: PropTypes.number.isRequired,
+</a><a href="#h3-0-139" id="h3-0-139" class="i">+  onSearchQueryChange: PropTypes.func.isRequired,
+</a><a href="#h3-0-140" id="h3-0-140" class="i">+  onSearchRepositoryFilePathChange: PropTypes.func.isRequired,
+</a><a href="#h3-0-141" id="h3-0-141" class="i">+  // HOC props
+</a><a href="#h3-0-142" id="h3-0-142" class="i">+  isExpanded: PropTypes.bool.isRequired,
+</a><a href="#h3-0-143" id="h3-0-143" class="i">+  expand: PropTypes.func.isRequired,
+</a><a href="#h3-0-144" id="h3-0-144" class="i">+  contract: PropTypes.func.isRequired,
+</a><a href="#h3-0-145" id="h3-0-145" class="i">+};
+</a> 
+<a href="#h3-0-147" id="h3-0-147" class="d">-export default compose(
+</a><a href="#h3-0-148" id="h3-0-148" class="d">-  withTelemetry,
+</a><a href="#h3-0-149" id="h3-0-149" class="d">-  withToggleState({
+</a><a href="#h3-0-150" id="h3-0-150" class="d">-    key: &#39;isExpanded&#39;,
+</a><a href="#h3-0-151" id="h3-0-151" class="d">-    enable: &#39;expand&#39;,
+</a><a href="#h3-0-152" id="h3-0-152" class="d">-    disable: &#39;contract&#39;,
+</a><a href="#h3-0-153" id="h3-0-153" class="d">-  }),
+</a><a href="#h3-0-154" id="h3-0-154" class="d">-)(FileResultsContainer);
+</a><a href="#h3-0-155" id="h3-0-155" class="i">+export default withToggleState({
+</a><a href="#h3-0-156" id="h3-0-156" class="i">+  key: &#39;isExpanded&#39;,
+</a><a href="#h3-0-157" id="h3-0-157" class="i">+  enable: &#39;expand&#39;,
+</a><a href="#h3-0-158" id="h3-0-158" class="i">+  disable: &#39;contract&#39;,
+</a><a href="#h3-0-159" id="h3-0-159" class="i">+})(FileResultsContainer);
+</a><b>diff --git a/<a id="h4" href="../file/src/client/app/react/containers/search/results/index.js.html">src/client/app/react/containers/search/results/index.js</a> b/<a href="../file/src/client/app/react/containers/search/results/index.js.html">src/client/app/react/containers/search/results/index.js</a></b>
+<a href="#h4-0" id="h4-0" class="h">@@ -34,6 +34,7 @@ class SearchResultsContainer extends Component {
+</a>     onQueryChange: PropTypes.func.isRequired,
+     onQueryRecord: PropTypes.func.isRequired,
+     // HOC props
+<a href="#h4-0-3" id="h4-0-3" class="i">+    windowWidth: PropTypes.number.isRequired,
+</a>     repositories: PropTypes.object.isRequired,
+     recordTelemetryEvent: PropTypes.func.isRequired,
+     history: PropTypes.array.isRequired,
+<a href="#h4-1" id="h4-1" class="h">@@ -89,6 +90,7 @@ class SearchResultsContainer extends Component {
+</a>       repositories,
+       history,
+       fileResultsLimit,
+<a href="#h4-1-3" id="h4-1-3" class="i">+      windowWidth,
+</a>     } = this.props;
+ 
+     const data = objLookup(results, [&#39;data&#39;]) || {
+<a href="#h4-2" id="h4-2" class="h">@@ -133,6 +135,9 @@ class SearchResultsContainer extends Component {
+</a>               files={data.files}
+               repositories={repositories}
+               fileResultsLimit={fileResultsLimit}
+<a href="#h4-2-3" id="h4-2-3" class="i">+              windowWidth={windowWidth}
+</a><a href="#h4-2-4" id="h4-2-4" class="i">+              onSearchQueryChange={this.executeSourcePreviewSearch}
+</a><a href="#h4-2-5" id="h4-2-5" class="i">+              onSearchRepositoryFilePathChange={this.executeSingleFileSearch}
+</a>             /&gt;
+           &lt;/Spacing&gt;
+         )}
+<a href="#h4-3" id="h4-3" class="h">@@ -162,14 +167,15 @@ class SearchResultsContainer extends Component {
+</a>   }
+ }
+ 
+<a href="#h4-3-3" id="h4-3-3" class="d">-const mapStateToProps = ({ meta, preferences, search }) =&gt; ({
+</a><a href="#h4-3-4" id="h4-3-4" class="i">+const mapStateToProps = ({ context, meta, preferences, search }) =&gt; ({
+</a>   repositories: meta.repositories,
+   history: search.history,
+   fileResultsLimit: preferences[PREFERENCE_KEYS.CODE_SEARCH_FILE_RESULTS_LIMIT],
+<a href="#h4-3-8" id="h4-3-8" class="i">+  windowWidth: context.window.width,
+</a> });
+ 
+ export default compose(
+<a href="#h4-3-12" id="h4-3-12" class="d">-  connect(mapStateToProps),
+</a>   onlyUpdateForKeys([&#39;results&#39;]),
+<a href="#h4-3-14" id="h4-3-14" class="i">+  connect(mapStateToProps),
+</a>   withTelemetry,
+ )(SearchResultsContainer);
+</pre>
+</div>
+</body>
+</html>

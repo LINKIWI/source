@@ -1,0 +1,71 @@
+pipeline {
+    agent {
+        docker {
+            image 'docker.internal.kevinlin.info/infra/ci-base:0.3.4'
+            label 'docker-executor'
+        }
+    }
+
+    options {
+        withAWS(
+            endpointUrl: 'https://storage.kevinlin.info',
+            credentials: 'storage-internal',
+        )
+    }
+
+    stages {
+        stage('Install') {
+            steps {
+                sh 'npm-s3 install'
+            }
+        }
+        stage('Test') {
+            parallel {
+                stage('Lint') {
+                    steps {
+                        sh 'npm run lint'
+                    }
+                }
+                stage('Unit') {
+                    steps {
+                        sh 'npm run cover'
+                    }
+                }
+            }
+        }
+        stage('Build') {
+            environment {
+                NODE_ENV = 'production'
+                VERSION = "${GIT_COMMIT}"
+            }
+            parallel {
+                stage('Client') {
+                    steps {
+                        sh 'npm run build:client'
+                    }
+                }
+                stage('Server') {
+                    steps {
+                        sh 'npm run build:server'
+                    }
+                }
+                stage('Shared') {
+                    steps {
+                        sh 'npm run build:shared'
+                    }
+                }
+            }
+        }
+        stage('Release') {
+            steps {
+                sh 'npm run release'
+                sh 'tar -cvzf release.tar.gz dist/bin/'
+                s3Upload(
+                    bucket: 'internal',
+                    path: "deploy/${env.JOB_NAME}/${env.GIT_COMMIT}/",
+                    file: 'release.tar.gz',
+                )
+            }
+        }
+    }
+}
