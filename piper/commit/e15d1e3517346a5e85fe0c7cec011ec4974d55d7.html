@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/tail: Create a Watcher abstraction on top of fsnotify.Watcher to recognize file truncations - piper - Realtime log file to Kafka relay daemon</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="piper Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="piper Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i,
+a.line {
+	text-decoration: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>piper</h1><span class="desc">Realtime log file to Kafka relay daemon</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/piper.git">https://source.static.kevinlin.info/piper.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/e15d1e3517346a5e85fe0c7cec011ec4974d55d7">e15d1e3517346a5e85fe0c7cec011ec4974d55d7</a>
+<b>parent</b> <a href="../commit/3ee567b5363e1b9e32ed4f335c32642409b7024d">3ee567b5363e1b9e32ed4f335c32642409b7024d</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Wed,  6 Jan 2021 22:06:13 -0800
+
+internal/tail: Create a Watcher abstraction on top of fsnotify.Watcher to recognize file truncations
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/tail/tail.go</a></td><td> | </td><td class="num">45</td><td><span class="i">++++++++++++++++++++++++</span><span class="d">---------------------</span></td></tr>
+<tr><td class="A">A</td><td><a href="#h1">internal/tail/watcher.go</a></td><td> | </td><td class="num">129</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+</table></pre><pre>2 files changed, 153 insertions(+), 21 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/tail/tail.go">internal/tail/tail.go</a> b/<a href="../file/internal/tail/tail.go">internal/tail/tail.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -8,8 +8,6 @@ import (
+</a> 	&quot;strings&quot;
+ 	&quot;syscall&quot;
+ 	&quot;time&quot;
+<a href="#h0-0-3" id="h0-0-3" class="d">-
+</a><a href="#h0-0-4" id="h0-0-4" class="d">-	&quot;github.com/fsnotify/fsnotify&quot;
+</a> )
+ 
+ // State is an enum that describes the current state of the client within its finite state machine
+<a href="#h0-1" id="h0-1" class="h">@@ -52,7 +50,7 @@ type Tail struct {
+</a> 	path    string
+ 	file    *os.File
+ 	reader  *bufio.Reader
+<a href="#h0-1-3" id="h0-1-3" class="d">-	watcher *fsnotify.Watcher
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+	watcher *Watcher
+</a> 	err     error
+ 	state   State
+ 	opts    Options
+<a href="#h0-2" id="h0-2" class="h">@@ -141,15 +139,11 @@ func (t *Tail) Reset() error {
+</a> 		return fmt.Errorf(&quot;tail: file is not a regular file nor a named pipe&quot;)
+ 	}
+ 
+<a href="#h0-2-3" id="h0-2-3" class="d">-	t.watcher, err = fsnotify.NewWatcher()
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+	t.watcher, err = NewWatcher(t.path)
+</a> 	if err != nil {
+ 		return err
+ 	}
+ 
+<a href="#h0-2-9" id="h0-2-9" class="d">-	if err := t.watcher.Add(t.path); err != nil {
+</a><a href="#h0-2-10" id="h0-2-10" class="d">-		return err
+</a><a href="#h0-2-11" id="h0-2-11" class="d">-	}
+</a><a href="#h0-2-12" id="h0-2-12" class="d">-
+</a> 	t.reader = bufio.NewReader(t.file)
+ 	t.state = Consuming
+ 
+<a href="#h0-3" id="h0-3" class="h">@@ -174,15 +168,28 @@ func (t *Tail) Consume() (&lt;-chan Message, error) {
+</a> 	go func() {
+ 		for {
+ 			select {
+<a href="#h0-3-3" id="h0-3-3" class="d">-			case event, ok := &lt;-t.watcher.Events:
+</a><a href="#h0-3-4" id="h0-3-4" class="i">+			case event, ok := &lt;-t.watcher.Events():
+</a> 				if !ok {
+ 					close(messages)
+ 					return
+ 				}
+ 
+<a href="#h0-3-10" id="h0-3-10" class="d">-				if event.Op&amp;fsnotify.Write &gt; 0 {
+</a><a href="#h0-3-11" id="h0-3-11" class="i">+				switch event {
+</a><a href="#h0-3-12" id="h0-3-12" class="i">+				case FsRemove, FsRename:
+</a><a href="#h0-3-13" id="h0-3-13" class="i">+					t.err = fmt.Errorf(&quot;tail: file relocated&quot;)
+</a><a href="#h0-3-14" id="h0-3-14" class="i">+					t.state = Errored
+</a><a href="#h0-3-15" id="h0-3-15" class="i">+					close(messages)
+</a><a href="#h0-3-16" id="h0-3-16" class="i">+					return
+</a><a href="#h0-3-17" id="h0-3-17" class="i">+
+</a><a href="#h0-3-18" id="h0-3-18" class="i">+				case FsTruncate:
+</a><a href="#h0-3-19" id="h0-3-19" class="i">+					t.err = fmt.Errorf(&quot;tail: file truncated&quot;)
+</a><a href="#h0-3-20" id="h0-3-20" class="i">+					t.state = Errored
+</a><a href="#h0-3-21" id="h0-3-21" class="i">+					close(messages)
+</a><a href="#h0-3-22" id="h0-3-22" class="i">+					return
+</a><a href="#h0-3-23" id="h0-3-23" class="i">+
+</a><a href="#h0-3-24" id="h0-3-24" class="i">+				case FsAppend:
+</a> 					lines, err := t.readLines()
+<a href="#h0-3-26" id="h0-3-26" class="d">-					if err == errNoData {
+</a><a href="#h0-3-27" id="h0-3-27" class="i">+					if err == errNoData || err == io.EOF {
+</a> 						// No new log lines are currently available; wait
+ 						// until the next write and try again.
+ 						break
+<a href="#h0-4" id="h0-4" class="h">@@ -203,14 +210,9 @@ func (t *Tail) Consume() (&lt;-chan Message, error) {
+</a> 
+ 						sequenceID++
+ 					}
+<a href="#h0-4-3" id="h0-4-3" class="d">-				} else if event.Op&amp;(fsnotify.Rename|fsnotify.Remove) &gt; 0 {
+</a><a href="#h0-4-4" id="h0-4-4" class="d">-					t.err = fmt.Errorf(&quot;tail: file relocated&quot;)
+</a><a href="#h0-4-5" id="h0-4-5" class="d">-					t.state = Errored
+</a><a href="#h0-4-6" id="h0-4-6" class="d">-					close(messages)
+</a><a href="#h0-4-7" id="h0-4-7" class="d">-					return
+</a> 				}
+ 
+<a href="#h0-4-10" id="h0-4-10" class="d">-			case err := &lt;-t.watcher.Errors:
+</a><a href="#h0-4-11" id="h0-4-11" class="i">+			case err := &lt;-t.watcher.Errors():
+</a> 				if err != nil {
+ 					t.err = err
+ 					t.state = Errored
+<a href="#h0-5" id="h0-5" class="h">@@ -238,10 +240,11 @@ func (t *Tail) readLines() ([]string, error) {
+</a> 	if err == io.EOF &amp;&amp; len(line) == 0 {
+ 		// Immediately encountering io.EOF without reading any bytes from the stream is a
+ 		// fairly reliable indicator that the current seek position is invalid. This could,
+<a href="#h0-5-3" id="h0-5-3" class="d">-		// for example, be due to truncation caused by log rotation. In any case, the Tail
+</a><a href="#h0-5-4" id="h0-5-4" class="d">-		// client has no ability to determine the reason for the error (and thus has no
+</a><a href="#h0-5-5" id="h0-5-5" class="d">-		// heuristics available to recover the consumption) so the error is simply
+</a><a href="#h0-5-6" id="h0-5-6" class="d">-		// propagated downstream as-is.
+</a><a href="#h0-5-7" id="h0-5-7" class="i">+		// for example, be due to truncation caused by log rotation, or a duplicated
+</a><a href="#h0-5-8" id="h0-5-8" class="i">+		// filesystem notification event fired on file whose seek position is already at the
+</a><a href="#h0-5-9" id="h0-5-9" class="i">+		// end of the file. In any case, the Tail client has no ability to determine the
+</a><a href="#h0-5-10" id="h0-5-10" class="i">+		// reason for the error (and thus has no heuristics available to recover the
+</a><a href="#h0-5-11" id="h0-5-11" class="i">+		// consumption) so the error is simply propagated downstream as-is.
+</a> 		return lines, io.EOF
+ 	} else if err == io.EOF &amp;&amp; len(line) &gt; 0 {
+ 		// Encountering io.EOF while successfully reading back a nonzero number of bytes
+<b>diff --git a/<a id="h1" href="../file/internal/tail/watcher.go">internal/tail/watcher.go</a> b/<a href="../file/internal/tail/watcher.go">internal/tail/watcher.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -0,0 +1,129 @@
+</a><a href="#h1-0-0" id="h1-0-0" class="i">+package tail
+</a><a href="#h1-0-1" id="h1-0-1" class="i">+
+</a><a href="#h1-0-2" id="h1-0-2" class="i">+import (
+</a><a href="#h1-0-3" id="h1-0-3" class="i">+	&quot;os&quot;
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+	&quot;github.com/fsnotify/fsnotify&quot;
+</a><a href="#h1-0-6" id="h1-0-6" class="i">+)
+</a><a href="#h1-0-7" id="h1-0-7" class="i">+
+</a><a href="#h1-0-8" id="h1-0-8" class="i">+// FsEvent describes a filesystem event on a watched file.
+</a><a href="#h1-0-9" id="h1-0-9" class="i">+type FsEvent int
+</a><a href="#h1-0-10" id="h1-0-10" class="i">+
+</a><a href="#h1-0-11" id="h1-0-11" class="i">+const (
+</a><a href="#h1-0-12" id="h1-0-12" class="i">+	// FsUnknown is a fallthrough, unknown event type.
+</a><a href="#h1-0-13" id="h1-0-13" class="i">+	FsUnknown FsEvent = iota
+</a><a href="#h1-0-14" id="h1-0-14" class="i">+	// FsAppend indicates that data was (likely) appended to the file.
+</a><a href="#h1-0-15" id="h1-0-15" class="i">+	FsAppend
+</a><a href="#h1-0-16" id="h1-0-16" class="i">+	// FsRemove indicates that the file was removed.
+</a><a href="#h1-0-17" id="h1-0-17" class="i">+	FsRemove
+</a><a href="#h1-0-18" id="h1-0-18" class="i">+	// FsRename indicates that the file was renamed.
+</a><a href="#h1-0-19" id="h1-0-19" class="i">+	FsRename
+</a><a href="#h1-0-20" id="h1-0-20" class="i">+	// FsTruncate indicates that the file was truncated.
+</a><a href="#h1-0-21" id="h1-0-21" class="i">+	FsTruncate
+</a><a href="#h1-0-22" id="h1-0-22" class="i">+)
+</a><a href="#h1-0-23" id="h1-0-23" class="i">+
+</a><a href="#h1-0-24" id="h1-0-24" class="i">+// Watcher is an abstraction over an fsnotify.Watcher that wraps event processing with additional
+</a><a href="#h1-0-25" id="h1-0-25" class="i">+// heuristics to expose more filesystem event types.
+</a><a href="#h1-0-26" id="h1-0-26" class="i">+type Watcher struct {
+</a><a href="#h1-0-27" id="h1-0-27" class="i">+	fsw    *fsnotify.Watcher
+</a><a href="#h1-0-28" id="h1-0-28" class="i">+	events chan FsEvent
+</a><a href="#h1-0-29" id="h1-0-29" class="i">+	errs   chan error
+</a><a href="#h1-0-30" id="h1-0-30" class="i">+	path   string
+</a><a href="#h1-0-31" id="h1-0-31" class="i">+	size   int64
+</a><a href="#h1-0-32" id="h1-0-32" class="i">+}
+</a><a href="#h1-0-33" id="h1-0-33" class="i">+
+</a><a href="#h1-0-34" id="h1-0-34" class="i">+// NewWatcher creates a new watcher on a path.
+</a><a href="#h1-0-35" id="h1-0-35" class="i">+func NewWatcher(path string) (*Watcher, error) {
+</a><a href="#h1-0-36" id="h1-0-36" class="i">+	fsw, err := fsnotify.NewWatcher()
+</a><a href="#h1-0-37" id="h1-0-37" class="i">+	if err != nil {
+</a><a href="#h1-0-38" id="h1-0-38" class="i">+		return nil, err
+</a><a href="#h1-0-39" id="h1-0-39" class="i">+	}
+</a><a href="#h1-0-40" id="h1-0-40" class="i">+
+</a><a href="#h1-0-41" id="h1-0-41" class="i">+	if err := fsw.Add(path); err != nil {
+</a><a href="#h1-0-42" id="h1-0-42" class="i">+		return nil, err
+</a><a href="#h1-0-43" id="h1-0-43" class="i">+	}
+</a><a href="#h1-0-44" id="h1-0-44" class="i">+
+</a><a href="#h1-0-45" id="h1-0-45" class="i">+	stat, err := os.Stat(path)
+</a><a href="#h1-0-46" id="h1-0-46" class="i">+	if err != nil {
+</a><a href="#h1-0-47" id="h1-0-47" class="i">+		return nil, err
+</a><a href="#h1-0-48" id="h1-0-48" class="i">+	}
+</a><a href="#h1-0-49" id="h1-0-49" class="i">+
+</a><a href="#h1-0-50" id="h1-0-50" class="i">+	watcher := &amp;Watcher{
+</a><a href="#h1-0-51" id="h1-0-51" class="i">+		fsw:    fsw,
+</a><a href="#h1-0-52" id="h1-0-52" class="i">+		events: make(chan FsEvent),
+</a><a href="#h1-0-53" id="h1-0-53" class="i">+		errs:   make(chan error),
+</a><a href="#h1-0-54" id="h1-0-54" class="i">+		path:   path,
+</a><a href="#h1-0-55" id="h1-0-55" class="i">+		size:   stat.Size(),
+</a><a href="#h1-0-56" id="h1-0-56" class="i">+	}
+</a><a href="#h1-0-57" id="h1-0-57" class="i">+
+</a><a href="#h1-0-58" id="h1-0-58" class="i">+	go watcher.watch()
+</a><a href="#h1-0-59" id="h1-0-59" class="i">+
+</a><a href="#h1-0-60" id="h1-0-60" class="i">+	return watcher, nil
+</a><a href="#h1-0-61" id="h1-0-61" class="i">+}
+</a><a href="#h1-0-62" id="h1-0-62" class="i">+
+</a><a href="#h1-0-63" id="h1-0-63" class="i">+// Events is an accessor for the filesystem events channel.
+</a><a href="#h1-0-64" id="h1-0-64" class="i">+func (w *Watcher) Events() &lt;-chan FsEvent {
+</a><a href="#h1-0-65" id="h1-0-65" class="i">+	return w.events
+</a><a href="#h1-0-66" id="h1-0-66" class="i">+}
+</a><a href="#h1-0-67" id="h1-0-67" class="i">+
+</a><a href="#h1-0-68" id="h1-0-68" class="i">+// Errors is an accessor for the errors channel.
+</a><a href="#h1-0-69" id="h1-0-69" class="i">+func (w *Watcher) Errors() &lt;-chan error {
+</a><a href="#h1-0-70" id="h1-0-70" class="i">+	return w.errs
+</a><a href="#h1-0-71" id="h1-0-71" class="i">+}
+</a><a href="#h1-0-72" id="h1-0-72" class="i">+
+</a><a href="#h1-0-73" id="h1-0-73" class="i">+// watch starts an indefinite loop that consumes events from fsnotify.Watcher and re-emits them
+</a><a href="#h1-0-74" id="h1-0-74" class="i">+// with a best-effort more granular classification.
+</a><a href="#h1-0-75" id="h1-0-75" class="i">+func (w *Watcher) watch() {
+</a><a href="#h1-0-76" id="h1-0-76" class="i">+	defer close(w.events)
+</a><a href="#h1-0-77" id="h1-0-77" class="i">+	defer close(w.errs)
+</a><a href="#h1-0-78" id="h1-0-78" class="i">+
+</a><a href="#h1-0-79" id="h1-0-79" class="i">+	for {
+</a><a href="#h1-0-80" id="h1-0-80" class="i">+		select {
+</a><a href="#h1-0-81" id="h1-0-81" class="i">+		case evt, ok := &lt;-w.fsw.Events:
+</a><a href="#h1-0-82" id="h1-0-82" class="i">+			if !ok {
+</a><a href="#h1-0-83" id="h1-0-83" class="i">+				return
+</a><a href="#h1-0-84" id="h1-0-84" class="i">+			}
+</a><a href="#h1-0-85" id="h1-0-85" class="i">+
+</a><a href="#h1-0-86" id="h1-0-86" class="i">+			if evt.Op&amp;fsnotify.Write &gt; 0 {
+</a><a href="#h1-0-87" id="h1-0-87" class="i">+				// inotify only knows that the file was written to; there&#39;s no
+</a><a href="#h1-0-88" id="h1-0-88" class="i">+				// information whether the file was appended to, modified in place,
+</a><a href="#h1-0-89" id="h1-0-89" class="i">+				// or truncated. The following logic attempts to make a guess using
+</a><a href="#h1-0-90" id="h1-0-90" class="i">+				// some best-effort heuristics around changes in the file size.
+</a><a href="#h1-0-91" id="h1-0-91" class="i">+				stat, err := os.Stat(w.path)
+</a><a href="#h1-0-92" id="h1-0-92" class="i">+				if err != nil {
+</a><a href="#h1-0-93" id="h1-0-93" class="i">+					w.errs &lt;- err
+</a><a href="#h1-0-94" id="h1-0-94" class="i">+					break
+</a><a href="#h1-0-95" id="h1-0-95" class="i">+				}
+</a><a href="#h1-0-96" id="h1-0-96" class="i">+
+</a><a href="#h1-0-97" id="h1-0-97" class="i">+				if stat.Size() &lt; w.size {
+</a><a href="#h1-0-98" id="h1-0-98" class="i">+					w.events &lt;- FsTruncate
+</a><a href="#h1-0-99" id="h1-0-99" class="i">+				} else {
+</a><a href="#h1-0-100" id="h1-0-100" class="i">+					// Strictly speaking, insertion of bytes at any position in
+</a><a href="#h1-0-101" id="h1-0-101" class="i">+					// the file other than the end would not be considered an
+</a><a href="#h1-0-102" id="h1-0-102" class="i">+					// append operation even though it increases the file size.
+</a><a href="#h1-0-103" id="h1-0-103" class="i">+					// However, this is relatively uncommon write pattern for a
+</a><a href="#h1-0-104" id="h1-0-104" class="i">+					// log file, so just assume it was an append.
+</a><a href="#h1-0-105" id="h1-0-105" class="i">+					w.events &lt;- FsAppend
+</a><a href="#h1-0-106" id="h1-0-106" class="i">+				}
+</a><a href="#h1-0-107" id="h1-0-107" class="i">+
+</a><a href="#h1-0-108" id="h1-0-108" class="i">+				w.size = stat.Size()
+</a><a href="#h1-0-109" id="h1-0-109" class="i">+			} else if evt.Op&amp;fsnotify.Rename &gt; 0 {
+</a><a href="#h1-0-110" id="h1-0-110" class="i">+				w.events &lt;- FsRename
+</a><a href="#h1-0-111" id="h1-0-111" class="i">+			} else if evt.Op&amp;fsnotify.Remove &gt; 0 {
+</a><a href="#h1-0-112" id="h1-0-112" class="i">+				w.events &lt;- FsRemove
+</a><a href="#h1-0-113" id="h1-0-113" class="i">+			}
+</a><a href="#h1-0-114" id="h1-0-114" class="i">+
+</a><a href="#h1-0-115" id="h1-0-115" class="i">+		case err, ok := &lt;-w.fsw.Errors:
+</a><a href="#h1-0-116" id="h1-0-116" class="i">+			if !ok {
+</a><a href="#h1-0-117" id="h1-0-117" class="i">+				return
+</a><a href="#h1-0-118" id="h1-0-118" class="i">+			}
+</a><a href="#h1-0-119" id="h1-0-119" class="i">+
+</a><a href="#h1-0-120" id="h1-0-120" class="i">+			w.errs &lt;- err
+</a><a href="#h1-0-121" id="h1-0-121" class="i">+		}
+</a><a href="#h1-0-122" id="h1-0-122" class="i">+	}
+</a><a href="#h1-0-123" id="h1-0-123" class="i">+}
+</a><a href="#h1-0-124" id="h1-0-124" class="i">+
+</a><a href="#h1-0-125" id="h1-0-125" class="i">+// Close closes the underlying filesystem watch.
+</a><a href="#h1-0-126" id="h1-0-126" class="i">+func (w *Watcher) Close() error {
+</a><a href="#h1-0-127" id="h1-0-127" class="i">+	return w.fsw.Close()
+</a><a href="#h1-0-128" id="h1-0-128" class="i">+}
+</a></pre>
+</div>
+</body>
+</html>

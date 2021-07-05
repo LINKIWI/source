@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>transport: Migrate Buffered transport constructor to transport factory - aperture - Go statsd client library</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="aperture Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="aperture Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i,
+a.line {
+	text-decoration: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>aperture</h1><span class="desc">Go statsd client library</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/aperture.git">https://source.static.kevinlin.info/aperture.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/LICENSE">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/e5dd1c5368591b2a1f2a1399ab6b699b3d8ff730">e5dd1c5368591b2a1f2a1399ab6b699b3d8ff730</a>
+<b>parent</b> <a href="../commit/43f29b6ee0f4ba092985575d8a7ae25fede4b597">43f29b6ee0f4ba092985575d8a7ae25fede4b597</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Tue, 16 Jun 2020 21:49:58 -0700
+
+transport: Migrate Buffered transport constructor to transport factory
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">transport/buffered.go</a></td><td> | </td><td class="num">9</td><td><span class="i">+++++++</span><span class="d">--</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">transport/buffered_test.go</a></td><td> | </td><td class="num">17</td><td><span class="i">+++++++++++</span><span class="d">------</span></td></tr>
+</table></pre><pre>2 files changed, 18 insertions(+), 8 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/transport/buffered.go">transport/buffered.go</a> b/<a href="../file/transport/buffered.go">transport/buffered.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -12,7 +12,7 @@ type Buffered struct {
+</a> }
+ 
+ // NewBuffered creates a new buffered transport over an existing Transport backend.
+<a href="#h0-0-3" id="h0-0-3" class="d">-func NewBuffered(backend Transport, size int) (Transport, error) {
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+func NewBuffered(backendFactory Factory, size int) (Transport, error) {
+</a> 	if size &lt;= 0 {
+ 		return nil, errors.New(
+ 			&quot;transport&quot;,
+<a href="#h0-1" id="h0-1" class="h">@@ -20,8 +20,13 @@ func NewBuffered(backend Transport, size int) (Transport, error) {
+</a> 		)
+ 	}
+ 
+<a href="#h0-1-3" id="h0-1-3" class="i">+	tport, err := backendFactory()
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+	if err != nil {
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+		return nil, err
+</a><a href="#h0-1-6" id="h0-1-6" class="i">+	}
+</a><a href="#h0-1-7" id="h0-1-7" class="i">+
+</a> 	return &amp;Buffered{
+<a href="#h0-1-9" id="h0-1-9" class="d">-		Transport: backend,
+</a><a href="#h0-1-10" id="h0-1-10" class="i">+		Transport: tport,
+</a> 		buf:       make(chan []byte, size),
+ 	}, nil
+ }
+<b>diff --git a/<a id="h1" href="../file/transport/buffered_test.go">transport/buffered_test.go</a> b/<a href="../file/transport/buffered_test.go">transport/buffered_test.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -11,13 +11,15 @@ import (
+</a> func TestNewBufferedValidationError(t *testing.T) {
+ 	t.Parallel()
+ 
+<a href="#h1-0-3" id="h1-0-3" class="d">-	_, err := NewBuffered(test.NewMockTransport(), 0)
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+	backendFactory := func() (Transport, error) { return test.NewMockTransport(), nil }
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+
+</a><a href="#h1-0-6" id="h1-0-6" class="i">+	_, err := NewBuffered(backendFactory, 0)
+</a> 	assert.Error(t, err)
+ 
+<a href="#h1-0-9" id="h1-0-9" class="d">-	_, err = NewBuffered(test.NewMockTransport(), -1)
+</a><a href="#h1-0-10" id="h1-0-10" class="i">+	_, err = NewBuffered(backendFactory, -1)
+</a> 	assert.Error(t, err)
+ 
+<a href="#h1-0-13" id="h1-0-13" class="d">-	buffered, err := NewBuffered(test.NewMockTransport(), 1)
+</a><a href="#h1-0-14" id="h1-0-14" class="i">+	buffered, err := NewBuffered(backendFactory, 1)
+</a> 	assert.NotNil(t, buffered)
+ 	assert.NoError(t, err)
+ }
+<a href="#h1-1" id="h1-1" class="h">@@ -26,7 +28,8 @@ func TestBufferedBatchedSend(t *testing.T) {
+</a> 	t.Parallel()
+ 
+ 	backend := test.NewMockTransport()
+<a href="#h1-1-3" id="h1-1-3" class="d">-	buffered, _ := NewBuffered(backend, 2)
+</a><a href="#h1-1-4" id="h1-1-4" class="i">+	backendFactory := func() (Transport, error) { return backend, nil }
+</a><a href="#h1-1-5" id="h1-1-5" class="i">+	buffered, _ := NewBuffered(backendFactory, 2)
+</a> 
+ 	n, err := buffered.Send([]byte{1})
+ 	assert.Equal(t, 1, n)
+<a href="#h1-2" id="h1-2" class="h">@@ -43,7 +46,8 @@ func TestBufferedFlush(t *testing.T) {
+</a> 	t.Parallel()
+ 
+ 	backend := test.NewMockTransport()
+<a href="#h1-2-3" id="h1-2-3" class="d">-	buffered, _ := NewBuffered(backend, 2)
+</a><a href="#h1-2-4" id="h1-2-4" class="i">+	backendFactory := func() (Transport, error) { return backend, nil }
+</a><a href="#h1-2-5" id="h1-2-5" class="i">+	buffered, _ := NewBuffered(backendFactory, 2)
+</a> 
+ 	n, err := buffered.Send([]byte{1})
+ 	assert.Equal(t, 1, n)
+<a href="#h1-3" id="h1-3" class="h">@@ -60,7 +64,8 @@ func TestBufferedClose(t *testing.T) {
+</a> 	t.Parallel()
+ 
+ 	backend := test.NewMockTransport()
+<a href="#h1-3-3" id="h1-3-3" class="d">-	buffered, _ := NewBuffered(backend, 2)
+</a><a href="#h1-3-4" id="h1-3-4" class="i">+	backendFactory := func() (Transport, error) { return backend, nil }
+</a><a href="#h1-3-5" id="h1-3-5" class="i">+	buffered, _ := NewBuffered(backendFactory, 2)
+</a> 
+ 	assert.Equal(t, test.ActiveTransport, backend.State())
+ 	assert.NoError(t, buffered.Close())
+</pre>
+</div>
+</body>
+</html>

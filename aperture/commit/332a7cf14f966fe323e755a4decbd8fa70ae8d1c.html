@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/errors: Error utilities - aperture - Go statsd client library</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="aperture Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="aperture Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i,
+a.line {
+	text-decoration: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>aperture</h1><span class="desc">Go statsd client library</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/aperture.git">https://source.static.kevinlin.info/aperture.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/LICENSE">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/332a7cf14f966fe323e755a4decbd8fa70ae8d1c">332a7cf14f966fe323e755a4decbd8fa70ae8d1c</a>
+<b>parent</b> <a href="../commit/aa3bfba8d841ed113a83feef7bd234c043d295f8">aa3bfba8d841ed113a83feef7bd234c043d295f8</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Thu, 26 Dec 2019 11:04:58 -0800
+
+internal/errors: Error utilities
+
+<b>Diffstat:</b>
+<table><tr><td class="A">A</td><td><a href="#h0">internal/errors/error.go</a></td><td> | </td><td class="num">56</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="A">A</td><td><a href="#h1">internal/errors/error_test.go</a></td><td> | </td><td class="num">37</td><td><span class="i">+++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+</table></pre><pre>2 files changed, 93 insertions(+), 0 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/errors/error.go">internal/errors/error.go</a> b/<a href="../file/internal/errors/error.go">internal/errors/error.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -0,0 +1,56 @@
+</a><a href="#h0-0-0" id="h0-0-0" class="i">+package errors
+</a><a href="#h0-0-1" id="h0-0-1" class="i">+
+</a><a href="#h0-0-2" id="h0-0-2" class="i">+import (
+</a><a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;fmt&quot;
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+	&quot;strings&quot;
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+)
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+// Error provides structured abstractions over errors and supports stacking inner errors.
+</a><a href="#h0-0-8" id="h0-0-8" class="i">+type Error struct {
+</a><a href="#h0-0-9" id="h0-0-9" class="i">+	Namespace string
+</a><a href="#h0-0-10" id="h0-0-10" class="i">+	Message   string
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+	Tags      []Tag
+</a><a href="#h0-0-12" id="h0-0-12" class="i">+	Stacked   error
+</a><a href="#h0-0-13" id="h0-0-13" class="i">+}
+</a><a href="#h0-0-14" id="h0-0-14" class="i">+
+</a><a href="#h0-0-15" id="h0-0-15" class="i">+// Tag is an optional key-value tag used to provide additional context for an error.
+</a><a href="#h0-0-16" id="h0-0-16" class="i">+type Tag struct {
+</a><a href="#h0-0-17" id="h0-0-17" class="i">+	Key   string
+</a><a href="#h0-0-18" id="h0-0-18" class="i">+	Value interface{}
+</a><a href="#h0-0-19" id="h0-0-19" class="i">+}
+</a><a href="#h0-0-20" id="h0-0-20" class="i">+
+</a><a href="#h0-0-21" id="h0-0-21" class="i">+// Error serializes the error as a human-consumable string.
+</a><a href="#h0-0-22" id="h0-0-22" class="i">+func (e *Error) Error() string {
+</a><a href="#h0-0-23" id="h0-0-23" class="i">+	var tags []string
+</a><a href="#h0-0-24" id="h0-0-24" class="i">+
+</a><a href="#h0-0-25" id="h0-0-25" class="i">+	err := fmt.Sprintf(&quot;%s: %s&quot;, e.Namespace, e.Message)
+</a><a href="#h0-0-26" id="h0-0-26" class="i">+
+</a><a href="#h0-0-27" id="h0-0-27" class="i">+	for _, tag := range e.Tags {
+</a><a href="#h0-0-28" id="h0-0-28" class="i">+		tags = append(tags, fmt.Sprintf(&quot;%v=%v&quot;, tag.Key, tag.Value))
+</a><a href="#h0-0-29" id="h0-0-29" class="i">+	}
+</a><a href="#h0-0-30" id="h0-0-30" class="i">+
+</a><a href="#h0-0-31" id="h0-0-31" class="i">+	if len(tags) &gt; 0 {
+</a><a href="#h0-0-32" id="h0-0-32" class="i">+		err += strings.Join(append([]string{&quot;:&quot;}, tags...), &quot; &quot;)
+</a><a href="#h0-0-33" id="h0-0-33" class="i">+	}
+</a><a href="#h0-0-34" id="h0-0-34" class="i">+
+</a><a href="#h0-0-35" id="h0-0-35" class="i">+	if e.Stacked != nil {
+</a><a href="#h0-0-36" id="h0-0-36" class="i">+		err += fmt.Sprintf(&quot;\n%s&quot;, e.Stacked)
+</a><a href="#h0-0-37" id="h0-0-37" class="i">+	}
+</a><a href="#h0-0-38" id="h0-0-38" class="i">+
+</a><a href="#h0-0-39" id="h0-0-39" class="i">+	return err
+</a><a href="#h0-0-40" id="h0-0-40" class="i">+}
+</a><a href="#h0-0-41" id="h0-0-41" class="i">+
+</a><a href="#h0-0-42" id="h0-0-42" class="i">+// New creates an error instance.
+</a><a href="#h0-0-43" id="h0-0-43" class="i">+func New(namespace string, message string, tags ...Tag) *Error {
+</a><a href="#h0-0-44" id="h0-0-44" class="i">+	return Stack(namespace, message, nil, tags...)
+</a><a href="#h0-0-45" id="h0-0-45" class="i">+}
+</a><a href="#h0-0-46" id="h0-0-46" class="i">+
+</a><a href="#h0-0-47" id="h0-0-47" class="i">+// Stack creates a new error instance, stacking an existing inner error.
+</a><a href="#h0-0-48" id="h0-0-48" class="i">+func Stack(namespace string, message string, err error, tags ...Tag) *Error {
+</a><a href="#h0-0-49" id="h0-0-49" class="i">+	return &amp;Error{
+</a><a href="#h0-0-50" id="h0-0-50" class="i">+		Namespace: namespace,
+</a><a href="#h0-0-51" id="h0-0-51" class="i">+		Message:   message,
+</a><a href="#h0-0-52" id="h0-0-52" class="i">+		Tags:      tags,
+</a><a href="#h0-0-53" id="h0-0-53" class="i">+		Stacked:   err,
+</a><a href="#h0-0-54" id="h0-0-54" class="i">+	}
+</a><a href="#h0-0-55" id="h0-0-55" class="i">+}
+</a><b>diff --git a/<a id="h1" href="../file/internal/errors/error_test.go">internal/errors/error_test.go</a> b/<a href="../file/internal/errors/error_test.go">internal/errors/error_test.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -0,0 +1,37 @@
+</a><a href="#h1-0-0" id="h1-0-0" class="i">+package errors
+</a><a href="#h1-0-1" id="h1-0-1" class="i">+
+</a><a href="#h1-0-2" id="h1-0-2" class="i">+import (
+</a><a href="#h1-0-3" id="h1-0-3" class="i">+	&quot;fmt&quot;
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+	&quot;testing&quot;
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+
+</a><a href="#h1-0-6" id="h1-0-6" class="i">+	&quot;github.com/stretchr/testify/assert&quot;
+</a><a href="#h1-0-7" id="h1-0-7" class="i">+)
+</a><a href="#h1-0-8" id="h1-0-8" class="i">+
+</a><a href="#h1-0-9" id="h1-0-9" class="i">+func TestVanillaUntagged(t *testing.T) {
+</a><a href="#h1-0-10" id="h1-0-10" class="i">+	t.Parallel()
+</a><a href="#h1-0-11" id="h1-0-11" class="i">+
+</a><a href="#h1-0-12" id="h1-0-12" class="i">+	err := New(&quot;namespace&quot;, &quot;message&quot;)
+</a><a href="#h1-0-13" id="h1-0-13" class="i">+	assert.Equal(t, &quot;namespace: message&quot;, err.Error())
+</a><a href="#h1-0-14" id="h1-0-14" class="i">+}
+</a><a href="#h1-0-15" id="h1-0-15" class="i">+
+</a><a href="#h1-0-16" id="h1-0-16" class="i">+func TestVanillaTagged(t *testing.T) {
+</a><a href="#h1-0-17" id="h1-0-17" class="i">+	t.Parallel()
+</a><a href="#h1-0-18" id="h1-0-18" class="i">+
+</a><a href="#h1-0-19" id="h1-0-19" class="i">+	err := New(&quot;namespace&quot;, &quot;message&quot;, Tag{&quot;num&quot;, 5}, Tag{&quot;bytes&quot;, []byte{1, 2, 3}})
+</a><a href="#h1-0-20" id="h1-0-20" class="i">+	assert.Equal(t, &quot;namespace: message: num=5 bytes=[1 2 3]&quot;, err.Error())
+</a><a href="#h1-0-21" id="h1-0-21" class="i">+}
+</a><a href="#h1-0-22" id="h1-0-22" class="i">+
+</a><a href="#h1-0-23" id="h1-0-23" class="i">+func TestStacked(t *testing.T) {
+</a><a href="#h1-0-24" id="h1-0-24" class="i">+	t.Parallel()
+</a><a href="#h1-0-25" id="h1-0-25" class="i">+
+</a><a href="#h1-0-26" id="h1-0-26" class="i">+	var err *Error
+</a><a href="#h1-0-27" id="h1-0-27" class="i">+
+</a><a href="#h1-0-28" id="h1-0-28" class="i">+	err = Stack(&quot;namespace&quot;, &quot;message&quot;, fmt.Errorf(&quot;stacked&quot;))
+</a><a href="#h1-0-29" id="h1-0-29" class="i">+	assert.Equal(t, &quot;namespace: message\nstacked&quot;, err.Error())
+</a><a href="#h1-0-30" id="h1-0-30" class="i">+
+</a><a href="#h1-0-31" id="h1-0-31" class="i">+	err = Stack(&quot;namespace&quot;, &quot;message&quot;, New(&quot;stacked&quot;, &quot;message&quot;, Tag{&quot;num&quot;, 5}))
+</a><a href="#h1-0-32" id="h1-0-32" class="i">+	assert.Equal(t, &quot;namespace: message\nstacked: message: num=5&quot;, err.Error())
+</a><a href="#h1-0-33" id="h1-0-33" class="i">+
+</a><a href="#h1-0-34" id="h1-0-34" class="i">+	err = Stack(&quot;namespace&quot;, &quot;message&quot;, New(&quot;stacked&quot;, &quot;message&quot;, Tag{&quot;num&quot;, 5}), Tag{&quot;num&quot;, 6})
+</a><a href="#h1-0-35" id="h1-0-35" class="i">+	assert.Equal(t, &quot;namespace: message: num=6\nstacked: message: num=5&quot;, err.Error())
+</a><a href="#h1-0-36" id="h1-0-36" class="i">+}
+</a></pre>
+</div>
+</body>
+</html>

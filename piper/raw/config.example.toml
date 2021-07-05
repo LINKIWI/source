@@ -1,0 +1,78 @@
+# The piper section contains directives for configuring piper itself.
+[piper]
+# statsd listener address URI for application metrics.
+# Omit or leave blank to disable. Defaults to disabled metrics reporting.
+metrics-address = "udp://localhost:8125"
+# Optional address URI of a SOCKS5 proxy server through which the metrics transport should be
+# established. Note that only certain metrics transports support tunneling through a proxy server.
+# Defaults to no proxy server.
+metrics-proxy = "tcp://localhost:8125"
+# Prefix to apply to all outgoing statsd metrics, when enabled.
+metrics-prefix = "piper"
+# Sentry DSN for error reporting.
+# Omit or leave blank to disable. Defaults to disabled Sentry reporting.
+sentry-dsn = "https://key@sentry.example.com/1"
+
+# Each relay section describes one log stream relay.
+# The fields `name`. `log-file`, `kafka-address`, and `kafka-topic` are required; all others are
+# optional and will assume defaults.
+# Note that more than one relay can be specified.
+[[relay]]
+# Name of this relay; used only for purposes of identification.
+name = "dmesg"
+# Path to the log file on disk.
+log-file = "/var/log/dmesg"
+# Character separating logical log line entries. Defaults to newline.
+delimiter = "\n"
+# Delay duration between resets (re-initializations) of the log tailer when it fails.
+# Defaults to no delay.
+reset-delay = "5s"
+# Optional regular expression to apply to tailed log lines to filter eligible messages.
+# Only fully formed log lines that match the following regular expression will be published.
+# Defaults to no filter; i.e. ship all received log lines.
+filter = "^pattern"
+# Name of the serializer implementation to use for serializing tailed log lines into Kafka messages.
+# Available serializers are:
+#   - line: Deliver the log line literal exactly as-is.
+#   - json: Deliver a JSON object with metadata about the tailed line, with the actual line contents
+#           as one field within the JSON object.
+# Defaults to line.
+serializer = "line"
+# Identifier for the file seek behavior to use when the log file is opened. Note that the seek
+# position is only respected for regular files (i.e., not named pipes). Available positions are:
+#   - start: Read log lines from the beginning of the file. Any existing lines in the file will be
+#            published immediately upon open or reopen.
+#   - end: Read log lines from the end of the file, i.e. seek to the end of the file before
+#          publishing tailed lines.
+# Defaults to end.
+seek-position = "end"
+# List of runtime-derived tags to include as additional metadata in outgoing messages. Note that
+# only certain serializers are capable of including these tags in shipped log lines.
+# Available tags are:
+#   - hostname: Hostname of the local machine.
+#   - version: Piper application version.
+# Defaults to no tags.
+tags = ["hostname", "version"]
+# Number of log lines to queue in the internal buffer when there is log consumption lag (i.e., new
+# lines are produced faster than they are written to Kafka). Setting a positive buffer length allows
+# new log lines to be read from the file while existing messages are yet to be published, thus
+# providing some safeguards against losing lines if a file is rotated while lines are being written.
+# Defaults to no buffer; i.e. new lines are read from the file only after existing lines have been
+# published.
+buffer-length = 1024
+# Optional address of a SOCKS5 proxy server through which the Kafka broker connection should be
+# established. Defaults to no proxy server.
+proxy-address = "localhost:3125"
+# Address of the target Kafka broker.
+kafka-address = "localhost:9092"
+# Name of the Kafka topic for published log lines.
+kafka-topic = "piper-dmesg"
+# Code for the number of required acknowledgements by Kafka for a write to be considered successful.
+# Defaults to 0; i.e. no acknowledge is required at all.
+kafka-acks = 1
+# Maximum number of retries permitted for a single write
+# Defaults to no retries.
+kafka-retries = 10
+# Timeout for Kafka network I/O operations.
+# Defaults to no timeout.
+kafka-timeout = "100ms"

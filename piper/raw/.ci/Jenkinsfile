@@ -1,0 +1,114 @@
+pipeline {
+    agent {
+        docker {
+            image 'docker.internal.kevinlin.info/infra/ci-base:0.3.4'
+            label 'docker-executor'
+        }
+    }
+
+    options {
+        withAWS(
+            endpointUrl: 'https://storage.kevinlin.info',
+            credentials: 'storage-internal',
+        )
+    }
+
+    stages {
+        stage('Install') {
+            steps {
+                sh 'go mod download -x'
+            }
+        }
+        stage('Lint') {
+            steps {
+                sh 'make lint'
+            }
+        }
+        stage('Build') {
+            parallel {
+                stage('linux/amd64') {
+                    environment {
+                        CGO_ENABLED = '0'
+                        GOOS = 'linux'
+                        GOARCH = 'amd64'
+                        VERSION = "${GIT_COMMIT}"
+                    }
+                    steps {
+                        sh 'make'
+                    }
+                }
+                stage('linux/arm') {
+                    environment {
+                        CGO_ENABLED = '0'
+                        GOOS = 'linux'
+                        GOARCH = 'arm'
+                        VERSION = "${GIT_COMMIT}"
+                    }
+                    steps {
+                        sh 'make'
+                    }
+                }
+            }
+        }
+        stage('Release') {
+            steps {
+                sh 'tar -cvzf release.tar.gz bin/ init/'
+                s3Upload(
+                    bucket: 'internal',
+                    path: "deploy/${env.JOB_NAME}/${env.GIT_COMMIT}/",
+                    file: 'release.tar.gz',
+                )
+            }
+        }
+        stage('Publish') {
+            environment {
+                PACKAGE_VERSION = sh(
+                    script: 'git show ' +
+                            '--no-patch ' +
+                            '--no-notes ' +
+                            "--date=format:\"%Y.%m.%d-%H.%M.%S-\$(echo ${GIT_COMMIT} | cut -c -8)\" " +
+                            "--pretty=format:'%cd' ${GIT_COMMIT}",
+                    returnStdout: true,
+                ).trim()
+            }
+            parallel {
+                stage('linux/amd64') {
+                    steps {
+                        build(
+                            job: 'task--package',
+                            parameters: [
+                                string(name: 'RELEASE_ARTIFACT', value: "${env.JOB_NAME}"),
+                                string(name: 'RELEASE_VERSION', value: "${env.GIT_COMMIT}"),
+                                string(name: 'PACKAGE_NAME', value: "${env.JOB_NAME}"),
+                                string(name: 'PACKAGE_VERSION', value: "${env.PACKAGE_VERSION}"),
+                                string(name: 'PACKAGE_DESCRIPTION', value: 'Realtime log file to Kafka relay daemon'),
+                                string(name: 'PACKAGE_ARCHITECTURE', value: 'amd64'),
+                                string(name: 'BINARY_SPEC', value: 'piper:bin/piper-linux-amd64'),
+                                string(name: 'SYSTEMD_SERVICES', value: 'init/piper.service'),
+                            ],
+                            wait: true,
+                        )
+                    }
+                }
+                stage('linux/arm') {
+                    steps {
+                        build(
+                            job: 'task--package',
+                            parameters: [
+                                string(name: 'RELEASE_ARTIFACT', value: "${env.JOB_NAME}"),
+                                string(name: 'RELEASE_VERSION', value: "${env.GIT_COMMIT}"),
+                                string(name: 'PACKAGE_NAME', value: "${env.JOB_NAME}"),
+                                string(name: 'PACKAGE_VERSION', value: "${env.PACKAGE_VERSION}"),
+                                string(name: 'PACKAGE_DESCRIPTION', value: 'Realtime log file to Kafka relay daemon'),
+                                string(name: 'PACKAGE_ARCHITECTURE', value: 'armhf'),
+                                string(name: 'BINARY_SPEC', value: 'piper:bin/piper-linux-arm'),
+                                string(name: 'SYSTEMD_SERVICES', value: 'init/piper.service'),
+                            ],
+                            wait: true,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}

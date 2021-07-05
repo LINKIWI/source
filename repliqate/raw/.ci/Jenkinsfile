@@ -1,0 +1,114 @@
+pipeline {
+    agent {
+        label 'docker-executor'
+    }
+
+    options {
+        withAWS(
+            endpointUrl: 'https://storage.kevinlin.info',
+            credentials: 'storage-internal',
+        )
+    }
+
+    stages {
+        stage('Install') {
+            parallel {
+                stage('linux/amd64') {
+                    agent {
+                        dockerfile {
+                            dir '.ci/amd64'
+                            reuseNode true
+                        }
+                    }
+                    steps {
+                        sh 'python -m venv --system-site-packages env-amd64'
+                        sh '. env-amd64/bin/activate && make bootstrap'
+                    }
+                }
+                stage('linux/arm') {
+                    agent {
+                        dockerfile {
+                            dir '.ci/arm'
+                            reuseNode true
+                        }
+                    }
+                    steps {
+                        sh 'python -m venv --system-site-packages env-arm'
+                        sh '. env-arm/bin/activate && make bootstrap'
+                    }
+                }
+            }
+        }
+        stage('Test') {
+            parallel {
+                stage('Lint') {
+                    agent {
+                        dockerfile {
+                            dir '.ci/amd64'
+                            reuseNode true
+                        }
+                    }
+                    steps {
+                        sh '. env-amd64/bin/activate && make lint'
+                    }
+                }
+                stage('Unit') {
+                    steps {
+                        sh 'exit 0'
+                    }
+                }
+            }
+        }
+        stage('Build') {
+            parallel {
+                stage('linux/amd64') {
+                    agent {
+                        dockerfile {
+                            dir '.ci/amd64'
+                            reuseNode true
+                        }
+                    }
+                    environment {
+                        ARCHITECTURE = 'linux-amd64'
+                        VERSION = "${env.GIT_COMMIT}"
+                    }
+                    steps {
+                        sh '. env-amd64/bin/activate && make build'
+                    }
+                }
+                stage('linux/arm') {
+                    agent {
+                        dockerfile {
+                            dir '.ci/arm'
+                            reuseNode true
+                        }
+                    }
+                    environment {
+                        ARCHITECTURE = 'linux-arm'
+                        VERSION = "${env.GIT_COMMIT}"
+                    }
+                    steps {
+                        sh 'python -m venv env-arm'
+                        sh '. env-arm/bin/activate && make build'
+                    }
+                }
+            }
+        }
+        stage('Release') {
+            agent {
+                docker {
+                    image 'docker.internal.kevinlin.info/infra/ci-base:0.3.0'
+                    reuseNode true
+                }
+            }
+            steps {
+                sh 'tar -cvzf release.tar.gz dist/'
+                s3Upload(
+                    bucket: 'internal',
+                    path: "deploy/${env.JOB_NAME}/${env.GIT_COMMIT}/",
+                    file: 'release.tar.gz',
+                )
+            }
+        }
+    }
+}

@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>root: Interpret comma-delimited addresses in config as composite backend - aperture - Go statsd client library</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="aperture Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="aperture Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i,
+a.line {
+	text-decoration: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>aperture</h1><span class="desc">Go statsd client library</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/aperture.git">https://source.static.kevinlin.info/aperture.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/LICENSE">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/5dfb5864d38f17b2ac5f228de6b16a852a2258cc">5dfb5864d38f17b2ac5f228de6b16a852a2258cc</a>
+<b>parent</b> <a href="../commit/a521e86550fe18c3a2e58f8e77657ae73ef2107b">a521e86550fe18c3a2e58f8e77657ae73ef2107b</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Wed, 30 Dec 2020 18:59:38 -0800
+
+root: Interpret comma-delimited addresses in config as composite backend
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">client.go</a></td><td> | </td><td class="num">104</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">--------------------------------</span></td></tr>
+</table></pre><pre>1 file changed, 62 insertions(+), 42 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/client.go">client.go</a> b/<a href="../file/client.go">client.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -38,57 +38,77 @@ func NewClient(cfg *Config) (*Client, error) {
+</a> 
+ 	/* Transport instantiation */
+ 
+<a href="#h0-0-3" id="h0-0-3" class="i">+	var backends []transport.Factory
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+
+</a> 	tFactory := func() (transport.Transport, error) {
+ 		return transport.NewNoop(), nil
+ 	}
+ 
+ 	if cfg.Address != &quot;&quot; {
+<a href="#h0-0-10" id="h0-0-10" class="d">-		if strings.HasPrefix(cfg.Address, &quot;udp://&quot;) {
+</a><a href="#h0-0-11" id="h0-0-11" class="d">-			tFactory = func() (transport.Transport, error) {
+</a><a href="#h0-0-12" id="h0-0-12" class="d">-				return transport.NewUDP(cfg.Address[6:])
+</a><a href="#h0-0-13" id="h0-0-13" class="d">-			}
+</a><a href="#h0-0-14" id="h0-0-14" class="d">-		} else if strings.HasPrefix(cfg.Address, &quot;tcp://&quot;) {
+</a><a href="#h0-0-15" id="h0-0-15" class="d">-			tFactory = func() (transport.Transport, error) {
+</a><a href="#h0-0-16" id="h0-0-16" class="d">-				return transport.NewTCP(
+</a><a href="#h0-0-17" id="h0-0-17" class="d">-					cfg.Address[6:],
+</a><a href="#h0-0-18" id="h0-0-18" class="d">-					transport.TCPSocketConfig{
+</a><a href="#h0-0-19" id="h0-0-19" class="d">-						ConnectTimeout:    cfg.TransportConnectTimeout,
+</a><a href="#h0-0-20" id="h0-0-20" class="d">-						SendTimeout:       cfg.TransportSendTimeout,
+</a><a href="#h0-0-21" id="h0-0-21" class="d">-						KeepAliveInterval: cfg.TransportKeepaliveInterval,
+</a><a href="#h0-0-22" id="h0-0-22" class="d">-					},
+</a><a href="#h0-0-23" id="h0-0-23" class="d">-				)
+</a><a href="#h0-0-24" id="h0-0-24" class="d">-			}
+</a><a href="#h0-0-25" id="h0-0-25" class="d">-		} else if strings.HasPrefix(cfg.Address, &quot;unix://&quot;) {
+</a><a href="#h0-0-26" id="h0-0-26" class="d">-			tFactory = func() (transport.Transport, error) {
+</a><a href="#h0-0-27" id="h0-0-27" class="d">-				return transport.NewUDS(cfg.Address[7:])
+</a><a href="#h0-0-28" id="h0-0-28" class="d">-			}
+</a><a href="#h0-0-29" id="h0-0-29" class="d">-		} else if strings.HasPrefix(cfg.Address, &quot;file://&quot;) {
+</a><a href="#h0-0-30" id="h0-0-30" class="d">-			tFactory = func() (transport.Transport, error) {
+</a><a href="#h0-0-31" id="h0-0-31" class="d">-				return transport.NewFile(cfg.Address[7:])
+</a><a href="#h0-0-32" id="h0-0-32" class="d">-			}
+</a><a href="#h0-0-33" id="h0-0-33" class="d">-		}
+</a><a href="#h0-0-34" id="h0-0-34" class="d">-
+</a><a href="#h0-0-35" id="h0-0-35" class="d">-		backendTFactory := tFactory
+</a><a href="#h0-0-36" id="h0-0-36" class="d">-		tFactory = func() (transport.Transport, error) {
+</a><a href="#h0-0-37" id="h0-0-37" class="d">-			return transport.NewFramed(backendTFactory, []byte(&quot;\n&quot;))
+</a><a href="#h0-0-38" id="h0-0-38" class="i">+		for _, addr := range strings.Split(cfg.Address, &quot;,&quot;) {
+</a><a href="#h0-0-39" id="h0-0-39" class="i">+			func(addr string) {
+</a><a href="#h0-0-40" id="h0-0-40" class="i">+				// Instantiation of the transport client specified by the address
+</a><a href="#h0-0-41" id="h0-0-41" class="i">+
+</a><a href="#h0-0-42" id="h0-0-42" class="i">+				if strings.HasPrefix(addr, &quot;udp://&quot;) {
+</a><a href="#h0-0-43" id="h0-0-43" class="i">+					tFactory = func() (transport.Transport, error) {
+</a><a href="#h0-0-44" id="h0-0-44" class="i">+						return transport.NewUDP(addr[6:])
+</a><a href="#h0-0-45" id="h0-0-45" class="i">+					}
+</a><a href="#h0-0-46" id="h0-0-46" class="i">+				} else if strings.HasPrefix(addr, &quot;tcp://&quot;) {
+</a><a href="#h0-0-47" id="h0-0-47" class="i">+					tFactory = func() (transport.Transport, error) {
+</a><a href="#h0-0-48" id="h0-0-48" class="i">+						return transport.NewTCP(
+</a><a href="#h0-0-49" id="h0-0-49" class="i">+							addr[6:],
+</a><a href="#h0-0-50" id="h0-0-50" class="i">+							transport.TCPSocketConfig{
+</a><a href="#h0-0-51" id="h0-0-51" class="i">+								ConnectTimeout:    cfg.TransportConnectTimeout,
+</a><a href="#h0-0-52" id="h0-0-52" class="i">+								SendTimeout:       cfg.TransportSendTimeout,
+</a><a href="#h0-0-53" id="h0-0-53" class="i">+								KeepAliveInterval: cfg.TransportKeepaliveInterval,
+</a><a href="#h0-0-54" id="h0-0-54" class="i">+							},
+</a><a href="#h0-0-55" id="h0-0-55" class="i">+						)
+</a><a href="#h0-0-56" id="h0-0-56" class="i">+					}
+</a><a href="#h0-0-57" id="h0-0-57" class="i">+				} else if strings.HasPrefix(addr, &quot;unix://&quot;) {
+</a><a href="#h0-0-58" id="h0-0-58" class="i">+					tFactory = func() (transport.Transport, error) {
+</a><a href="#h0-0-59" id="h0-0-59" class="i">+						return transport.NewUDS(addr[7:])
+</a><a href="#h0-0-60" id="h0-0-60" class="i">+					}
+</a><a href="#h0-0-61" id="h0-0-61" class="i">+				} else if strings.HasPrefix(addr, &quot;file://&quot;) {
+</a><a href="#h0-0-62" id="h0-0-62" class="i">+					tFactory = func() (transport.Transport, error) {
+</a><a href="#h0-0-63" id="h0-0-63" class="i">+						return transport.NewFile(addr[7:])
+</a><a href="#h0-0-64" id="h0-0-64" class="i">+					}
+</a><a href="#h0-0-65" id="h0-0-65" class="i">+				}
+</a><a href="#h0-0-66" id="h0-0-66" class="i">+
+</a><a href="#h0-0-67" id="h0-0-67" class="i">+				// Transport usage abstractions on top of backends
+</a><a href="#h0-0-68" id="h0-0-68" class="i">+
+</a><a href="#h0-0-69" id="h0-0-69" class="i">+				backendTFactory := tFactory
+</a><a href="#h0-0-70" id="h0-0-70" class="i">+				tFactory = func() (transport.Transport, error) {
+</a><a href="#h0-0-71" id="h0-0-71" class="i">+					return transport.NewFramed(backendTFactory, []byte(&quot;\n&quot;))
+</a><a href="#h0-0-72" id="h0-0-72" class="i">+				}
+</a><a href="#h0-0-73" id="h0-0-73" class="i">+
+</a><a href="#h0-0-74" id="h0-0-74" class="i">+				if cfg.LazyTransportInitialization {
+</a><a href="#h0-0-75" id="h0-0-75" class="i">+					backendTFactory := tFactory
+</a><a href="#h0-0-76" id="h0-0-76" class="i">+					tFactory = func() (transport.Transport, error) {
+</a><a href="#h0-0-77" id="h0-0-77" class="i">+						return transport.NewLazy(backendTFactory)
+</a><a href="#h0-0-78" id="h0-0-78" class="i">+					}
+</a><a href="#h0-0-79" id="h0-0-79" class="i">+				}
+</a><a href="#h0-0-80" id="h0-0-80" class="i">+
+</a><a href="#h0-0-81" id="h0-0-81" class="i">+				if cfg.TransportProbeInterval &gt; 0 {
+</a><a href="#h0-0-82" id="h0-0-82" class="i">+					backendTFactory := tFactory
+</a><a href="#h0-0-83" id="h0-0-83" class="i">+					tFactory = func() (transport.Transport, error) {
+</a><a href="#h0-0-84" id="h0-0-84" class="i">+						return transport.NewReconnecting(
+</a><a href="#h0-0-85" id="h0-0-85" class="i">+							backendTFactory,
+</a><a href="#h0-0-86" id="h0-0-86" class="i">+							cfg.TransportProbeInterval,
+</a><a href="#h0-0-87" id="h0-0-87" class="i">+							1,
+</a><a href="#h0-0-88" id="h0-0-88" class="i">+						)
+</a><a href="#h0-0-89" id="h0-0-89" class="i">+					}
+</a><a href="#h0-0-90" id="h0-0-90" class="i">+				}
+</a><a href="#h0-0-91" id="h0-0-91" class="i">+
+</a><a href="#h0-0-92" id="h0-0-92" class="i">+				backends = append(backends, tFactory)
+</a><a href="#h0-0-93" id="h0-0-93" class="i">+			}(addr)
+</a> 		}
+ 	}
+ 
+<a href="#h0-0-97" id="h0-0-97" class="d">-	if cfg.LazyTransportInitialization {
+</a><a href="#h0-0-98" id="h0-0-98" class="d">-		backendTFactory := tFactory
+</a><a href="#h0-0-99" id="h0-0-99" class="d">-		tFactory = func() (transport.Transport, error) {
+</a><a href="#h0-0-100" id="h0-0-100" class="d">-			return transport.NewLazy(backendTFactory)
+</a><a href="#h0-0-101" id="h0-0-101" class="d">-		}
+</a><a href="#h0-0-102" id="h0-0-102" class="d">-	}
+</a><a href="#h0-0-103" id="h0-0-103" class="d">-
+</a><a href="#h0-0-104" id="h0-0-104" class="d">-	if cfg.TransportProbeInterval &gt; 0 {
+</a><a href="#h0-0-105" id="h0-0-105" class="d">-		backendTFactory := tFactory
+</a><a href="#h0-0-106" id="h0-0-106" class="i">+	if len(backends) == 1 {
+</a><a href="#h0-0-107" id="h0-0-107" class="i">+		tFactory = backends[0]
+</a><a href="#h0-0-108" id="h0-0-108" class="i">+	} else if len(backends) &gt; 1 {
+</a> 		tFactory = func() (transport.Transport, error) {
+<a href="#h0-0-110" id="h0-0-110" class="d">-			return transport.NewReconnecting(
+</a><a href="#h0-0-111" id="h0-0-111" class="d">-				backendTFactory,
+</a><a href="#h0-0-112" id="h0-0-112" class="d">-				cfg.TransportProbeInterval,
+</a><a href="#h0-0-113" id="h0-0-113" class="d">-				1,
+</a><a href="#h0-0-114" id="h0-0-114" class="d">-			)
+</a><a href="#h0-0-115" id="h0-0-115" class="i">+			return transport.NewComposite(backends, transport.All)
+</a> 		}
+ 	}
+ 
+</pre>
+</div>
+</body>
+</html>

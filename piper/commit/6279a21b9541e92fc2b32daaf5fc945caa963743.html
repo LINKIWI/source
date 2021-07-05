@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>cmd/piper, internal/config: Support glob pattern match for log file directive - piper - Realtime log file to Kafka relay daemon</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="piper Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="piper Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i,
+a.line {
+	text-decoration: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>piper</h1><span class="desc">Realtime log file to Kafka relay daemon</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/piper.git">https://source.static.kevinlin.info/piper.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/6279a21b9541e92fc2b32daaf5fc945caa963743">6279a21b9541e92fc2b32daaf5fc945caa963743</a>
+<b>parent</b> <a href="../commit/8d0cad09ba3dbd016547eb5e60b245cb762e6920">8d0cad09ba3dbd016547eb5e60b245cb762e6920</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sat,  6 Mar 2021 11:37:09 -0800
+
+cmd/piper, internal/config: Support glob pattern match for log file directive
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">cmd/piper/main.go</a></td><td> | </td><td class="num">15</td><td><span class="i">++++++++++</span><span class="d">-----</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">internal/config/config.go</a></td><td> | </td><td class="num">2</td><td><span class="i">+</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">internal/config/data.go</a></td><td> | </td><td class="num">46</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++</span><span class="d">-----</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">internal/config/types.go</a></td><td> | </td><td class="num">2</td><td><span class="i">+</span><span class="d">-</span></td></tr>
+</table></pre><pre>4 files changed, 53 insertions(+), 12 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/cmd/piper/main.go">cmd/piper/main.go</a> b/<a href="../file/cmd/piper/main.go">cmd/piper/main.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -117,7 +117,7 @@ func main() {
+</a> 		logger.Info(
+ 			&quot;registering log stream relay&quot;,
+ 			zap.String(&quot;name&quot;, cfgRelay.Name),
+<a href="#h0-0-3" id="h0-0-3" class="d">-			zap.String(&quot;path&quot;, cfgRelay.LogFile),
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+			zap.String(&quot;path&quot;, cfgRelay.LogFile.Pattern),
+</a> 			zap.String(&quot;address&quot;, cfgRelay.KafkaAddress),
+ 			zap.String(&quot;topic&quot;, cfgRelay.KafkaTopic),
+ 		)
+<a href="#h0-1" id="h0-1" class="h">@@ -127,7 +127,7 @@ func main() {
+</a> 				logger.Info(
+ 					&quot;initializing log stream relay&quot;,
+ 					zap.String(&quot;name&quot;, cfgRelay.Name),
+<a href="#h0-1-3" id="h0-1-3" class="d">-					zap.String(&quot;path&quot;, cfgRelay.LogFile),
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+					zap.String(&quot;path&quot;, cfgRelay.LogFile.Pattern),
+</a> 					zap.String(&quot;address&quot;, cfgRelay.KafkaAddress),
+ 					zap.String(&quot;topic&quot;, cfgRelay.KafkaTopic),
+ 				)
+<a href="#h0-2" id="h0-2" class="h">@@ -150,7 +150,7 @@ func main() {
+</a> 					hub := sentry.CurrentHub().Clone()
+ 					hub.ConfigureScope(func(scope *sentry.Scope) {
+ 						scope.SetTag(&quot;name&quot;, cfgRelay.Name)
+<a href="#h0-2-3" id="h0-2-3" class="d">-						scope.SetTag(&quot;path&quot;, cfgRelay.LogFile)
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+						scope.SetTag(&quot;path&quot;, cfgRelay.LogFile.Pattern)
+</a> 						scope.SetTag(&quot;topic&quot;, cfgRelay.KafkaTopic)
+ 					})
+ 					hub.CaptureException(err)
+<a href="#h0-3" id="h0-3" class="h">@@ -197,7 +197,12 @@ func streamLog(cfgRelay *config.Relay) error {
+</a> 		tailOpts.Tags = tags
+ 	}
+ 
+<a href="#h0-3-3" id="h0-3-3" class="d">-	logFile, err := tail.New(cfgRelay.LogFile, tailOpts)
+</a><a href="#h0-3-4" id="h0-3-4" class="i">+	match, err := cfgRelay.LogFile.Match()
+</a><a href="#h0-3-5" id="h0-3-5" class="i">+	if err != nil {
+</a><a href="#h0-3-6" id="h0-3-6" class="i">+		return err
+</a><a href="#h0-3-7" id="h0-3-7" class="i">+	}
+</a><a href="#h0-3-8" id="h0-3-8" class="i">+
+</a><a href="#h0-3-9" id="h0-3-9" class="i">+	logFile, err := tail.New(match, tailOpts)
+</a> 	if err != nil {
+ 		return err
+ 	}
+<a href="#h0-4" id="h0-4" class="h">@@ -205,7 +210,7 @@ func streamLog(cfgRelay *config.Relay) error {
+</a> 
+ 	logger.Debug(
+ 		&quot;opened log file for tailing&quot;,
+<a href="#h0-4-3" id="h0-4-3" class="d">-		zap.String(&quot;path&quot;, cfgRelay.LogFile),
+</a><a href="#h0-4-4" id="h0-4-4" class="i">+		zap.String(&quot;path&quot;, match),
+</a> 		zap.Any(&quot;options&quot;, tailOpts),
+ 	)
+ 
+<b>diff --git a/<a id="h1" href="../file/internal/config/config.go">internal/config/config.go</a> b/<a href="../file/internal/config/config.go">internal/config/config.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -35,7 +35,7 @@ func (c *Config) Validate() error {
+</a> 	for _, relay := range c.Relays {
+ 		if relay.Name == &quot;&quot; {
+ 			return fmt.Errorf(&quot;config: relay name is not populated&quot;)
+<a href="#h1-0-3" id="h1-0-3" class="d">-		} else if relay.LogFile == &quot;&quot; {
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+		} else if relay.LogFile.Pattern == &quot;&quot; {
+</a> 			return fmt.Errorf(&quot;config: relay log file path is not populated&quot;)
+ 		} else if len(relay.Delimiter) &gt; 1 {
+ 			return fmt.Errorf(&quot;config: relay delimiter must be omitted or exactly one character&quot;)
+<b>diff --git a/<a id="h2" href="../file/internal/config/data.go">internal/config/data.go</a> b/<a href="../file/internal/config/data.go">internal/config/data.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -1,20 +1,51 @@
+</a> package config
+ 
+ import (
+<a href="#h2-0-3" id="h2-0-3" class="i">+	&quot;fmt&quot;
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+	&quot;path/filepath&quot;
+</a> 	&quot;regexp&quot;
+ 	&quot;time&quot;
+ )
+ 
+<a href="#h2-0-9" id="h2-0-9" class="i">+// glob is a TOML unmarshaler implementation for a string with globbing convenience methods.
+</a><a href="#h2-0-10" id="h2-0-10" class="i">+type glob struct {
+</a><a href="#h2-0-11" id="h2-0-11" class="i">+	Pattern string
+</a><a href="#h2-0-12" id="h2-0-12" class="i">+}
+</a><a href="#h2-0-13" id="h2-0-13" class="i">+
+</a><a href="#h2-0-14" id="h2-0-14" class="i">+// Match attempts to return exactly one match from the glob pattern, and errors when not possible.
+</a><a href="#h2-0-15" id="h2-0-15" class="i">+func (g *glob) Match() (string, error) {
+</a><a href="#h2-0-16" id="h2-0-16" class="i">+	matches, err := g.Matches()
+</a><a href="#h2-0-17" id="h2-0-17" class="i">+	if err != nil {
+</a><a href="#h2-0-18" id="h2-0-18" class="i">+		return &quot;&quot;, err
+</a><a href="#h2-0-19" id="h2-0-19" class="i">+	} else if len(matches) == 0 {
+</a><a href="#h2-0-20" id="h2-0-20" class="i">+		return &quot;&quot;, fmt.Errorf(&quot;config: glob pattern matched no files&quot;)
+</a><a href="#h2-0-21" id="h2-0-21" class="i">+	} else if len(matches) &gt; 1 {
+</a><a href="#h2-0-22" id="h2-0-22" class="i">+		return &quot;&quot;, fmt.Errorf(
+</a><a href="#h2-0-23" id="h2-0-23" class="i">+			&quot;config: glob pattern matched more than one file: matches=%v&quot;,
+</a><a href="#h2-0-24" id="h2-0-24" class="i">+			matches,
+</a><a href="#h2-0-25" id="h2-0-25" class="i">+		)
+</a><a href="#h2-0-26" id="h2-0-26" class="i">+	}
+</a><a href="#h2-0-27" id="h2-0-27" class="i">+
+</a><a href="#h2-0-28" id="h2-0-28" class="i">+	return matches[0], nil
+</a><a href="#h2-0-29" id="h2-0-29" class="i">+}
+</a><a href="#h2-0-30" id="h2-0-30" class="i">+
+</a><a href="#h2-0-31" id="h2-0-31" class="i">+// Matches returns the names of all files that match the glob pattern.
+</a><a href="#h2-0-32" id="h2-0-32" class="i">+func (g *glob) Matches() ([]string, error) {
+</a><a href="#h2-0-33" id="h2-0-33" class="i">+	return filepath.Glob(g.Pattern)
+</a><a href="#h2-0-34" id="h2-0-34" class="i">+}
+</a><a href="#h2-0-35" id="h2-0-35" class="i">+
+</a><a href="#h2-0-36" id="h2-0-36" class="i">+// UnmarshalText stores the string value as a glob pattern.
+</a><a href="#h2-0-37" id="h2-0-37" class="i">+func (g *glob) UnmarshalText(text []byte) error {
+</a><a href="#h2-0-38" id="h2-0-38" class="i">+	g.Pattern = string(text)
+</a><a href="#h2-0-39" id="h2-0-39" class="i">+
+</a><a href="#h2-0-40" id="h2-0-40" class="i">+	return nil
+</a><a href="#h2-0-41" id="h2-0-41" class="i">+}
+</a><a href="#h2-0-42" id="h2-0-42" class="i">+
+</a> // duration is a TOML unmarshaler implementation for a time.Duration.
+ type duration struct {
+ 	time.Duration
+ }
+ 
+<a href="#h2-0-48" id="h2-0-48" class="d">-// regex is a TOML unmarshaler implementation for a regexp.Regexp.
+</a><a href="#h2-0-49" id="h2-0-49" class="d">-type regex struct {
+</a><a href="#h2-0-50" id="h2-0-50" class="d">-	*regexp.Regexp
+</a><a href="#h2-0-51" id="h2-0-51" class="d">-}
+</a><a href="#h2-0-52" id="h2-0-52" class="d">-
+</a> // UnmarshalText attempts to parse the input string into a time.Duration.
+ func (d *duration) UnmarshalText(text []byte) error {
+ 	var err error
+<a href="#h2-1" id="h2-1" class="h">@@ -24,6 +55,11 @@ func (d *duration) UnmarshalText(text []byte) error {
+</a> 	return err
+ }
+ 
+<a href="#h2-1-3" id="h2-1-3" class="i">+// regex is a TOML unmarshaler implementation for a regexp.Regexp.
+</a><a href="#h2-1-4" id="h2-1-4" class="i">+type regex struct {
+</a><a href="#h2-1-5" id="h2-1-5" class="i">+	*regexp.Regexp
+</a><a href="#h2-1-6" id="h2-1-6" class="i">+}
+</a><a href="#h2-1-7" id="h2-1-7" class="i">+
+</a> // UnmarshalText attempts to parse a non-empty input string into a regexp.Regexp.
+ // Empty input strings will leave the regexp.Regexp as nil.
+ func (r *regex) UnmarshalText(text []byte) error {
+<b>diff --git a/<a id="h3" href="../file/internal/config/types.go">internal/config/types.go</a> b/<a href="../file/internal/config/types.go">internal/config/types.go</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -43,7 +43,7 @@ type Piper struct {
+</a> // Relay provides configuration of a single log relay stream.
+ type Relay struct {
+ 	Name           string       `toml:&quot;name&quot;`
+<a href="#h3-0-3" id="h3-0-3" class="d">-	LogFile        string       `toml:&quot;log-file&quot;`
+</a><a href="#h3-0-4" id="h3-0-4" class="i">+	LogFile        glob         `toml:&quot;log-file&quot;`
+</a> 	Delimiter      string       `toml:&quot;delimiter&quot;`
+ 	ResetDelay     duration     `toml:&quot;reset-delay&quot;`
+ 	Filter         regex        `toml:&quot;filter&quot;`
+</pre>
+</div>
+</body>
+</html>

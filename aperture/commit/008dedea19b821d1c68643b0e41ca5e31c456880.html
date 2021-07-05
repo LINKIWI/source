@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>protocol: statsd line protocol serializer implementation - aperture - Go statsd client library</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="aperture Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="aperture Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i,
+a.line {
+	text-decoration: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>aperture</h1><span class="desc">Go statsd client library</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/aperture.git">https://source.static.kevinlin.info/aperture.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/LICENSE">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/008dedea19b821d1c68643b0e41ca5e31c456880">008dedea19b821d1c68643b0e41ca5e31c456880</a>
+<b>parent</b> <a href="../commit/0b920db1aed7d8447881ecc9e156e3dad9a843e3">0b920db1aed7d8447881ecc9e156e3dad9a843e3</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Thu, 26 Dec 2019 12:23:48 -0800
+
+protocol: statsd line protocol serializer implementation
+
+<b>Diffstat:</b>
+<table><tr><td class="A">A</td><td><a href="#h0">protocol/line.go</a></td><td> | </td><td class="num">110</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="A">A</td><td><a href="#h1">protocol/line_test.go</a></td><td> | </td><td class="num">127</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="A">A</td><td><a href="#h2">protocol/types.go</a></td><td> | </td><td class="num">58</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+</table></pre><pre>3 files changed, 295 insertions(+), 0 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/protocol/line.go">protocol/line.go</a> b/<a href="../file/protocol/line.go">protocol/line.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -0,0 +1,110 @@
+</a><a href="#h0-0-0" id="h0-0-0" class="i">+package protocol
+</a><a href="#h0-0-1" id="h0-0-1" class="i">+
+</a><a href="#h0-0-2" id="h0-0-2" class="i">+import (
+</a><a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;fmt&quot;
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+	&quot;net/url&quot;
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+	&quot;sort&quot;
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+	&quot;strings&quot;
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+)
+</a><a href="#h0-0-8" id="h0-0-8" class="i">+
+</a><a href="#h0-0-9" id="h0-0-9" class="i">+// LineSerializer describes a protocol serializer for various metric types.
+</a><a href="#h0-0-10" id="h0-0-10" class="i">+type LineSerializer interface {
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+	// SerializeGauge serializes a Gauge to a protocol-compliant line.
+</a><a href="#h0-0-12" id="h0-0-12" class="i">+	SerializeGauge(gauge *Gauge) (string, error)
+</a><a href="#h0-0-13" id="h0-0-13" class="i">+
+</a><a href="#h0-0-14" id="h0-0-14" class="i">+	// SerializeCounter serializes a Counter to a protocol-compliant line.
+</a><a href="#h0-0-15" id="h0-0-15" class="i">+	SerializeCounter(counter *Counter) (string, error)
+</a><a href="#h0-0-16" id="h0-0-16" class="i">+
+</a><a href="#h0-0-17" id="h0-0-17" class="i">+	// SerializeTimer serializes a Timer to a protocol-compliant line.
+</a><a href="#h0-0-18" id="h0-0-18" class="i">+	SerializeTimer(timer *Timer) (string, error)
+</a><a href="#h0-0-19" id="h0-0-19" class="i">+
+</a><a href="#h0-0-20" id="h0-0-20" class="i">+	// SerializeHistogram serializes a Histogram to a protocol-compliant line.
+</a><a href="#h0-0-21" id="h0-0-21" class="i">+	SerializeHistogram(histogram *Histogram) (string, error)
+</a><a href="#h0-0-22" id="h0-0-22" class="i">+}
+</a><a href="#h0-0-23" id="h0-0-23" class="i">+
+</a><a href="#h0-0-24" id="h0-0-24" class="i">+// StatsdLineSerializer implements LineSerializer for the statsd protocol.
+</a><a href="#h0-0-25" id="h0-0-25" class="i">+type StatsdLineSerializer struct {
+</a><a href="#h0-0-26" id="h0-0-26" class="i">+	tagDelimiter string
+</a><a href="#h0-0-27" id="h0-0-27" class="i">+	tagJoiner    string
+</a><a href="#h0-0-28" id="h0-0-28" class="i">+}
+</a><a href="#h0-0-29" id="h0-0-29" class="i">+
+</a><a href="#h0-0-30" id="h0-0-30" class="i">+// NewStatsdLineSerializer creates a statsd line serializer with custom serialization options.
+</a><a href="#h0-0-31" id="h0-0-31" class="i">+func NewStatsdLineSerializer(tagDelimiter string, tagJoiner string) LineSerializer {
+</a><a href="#h0-0-32" id="h0-0-32" class="i">+	return &amp;StatsdLineSerializer{
+</a><a href="#h0-0-33" id="h0-0-33" class="i">+		tagDelimiter: tagDelimiter,
+</a><a href="#h0-0-34" id="h0-0-34" class="i">+		tagJoiner:    tagJoiner,
+</a><a href="#h0-0-35" id="h0-0-35" class="i">+	}
+</a><a href="#h0-0-36" id="h0-0-36" class="i">+}
+</a><a href="#h0-0-37" id="h0-0-37" class="i">+
+</a><a href="#h0-0-38" id="h0-0-38" class="i">+// SerializeGauge serializes a statsd gauge.
+</a><a href="#h0-0-39" id="h0-0-39" class="i">+func (s *StatsdLineSerializer) SerializeGauge(gauge *Gauge) (string, error) {
+</a><a href="#h0-0-40" id="h0-0-40" class="i">+	return s.serializeMetric(gauge.Name, gauge.Value, gauge.Tags, gaugeType), nil
+</a><a href="#h0-0-41" id="h0-0-41" class="i">+}
+</a><a href="#h0-0-42" id="h0-0-42" class="i">+
+</a><a href="#h0-0-43" id="h0-0-43" class="i">+// SerializeCounter serializes a statsd counter.
+</a><a href="#h0-0-44" id="h0-0-44" class="i">+func (s *StatsdLineSerializer) SerializeCounter(counter *Counter) (string, error) {
+</a><a href="#h0-0-45" id="h0-0-45" class="i">+	metric := s.serializeMetric(counter.Name, counter.Value, counter.Tags, counterType)
+</a><a href="#h0-0-46" id="h0-0-46" class="i">+
+</a><a href="#h0-0-47" id="h0-0-47" class="i">+	if counter.SampleRate == 1.0 {
+</a><a href="#h0-0-48" id="h0-0-48" class="i">+		return metric, nil
+</a><a href="#h0-0-49" id="h0-0-49" class="i">+	}
+</a><a href="#h0-0-50" id="h0-0-50" class="i">+
+</a><a href="#h0-0-51" id="h0-0-51" class="i">+	return fmt.Sprintf(&quot;%s%s@%v&quot;, metric, typeDelimiter, counter.SampleRate), nil
+</a><a href="#h0-0-52" id="h0-0-52" class="i">+}
+</a><a href="#h0-0-53" id="h0-0-53" class="i">+
+</a><a href="#h0-0-54" id="h0-0-54" class="i">+// SerializeTimer serializes a statsd timer.
+</a><a href="#h0-0-55" id="h0-0-55" class="i">+func (s *StatsdLineSerializer) SerializeTimer(timer *Timer) (string, error) {
+</a><a href="#h0-0-56" id="h0-0-56" class="i">+	return s.serializeMetric(timer.Name, timer.Value, timer.Tags, timerType), nil
+</a><a href="#h0-0-57" id="h0-0-57" class="i">+}
+</a><a href="#h0-0-58" id="h0-0-58" class="i">+
+</a><a href="#h0-0-59" id="h0-0-59" class="i">+// SerializeHistogram serializes a statsd histogram.
+</a><a href="#h0-0-60" id="h0-0-60" class="i">+func (s *StatsdLineSerializer) SerializeHistogram(histogram *Histogram) (string, error) {
+</a><a href="#h0-0-61" id="h0-0-61" class="i">+	return s.serializeMetric(histogram.Name, histogram.Value, histogram.Tags, histogramType), nil
+</a><a href="#h0-0-62" id="h0-0-62" class="i">+}
+</a><a href="#h0-0-63" id="h0-0-63" class="i">+
+</a><a href="#h0-0-64" id="h0-0-64" class="i">+// serializeMetric is an common utility to format tagged metrics in accordance with statsd
+</a><a href="#h0-0-65" id="h0-0-65" class="i">+// protocol conventions.
+</a><a href="#h0-0-66" id="h0-0-66" class="i">+func (s *StatsdLineSerializer) serializeMetric(name string, value interface{}, tags map[string]string, id identifier) string {
+</a><a href="#h0-0-67" id="h0-0-67" class="i">+	var tagComponents []string
+</a><a href="#h0-0-68" id="h0-0-68" class="i">+	var tagKeys []string
+</a><a href="#h0-0-69" id="h0-0-69" class="i">+
+</a><a href="#h0-0-70" id="h0-0-70" class="i">+	// Sort tag keys to achieve deterministic serialization outputs
+</a><a href="#h0-0-71" id="h0-0-71" class="i">+	for tagKey := range tags {
+</a><a href="#h0-0-72" id="h0-0-72" class="i">+		tagKeys = append(tagKeys, tagKey)
+</a><a href="#h0-0-73" id="h0-0-73" class="i">+	}
+</a><a href="#h0-0-74" id="h0-0-74" class="i">+	sort.Strings(tagKeys)
+</a><a href="#h0-0-75" id="h0-0-75" class="i">+
+</a><a href="#h0-0-76" id="h0-0-76" class="i">+	for _, tagKey := range tagKeys {
+</a><a href="#h0-0-77" id="h0-0-77" class="i">+		tagComponents = append(
+</a><a href="#h0-0-78" id="h0-0-78" class="i">+			tagComponents,
+</a><a href="#h0-0-79" id="h0-0-79" class="i">+			strings.Join([]string{
+</a><a href="#h0-0-80" id="h0-0-80" class="i">+				url.QueryEscape(tagKey),
+</a><a href="#h0-0-81" id="h0-0-81" class="i">+				s.tagJoiner,
+</a><a href="#h0-0-82" id="h0-0-82" class="i">+				url.QueryEscape(fmt.Sprintf(&quot;%v&quot;, tags[tagKey])),
+</a><a href="#h0-0-83" id="h0-0-83" class="i">+			}, &quot;&quot;),
+</a><a href="#h0-0-84" id="h0-0-84" class="i">+		)
+</a><a href="#h0-0-85" id="h0-0-85" class="i">+	}
+</a><a href="#h0-0-86" id="h0-0-86" class="i">+
+</a><a href="#h0-0-87" id="h0-0-87" class="i">+	// Some characters, like colons, are incompatible with the statsd protocol.
+</a><a href="#h0-0-88" id="h0-0-88" class="i">+	// This standardizes on URL escaping to encode such characters that may appear in the metric
+</a><a href="#h0-0-89" id="h0-0-89" class="i">+	// name or tag keys/values.
+</a><a href="#h0-0-90" id="h0-0-90" class="i">+	taggedName := url.QueryEscape(name)
+</a><a href="#h0-0-91" id="h0-0-91" class="i">+
+</a><a href="#h0-0-92" id="h0-0-92" class="i">+	if len(tagComponents) &gt; 0 {
+</a><a href="#h0-0-93" id="h0-0-93" class="i">+		taggedName = strings.Join([]string{
+</a><a href="#h0-0-94" id="h0-0-94" class="i">+			taggedName,
+</a><a href="#h0-0-95" id="h0-0-95" class="i">+			s.tagDelimiter,
+</a><a href="#h0-0-96" id="h0-0-96" class="i">+			strings.Join(tagComponents, s.tagDelimiter),
+</a><a href="#h0-0-97" id="h0-0-97" class="i">+		}, &quot;&quot;)
+</a><a href="#h0-0-98" id="h0-0-98" class="i">+	}
+</a><a href="#h0-0-99" id="h0-0-99" class="i">+
+</a><a href="#h0-0-100" id="h0-0-100" class="i">+	metric := strings.Join([]string{
+</a><a href="#h0-0-101" id="h0-0-101" class="i">+		taggedName,
+</a><a href="#h0-0-102" id="h0-0-102" class="i">+		valueDelimiter,
+</a><a href="#h0-0-103" id="h0-0-103" class="i">+		fmt.Sprintf(&quot;%v&quot;, value),
+</a><a href="#h0-0-104" id="h0-0-104" class="i">+		typeDelimiter,
+</a><a href="#h0-0-105" id="h0-0-105" class="i">+		string(id),
+</a><a href="#h0-0-106" id="h0-0-106" class="i">+	}, &quot;&quot;)
+</a><a href="#h0-0-107" id="h0-0-107" class="i">+
+</a><a href="#h0-0-108" id="h0-0-108" class="i">+	return metric
+</a><a href="#h0-0-109" id="h0-0-109" class="i">+}
+</a><b>diff --git a/<a id="h1" href="../file/protocol/line_test.go">protocol/line_test.go</a> b/<a href="../file/protocol/line_test.go">protocol/line_test.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -0,0 +1,127 @@
+</a><a href="#h1-0-0" id="h1-0-0" class="i">+package protocol
+</a><a href="#h1-0-1" id="h1-0-1" class="i">+
+</a><a href="#h1-0-2" id="h1-0-2" class="i">+import (
+</a><a href="#h1-0-3" id="h1-0-3" class="i">+	&quot;testing&quot;
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+	&quot;github.com/stretchr/testify/assert&quot;
+</a><a href="#h1-0-6" id="h1-0-6" class="i">+)
+</a><a href="#h1-0-7" id="h1-0-7" class="i">+
+</a><a href="#h1-0-8" id="h1-0-8" class="i">+func TestStatsdLineSerializerGauge(t *testing.T) {
+</a><a href="#h1-0-9" id="h1-0-9" class="i">+	t.Parallel()
+</a><a href="#h1-0-10" id="h1-0-10" class="i">+
+</a><a href="#h1-0-11" id="h1-0-11" class="i">+	gauge := &amp;Gauge{
+</a><a href="#h1-0-12" id="h1-0-12" class="i">+		Name:  &quot;name&quot;,
+</a><a href="#h1-0-13" id="h1-0-13" class="i">+		Value: 1.234,
+</a><a href="#h1-0-14" id="h1-0-14" class="i">+	}
+</a><a href="#h1-0-15" id="h1-0-15" class="i">+	line, err := DefaultStatsdLineSerializer.SerializeGauge(gauge)
+</a><a href="#h1-0-16" id="h1-0-16" class="i">+
+</a><a href="#h1-0-17" id="h1-0-17" class="i">+	assert.NoError(t, err)
+</a><a href="#h1-0-18" id="h1-0-18" class="i">+	assert.Equal(t, &quot;name:1.234|g&quot;, line)
+</a><a href="#h1-0-19" id="h1-0-19" class="i">+}
+</a><a href="#h1-0-20" id="h1-0-20" class="i">+
+</a><a href="#h1-0-21" id="h1-0-21" class="i">+func TestStatsdLineSerializerCounter(t *testing.T) {
+</a><a href="#h1-0-22" id="h1-0-22" class="i">+	t.Parallel()
+</a><a href="#h1-0-23" id="h1-0-23" class="i">+
+</a><a href="#h1-0-24" id="h1-0-24" class="i">+	cases := []struct {
+</a><a href="#h1-0-25" id="h1-0-25" class="i">+		counter    *Counter
+</a><a href="#h1-0-26" id="h1-0-26" class="i">+		serialized string
+</a><a href="#h1-0-27" id="h1-0-27" class="i">+	}{
+</a><a href="#h1-0-28" id="h1-0-28" class="i">+		{
+</a><a href="#h1-0-29" id="h1-0-29" class="i">+			&amp;Counter{Name: &quot;name&quot;, Value: 1, SampleRate: 1.0},
+</a><a href="#h1-0-30" id="h1-0-30" class="i">+			&quot;name:1|c&quot;,
+</a><a href="#h1-0-31" id="h1-0-31" class="i">+		},
+</a><a href="#h1-0-32" id="h1-0-32" class="i">+		{
+</a><a href="#h1-0-33" id="h1-0-33" class="i">+			&amp;Counter{Name: &quot;name&quot;, Value: -1, SampleRate: 1.0},
+</a><a href="#h1-0-34" id="h1-0-34" class="i">+			&quot;name:-1|c&quot;,
+</a><a href="#h1-0-35" id="h1-0-35" class="i">+		},
+</a><a href="#h1-0-36" id="h1-0-36" class="i">+		{
+</a><a href="#h1-0-37" id="h1-0-37" class="i">+			&amp;Counter{Name: &quot;name&quot;, Value: 5, SampleRate: 0.8},
+</a><a href="#h1-0-38" id="h1-0-38" class="i">+			&quot;name:5|c|@0.8&quot;,
+</a><a href="#h1-0-39" id="h1-0-39" class="i">+		},
+</a><a href="#h1-0-40" id="h1-0-40" class="i">+	}
+</a><a href="#h1-0-41" id="h1-0-41" class="i">+
+</a><a href="#h1-0-42" id="h1-0-42" class="i">+	for _, testCase := range cases {
+</a><a href="#h1-0-43" id="h1-0-43" class="i">+		line, err := DefaultStatsdLineSerializer.SerializeCounter(testCase.counter)
+</a><a href="#h1-0-44" id="h1-0-44" class="i">+
+</a><a href="#h1-0-45" id="h1-0-45" class="i">+		assert.NoError(t, err)
+</a><a href="#h1-0-46" id="h1-0-46" class="i">+		assert.Equal(t, testCase.serialized, line)
+</a><a href="#h1-0-47" id="h1-0-47" class="i">+	}
+</a><a href="#h1-0-48" id="h1-0-48" class="i">+}
+</a><a href="#h1-0-49" id="h1-0-49" class="i">+
+</a><a href="#h1-0-50" id="h1-0-50" class="i">+func TestStatsdLineSerializerTimer(t *testing.T) {
+</a><a href="#h1-0-51" id="h1-0-51" class="i">+	t.Parallel()
+</a><a href="#h1-0-52" id="h1-0-52" class="i">+
+</a><a href="#h1-0-53" id="h1-0-53" class="i">+	timer := &amp;Timer{
+</a><a href="#h1-0-54" id="h1-0-54" class="i">+		Name:  &quot;name&quot;,
+</a><a href="#h1-0-55" id="h1-0-55" class="i">+		Value: 1.2340,
+</a><a href="#h1-0-56" id="h1-0-56" class="i">+	}
+</a><a href="#h1-0-57" id="h1-0-57" class="i">+	line, err := DefaultStatsdLineSerializer.SerializeTimer(timer)
+</a><a href="#h1-0-58" id="h1-0-58" class="i">+
+</a><a href="#h1-0-59" id="h1-0-59" class="i">+	assert.NoError(t, err)
+</a><a href="#h1-0-60" id="h1-0-60" class="i">+	assert.Equal(t, &quot;name:1.234|ms&quot;, line)
+</a><a href="#h1-0-61" id="h1-0-61" class="i">+}
+</a><a href="#h1-0-62" id="h1-0-62" class="i">+
+</a><a href="#h1-0-63" id="h1-0-63" class="i">+func TestStatsdLineSerializerHistogram(t *testing.T) {
+</a><a href="#h1-0-64" id="h1-0-64" class="i">+	t.Parallel()
+</a><a href="#h1-0-65" id="h1-0-65" class="i">+
+</a><a href="#h1-0-66" id="h1-0-66" class="i">+	histogram := &amp;Histogram{
+</a><a href="#h1-0-67" id="h1-0-67" class="i">+		Name:  &quot;name&quot;,
+</a><a href="#h1-0-68" id="h1-0-68" class="i">+		Value: 1.234,
+</a><a href="#h1-0-69" id="h1-0-69" class="i">+	}
+</a><a href="#h1-0-70" id="h1-0-70" class="i">+	line, err := DefaultStatsdLineSerializer.SerializeHistogram(histogram)
+</a><a href="#h1-0-71" id="h1-0-71" class="i">+
+</a><a href="#h1-0-72" id="h1-0-72" class="i">+	assert.NoError(t, err)
+</a><a href="#h1-0-73" id="h1-0-73" class="i">+	assert.Equal(t, &quot;name:1.234|h&quot;, line)
+</a><a href="#h1-0-74" id="h1-0-74" class="i">+}
+</a><a href="#h1-0-75" id="h1-0-75" class="i">+
+</a><a href="#h1-0-76" id="h1-0-76" class="i">+func TestStatsdLineSerializerTags(t *testing.T) {
+</a><a href="#h1-0-77" id="h1-0-77" class="i">+	t.Parallel()
+</a><a href="#h1-0-78" id="h1-0-78" class="i">+
+</a><a href="#h1-0-79" id="h1-0-79" class="i">+	gauge := &amp;Gauge{
+</a><a href="#h1-0-80" id="h1-0-80" class="i">+		Name:  &quot;name&quot;,
+</a><a href="#h1-0-81" id="h1-0-81" class="i">+		Value: 1.234,
+</a><a href="#h1-0-82" id="h1-0-82" class="i">+		Tags: map[string]string{
+</a><a href="#h1-0-83" id="h1-0-83" class="i">+			&quot;foo&quot;: &quot;bar&quot;,
+</a><a href="#h1-0-84" id="h1-0-84" class="i">+			&quot;bar&quot;: &quot;baz&quot;,
+</a><a href="#h1-0-85" id="h1-0-85" class="i">+		},
+</a><a href="#h1-0-86" id="h1-0-86" class="i">+	}
+</a><a href="#h1-0-87" id="h1-0-87" class="i">+	line, err := DefaultStatsdLineSerializer.SerializeGauge(gauge)
+</a><a href="#h1-0-88" id="h1-0-88" class="i">+
+</a><a href="#h1-0-89" id="h1-0-89" class="i">+	assert.NoError(t, err)
+</a><a href="#h1-0-90" id="h1-0-90" class="i">+	assert.Equal(t, &quot;name,bar=baz,foo=bar:1.234|g&quot;, line)
+</a><a href="#h1-0-91" id="h1-0-91" class="i">+}
+</a><a href="#h1-0-92" id="h1-0-92" class="i">+
+</a><a href="#h1-0-93" id="h1-0-93" class="i">+func TestStatsdLineSerializerCustomTagDelimiters(t *testing.T) {
+</a><a href="#h1-0-94" id="h1-0-94" class="i">+	t.Parallel()
+</a><a href="#h1-0-95" id="h1-0-95" class="i">+
+</a><a href="#h1-0-96" id="h1-0-96" class="i">+	serializer := NewStatsdLineSerializer(&quot; &quot;, &quot;:&quot;)
+</a><a href="#h1-0-97" id="h1-0-97" class="i">+
+</a><a href="#h1-0-98" id="h1-0-98" class="i">+	gauge := &amp;Gauge{
+</a><a href="#h1-0-99" id="h1-0-99" class="i">+		Name:  &quot;name&quot;,
+</a><a href="#h1-0-100" id="h1-0-100" class="i">+		Value: 1.234,
+</a><a href="#h1-0-101" id="h1-0-101" class="i">+		Tags: map[string]string{
+</a><a href="#h1-0-102" id="h1-0-102" class="i">+			&quot;foo&quot;: &quot;bar&quot;,
+</a><a href="#h1-0-103" id="h1-0-103" class="i">+			&quot;bar&quot;: &quot;baz&quot;,
+</a><a href="#h1-0-104" id="h1-0-104" class="i">+		},
+</a><a href="#h1-0-105" id="h1-0-105" class="i">+	}
+</a><a href="#h1-0-106" id="h1-0-106" class="i">+	line, err := serializer.SerializeGauge(gauge)
+</a><a href="#h1-0-107" id="h1-0-107" class="i">+
+</a><a href="#h1-0-108" id="h1-0-108" class="i">+	assert.NoError(t, err)
+</a><a href="#h1-0-109" id="h1-0-109" class="i">+	assert.Equal(t, &quot;name bar:baz foo:bar:1.234|g&quot;, line)
+</a><a href="#h1-0-110" id="h1-0-110" class="i">+}
+</a><a href="#h1-0-111" id="h1-0-111" class="i">+
+</a><a href="#h1-0-112" id="h1-0-112" class="i">+func TestStatsdLineSerializerQueryEscape(t *testing.T) {
+</a><a href="#h1-0-113" id="h1-0-113" class="i">+	t.Parallel()
+</a><a href="#h1-0-114" id="h1-0-114" class="i">+
+</a><a href="#h1-0-115" id="h1-0-115" class="i">+	gauge := &amp;Gauge{
+</a><a href="#h1-0-116" id="h1-0-116" class="i">+		Name:  &quot;name:with:colons&quot;,
+</a><a href="#h1-0-117" id="h1-0-117" class="i">+		Value: 1.234,
+</a><a href="#h1-0-118" id="h1-0-118" class="i">+		Tags: map[string]string{
+</a><a href="#h1-0-119" id="h1-0-119" class="i">+			&quot;foo&quot;: &quot;bar baz&quot;,
+</a><a href="#h1-0-120" id="h1-0-120" class="i">+		},
+</a><a href="#h1-0-121" id="h1-0-121" class="i">+	}
+</a><a href="#h1-0-122" id="h1-0-122" class="i">+	line, err := DefaultStatsdLineSerializer.SerializeGauge(gauge)
+</a><a href="#h1-0-123" id="h1-0-123" class="i">+
+</a><a href="#h1-0-124" id="h1-0-124" class="i">+	assert.NoError(t, err)
+</a><a href="#h1-0-125" id="h1-0-125" class="i">+	assert.Equal(t, &quot;name%3Awith%3Acolons,foo=bar+baz:1.234|g&quot;, line)
+</a><a href="#h1-0-126" id="h1-0-126" class="i">+}
+</a><b>diff --git a/<a id="h2" href="../file/protocol/types.go">protocol/types.go</a> b/<a href="../file/protocol/types.go">protocol/types.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -0,0 +1,58 @@
+</a><a href="#h2-0-0" id="h2-0-0" class="i">+package protocol
+</a><a href="#h2-0-1" id="h2-0-1" class="i">+
+</a><a href="#h2-0-2" id="h2-0-2" class="i">+// Identifier is the statsd protocol metric type identifier string.
+</a><a href="#h2-0-3" id="h2-0-3" class="i">+type identifier string
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+
+</a><a href="#h2-0-5" id="h2-0-5" class="i">+const (
+</a><a href="#h2-0-6" id="h2-0-6" class="i">+	// Default tag delimiters, suitable for use with InfluxDB
+</a><a href="#h2-0-7" id="h2-0-7" class="i">+	defaultTagDelimiter = &quot;,&quot;
+</a><a href="#h2-0-8" id="h2-0-8" class="i">+	defaultTagJoiner    = &quot;=&quot;
+</a><a href="#h2-0-9" id="h2-0-9" class="i">+
+</a><a href="#h2-0-10" id="h2-0-10" class="i">+	// statsd line protocol name, value, and type delimiters
+</a><a href="#h2-0-11" id="h2-0-11" class="i">+	valueDelimiter = &quot;:&quot;
+</a><a href="#h2-0-12" id="h2-0-12" class="i">+	typeDelimiter  = &quot;|&quot;
+</a><a href="#h2-0-13" id="h2-0-13" class="i">+
+</a><a href="#h2-0-14" id="h2-0-14" class="i">+	// statsd protocol metric type constants
+</a><a href="#h2-0-15" id="h2-0-15" class="i">+	gaugeType     identifier = &quot;g&quot;
+</a><a href="#h2-0-16" id="h2-0-16" class="i">+	counterType   identifier = &quot;c&quot;
+</a><a href="#h2-0-17" id="h2-0-17" class="i">+	timerType     identifier = &quot;ms&quot;
+</a><a href="#h2-0-18" id="h2-0-18" class="i">+	histogramType identifier = &quot;h&quot;
+</a><a href="#h2-0-19" id="h2-0-19" class="i">+)
+</a><a href="#h2-0-20" id="h2-0-20" class="i">+
+</a><a href="#h2-0-21" id="h2-0-21" class="i">+var (
+</a><a href="#h2-0-22" id="h2-0-22" class="i">+	// DefaultStatsdLineSerializer is a statsd protocol LineSerializer implementation that uses
+</a><a href="#h2-0-23" id="h2-0-23" class="i">+	// default tag delimiters and joiners. The default delimiters are compatible with InfluxDB.
+</a><a href="#h2-0-24" id="h2-0-24" class="i">+	DefaultStatsdLineSerializer = NewStatsdLineSerializer(defaultTagDelimiter, defaultTagJoiner)
+</a><a href="#h2-0-25" id="h2-0-25" class="i">+)
+</a><a href="#h2-0-26" id="h2-0-26" class="i">+
+</a><a href="#h2-0-27" id="h2-0-27" class="i">+// The below struct types are formalizations of metric types defined in the statsd protocol.
+</a><a href="#h2-0-28" id="h2-0-28" class="i">+// See: https://github.com/b/statsd_spec/blob/master/README.md
+</a><a href="#h2-0-29" id="h2-0-29" class="i">+
+</a><a href="#h2-0-30" id="h2-0-30" class="i">+// Gauge is a statsd gauge metric.
+</a><a href="#h2-0-31" id="h2-0-31" class="i">+type Gauge struct {
+</a><a href="#h2-0-32" id="h2-0-32" class="i">+	Name  string
+</a><a href="#h2-0-33" id="h2-0-33" class="i">+	Value float64
+</a><a href="#h2-0-34" id="h2-0-34" class="i">+	Tags  map[string]string
+</a><a href="#h2-0-35" id="h2-0-35" class="i">+}
+</a><a href="#h2-0-36" id="h2-0-36" class="i">+
+</a><a href="#h2-0-37" id="h2-0-37" class="i">+// Counter is a statsd counter metric.
+</a><a href="#h2-0-38" id="h2-0-38" class="i">+type Counter struct {
+</a><a href="#h2-0-39" id="h2-0-39" class="i">+	Name       string
+</a><a href="#h2-0-40" id="h2-0-40" class="i">+	Value      int64
+</a><a href="#h2-0-41" id="h2-0-41" class="i">+	SampleRate float64
+</a><a href="#h2-0-42" id="h2-0-42" class="i">+	Tags       map[string]string
+</a><a href="#h2-0-43" id="h2-0-43" class="i">+}
+</a><a href="#h2-0-44" id="h2-0-44" class="i">+
+</a><a href="#h2-0-45" id="h2-0-45" class="i">+// Timer is a statsd timing metric.
+</a><a href="#h2-0-46" id="h2-0-46" class="i">+type Timer struct {
+</a><a href="#h2-0-47" id="h2-0-47" class="i">+	Name  string
+</a><a href="#h2-0-48" id="h2-0-48" class="i">+	Value float64
+</a><a href="#h2-0-49" id="h2-0-49" class="i">+	Tags  map[string]string
+</a><a href="#h2-0-50" id="h2-0-50" class="i">+}
+</a><a href="#h2-0-51" id="h2-0-51" class="i">+
+</a><a href="#h2-0-52" id="h2-0-52" class="i">+// Histogram is a statsd histogram metric.
+</a><a href="#h2-0-53" id="h2-0-53" class="i">+type Histogram struct {
+</a><a href="#h2-0-54" id="h2-0-54" class="i">+	Name  string
+</a><a href="#h2-0-55" id="h2-0-55" class="i">+	Value float64
+</a><a href="#h2-0-56" id="h2-0-56" class="i">+	Tags  map[string]string
+</a><a href="#h2-0-57" id="h2-0-57" class="i">+}
+</a></pre>
+</div>
+</body>
+</html>

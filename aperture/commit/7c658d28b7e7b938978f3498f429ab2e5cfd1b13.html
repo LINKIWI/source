@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>transport: TCP client with SOCKS5 proxy dialer support - aperture - Go statsd client library</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="aperture Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="aperture Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i,
+a.line {
+	text-decoration: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>aperture</h1><span class="desc">Go statsd client library</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/aperture.git">https://source.static.kevinlin.info/aperture.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/LICENSE">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/7c658d28b7e7b938978f3498f429ab2e5cfd1b13">7c658d28b7e7b938978f3498f429ab2e5cfd1b13</a>
+<b>parent</b> <a href="../commit/1a60fb99f4cc8418afef4bf9474ceadcd7de7f98">1a60fb99f4cc8418afef4bf9474ceadcd7de7f98</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sun, 10 Jan 2021 10:19:58 -0800
+
+transport: TCP client with SOCKS5 proxy dialer support
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">client.go</a></td><td> | </td><td class="num">26</td><td><span class="i">+++++++++++++++++++</span><span class="d">-------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">go.mod</a></td><td> | </td><td class="num">1</td><td><span class="i">+</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">go.sum</a></td><td> | </td><td class="num">1</td><td><span class="i">+</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">transport/tcp.go</a></td><td> | </td><td class="num">29</td><td><span class="i">++++++++++++++++++++++++++</span><span class="d">---</span></td></tr>
+</table></pre><pre>4 files changed, 47 insertions(+), 10 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/client.go">client.go</a> b/<a href="../file/client.go">client.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -59,13 +59,25 @@ func NewClient(cfg *Config) (*Client, error) {
+</a> 					}
+ 				case &quot;tcp&quot;:
+ 					tFactory = func() (transport.Transport, error) {
+<a href="#h0-0-3" id="h0-0-3" class="d">-						return transport.NewTCP(
+</a><a href="#h0-0-4" id="h0-0-4" class="d">-							addr[6:],
+</a><a href="#h0-0-5" id="h0-0-5" class="d">-							transport.TCPSocketConfig{
+</a><a href="#h0-0-6" id="h0-0-6" class="d">-								ConnectTimeout:    cfg.TransportConnectTimeout,
+</a><a href="#h0-0-7" id="h0-0-7" class="d">-								SendTimeout:       cfg.TransportSendTimeout,
+</a><a href="#h0-0-8" id="h0-0-8" class="d">-								KeepAliveInterval: cfg.TransportKeepaliveInterval,
+</a><a href="#h0-0-9" id="h0-0-9" class="d">-							},
+</a><a href="#h0-0-10" id="h0-0-10" class="i">+						opts := transport.TCPSocketConfig{
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+							ConnectTimeout:    cfg.TransportConnectTimeout,
+</a><a href="#h0-0-12" id="h0-0-12" class="i">+							SendTimeout:       cfg.TransportSendTimeout,
+</a><a href="#h0-0-13" id="h0-0-13" class="i">+							KeepAliveInterval: cfg.TransportKeepaliveInterval,
+</a><a href="#h0-0-14" id="h0-0-14" class="i">+						}
+</a><a href="#h0-0-15" id="h0-0-15" class="i">+
+</a><a href="#h0-0-16" id="h0-0-16" class="i">+						if cfg.Proxy == &quot;&quot; {
+</a><a href="#h0-0-17" id="h0-0-17" class="i">+							return transport.NewDirectTCP(
+</a><a href="#h0-0-18" id="h0-0-18" class="i">+								uri.Authority,
+</a><a href="#h0-0-19" id="h0-0-19" class="i">+								opts,
+</a><a href="#h0-0-20" id="h0-0-20" class="i">+							)
+</a><a href="#h0-0-21" id="h0-0-21" class="i">+						}
+</a><a href="#h0-0-22" id="h0-0-22" class="i">+
+</a><a href="#h0-0-23" id="h0-0-23" class="i">+						proxy, _ := data.ParseAddressURI(cfg.Proxy)
+</a><a href="#h0-0-24" id="h0-0-24" class="i">+						return transport.NewProxiedTCP(
+</a><a href="#h0-0-25" id="h0-0-25" class="i">+							uri.Authority,
+</a><a href="#h0-0-26" id="h0-0-26" class="i">+							proxy.Scheme,
+</a><a href="#h0-0-27" id="h0-0-27" class="i">+							proxy.Authority,
+</a><a href="#h0-0-28" id="h0-0-28" class="i">+							opts,
+</a> 						)
+ 					}
+ 				case &quot;unix&quot;:
+<b>diff --git a/<a id="h1" href="../file/go.mod">go.mod</a> b/<a href="../file/go.mod">go.mod</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -5,6 +5,7 @@ go 1.15
+</a> require (
+ 	github.com/stretchr/testify v1.6.1
+ 	golang.org/x/lint v0.0.0-20200302205851-738671d3881b
+<a href="#h1-0-3" id="h1-0-3" class="i">+	golang.org/x/net v0.0.0-20190620200207-3b0461eec859
+</a> 	golang.org/x/sys v0.0.0-20190412213103-97732733099d
+ 	golang.org/x/tools v0.0.0-20200130002326-2f3ba24bd6e7
+ )
+<b>diff --git a/<a id="h2" href="../file/go.sum">go.sum</a> b/<a href="../file/go.sum">go.sum</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -12,6 +12,7 @@ golang.org/x/lint v0.0.0-20200302205851-738671d3881b h1:Wh+f8QHJXR411sJR8/vRBTZ7
+</a> golang.org/x/lint v0.0.0-20200302205851-738671d3881b/go.mod h1:3xt1FjdF8hUf6vQPIChWIBhFzV8gjjsPE/fR3IyQdNY=
+ golang.org/x/mod v0.1.1-0.20191105210325-c90efee705ee/go.mod h1:QqPTAvyqsEbceGzBzNggFXnrqF1CaUcvgkdR5Ot7KZg=
+ golang.org/x/net v0.0.0-20190404232315-eb5bcb51f2a3/go.mod h1:t9HGtf8HONx5eT2rtn7q6eTqICYqUVnKs3thJo3Qplg=
+<a href="#h2-0-3" id="h2-0-3" class="i">+golang.org/x/net v0.0.0-20190620200207-3b0461eec859 h1:R/3boaszxrf1GEUWTVDzSKVwLmSJpwZ1yqXm8j0v2QI=
+</a> golang.org/x/net v0.0.0-20190620200207-3b0461eec859/go.mod h1:z5CRVTTTmAJ677TzLLGU+0bjPO0LkuOLi4/5GtJWs/s=
+ golang.org/x/sync v0.0.0-20190423024810-112230192c58/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
+ golang.org/x/sys v0.0.0-20190215142949-d0b11bdaac8a/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
+<b>diff --git a/<a id="h3" href="../file/transport/tcp.go">transport/tcp.go</a> b/<a href="../file/transport/tcp.go">transport/tcp.go</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -4,6 +4,8 @@ import (
+</a> 	&quot;net&quot;
+ 	&quot;time&quot;
+ 
+<a href="#h3-0-3" id="h3-0-3" class="i">+	&quot;golang.org/x/net/proxy&quot;
+</a><a href="#h3-0-4" id="h3-0-4" class="i">+
+</a> 	&quot;lib.kevinlin.info/aperture/internal/errors&quot;
+ )
+ 
+<a href="#h3-1" id="h3-1" class="h">@@ -20,13 +22,34 @@ type TCPSocketConfig struct {
+</a> 	KeepAliveInterval time.Duration
+ }
+ 
+<a href="#h3-1-3" id="h3-1-3" class="d">-// NewTCP creates a TCP transport for a target address.
+</a><a href="#h3-1-4" id="h3-1-4" class="d">-func NewTCP(addr string, cfg TCPSocketConfig) (Transport, error) {
+</a><a href="#h3-1-5" id="h3-1-5" class="d">-	dialer := net.Dialer{
+</a><a href="#h3-1-6" id="h3-1-6" class="i">+// NewDirectTCP establishes a TCP transport client against the target address directly.
+</a><a href="#h3-1-7" id="h3-1-7" class="i">+func NewDirectTCP(addr string, cfg TCPSocketConfig) (Transport, error) {
+</a><a href="#h3-1-8" id="h3-1-8" class="i">+	dialer := &amp;net.Dialer{
+</a><a href="#h3-1-9" id="h3-1-9" class="i">+		Timeout:   cfg.ConnectTimeout,
+</a><a href="#h3-1-10" id="h3-1-10" class="i">+		KeepAlive: cfg.KeepAliveInterval,
+</a><a href="#h3-1-11" id="h3-1-11" class="i">+	}
+</a><a href="#h3-1-12" id="h3-1-12" class="i">+
+</a><a href="#h3-1-13" id="h3-1-13" class="i">+	return newTCP(addr, dialer, cfg)
+</a><a href="#h3-1-14" id="h3-1-14" class="i">+}
+</a><a href="#h3-1-15" id="h3-1-15" class="i">+
+</a><a href="#h3-1-16" id="h3-1-16" class="i">+// NewProxiedTCP establishes a TCP transport client against the target address via an intermediate
+</a><a href="#h3-1-17" id="h3-1-17" class="i">+// SOCKS5 proxy server.
+</a><a href="#h3-1-18" id="h3-1-18" class="i">+func NewProxiedTCP(addr string, proxyNet string, proxyAddr string, cfg TCPSocketConfig) (Transport, error) {
+</a><a href="#h3-1-19" id="h3-1-19" class="i">+	forward := &amp;net.Dialer{
+</a> 		Timeout:   cfg.ConnectTimeout,
+ 		KeepAlive: cfg.KeepAliveInterval,
+ 	}
+ 
+<a href="#h3-1-24" id="h3-1-24" class="i">+	dialer, err := proxy.SOCKS5(proxyNet, proxyAddr, nil, forward)
+</a><a href="#h3-1-25" id="h3-1-25" class="i">+	if err != nil {
+</a><a href="#h3-1-26" id="h3-1-26" class="i">+		return nil, err
+</a><a href="#h3-1-27" id="h3-1-27" class="i">+	}
+</a><a href="#h3-1-28" id="h3-1-28" class="i">+
+</a><a href="#h3-1-29" id="h3-1-29" class="i">+	return newTCP(addr, dialer, cfg)
+</a><a href="#h3-1-30" id="h3-1-30" class="i">+}
+</a><a href="#h3-1-31" id="h3-1-31" class="i">+
+</a><a href="#h3-1-32" id="h3-1-32" class="i">+// newTCP establishes a TCP transport client using a proxy.Dialer and set of socket options.
+</a><a href="#h3-1-33" id="h3-1-33" class="i">+func newTCP(addr string, dialer proxy.Dialer, cfg TCPSocketConfig) (Transport, error) {
+</a> 	conn, err := dialer.Dial(&quot;tcp&quot;, addr)
+ 	if err != nil {
+ 		return nil, errors.Stack(
+</pre>
+</div>
+</body>
+</html>

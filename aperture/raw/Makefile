@@ -1,0 +1,13 @@
+build:
+	go build -race -v ./...
+
+lint:
+	! gofmt -s -d . | grep "^"
+	! go run golang.org/x/tools/cmd/goimports -d . | grep "^"
+	go run golang.org/x/lint/golint --set_exit_status ./...
+	go vet ./...
+
+test:
+	go test -v -cover ./...
+
+.PHONY: build lint test

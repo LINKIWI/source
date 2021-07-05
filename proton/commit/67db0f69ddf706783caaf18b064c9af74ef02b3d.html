@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>root: Migrate client to supercharged.Request for outgoing HTTP requests - proton - Go Supercharged HTTP client</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="proton Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="proton Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i,
+a.line {
+	text-decoration: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>proton</h1><span class="desc">Go Supercharged HTTP client</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/proton.git">https://source.static.kevinlin.info/proton.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/LICENSE">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/67db0f69ddf706783caaf18b064c9af74ef02b3d">67db0f69ddf706783caaf18b064c9af74ef02b3d</a>
+<b>parent</b> <a href="../commit/8c93962422016b3f425d3b1756c8cac422530fde">8c93962422016b3f425d3b1756c8cac422530fde</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Wed, 24 Mar 2021 22:26:49 -0700
+
+root: Migrate client to supercharged.Request for outgoing HTTP requests
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">client.go</a></td><td> | </td><td class="num">49</td><td><span class="i">++++++++++</span><span class="d">---------------------------------------</span></td></tr>
+</table></pre><pre>1 file changed, 10 insertions(+), 39 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/client.go">client.go</a> b/<a href="../file/client.go">client.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -1,12 +1,10 @@
+</a> package proton
+ 
+ import (
+<a href="#h0-0-3" id="h0-0-3" class="d">-	&quot;bytes&quot;
+</a> 	&quot;context&quot;
+ 	&quot;encoding/base64&quot;
+ 	&quot;encoding/json&quot;
+ 	&quot;io&quot;
+<a href="#h0-0-8" id="h0-0-8" class="d">-	&quot;net/http&quot;
+</a> 
+ 	&quot;github.com/gorilla/websocket&quot;
+ 	&quot;lib.kevinlin.info/aperture/lib&quot;
+<a href="#h0-1" id="h0-1" class="h">@@ -43,47 +41,20 @@ func (c *Client) DoHTTP(method string, endpoint string, data interface{}, respon
+</a> 		}
+ 	}()
+ 
+<a href="#h0-1-3" id="h0-1-3" class="d">-	if data == nil {
+</a><a href="#h0-1-4" id="h0-1-4" class="d">-		data = struct{}{}
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+	scReq := &amp;supercharged.Request{
+</a><a href="#h0-1-6" id="h0-1-6" class="i">+		BaseURL:  c.cfg.BaseURL,
+</a><a href="#h0-1-7" id="h0-1-7" class="i">+		Client:   c.cfg.ClientID,
+</a><a href="#h0-1-8" id="h0-1-8" class="i">+		Method:   method,
+</a><a href="#h0-1-9" id="h0-1-9" class="i">+		Endpoint: endpoint,
+</a><a href="#h0-1-10" id="h0-1-10" class="i">+		Data:     data,
+</a> 	}
+ 
+<a href="#h0-1-13" id="h0-1-13" class="d">-	reqBody, err := json.Marshal(data)
+</a><a href="#h0-1-14" id="h0-1-14" class="i">+	httpReq, err := scReq.Request()
+</a> 	if err != nil {
+ 		return supercharged.WrapError(err)
+ 	}
+ 
+<a href="#h0-1-19" id="h0-1-19" class="d">-	resource, err := c.cfg.BaseURL.Parse(endpoint)
+</a><a href="#h0-1-20" id="h0-1-20" class="d">-	if err != nil {
+</a><a href="#h0-1-21" id="h0-1-21" class="d">-		return supercharged.WrapError(err)
+</a><a href="#h0-1-22" id="h0-1-22" class="d">-	}
+</a><a href="#h0-1-23" id="h0-1-23" class="d">-
+</a><a href="#h0-1-24" id="h0-1-24" class="d">-	// By Supercharged conventions, GET and HEAD requests put the payload in a request header,\
+</a><a href="#h0-1-25" id="h0-1-25" class="d">-	// while other methods put the payload in the HTTP respBody
+</a><a href="#h0-1-26" id="h0-1-26" class="d">-	var req *http.Request
+</a><a href="#h0-1-27" id="h0-1-27" class="d">-	switch method {
+</a><a href="#h0-1-28" id="h0-1-28" class="d">-	case http.MethodHead, http.MethodGet:
+</a><a href="#h0-1-29" id="h0-1-29" class="d">-		req, err = http.NewRequest(method, resource.String(), nil)
+</a><a href="#h0-1-30" id="h0-1-30" class="d">-		if err != nil {
+</a><a href="#h0-1-31" id="h0-1-31" class="d">-			return supercharged.WrapError(err)
+</a><a href="#h0-1-32" id="h0-1-32" class="d">-		}
+</a><a href="#h0-1-33" id="h0-1-33" class="d">-		req.Header.Add(&quot;X-Supercharged-Client&quot;, c.cfg.ClientID)
+</a><a href="#h0-1-34" id="h0-1-34" class="d">-		req.Header.Add(&quot;X-Supercharged-Data&quot;, string(reqBody))
+</a><a href="#h0-1-35" id="h0-1-35" class="d">-
+</a><a href="#h0-1-36" id="h0-1-36" class="d">-	case http.MethodPost, http.MethodPut, http.MethodDelete:
+</a><a href="#h0-1-37" id="h0-1-37" class="d">-		req, err = http.NewRequest(method, resource.String(), bytes.NewReader(reqBody))
+</a><a href="#h0-1-38" id="h0-1-38" class="d">-		if err != nil {
+</a><a href="#h0-1-39" id="h0-1-39" class="d">-			return supercharged.WrapError(err)
+</a><a href="#h0-1-40" id="h0-1-40" class="d">-		}
+</a><a href="#h0-1-41" id="h0-1-41" class="d">-		req.Header.Add(&quot;X-Supercharged-Client&quot;, c.cfg.ClientID)
+</a><a href="#h0-1-42" id="h0-1-42" class="d">-
+</a><a href="#h0-1-43" id="h0-1-43" class="d">-	default:
+</a><a href="#h0-1-44" id="h0-1-44" class="d">-		return &amp;supercharged.Error{
+</a><a href="#h0-1-45" id="h0-1-45" class="d">-			Code:    supercharged.CodeNotFound,
+</a><a href="#h0-1-46" id="h0-1-46" class="d">-			Message: &quot;unsupported Supercharged HTTP method in request&quot;,
+</a><a href="#h0-1-47" id="h0-1-47" class="d">-		}
+</a><a href="#h0-1-48" id="h0-1-48" class="d">-	}
+</a><a href="#h0-1-49" id="h0-1-49" class="d">-
+</a><a href="#h0-1-50" id="h0-1-50" class="d">-	httpResp, err := c.cfg.Backend.Do(req)
+</a><a href="#h0-1-51" id="h0-1-51" class="i">+	httpResp, err := c.cfg.Backend.Do(httpReq)
+</a> 	if err != nil {
+ 		return supercharged.WrapError(err)
+ 	}
+<a href="#h0-2" id="h0-2" class="h">@@ -127,8 +98,8 @@ func (c *Client) DoHTTP(method string, endpoint string, data interface{}, respon
+</a> 		}
+ 	}
+ 
+<a href="#h0-2-3" id="h0-2-3" class="d">-	c.cfg.Metrics.Size(&quot;proton.http.request.body_size&quot;, int64(len(reqBody)), tags)
+</a><a href="#h0-2-4" id="h0-2-4" class="d">-	c.cfg.Metrics.Size(&quot;proton.http.response.body_size&quot;, int64(len(respBody)), tags)
+</a><a href="#h0-2-5" id="h0-2-5" class="i">+	c.cfg.Metrics.Size(&quot;proton.http.request.body_size&quot;, httpReq.ContentLength, tags)
+</a><a href="#h0-2-6" id="h0-2-6" class="i">+	c.cfg.Metrics.Size(&quot;proton.http.response.body_size&quot;, httpResp.ContentLength, tags)
+</a> 
+ 	return nil
+ }
+</pre>
+</div>
+</body>
+</html>

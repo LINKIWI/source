@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>root: Migrate client to use supercharged package structs - proton - Go Supercharged HTTP client</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="proton Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="proton Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i,
+a.line {
+	text-decoration: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>proton</h1><span class="desc">Go Supercharged HTTP client</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/proton.git">https://source.static.kevinlin.info/proton.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/LICENSE">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/75b4741f6a70d80c6829a8e8b589a0928e824dd5">75b4741f6a70d80c6829a8e8b589a0928e824dd5</a>
+<b>parent</b> <a href="../commit/38d2adffa02ef946dd97146bbe24ca3d00250e97">38d2adffa02ef946dd97146bbe24ca3d00250e97</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Wed, 24 Mar 2021 21:38:30 -0700
+
+root: Migrate client to use supercharged package structs
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">client.go</a></td><td> | </td><td class="num">40</td><td><span class="i">+++++++++++++++++++++</span><span class="d">-------------------</span></td></tr>
+<tr><td class="D">D</td><td><a href="#h1">protocol.go</a></td><td> | </td><td class="num">51</td><td><span class="i"></span><span class="d">---------------------------------------------------</span></td></tr>
+<tr><td class="D">D</td><td><a href="#h2">protocol_test.go</a></td><td> | </td><td class="num">32</td><td><span class="i"></span><span class="d">--------------------------------</span></td></tr>
+</table></pre><pre>3 files changed, 21 insertions(+), 102 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/client.go">client.go</a> b/<a href="../file/client.go">client.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -10,6 +10,8 @@ import (
+</a> 
+ 	&quot;github.com/gorilla/websocket&quot;
+ 	&quot;lib.kevinlin.info/aperture/lib&quot;
+<a href="#h0-0-3" id="h0-0-3" class="i">+
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+	&quot;lib.kevinlin.info/proton/supercharged&quot;
+</a> )
+ 
+ // Client is a Supercharged client that transacts requests and responses over HTTP.
+<a href="#h0-1" id="h0-1" class="h">@@ -24,7 +26,7 @@ func NewClient(cfg *Config) *Client {
+</a> }
+ 
+ // DoHTTP executes an HTTP request against the server.
+<a href="#h0-1-3" id="h0-1-3" class="d">-func (c *Client) DoHTTP(method string, endpoint string, data interface{}, response interface{}) (scErr *Error) {
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+func (c *Client) DoHTTP(method string, endpoint string, data interface{}, response interface{}) (scErr *supercharged.Error) {
+</a> 	stopwatch := lib.NewStopwatch()
+ 	tags := map[string]interface{}{
+ 		&quot;method&quot;:   method,
+<a href="#h0-2" id="h0-2" class="h">@@ -47,12 +49,12 @@ func (c *Client) DoHTTP(method string, endpoint string, data interface{}, respon
+</a> 
+ 	reqBody, err := json.Marshal(data)
+ 	if err != nil {
+<a href="#h0-2-3" id="h0-2-3" class="d">-		return wrap(err)
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+		return supercharged.WrapError(err)
+</a> 	}
+ 
+ 	resource, err := c.cfg.BaseURL.Parse(endpoint)
+ 	if err != nil {
+<a href="#h0-2-9" id="h0-2-9" class="d">-		return wrap(err)
+</a><a href="#h0-2-10" id="h0-2-10" class="i">+		return supercharged.WrapError(err)
+</a> 	}
+ 
+ 	// By Supercharged conventions, GET and HEAD requests put the payload in a request header,\
+<a href="#h0-3" id="h0-3" class="h">@@ -62,7 +64,7 @@ func (c *Client) DoHTTP(method string, endpoint string, data interface{}, respon
+</a> 	case http.MethodHead, http.MethodGet:
+ 		req, err = http.NewRequest(method, resource.String(), nil)
+ 		if err != nil {
+<a href="#h0-3-3" id="h0-3-3" class="d">-			return wrap(err)
+</a><a href="#h0-3-4" id="h0-3-4" class="i">+			return supercharged.WrapError(err)
+</a> 		}
+ 		req.Header.Add(&quot;X-Supercharged-Client&quot;, c.cfg.ClientID)
+ 		req.Header.Add(&quot;X-Supercharged-Data&quot;, string(reqBody))
+<a href="#h0-4" id="h0-4" class="h">@@ -70,44 +72,44 @@ func (c *Client) DoHTTP(method string, endpoint string, data interface{}, respon
+</a> 	case http.MethodPost, http.MethodPut, http.MethodDelete:
+ 		req, err = http.NewRequest(method, resource.String(), bytes.NewReader(reqBody))
+ 		if err != nil {
+<a href="#h0-4-3" id="h0-4-3" class="d">-			return wrap(err)
+</a><a href="#h0-4-4" id="h0-4-4" class="i">+			return supercharged.WrapError(err)
+</a> 		}
+ 		req.Header.Add(&quot;X-Supercharged-Client&quot;, c.cfg.ClientID)
+ 
+ 	default:
+<a href="#h0-4-9" id="h0-4-9" class="d">-		return &amp;Error{
+</a><a href="#h0-4-10" id="h0-4-10" class="d">-			Code:    CodeNotFound,
+</a><a href="#h0-4-11" id="h0-4-11" class="i">+		return &amp;supercharged.Error{
+</a><a href="#h0-4-12" id="h0-4-12" class="i">+			Code:    supercharged.CodeNotFound,
+</a> 			Message: &quot;unsupported Supercharged HTTP method in request&quot;,
+ 		}
+ 	}
+ 
+ 	httpResp, err := c.cfg.Backend.Do(req)
+ 	if err != nil {
+<a href="#h0-4-19" id="h0-4-19" class="d">-		return wrap(err)
+</a><a href="#h0-4-20" id="h0-4-20" class="i">+		return supercharged.WrapError(err)
+</a> 	}
+ 	tags[&quot;status&quot;] = httpResp.StatusCode
+ 
+ 	respBody, err := ioutil.ReadAll(httpResp.Body)
+ 	if err != nil {
+<a href="#h0-4-26" id="h0-4-26" class="d">-		return &amp;Error{
+</a><a href="#h0-4-27" id="h0-4-27" class="i">+		return &amp;supercharged.Error{
+</a> 			Status:  httpResp.StatusCode,
+<a href="#h0-4-29" id="h0-4-29" class="d">-			Code:    CodeClientUndefined,
+</a><a href="#h0-4-30" id="h0-4-30" class="i">+			Code:    supercharged.CodeClientUndefined,
+</a> 			Message: err.Error(),
+ 		}
+ 	}
+ 
+<a href="#h0-4-35" id="h0-4-35" class="d">-	var scResp Response
+</a><a href="#h0-4-36" id="h0-4-36" class="i">+	var scResp supercharged.Response
+</a> 	if err := json.Unmarshal(respBody, &amp;scResp); err != nil {
+<a href="#h0-4-38" id="h0-4-38" class="d">-		return &amp;Error{
+</a><a href="#h0-4-39" id="h0-4-39" class="i">+		return &amp;supercharged.Error{
+</a> 			Status:  httpResp.StatusCode,
+<a href="#h0-4-41" id="h0-4-41" class="d">-			Code:    CodeClientUndefined,
+</a><a href="#h0-4-42" id="h0-4-42" class="i">+			Code:    supercharged.CodeClientUndefined,
+</a> 			Message: err.Error(),
+ 		}
+ 	}
+ 	tags[&quot;code&quot;] = scResp.Code
+ 
+ 	if !scResp.Success {
+<a href="#h0-4-49" id="h0-4-49" class="d">-		return &amp;Error{
+</a><a href="#h0-4-50" id="h0-4-50" class="i">+		return &amp;supercharged.Error{
+</a> 			Status:  httpResp.StatusCode,
+ 			Code:    scResp.Code,
+ 			Message: scResp.Message,
+<a href="#h0-5" id="h0-5" class="h">@@ -117,9 +119,9 @@ func (c *Client) DoHTTP(method string, endpoint string, data interface{}, respon
+</a> 
+ 	if response != nil {
+ 		if err := json.Unmarshal(scResp.Data, response); err != nil {
+<a href="#h0-5-3" id="h0-5-3" class="d">-			return &amp;Error{
+</a><a href="#h0-5-4" id="h0-5-4" class="i">+			return &amp;supercharged.Error{
+</a> 				Status:  httpResp.StatusCode,
+<a href="#h0-5-6" id="h0-5-6" class="d">-				Code:    CodeClientUndefined,
+</a><a href="#h0-5-7" id="h0-5-7" class="i">+				Code:    supercharged.CodeClientUndefined,
+</a> 				Message: err.Error(),
+ 			}
+ 		}
+<a href="#h0-6" id="h0-6" class="h">@@ -132,7 +134,7 @@ func (c *Client) DoHTTP(method string, endpoint string, data interface{}, respon
+</a> }
+ 
+ // DoWebsocket establishes a duplex websocket connection with the server.
+<a href="#h0-6-3" id="h0-6-3" class="d">-func (c *Client) DoWebsocket(endpoint string, data interface{}) (conn *websocket.Conn, scErr *Error) {
+</a><a href="#h0-6-4" id="h0-6-4" class="i">+func (c *Client) DoWebsocket(endpoint string, data interface{}) (conn *websocket.Conn, scErr *supercharged.Error) {
+</a> 	stopwatch := lib.NewStopwatch()
+ 	tags := map[string]interface{}{
+ 		&quot;endpoint&quot;: endpoint,
+<a href="#h0-7" id="h0-7" class="h">@@ -152,7 +154,7 @@ func (c *Client) DoWebsocket(endpoint string, data interface{}) (conn *websocket
+</a> 	if data != nil {
+ 		serializedData, err := json.Marshal(data)
+ 		if err != nil {
+<a href="#h0-7-3" id="h0-7-3" class="d">-			return nil, wrap(err)
+</a><a href="#h0-7-4" id="h0-7-4" class="i">+			return nil, supercharged.WrapError(err)
+</a> 		}
+ 
+ 		payloadData = base64.StdEncoding.EncodeToString(serializedData)
+<a href="#h0-8" id="h0-8" class="h">@@ -179,7 +181,7 @@ func (c *Client) DoWebsocket(endpoint string, data interface{}) (conn *websocket
+</a> 
+ 	conn, _, err := dialer.DialContext(context.Background(), target.String(), nil)
+ 	if err != nil {
+<a href="#h0-8-3" id="h0-8-3" class="d">-		return nil, wrap(err)
+</a><a href="#h0-8-4" id="h0-8-4" class="i">+		return nil, supercharged.WrapError(err)
+</a> 	}
+ 
+ 	return conn, nil
+<b>diff --git a/<a id="h1" href="../file/protocol.go">protocol.go</a> b/<a href="../file/protocol.go">protocol.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -1,51 +0,0 @@
+</a><a href="#h1-0-0" id="h1-0-0" class="d">-package proton
+</a><a href="#h1-0-1" id="h1-0-1" class="d">-
+</a><a href="#h1-0-2" id="h1-0-2" class="d">-import (
+</a><a href="#h1-0-3" id="h1-0-3" class="d">-	&quot;encoding/json&quot;
+</a><a href="#h1-0-4" id="h1-0-4" class="d">-	&quot;fmt&quot;
+</a><a href="#h1-0-5" id="h1-0-5" class="d">-	&quot;net/http&quot;
+</a><a href="#h1-0-6" id="h1-0-6" class="d">-)
+</a><a href="#h1-0-7" id="h1-0-7" class="d">-
+</a><a href="#h1-0-8" id="h1-0-8" class="d">-const (
+</a><a href="#h1-0-9" id="h1-0-9" class="d">-	// CodeOK describes a successful response.
+</a><a href="#h1-0-10" id="h1-0-10" class="d">-	CodeOK = 0
+</a><a href="#h1-0-11" id="h1-0-11" class="d">-	// CodeServerUndefined describes an undefined server-side error.
+</a><a href="#h1-0-12" id="h1-0-12" class="d">-	CodeServerUndefined = -1
+</a><a href="#h1-0-13" id="h1-0-13" class="d">-	// CodeClientUndefined describes an undefined client-side error.
+</a><a href="#h1-0-14" id="h1-0-14" class="d">-	CodeClientUndefined = -2
+</a><a href="#h1-0-15" id="h1-0-15" class="d">-	// CodeInvalidParameters indicates the client supplied invalid input parameters.
+</a><a href="#h1-0-16" id="h1-0-16" class="d">-	CodeInvalidParameters = -3
+</a><a href="#h1-0-17" id="h1-0-17" class="d">-	// CodeNotFound indicates the client attempted to access an unknown route.
+</a><a href="#h1-0-18" id="h1-0-18" class="d">-	CodeNotFound = -4
+</a><a href="#h1-0-19" id="h1-0-19" class="d">-)
+</a><a href="#h1-0-20" id="h1-0-20" class="d">-
+</a><a href="#h1-0-21" id="h1-0-21" class="d">-// Response formalizes a canonical Supercharged JSON response body.
+</a><a href="#h1-0-22" id="h1-0-22" class="d">-type Response struct {
+</a><a href="#h1-0-23" id="h1-0-23" class="d">-	Success bool            `json:&quot;success&quot;`
+</a><a href="#h1-0-24" id="h1-0-24" class="d">-	Code    int             `json:&quot;code&quot;`
+</a><a href="#h1-0-25" id="h1-0-25" class="d">-	Message string          `json:&quot;message&quot;`
+</a><a href="#h1-0-26" id="h1-0-26" class="d">-	Data    json.RawMessage `json:&quot;data&quot;`
+</a><a href="#h1-0-27" id="h1-0-27" class="d">-}
+</a><a href="#h1-0-28" id="h1-0-28" class="d">-
+</a><a href="#h1-0-29" id="h1-0-29" class="d">-// Error includes additional metadata for a Supercharged error response.
+</a><a href="#h1-0-30" id="h1-0-30" class="d">-type Error struct {
+</a><a href="#h1-0-31" id="h1-0-31" class="d">-	Status  int
+</a><a href="#h1-0-32" id="h1-0-32" class="d">-	Code    int
+</a><a href="#h1-0-33" id="h1-0-33" class="d">-	Message string
+</a><a href="#h1-0-34" id="h1-0-34" class="d">-	Data    interface{}
+</a><a href="#h1-0-35" id="h1-0-35" class="d">-}
+</a><a href="#h1-0-36" id="h1-0-36" class="d">-
+</a><a href="#h1-0-37" id="h1-0-37" class="d">-// wrap wraps an error with default fields to conform to an Error struct.
+</a><a href="#h1-0-38" id="h1-0-38" class="d">-func wrap(err error) *Error {
+</a><a href="#h1-0-39" id="h1-0-39" class="d">-	return &amp;Error{
+</a><a href="#h1-0-40" id="h1-0-40" class="d">-		Status:  http.StatusBadRequest,
+</a><a href="#h1-0-41" id="h1-0-41" class="d">-		Code:    CodeClientUndefined,
+</a><a href="#h1-0-42" id="h1-0-42" class="d">-		Message: err.Error(),
+</a><a href="#h1-0-43" id="h1-0-43" class="d">-		Data:    nil,
+</a><a href="#h1-0-44" id="h1-0-44" class="d">-	}
+</a><a href="#h1-0-45" id="h1-0-45" class="d">-}
+</a><a href="#h1-0-46" id="h1-0-46" class="d">-
+</a><a href="#h1-0-47" id="h1-0-47" class="d">-// Error returns a string representation of the error.
+</a><a href="#h1-0-48" id="h1-0-48" class="d">-func (e *Error) Error() string {
+</a><a href="#h1-0-49" id="h1-0-49" class="d">-	return fmt.Sprintf(&quot;%s (%d)&quot;, e.Message, e.Code)
+</a><a href="#h1-0-50" id="h1-0-50" class="d">-}
+</a><b>diff --git a/<a id="h2" href="../file/protocol_test.go">protocol_test.go</a> b/<a href="../file/protocol_test.go">protocol_test.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -1,32 +0,0 @@
+</a><a href="#h2-0-0" id="h2-0-0" class="d">-package proton
+</a><a href="#h2-0-1" id="h2-0-1" class="d">-
+</a><a href="#h2-0-2" id="h2-0-2" class="d">-import (
+</a><a href="#h2-0-3" id="h2-0-3" class="d">-	&quot;errors&quot;
+</a><a href="#h2-0-4" id="h2-0-4" class="d">-	&quot;net/http&quot;
+</a><a href="#h2-0-5" id="h2-0-5" class="d">-	&quot;testing&quot;
+</a><a href="#h2-0-6" id="h2-0-6" class="d">-
+</a><a href="#h2-0-7" id="h2-0-7" class="d">-	&quot;github.com/stretchr/testify/assert&quot;
+</a><a href="#h2-0-8" id="h2-0-8" class="d">-)
+</a><a href="#h2-0-9" id="h2-0-9" class="d">-
+</a><a href="#h2-0-10" id="h2-0-10" class="d">-func TestErrorWrap(t *testing.T) {
+</a><a href="#h2-0-11" id="h2-0-11" class="d">-	t.Parallel()
+</a><a href="#h2-0-12" id="h2-0-12" class="d">-
+</a><a href="#h2-0-13" id="h2-0-13" class="d">-	err := wrap(errors.New(&quot;example&quot;))
+</a><a href="#h2-0-14" id="h2-0-14" class="d">-
+</a><a href="#h2-0-15" id="h2-0-15" class="d">-	assert.Equal(t, http.StatusBadRequest, err.Status)
+</a><a href="#h2-0-16" id="h2-0-16" class="d">-	assert.Equal(t, CodeClientUndefined, err.Code)
+</a><a href="#h2-0-17" id="h2-0-17" class="d">-	assert.Equal(t, &quot;example&quot;, err.Message)
+</a><a href="#h2-0-18" id="h2-0-18" class="d">-	assert.Nil(t, err.Data)
+</a><a href="#h2-0-19" id="h2-0-19" class="d">-}
+</a><a href="#h2-0-20" id="h2-0-20" class="d">-
+</a><a href="#h2-0-21" id="h2-0-21" class="d">-func TestErrorString(t *testing.T) {
+</a><a href="#h2-0-22" id="h2-0-22" class="d">-	t.Parallel()
+</a><a href="#h2-0-23" id="h2-0-23" class="d">-
+</a><a href="#h2-0-24" id="h2-0-24" class="d">-	err := Error{
+</a><a href="#h2-0-25" id="h2-0-25" class="d">-		Status:  http.StatusInternalServerError,
+</a><a href="#h2-0-26" id="h2-0-26" class="d">-		Code:    CodeServerUndefined,
+</a><a href="#h2-0-27" id="h2-0-27" class="d">-		Message: &quot;message&quot;,
+</a><a href="#h2-0-28" id="h2-0-28" class="d">-	}
+</a><a href="#h2-0-29" id="h2-0-29" class="d">-
+</a><a href="#h2-0-30" id="h2-0-30" class="d">-	assert.Equal(t, &quot;message (-1)&quot;, err.Error())
+</a><a href="#h2-0-31" id="h2-0-31" class="d">-}
+</a></pre>
+</div>
+</body>
+</html>

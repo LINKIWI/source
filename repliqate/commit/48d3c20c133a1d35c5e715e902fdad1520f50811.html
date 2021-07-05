@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>db: SQL and Redis clients - repliqate - SQL -&gt; Kafka replication for append-only workloads</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="repliqate Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="repliqate Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i,
+a.line {
+	text-decoration: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>repliqate</h1><span class="desc">SQL -&gt; Kafka replication for append-only workloads</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/repliqate.git">https://source.static.kevinlin.info/repliqate.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/48d3c20c133a1d35c5e715e902fdad1520f50811">48d3c20c133a1d35c5e715e902fdad1520f50811</a>
+<b>parent</b> <a href="../commit/dda7150751df629b5507693f3eade961fffb062f">dda7150751df629b5507693f3eade961fffb062f</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Thu, 14 Feb 2019 17:51:04 -0800
+
+db: SQL and Redis clients
+
+<b>Diffstat:</b>
+<table><tr><td class="A">A</td><td><a href="#h0">repliqate/db/__init__.py</a></td><td> | </td><td class="num">0</td><td><span class="i"></span><span class="d"></span></td></tr>
+<tr><td class="A">A</td><td><a href="#h1">repliqate/db/kv.py</a></td><td> | </td><td class="num">252</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="A">A</td><td><a href="#h2">repliqate/db/sql.py</a></td><td> | </td><td class="num">73</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+</table></pre><pre>3 files changed, 325 insertions(+), 0 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/repliqate/db/__init__.py">repliqate/db/__init__.py</a> b/<a href="../file/repliqate/db/__init__.py">repliqate/db/__init__.py</a></b>
+<b>diff --git a/<a id="h1" href="../file/repliqate/db/kv.py">repliqate/db/kv.py</a> b/<a href="../file/repliqate/db/kv.py">repliqate/db/kv.py</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -0,0 +1,252 @@
+</a><a href="#h1-0-0" id="h1-0-0" class="i">+import threading
+</a><a href="#h1-0-1" id="h1-0-1" class="i">+
+</a><a href="#h1-0-2" id="h1-0-2" class="i">+import redis
+</a><a href="#h1-0-3" id="h1-0-3" class="i">+from redis.exceptions import ConnectionError
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+from redis.exceptions import TimeoutError
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+
+</a><a href="#h1-0-6" id="h1-0-6" class="i">+
+</a><a href="#h1-0-7" id="h1-0-7" class="i">+class CacheException(Exception):
+</a><a href="#h1-0-8" id="h1-0-8" class="i">+    &quot;&quot;&quot;
+</a><a href="#h1-0-9" id="h1-0-9" class="i">+    Application-level exception raised by the client for invalid parameters.
+</a><a href="#h1-0-10" id="h1-0-10" class="i">+    &quot;&quot;&quot;
+</a><a href="#h1-0-11" id="h1-0-11" class="i">+    pass
+</a><a href="#h1-0-12" id="h1-0-12" class="i">+
+</a><a href="#h1-0-13" id="h1-0-13" class="i">+
+</a><a href="#h1-0-14" id="h1-0-14" class="i">+class MemoryCache(object):
+</a><a href="#h1-0-15" id="h1-0-15" class="i">+    &quot;&quot;&quot;
+</a><a href="#h1-0-16" id="h1-0-16" class="i">+    MemoryCache is a simple, thread-safe in-memory key-value cache.
+</a><a href="#h1-0-17" id="h1-0-17" class="i">+    &quot;&quot;&quot;
+</a><a href="#h1-0-18" id="h1-0-18" class="i">+
+</a><a href="#h1-0-19" id="h1-0-19" class="i">+    def __init__(self):
+</a><a href="#h1-0-20" id="h1-0-20" class="i">+        &quot;&quot;&quot;
+</a><a href="#h1-0-21" id="h1-0-21" class="i">+        Create a MemoryCache with the default in-memory storage backend.
+</a><a href="#h1-0-22" id="h1-0-22" class="i">+        &quot;&quot;&quot;
+</a><a href="#h1-0-23" id="h1-0-23" class="i">+        self.lock = threading.Lock()
+</a><a href="#h1-0-24" id="h1-0-24" class="i">+        self.store = {}
+</a><a href="#h1-0-25" id="h1-0-25" class="i">+
+</a><a href="#h1-0-26" id="h1-0-26" class="i">+    def get(self, key):
+</a><a href="#h1-0-27" id="h1-0-27" class="i">+        &quot;&quot;&quot;
+</a><a href="#h1-0-28" id="h1-0-28" class="i">+        Retrieve a key&#39;s value.
+</a><a href="#h1-0-29" id="h1-0-29" class="i">+
+</a><a href="#h1-0-30" id="h1-0-30" class="i">+        :param key: Raw key.
+</a><a href="#h1-0-31" id="h1-0-31" class="i">+        :return: Associated value, if it exists and is prior to expiry.
+</a><a href="#h1-0-32" id="h1-0-32" class="i">+        &quot;&quot;&quot;
+</a><a href="#h1-0-33" id="h1-0-33" class="i">+        with self.lock:
+</a><a href="#h1-0-34" id="h1-0-34" class="i">+            try:
+</a><a href="#h1-0-35" id="h1-0-35" class="i">+                return self.store[key]
+</a><a href="#h1-0-36" id="h1-0-36" class="i">+            except KeyError:
+</a><a href="#h1-0-37" id="h1-0-37" class="i">+                return None
+</a><a href="#h1-0-38" id="h1-0-38" class="i">+
+</a><a href="#h1-0-39" id="h1-0-39" class="i">+    def set(self, key, value):
+</a><a href="#h1-0-40" id="h1-0-40" class="i">+        &quot;&quot;&quot;
+</a><a href="#h1-0-41" id="h1-0-41" class="i">+        Set a key-value pair.
+</a><a href="#h1-0-42" id="h1-0-42" class="i">+
+</a><a href="#h1-0-43" id="h1-0-43" class="i">+        :param key: Raw key.
+</a><a href="#h1-0-44" id="h1-0-44" class="i">+        :param value: Associated value.
+</a><a href="#h1-0-45" id="h1-0-45" class="i">+        &quot;&quot;&quot;
+</a><a href="#h1-0-46" id="h1-0-46" class="i">+        with self.lock:
+</a><a href="#h1-0-47" id="h1-0-47" class="i">+            self.store[key] = value
+</a><a href="#h1-0-48" id="h1-0-48" class="i">+
+</a><a href="#h1-0-49" id="h1-0-49" class="i">+    def delete(self, key):
+</a><a href="#h1-0-50" id="h1-0-50" class="i">+        &quot;&quot;&quot;
+</a><a href="#h1-0-51" id="h1-0-51" class="i">+        Delete a key, if it exists.
+</a><a href="#h1-0-52" id="h1-0-52" class="i">+
+</a><a href="#h1-0-53" id="h1-0-53" class="i">+        :param key: Raw key.
+</a><a href="#h1-0-54" id="h1-0-54" class="i">+        &quot;&quot;&quot;
+</a><a href="#h1-0-55" id="h1-0-55" class="i">+        with self.lock:
+</a><a href="#h1-0-56" id="h1-0-56" class="i">+            if key in self.store:
+</a><a href="#h1-0-57" id="h1-0-57" class="i">+                del self.store[key]
+</a><a href="#h1-0-58" id="h1-0-58" class="i">+
+</a><a href="#h1-0-59" id="h1-0-59" class="i">+
+</a><a href="#h1-0-60" id="h1-0-60" class="i">+class RedisProxyClient(object):
+</a><a href="#h1-0-61" id="h1-0-61" class="i">+    &quot;&quot;&quot;
+</a><a href="#h1-0-62" id="h1-0-62" class="i">+    Intermediary proxy client in front of Redis that gracefully falls back to an in-memory cache if
+</a><a href="#h1-0-63" id="h1-0-63" class="i">+    Redis fails or is otherwise unavailable, to provide additional resiliency.
+</a><a href="#h1-0-64" id="h1-0-64" class="i">+    &quot;&quot;&quot;
+</a><a href="#h1-0-65" id="h1-0-65" class="i">+
+</a><a href="#h1-0-66" id="h1-0-66" class="i">+    def __init__(self, addr):
+</a><a href="#h1-0-67" id="h1-0-67" class="i">+        &quot;&quot;&quot;
+</a><a href="#h1-0-68" id="h1-0-68" class="i">+        Create a RedisProxyClient.
+</a><a href="#h1-0-69" id="h1-0-69" class="i">+
+</a><a href="#h1-0-70" id="h1-0-70" class="i">+        :param addr: Address to the Redis cluster.
+</a><a href="#h1-0-71" id="h1-0-71" class="i">+        &quot;&quot;&quot;
+</a><a href="#h1-0-72" id="h1-0-72" class="i">+        ip, port = addr.split(&#39;:&#39;)
+</a><a href="#h1-0-73" id="h1-0-73" class="i">+
+</a><a href="#h1-0-74" id="h1-0-74" class="i">+        self.memory = MemoryCache()
+</a><a href="#h1-0-75" id="h1-0-75" class="i">+        self.redis = redis.Redis(
+</a><a href="#h1-0-76" id="h1-0-76" class="i">+            host=ip,
+</a><a href="#h1-0-77" id="h1-0-77" class="i">+            port=port,
+</a><a href="#h1-0-78" id="h1-0-78" class="i">+        )
+</a><a href="#h1-0-79" id="h1-0-79" class="i">+
+</a><a href="#h1-0-80" id="h1-0-80" class="i">+    def get(self, key):
+</a><a href="#h1-0-81" id="h1-0-81" class="i">+        &quot;&quot;&quot;
+</a><a href="#h1-0-82" id="h1-0-82" class="i">+        Get the value for a key, prioritizing Redis if available.
+</a><a href="#h1-0-83" id="h1-0-83" class="i">+
+</a><a href="#h1-0-84" id="h1-0-84" class="i">+        :param key: Raw key.
+</a><a href="#h1-0-85" id="h1-0-85" class="i">+        :return: Associated value.
+</a><a href="#h1-0-86" id="h1-0-86" class="i">+        &quot;&quot;&quot;
+</a><a href="#h1-0-87" id="h1-0-87" class="i">+        try:
+</a><a href="#h1-0-88" id="h1-0-88" class="i">+            return self.redis.get(key)
+</a><a href="#h1-0-89" id="h1-0-89" class="i">+        except (ConnectionError, TimeoutError):
+</a><a href="#h1-0-90" id="h1-0-90" class="i">+            return self.memory.get(key)
+</a><a href="#h1-0-91" id="h1-0-91" class="i">+
+</a><a href="#h1-0-92" id="h1-0-92" class="i">+    def set(self, key, value):
+</a><a href="#h1-0-93" id="h1-0-93" class="i">+        &quot;&quot;&quot;
+</a><a href="#h1-0-94" id="h1-0-94" class="i">+        Set the value for a key. Dark writes to the backup in-memory store are always performed
+</a><a href="#h1-0-95" id="h1-0-95" class="i">+        to synchronize the state of the in-memory store with Redis, so that read failovers do not
+</a><a href="#h1-0-96" id="h1-0-96" class="i">+        sacrifice the consistency of the underlying data.
+</a><a href="#h1-0-97" id="h1-0-97" class="i">+
+</a><a href="#h1-0-98" id="h1-0-98" class="i">+        :param key: Raw key.
+</a><a href="#h1-0-99" id="h1-0-99" class="i">+        :param value: Associated value.
+</a><a href="#h1-0-100" id="h1-0-100" class="i">+        &quot;&quot;&quot;
+</a><a href="#h1-0-101" id="h1-0-101" class="i">+        try:
+</a><a href="#h1-0-102" id="h1-0-102" class="i">+            return self.redis.set(key, value)
+</a><a href="#h1-0-103" id="h1-0-103" class="i">+        except (ConnectionError, TimeoutError):
+</a><a href="#h1-0-104" id="h1-0-104" class="i">+            pass
+</a><a href="#h1-0-105" id="h1-0-105" class="i">+        finally:
+</a><a href="#h1-0-106" id="h1-0-106" class="i">+            return self.memory.set(key, value)
+</a><a href="#h1-0-107" id="h1-0-107" class="i">+
+</a><a href="#h1-0-108" id="h1-0-108" class="i">+    def delete(self, key):
+</a><a href="#h1-0-109" id="h1-0-109" class="i">+        &quot;&quot;&quot;
+</a><a href="#h1-0-110" id="h1-0-110" class="i">+        Invalidate a cache entry. Like the other write operation set(), dark writes are always
+</a><a href="#h1-0-111" id="h1-0-111" class="i">+        performed to keep the in-memory cache consistent with Redis in the event of a failover.
+</a><a href="#h1-0-112" id="h1-0-112" class="i">+
+</a><a href="#h1-0-113" id="h1-0-113" class="i">+        :param key: Raw key.
+</a><a href="#h1-0-114" id="h1-0-114" class="i">+        &quot;&quot;&quot;
+</a><a href="#h1-0-115" id="h1-0-115" class="i">+        try:
+</a><a href="#h1-0-116" id="h1-0-116" class="i">+            return self.redis.delete(key)
+</a><a href="#h1-0-117" id="h1-0-117" class="i">+        except (ConnectionError, TimeoutError):
+</a><a href="#h1-0-118" id="h1-0-118" class="i">+            pass
+</a><a href="#h1-0-119" id="h1-0-119" class="i">+        finally:
+</a><a href="#h1-0-120" id="h1-0-120" class="i">+            return self.memory.delete(key)
+</a><a href="#h1-0-121" id="h1-0-121" class="i">+
+</a><a href="#h1-0-122" id="h1-0-122" class="i">+
+</a><a href="#h1-0-123" id="h1-0-123" class="i">+class KeyValueStoreClient(object):
+</a><a href="#h1-0-124" id="h1-0-124" class="i">+    &quot;&quot;&quot;
+</a><a href="#h1-0-125" id="h1-0-125" class="i">+    Caching abstractions on top of a key value storage system.
+</a><a href="#h1-0-126" id="h1-0-126" class="i">+    &quot;&quot;&quot;
+</a><a href="#h1-0-127" id="h1-0-127" class="i">+
+</a><a href="#h1-0-128" id="h1-0-128" class="i">+    def __init__(self, addr, prefix):
+</a><a href="#h1-0-129" id="h1-0-129" class="i">+        &quot;&quot;&quot;
+</a><a href="#h1-0-130" id="h1-0-130" class="i">+        Create a key value store client with a Redis backend.
+</a><a href="#h1-0-131" id="h1-0-131" class="i">+
+</a><a href="#h1-0-132" id="h1-0-132" class="i">+        :param addr: Address of the Redis cluster.
+</a><a href="#h1-0-133" id="h1-0-133" class="i">+        :param prefix: String prefix for all inserted cache keys.
+</a><a href="#h1-0-134" id="h1-0-134" class="i">+        &quot;&quot;&quot;
+</a><a href="#h1-0-135" id="h1-0-135" class="i">+        self.prefix = prefix
+</a><a href="#h1-0-136" id="h1-0-136" class="i">+
+</a><a href="#h1-0-137" id="h1-0-137" class="i">+        if addr:
+</a><a href="#h1-0-138" id="h1-0-138" class="i">+            self.backend = RedisProxyClient(addr)
+</a><a href="#h1-0-139" id="h1-0-139" class="i">+        else:
+</a><a href="#h1-0-140" id="h1-0-140" class="i">+            self.backend = MemoryCache()
+</a><a href="#h1-0-141" id="h1-0-141" class="i">+
+</a><a href="#h1-0-142" id="h1-0-142" class="i">+    def closure(self, namespace, key, tags={}):
+</a><a href="#h1-0-143" id="h1-0-143" class="i">+        &quot;&quot;&quot;
+</a><a href="#h1-0-144" id="h1-0-144" class="i">+        Factory for a key value read/write client for a particular key.
+</a><a href="#h1-0-145" id="h1-0-145" class="i">+
+</a><a href="#h1-0-146" id="h1-0-146" class="i">+        :param namespace: Namespace of the key.
+</a><a href="#h1-0-147" id="h1-0-147" class="i">+        :param key: The key itself.
+</a><a href="#h1-0-148" id="h1-0-148" class="i">+        :param tags: Optional dictionary of tags to qualify the key.
+</a><a href="#h1-0-149" id="h1-0-149" class="i">+        :return: A client with get and set methods within this client&#39;s closure.
+</a><a href="#h1-0-150" id="h1-0-150" class="i">+        &quot;&quot;&quot;
+</a><a href="#h1-0-151" id="h1-0-151" class="i">+        def set_proxy(value):
+</a><a href="#h1-0-152" id="h1-0-152" class="i">+            return self.set(namespace, key, tags, value)
+</a><a href="#h1-0-153" id="h1-0-153" class="i">+
+</a><a href="#h1-0-154" id="h1-0-154" class="i">+        def get_proxy():
+</a><a href="#h1-0-155" id="h1-0-155" class="i">+            return self.get(namespace, key, tags)
+</a><a href="#h1-0-156" id="h1-0-156" class="i">+
+</a><a href="#h1-0-157" id="h1-0-157" class="i">+        def delete_proxy():
+</a><a href="#h1-0-158" id="h1-0-158" class="i">+            return self.delete(namespace, key, tags)
+</a><a href="#h1-0-159" id="h1-0-159" class="i">+
+</a><a href="#h1-0-160" id="h1-0-160" class="i">+        return KeyValueStoreClosure(set_proxy, get_proxy, delete_proxy)
+</a><a href="#h1-0-161" id="h1-0-161" class="i">+
+</a><a href="#h1-0-162" id="h1-0-162" class="i">+    def get(self, namespace, key, tags={}):
+</a><a href="#h1-0-163" id="h1-0-163" class="i">+        &quot;&quot;&quot;
+</a><a href="#h1-0-164" id="h1-0-164" class="i">+        Get a value.
+</a><a href="#h1-0-165" id="h1-0-165" class="i">+
+</a><a href="#h1-0-166" id="h1-0-166" class="i">+        :param namespace: Namespace of the key.
+</a><a href="#h1-0-167" id="h1-0-167" class="i">+        :param key: The key itself.
+</a><a href="#h1-0-168" id="h1-0-168" class="i">+        :param tags: Optional dictionary of tags to qualify the key.
+</a><a href="#h1-0-169" id="h1-0-169" class="i">+        :return: The cached value, if available; None otherwise.
+</a><a href="#h1-0-170" id="h1-0-170" class="i">+        &quot;&quot;&quot;
+</a><a href="#h1-0-171" id="h1-0-171" class="i">+        return self.backend.get(
+</a><a href="#h1-0-172" id="h1-0-172" class="i">+            key=self._format_key(namespace, key, tags),
+</a><a href="#h1-0-173" id="h1-0-173" class="i">+        )
+</a><a href="#h1-0-174" id="h1-0-174" class="i">+
+</a><a href="#h1-0-175" id="h1-0-175" class="i">+    def set(self, namespace, key, tags, value):
+</a><a href="#h1-0-176" id="h1-0-176" class="i">+        &quot;&quot;&quot;
+</a><a href="#h1-0-177" id="h1-0-177" class="i">+        Set a value. This operation treats new entries and updates to existing entries
+</a><a href="#h1-0-178" id="h1-0-178" class="i">+        identically.
+</a><a href="#h1-0-179" id="h1-0-179" class="i">+
+</a><a href="#h1-0-180" id="h1-0-180" class="i">+        :param namespace: Namespace of the key.
+</a><a href="#h1-0-181" id="h1-0-181" class="i">+        :param key:The key itself.
+</a><a href="#h1-0-182" id="h1-0-182" class="i">+        :param tags: Optional dictionary of tags to qualify the key.
+</a><a href="#h1-0-183" id="h1-0-183" class="i">+        :param value: Value to set.
+</a><a href="#h1-0-184" id="h1-0-184" class="i">+        &quot;&quot;&quot;
+</a><a href="#h1-0-185" id="h1-0-185" class="i">+        self.backend.set(
+</a><a href="#h1-0-186" id="h1-0-186" class="i">+            key=self._format_key(namespace, key, tags),
+</a><a href="#h1-0-187" id="h1-0-187" class="i">+            value=value,
+</a><a href="#h1-0-188" id="h1-0-188" class="i">+        )
+</a><a href="#h1-0-189" id="h1-0-189" class="i">+
+</a><a href="#h1-0-190" id="h1-0-190" class="i">+    def delete(self, namespace, key, tags):
+</a><a href="#h1-0-191" id="h1-0-191" class="i">+        &quot;&quot;&quot;
+</a><a href="#h1-0-192" id="h1-0-192" class="i">+        Delete an entry.
+</a><a href="#h1-0-193" id="h1-0-193" class="i">+
+</a><a href="#h1-0-194" id="h1-0-194" class="i">+        :param namespace: Namespace of the key.
+</a><a href="#h1-0-195" id="h1-0-195" class="i">+        :param key: The key itself.
+</a><a href="#h1-0-196" id="h1-0-196" class="i">+        :param tags: Optional dictionary of tags to qualify the key.
+</a><a href="#h1-0-197" id="h1-0-197" class="i">+        &quot;&quot;&quot;
+</a><a href="#h1-0-198" id="h1-0-198" class="i">+        self.backend.delete(
+</a><a href="#h1-0-199" id="h1-0-199" class="i">+            key=self._format_key(namespace, key, tags),
+</a><a href="#h1-0-200" id="h1-0-200" class="i">+        )
+</a><a href="#h1-0-201" id="h1-0-201" class="i">+
+</a><a href="#h1-0-202" id="h1-0-202" class="i">+    def _format_key(self, namespace, key, tags, delimiter=&#39;:&#39;):
+</a><a href="#h1-0-203" id="h1-0-203" class="i">+        &quot;&quot;&quot;
+</a><a href="#h1-0-204" id="h1-0-204" class="i">+        Serialize a (namespace, key, tags) triple to a plain-text string used as the raw key in the
+</a><a href="#h1-0-205" id="h1-0-205" class="i">+        key-value storage backend.
+</a><a href="#h1-0-206" id="h1-0-206" class="i">+
+</a><a href="#h1-0-207" id="h1-0-207" class="i">+        :param namespace: Namespace of the key.
+</a><a href="#h1-0-208" id="h1-0-208" class="i">+        :param key:The key itself.
+</a><a href="#h1-0-209" id="h1-0-209" class="i">+        :param tags: Optional dictionary of tags to qualify the key.
+</a><a href="#h1-0-210" id="h1-0-210" class="i">+        :param delimiter: String delimiter used for separating the key qualifiers during
+</a><a href="#h1-0-211" id="h1-0-211" class="i">+                          serialization. A colon is conventional for Redis keys.
+</a><a href="#h1-0-212" id="h1-0-212" class="i">+        :return: Formatted key string for insertion into the database.
+</a><a href="#h1-0-213" id="h1-0-213" class="i">+        &quot;&quot;&quot;
+</a><a href="#h1-0-214" id="h1-0-214" class="i">+        def format_tag_kv_pair(tag_key, tag_value):
+</a><a href="#h1-0-215" id="h1-0-215" class="i">+            if {&#39;=&#39;, &#39;&amp;&#39;}.intersection(&#39;{}{}&#39;.format(tag_key, tag_value)):
+</a><a href="#h1-0-216" id="h1-0-216" class="i">+                raise CacheException(&#39;Cache tag key or value contains illegal characters&#39;)
+</a><a href="#h1-0-217" id="h1-0-217" class="i">+
+</a><a href="#h1-0-218" id="h1-0-218" class="i">+            return &#39;{}={}&#39;.format(tag_key, tag_value)
+</a><a href="#h1-0-219" id="h1-0-219" class="i">+
+</a><a href="#h1-0-220" id="h1-0-220" class="i">+        serialized_tags = &#39;&amp;&#39;.join(
+</a><a href="#h1-0-221" id="h1-0-221" class="i">+            format_tag_kv_pair(tag_key, tag_value)
+</a><a href="#h1-0-222" id="h1-0-222" class="i">+            for tag_key, tag_value in tags.iteritems()
+</a><a href="#h1-0-223" id="h1-0-223" class="i">+        )
+</a><a href="#h1-0-224" id="h1-0-224" class="i">+
+</a><a href="#h1-0-225" id="h1-0-225" class="i">+        return &#39;{prefix}{delimiter}{namespace}{delimiter}{key}{delimiter}{tags}&#39;.format(
+</a><a href="#h1-0-226" id="h1-0-226" class="i">+            delimiter=delimiter,
+</a><a href="#h1-0-227" id="h1-0-227" class="i">+            prefix=self.prefix,
+</a><a href="#h1-0-228" id="h1-0-228" class="i">+            namespace=namespace,
+</a><a href="#h1-0-229" id="h1-0-229" class="i">+            key=key,
+</a><a href="#h1-0-230" id="h1-0-230" class="i">+            tags=serialized_tags,
+</a><a href="#h1-0-231" id="h1-0-231" class="i">+        )
+</a><a href="#h1-0-232" id="h1-0-232" class="i">+
+</a><a href="#h1-0-233" id="h1-0-233" class="i">+
+</a><a href="#h1-0-234" id="h1-0-234" class="i">+class KeyValueStoreClosure:
+</a><a href="#h1-0-235" id="h1-0-235" class="i">+    &quot;&quot;&quot;
+</a><a href="#h1-0-236" id="h1-0-236" class="i">+    Simple object container that proxies read/write methods within the closure of the cache client.
+</a><a href="#h1-0-237" id="h1-0-237" class="i">+    This is merely a usage abstraction to allow clients to call read and write methods without
+</a><a href="#h1-0-238" id="h1-0-238" class="i">+    repeating the same key qualification arguments.
+</a><a href="#h1-0-239" id="h1-0-239" class="i">+    &quot;&quot;&quot;
+</a><a href="#h1-0-240" id="h1-0-240" class="i">+
+</a><a href="#h1-0-241" id="h1-0-241" class="i">+    def __init__(self, set_proxy, get_proxy, delete_proxy):
+</a><a href="#h1-0-242" id="h1-0-242" class="i">+        &quot;&quot;&quot;
+</a><a href="#h1-0-243" id="h1-0-243" class="i">+        Create a CacheKeyRWClient.
+</a><a href="#h1-0-244" id="h1-0-244" class="i">+
+</a><a href="#h1-0-245" id="h1-0-245" class="i">+        :param set_proxy: Function that proxies the host set() method.
+</a><a href="#h1-0-246" id="h1-0-246" class="i">+        :param get_proxy: Function that proxies the host get() method.
+</a><a href="#h1-0-247" id="h1-0-247" class="i">+        :param delete_proxy: Function that proxies the host delete() method.
+</a><a href="#h1-0-248" id="h1-0-248" class="i">+        &quot;&quot;&quot;
+</a><a href="#h1-0-249" id="h1-0-249" class="i">+        self.set = set_proxy
+</a><a href="#h1-0-250" id="h1-0-250" class="i">+        self.get = get_proxy
+</a><a href="#h1-0-251" id="h1-0-251" class="i">+        self.delete = delete_proxy
+</a><b>diff --git a/<a id="h2" href="../file/repliqate/db/sql.py">repliqate/db/sql.py</a> b/<a href="../file/repliqate/db/sql.py">repliqate/db/sql.py</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -0,0 +1,73 @@
+</a><a href="#h2-0-0" id="h2-0-0" class="i">+import sqlalchemy
+</a><a href="#h2-0-1" id="h2-0-1" class="i">+
+</a><a href="#h2-0-2" id="h2-0-2" class="i">+
+</a><a href="#h2-0-3" id="h2-0-3" class="i">+class SQLDBClient(object):
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+    &quot;&quot;&quot;
+</a><a href="#h2-0-5" id="h2-0-5" class="i">+    Client for read-only interaction with a SQL database.
+</a><a href="#h2-0-6" id="h2-0-6" class="i">+    &quot;&quot;&quot;
+</a><a href="#h2-0-7" id="h2-0-7" class="i">+
+</a><a href="#h2-0-8" id="h2-0-8" class="i">+    def __init__(self, db_uri, table):
+</a><a href="#h2-0-9" id="h2-0-9" class="i">+        &quot;&quot;&quot;
+</a><a href="#h2-0-10" id="h2-0-10" class="i">+        Create a client instance.
+</a><a href="#h2-0-11" id="h2-0-11" class="i">+
+</a><a href="#h2-0-12" id="h2-0-12" class="i">+        :param db_uri: SQL URI of the source database.
+</a><a href="#h2-0-13" id="h2-0-13" class="i">+        :param table: Name of the SQL table in the database.
+</a><a href="#h2-0-14" id="h2-0-14" class="i">+        &quot;&quot;&quot;
+</a><a href="#h2-0-15" id="h2-0-15" class="i">+        engine = sqlalchemy.create_engine(db_uri)
+</a><a href="#h2-0-16" id="h2-0-16" class="i">+
+</a><a href="#h2-0-17" id="h2-0-17" class="i">+        self._conn = engine.connect()
+</a><a href="#h2-0-18" id="h2-0-18" class="i">+        self._table = sqlalchemy.Table(
+</a><a href="#h2-0-19" id="h2-0-19" class="i">+            table,
+</a><a href="#h2-0-20" id="h2-0-20" class="i">+            sqlalchemy.MetaData(),
+</a><a href="#h2-0-21" id="h2-0-21" class="i">+            autoload=True,
+</a><a href="#h2-0-22" id="h2-0-22" class="i">+            autoload_with=engine,
+</a><a href="#h2-0-23" id="h2-0-23" class="i">+        )
+</a><a href="#h2-0-24" id="h2-0-24" class="i">+
+</a><a href="#h2-0-25" id="h2-0-25" class="i">+    def query(
+</a><a href="#h2-0-26" id="h2-0-26" class="i">+        self,
+</a><a href="#h2-0-27" id="h2-0-27" class="i">+        fields=None,
+</a><a href="#h2-0-28" id="h2-0-28" class="i">+        criteria=sqlalchemy.sql.expression.true(),
+</a><a href="#h2-0-29" id="h2-0-29" class="i">+        limit=None,
+</a><a href="#h2-0-30" id="h2-0-30" class="i">+        offset=None,
+</a><a href="#h2-0-31" id="h2-0-31" class="i">+        order=None,
+</a><a href="#h2-0-32" id="h2-0-32" class="i">+    ):
+</a><a href="#h2-0-33" id="h2-0-33" class="i">+        &quot;&quot;&quot;
+</a><a href="#h2-0-34" id="h2-0-34" class="i">+        Perform a read query.
+</a><a href="#h2-0-35" id="h2-0-35" class="i">+
+</a><a href="#h2-0-36" id="h2-0-36" class="i">+        :param fields: Fields to retrieve; default all.
+</a><a href="#h2-0-37" id="h2-0-37" class="i">+        :param criteria: Filtering criteria; default no filter.
+</a><a href="#h2-0-38" id="h2-0-38" class="i">+        :param limit: Limit to the number of documents returned; default none.
+</a><a href="#h2-0-39" id="h2-0-39" class="i">+        :param offset: Offset in the documents returned; default none.
+</a><a href="#h2-0-40" id="h2-0-40" class="i">+        :param order: Field to use for ordering of returned results; default none.
+</a><a href="#h2-0-41" id="h2-0-41" class="i">+        :return: A list of row objects representing the full result of the query.
+</a><a href="#h2-0-42" id="h2-0-42" class="i">+        &quot;&quot;&quot;
+</a><a href="#h2-0-43" id="h2-0-43" class="i">+        if not fields:
+</a><a href="#h2-0-44" id="h2-0-44" class="i">+            fields = [self._table]
+</a><a href="#h2-0-45" id="h2-0-45" class="i">+
+</a><a href="#h2-0-46" id="h2-0-46" class="i">+        sql_query = sqlalchemy.select(
+</a><a href="#h2-0-47" id="h2-0-47" class="i">+            fields
+</a><a href="#h2-0-48" id="h2-0-48" class="i">+        ).where(
+</a><a href="#h2-0-49" id="h2-0-49" class="i">+            criteria
+</a><a href="#h2-0-50" id="h2-0-50" class="i">+        ).limit(
+</a><a href="#h2-0-51" id="h2-0-51" class="i">+            limit
+</a><a href="#h2-0-52" id="h2-0-52" class="i">+        ).offset(
+</a><a href="#h2-0-53" id="h2-0-53" class="i">+            offset
+</a><a href="#h2-0-54" id="h2-0-54" class="i">+        ).order_by(
+</a><a href="#h2-0-55" id="h2-0-55" class="i">+            order
+</a><a href="#h2-0-56" id="h2-0-56" class="i">+        )
+</a><a href="#h2-0-57" id="h2-0-57" class="i">+
+</a><a href="#h2-0-58" id="h2-0-58" class="i">+        return self._conn.execute(sql_query).fetchall()
+</a><a href="#h2-0-59" id="h2-0-59" class="i">+
+</a><a href="#h2-0-60" id="h2-0-60" class="i">+    def field(self, name):
+</a><a href="#h2-0-61" id="h2-0-61" class="i">+        &quot;&quot;&quot;
+</a><a href="#h2-0-62" id="h2-0-62" class="i">+        Factory for creating a field object with the specified name.
+</a><a href="#h2-0-63" id="h2-0-63" class="i">+        :param name:
+</a><a href="#h2-0-64" id="h2-0-64" class="i">+        :return:
+</a><a href="#h2-0-65" id="h2-0-65" class="i">+        &quot;&quot;&quot;
+</a><a href="#h2-0-66" id="h2-0-66" class="i">+        return self._table.columns[name]
+</a><a href="#h2-0-67" id="h2-0-67" class="i">+
+</a><a href="#h2-0-68" id="h2-0-68" class="i">+    def close(self):
+</a><a href="#h2-0-69" id="h2-0-69" class="i">+        &quot;&quot;&quot;
+</a><a href="#h2-0-70" id="h2-0-70" class="i">+        Close the underlying connection to the database.
+</a><a href="#h2-0-71" id="h2-0-71" class="i">+        &quot;&quot;&quot;
+</a><a href="#h2-0-72" id="h2-0-72" class="i">+        self._conn.close()
+</a></pre>
+</div>
+</body>
+</html>

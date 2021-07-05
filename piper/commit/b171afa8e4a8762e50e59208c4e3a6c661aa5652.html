@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/config: Typed enums for limited choice directives, add SeekPosition - piper - Realtime log file to Kafka relay daemon</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="piper Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="piper Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i,
+a.line {
+	text-decoration: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>piper</h1><span class="desc">Realtime log file to Kafka relay daemon</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/piper.git">https://source.static.kevinlin.info/piper.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/b171afa8e4a8762e50e59208c4e3a6c661aa5652">b171afa8e4a8762e50e59208c4e3a6c661aa5652</a>
+<b>parent</b> <a href="../commit/0c369579485d17aeb98a3ba3421edbbf3a1cb6b4">0c369579485d17aeb98a3ba3421edbbf3a1cb6b4</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Thu,  7 Jan 2021 19:33:18 -0800
+
+internal/config: Typed enums for limited choice directives, add SeekPosition
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">config.example.toml</a></td><td> | </td><td class="num">15</td><td><span class="i">+++++++++++++</span><span class="d">--</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">internal/config/config.go</a></td><td> | </td><td class="num">6</td><td><span class="i">++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">internal/config/types.go</a></td><td> | </td><td class="num">49</td><td><span class="i">++++++++++++++++++++++++++++++++</span><span class="d">-----------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">internal/relay/serializer.go</a></td><td> | </td><td class="num">9</td><td><span class="i">+++++</span><span class="d">----</span></td></tr>
+</table></pre><pre>4 files changed, 56 insertions(+), 23 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/config.example.toml">config.example.toml</a> b/<a href="../file/config.example.toml">config.example.toml</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -7,7 +7,8 @@ metrics-address = &quot;udp://localhost:8125&quot;
+</a> metrics-prefix = &quot;piper&quot;
+ 
+ # Each relay section describes one log stream relay.
+<a href="#h0-0-3" id="h0-0-3" class="d">-# The fields `name` and `log-file` are required; all others are optional and will assume defaults.
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+# The fields `name`. `log-file`, `kafka-address`, and `kafka-topic` are required; all others are
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+# optional and will assume defaults.
+</a> # Note that more than one relay can be specified.
+ [[relay]]
+ # Name of this relay; used only for purposes of identification.
+<a href="#h0-1" id="h0-1" class="h">@@ -30,6 +31,13 @@ filter = &quot;^pattern&quot;
+</a> #           as one field within the JSON object.
+ # Defaults to line.
+ serializer = &quot;line&quot;
+<a href="#h0-1-3" id="h0-1-3" class="i">+# Identifier for the file seek behavior to use when the log file is opened. Available positions are:
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+#   - start: Read log lines from the beginning of the file. Any existing lines in the file will be
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+#            published immediately upon open or reopen.
+</a><a href="#h0-1-6" id="h0-1-6" class="i">+#   - end: Read log lines from the end of the file, i.e. seek to the end of the file before
+</a><a href="#h0-1-7" id="h0-1-7" class="i">+#          publishing tailed lines.
+</a><a href="#h0-1-8" id="h0-1-8" class="i">+# Defaults to end.
+</a><a href="#h0-1-9" id="h0-1-9" class="i">+seek-position = &quot;end&quot;
+</a> # List of runtime-derived tags to include as additional metadata in outgoing messages. Note that
+ # only certain serializers are capable of including these tags in shipped log lines.
+ # Available tags are:
+<a href="#h0-2" id="h0-2" class="h">@@ -49,8 +57,11 @@ kafka-address = &quot;localhost:9092&quot;
+</a> # Name of the Kafka topic for published log lines.
+ kafka-topic = &quot;piper-dmesg&quot;
+ # Code for the number of required acknowledgements by Kafka for a write to be considered successful.
+<a href="#h0-2-3" id="h0-2-3" class="i">+# Defaults to 0; i.e. no acknowledge is required at all.
+</a> kafka-acks = 1
+<a href="#h0-2-5" id="h0-2-5" class="d">-# Maximum number of retries permitted for a single write.
+</a><a href="#h0-2-6" id="h0-2-6" class="i">+# Maximum number of retries permitted for a single write
+</a><a href="#h0-2-7" id="h0-2-7" class="i">+# Defaults to no retries.
+</a> kafka-retries = 10
+ # Timeout for Kafka network I/O operations.
+<a href="#h0-2-10" id="h0-2-10" class="i">+# Defaults to no timeout.
+</a> kafka-timeout = &quot;100ms&quot;
+<b>diff --git a/<a id="h1" href="../file/internal/config/config.go">internal/config/config.go</a> b/<a href="../file/internal/config/config.go">internal/config/config.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -52,6 +52,12 @@ func (c *Config) Validate() error {
+</a> 			return fmt.Errorf(&quot;config: unknown relay serializer identifier&quot;)
+ 		}
+ 
+<a href="#h1-0-3" id="h1-0-3" class="i">+		switch relay.SeekPosition {
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+		case &quot;&quot;, SeekPositionStart, SeekPositionEnd:
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+		default:
+</a><a href="#h1-0-6" id="h1-0-6" class="i">+			return fmt.Errorf(&quot;config: unknown seek position identifier&quot;)
+</a><a href="#h1-0-7" id="h1-0-7" class="i">+		}
+</a><a href="#h1-0-8" id="h1-0-8" class="i">+
+</a> 		for _, tagID := range relay.TagIdentifiers {
+ 			switch tagID {
+ 			case TagHostname, TagVersion:
+<b>diff --git a/<a id="h2" href="../file/internal/config/types.go">internal/config/types.go</a> b/<a href="../file/internal/config/types.go">internal/config/types.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -1,15 +1,29 @@
+</a> package config
+ 
+<a href="#h2-0-2" id="h2-0-2" class="i">+// Tag is an identifier for static metadata tag keys.
+</a><a href="#h2-0-3" id="h2-0-3" class="i">+type Tag string
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+
+</a><a href="#h2-0-5" id="h2-0-5" class="i">+// Serializer is an identifier for message serializer implementations.
+</a><a href="#h2-0-6" id="h2-0-6" class="i">+type Serializer string
+</a><a href="#h2-0-7" id="h2-0-7" class="i">+
+</a><a href="#h2-0-8" id="h2-0-8" class="i">+// SeekPosition is an identifier for file seek behaviors.
+</a><a href="#h2-0-9" id="h2-0-9" class="i">+type SeekPosition string
+</a><a href="#h2-0-10" id="h2-0-10" class="i">+
+</a> const (
+ 	// TagHostname is the tag identifier for the machine hostname.
+<a href="#h2-0-13" id="h2-0-13" class="d">-	TagHostname = &quot;hostname&quot;
+</a><a href="#h2-0-14" id="h2-0-14" class="i">+	TagHostname Tag = &quot;hostname&quot;
+</a> 	// TagVersion is the tag identifier for the application version.
+<a href="#h2-0-16" id="h2-0-16" class="d">-	TagVersion = &quot;version&quot;
+</a><a href="#h2-0-17" id="h2-0-17" class="i">+	TagVersion Tag = &quot;version&quot;
+</a> 
+ 	// SerializerLine is the serializer identifier for the line message serializer.
+<a href="#h2-0-20" id="h2-0-20" class="d">-	SerializerLine = &quot;line&quot;
+</a><a href="#h2-0-21" id="h2-0-21" class="i">+	SerializerLine Serializer = &quot;line&quot;
+</a> 	// SerializerJSON is the serializer identifier for the JSON message serializer.
+<a href="#h2-0-23" id="h2-0-23" class="d">-	SerializerJSON = &quot;json&quot;
+</a><a href="#h2-0-24" id="h2-0-24" class="i">+	SerializerJSON Serializer = &quot;json&quot;
+</a><a href="#h2-0-25" id="h2-0-25" class="i">+
+</a><a href="#h2-0-26" id="h2-0-26" class="i">+	// SeekPositionStart is the seek position identifier for the beginning of the file.
+</a><a href="#h2-0-27" id="h2-0-27" class="i">+	SeekPositionStart SeekPosition = &quot;start&quot;
+</a><a href="#h2-0-28" id="h2-0-28" class="i">+	// SeekPositionEnd is the seek position identifier for the end of the file.
+</a><a href="#h2-0-29" id="h2-0-29" class="i">+	SeekPositionEnd SeekPosition = &quot;end&quot;
+</a> )
+ 
+ // Config describes the top-level sections recognized in the configuration.
+<a href="#h2-1" id="h2-1" class="h">@@ -26,17 +40,18 @@ type Piper struct {
+</a> 
+ // Relay provides configuration of a single log relay stream.
+ type Relay struct {
+<a href="#h2-1-3" id="h2-1-3" class="d">-	Name           string   `toml:&quot;name&quot;`
+</a><a href="#h2-1-4" id="h2-1-4" class="d">-	LogFile        string   `toml:&quot;log-file&quot;`
+</a><a href="#h2-1-5" id="h2-1-5" class="d">-	Delimiter      string   `toml:&quot;delimiter&quot;`
+</a><a href="#h2-1-6" id="h2-1-6" class="d">-	ResetDelay     duration `toml:&quot;reset-delay&quot;`
+</a><a href="#h2-1-7" id="h2-1-7" class="d">-	Filter         regex    `toml:&quot;filter&quot;`
+</a><a href="#h2-1-8" id="h2-1-8" class="d">-	Serializer     string   `toml:&quot;serializer&quot;`
+</a><a href="#h2-1-9" id="h2-1-9" class="d">-	TagIdentifiers []string `toml:&quot;tags&quot;`
+</a><a href="#h2-1-10" id="h2-1-10" class="d">-	BufferLength   int      `toml:&quot;buffer-length&quot;`
+</a><a href="#h2-1-11" id="h2-1-11" class="d">-	KafkaAddress   string   `toml:&quot;kafka-address&quot;`
+</a><a href="#h2-1-12" id="h2-1-12" class="d">-	KafkaTopic     string   `toml:&quot;kafka-topic&quot;`
+</a><a href="#h2-1-13" id="h2-1-13" class="d">-	KafkaAcks      int      `toml:&quot;kafka-acks&quot;`
+</a><a href="#h2-1-14" id="h2-1-14" class="d">-	KafkaRetries   int      `toml:&quot;kafka-retries&quot;`
+</a><a href="#h2-1-15" id="h2-1-15" class="d">-	KafkaTimeout   duration `toml:&quot;kafka-timeout&quot;`
+</a><a href="#h2-1-16" id="h2-1-16" class="i">+	Name           string       `toml:&quot;name&quot;`
+</a><a href="#h2-1-17" id="h2-1-17" class="i">+	LogFile        string       `toml:&quot;log-file&quot;`
+</a><a href="#h2-1-18" id="h2-1-18" class="i">+	Delimiter      string       `toml:&quot;delimiter&quot;`
+</a><a href="#h2-1-19" id="h2-1-19" class="i">+	ResetDelay     duration     `toml:&quot;reset-delay&quot;`
+</a><a href="#h2-1-20" id="h2-1-20" class="i">+	Filter         regex        `toml:&quot;filter&quot;`
+</a><a href="#h2-1-21" id="h2-1-21" class="i">+	Serializer     Serializer   `toml:&quot;serializer&quot;`
+</a><a href="#h2-1-22" id="h2-1-22" class="i">+	SeekPosition   SeekPosition `toml:&quot;seek-position&quot;`
+</a><a href="#h2-1-23" id="h2-1-23" class="i">+	TagIdentifiers []Tag        `toml:&quot;tags&quot;`
+</a><a href="#h2-1-24" id="h2-1-24" class="i">+	BufferLength   int          `toml:&quot;buffer-length&quot;`
+</a><a href="#h2-1-25" id="h2-1-25" class="i">+	KafkaAddress   string       `toml:&quot;kafka-address&quot;`
+</a><a href="#h2-1-26" id="h2-1-26" class="i">+	KafkaTopic     string       `toml:&quot;kafka-topic&quot;`
+</a><a href="#h2-1-27" id="h2-1-27" class="i">+	KafkaAcks      int          `toml:&quot;kafka-acks&quot;`
+</a><a href="#h2-1-28" id="h2-1-28" class="i">+	KafkaRetries   int          `toml:&quot;kafka-retries&quot;`
+</a><a href="#h2-1-29" id="h2-1-29" class="i">+	KafkaTimeout   duration     `toml:&quot;kafka-timeout&quot;`
+</a> }
+<b>diff --git a/<a id="h3" href="../file/internal/relay/serializer.go">internal/relay/serializer.go</a> b/<a href="../file/internal/relay/serializer.go">internal/relay/serializer.go</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -3,6 +3,7 @@ package relay
+</a> import (
+ 	&quot;encoding/json&quot;
+ 
+<a href="#h3-0-3" id="h3-0-3" class="i">+	&quot;piper/internal/config&quot;
+</a> 	&quot;piper/internal/tail&quot;
+ )
+ 
+<a href="#h3-1" id="h3-1" class="h">@@ -13,10 +14,10 @@ var (
+</a> 	MessageJSONSerializer = &amp;messageJSONSerializer{}
+ 	// MessageSerializerRegistry provides a map of string identifiers to the corresponding
+ 	// MessageSerializer implementation
+<a href="#h3-1-3" id="h3-1-3" class="d">-	MessageSerializerRegistry = map[string]MessageSerializer{
+</a><a href="#h3-1-4" id="h3-1-4" class="d">-		&quot;&quot;:     MessageLineSerializer,
+</a><a href="#h3-1-5" id="h3-1-5" class="d">-		&quot;line&quot;: MessageLineSerializer,
+</a><a href="#h3-1-6" id="h3-1-6" class="d">-		&quot;json&quot;: MessageJSONSerializer,
+</a><a href="#h3-1-7" id="h3-1-7" class="i">+	MessageSerializerRegistry = map[config.Serializer]MessageSerializer{
+</a><a href="#h3-1-8" id="h3-1-8" class="i">+		&quot;&quot;:                    MessageLineSerializer,
+</a><a href="#h3-1-9" id="h3-1-9" class="i">+		config.SerializerLine: MessageLineSerializer,
+</a><a href="#h3-1-10" id="h3-1-10" class="i">+		config.SerializerJSON: MessageJSONSerializer,
+</a> 	}
+ )
+ 
+</pre>
+</div>
+</body>
+</html>

@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>replication: Report metrics in daemon task - repliqate - SQL -&gt; Kafka replication for append-only workloads</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="repliqate Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="repliqate Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i,
+a.line {
+	text-decoration: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>repliqate</h1><span class="desc">SQL -&gt; Kafka replication for append-only workloads</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/repliqate.git">https://source.static.kevinlin.info/repliqate.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/44872e2d82492c84d8ec2a185f34b4eb58fb76e9">44872e2d82492c84d8ec2a185f34b4eb58fb76e9</a>
+<b>parent</b> <a href="../commit/09abd1919a932172d368bb5210fd2a2d5329859a">09abd1919a932172d368bb5210fd2a2d5329859a</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Thu, 14 Feb 2019 22:53:17 -0800
+
+replication: Report metrics in daemon task
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">repliqate/replication/daemon.py</a></td><td> | </td><td class="num">56</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">------------</span></td></tr>
+</table></pre><pre>1 file changed, 44 insertions(+), 12 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/repliqate/replication/daemon.py">repliqate/replication/daemon.py</a> b/<a href="../file/repliqate/replication/daemon.py">repliqate/replication/daemon.py</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -5,6 +5,7 @@ from repliqate.db.kv import KeyValueStoreClient
+</a> from repliqate.db.sql import SQLDBClient
+ from repliqate.metrics.hook import NoopMetricsHook
+ from repliqate.metrics.hook import StatsdMetricsHook
+<a href="#h0-0-3" id="h0-0-3" class="i">+from repliqate.metrics.timer import ExecutionTimer
+</a> from repliqate.stream.message import Message
+ from repliqate.stream.producer import StreamProducerClient
+ 
+<a href="#h0-1" id="h0-1" class="h">@@ -50,6 +51,7 @@ class ReplicationDaemon(object):
+</a>         self.sql_primary_key = config.get(&#39;replication.sql_source.primary_key&#39;)
+         self.sql_fields = config.get(&#39;replication.sql_source.fields&#39;)
+         self.sql_limit = config.get(&#39;replication.sql_source.limit&#39;)
+<a href="#h0-1-3" id="h0-1-3" class="i">+        self.kafka_topic = config.get(&#39;replication.kafka_target.topic&#39;)
+</a> 
+         # Clients
+         self.db = SQLDBClient(
+<a href="#h0-2" id="h0-2" class="h">@@ -63,7 +65,7 @@ class ReplicationDaemon(object):
+</a>         )
+         self.stream = StreamProducerClient(
+             brokers=config.get(&#39;replication.kafka_target.brokers&#39;),
+<a href="#h0-2-3" id="h0-2-3" class="d">-            topic=config.get(&#39;replication.kafka_target.topic&#39;),
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+            topic=self.kafka_topic,
+</a>         )
+ 
+         statsd_addr = config.get(&#39;statsd_addr&#39;)
+<a href="#h0-3" id="h0-3" class="h">@@ -105,28 +107,44 @@ class ReplicationDaemon(object):
+</a>         &quot;&quot;&quot;
+         Execute a single iteration of the replication routine.
+         &quot;&quot;&quot;
+<a href="#h0-3-3" id="h0-3-3" class="i">+        exec_timer = ExecutionTimer()
+</a>         kv_closure = self.kv.closure(
+             namespace=&#39;replication&#39;,
+             key=&#39;offset&#39;,
+             tags={&#39;name&#39;: self.name},
+         )
+ 
+<a href="#h0-3-10" id="h0-3-10" class="d">-        offset = kv_closure.get() or 0
+</a><a href="#h0-3-11" id="h0-3-11" class="i">+        with exec_timer.timer():
+</a><a href="#h0-3-12" id="h0-3-12" class="i">+            offset = kv_closure.get() or 0
+</a><a href="#h0-3-13" id="h0-3-13" class="i">+        self.metrics.emit_store_read(success=True, duration=exec_timer.duration())
+</a> 
+         try:
+             self.logger.debug(&#39;querying source with primary key offset: offset={}&#39;.format(offset))
+<a href="#h0-3-17" id="h0-3-17" class="d">-            rows = self.db.query(
+</a><a href="#h0-3-18" id="h0-3-18" class="d">-                fields=[self.db.field(field) for field in self.sql_fields],
+</a><a href="#h0-3-19" id="h0-3-19" class="d">-                criteria=self.db.field(self.sql_primary_key) &gt; offset,
+</a><a href="#h0-3-20" id="h0-3-20" class="d">-                limit=self.sql_limit,
+</a><a href="#h0-3-21" id="h0-3-21" class="i">+
+</a><a href="#h0-3-22" id="h0-3-22" class="i">+            with exec_timer.timer():
+</a><a href="#h0-3-23" id="h0-3-23" class="i">+                rows = self.db.query(
+</a><a href="#h0-3-24" id="h0-3-24" class="i">+                    fields=[self.db.field(field) for field in self.sql_fields],
+</a><a href="#h0-3-25" id="h0-3-25" class="i">+                    criteria=self.db.field(self.sql_primary_key) &gt; offset,
+</a><a href="#h0-3-26" id="h0-3-26" class="i">+                    limit=self.sql_limit,
+</a><a href="#h0-3-27" id="h0-3-27" class="i">+                )
+</a><a href="#h0-3-28" id="h0-3-28" class="i">+
+</a><a href="#h0-3-29" id="h0-3-29" class="i">+            self.metrics.emit_sql_read(
+</a><a href="#h0-3-30" id="h0-3-30" class="i">+                success=True,
+</a><a href="#h0-3-31" id="h0-3-31" class="i">+                table=self.sql_table,
+</a><a href="#h0-3-32" id="h0-3-32" class="i">+                num_rows=len(rows),
+</a><a href="#h0-3-33" id="h0-3-33" class="i">+                duration=exec_timer.duration(),
+</a>             )
+         except Exception as e:
+             self.logger.error(&#39;sql source read failure: exception={}&#39;.format(e))
+<a href="#h0-3-37" id="h0-3-37" class="d">-            return
+</a><a href="#h0-3-38" id="h0-3-38" class="i">+            return self.metrics.emit_sql_read(
+</a><a href="#h0-3-39" id="h0-3-39" class="i">+                success=False,
+</a><a href="#h0-3-40" id="h0-3-40" class="i">+                table=self.sql_table,
+</a><a href="#h0-3-41" id="h0-3-41" class="i">+                num_rows=0,
+</a><a href="#h0-3-42" id="h0-3-42" class="i">+                duration=exec_timer.duration(),
+</a><a href="#h0-3-43" id="h0-3-43" class="i">+            )
+</a> 
+         if not rows:
+<a href="#h0-3-46" id="h0-3-46" class="d">-            self.logger.debug(&#39;no new rows since last fetch; aborting&#39;)
+</a><a href="#h0-3-47" id="h0-3-47" class="d">-            return
+</a><a href="#h0-3-48" id="h0-3-48" class="i">+            return self.logger.debug(&#39;no new rows since last fetch; aborting&#39;)
+</a> 
+         self.logger.debug(&#39;serializing messages from fetched rows: num_rows={}&#39;.format(len(rows)))
+         messages = [
+<a href="#h0-4" id="h0-4" class="h">@@ -139,13 +157,27 @@ class ReplicationDaemon(object):
+</a> 
+             try:
+                 self.logger.debug(&#39;publishing message: message={}&#39;.format(message))
+<a href="#h0-4-3" id="h0-4-3" class="d">-                self.stream.publish(message)
+</a><a href="#h0-4-4" id="h0-4-4" class="i">+
+</a><a href="#h0-4-5" id="h0-4-5" class="i">+                with exec_timer.timer():
+</a><a href="#h0-4-6" id="h0-4-6" class="i">+                    self.stream.publish(message)
+</a><a href="#h0-4-7" id="h0-4-7" class="i">+
+</a><a href="#h0-4-8" id="h0-4-8" class="i">+                self.metrics.emit_kafka_publish(
+</a><a href="#h0-4-9" id="h0-4-9" class="i">+                    success=True,
+</a><a href="#h0-4-10" id="h0-4-10" class="i">+                    topic=self.kafka_topic,
+</a><a href="#h0-4-11" id="h0-4-11" class="i">+                    duration=exec_timer.duration(),
+</a><a href="#h0-4-12" id="h0-4-12" class="i">+                )
+</a>             except Exception as e:
+                 self.logger.error(&#39;kafka publication failure: exception={}&#39;.format(e))
+                 self.logger.error(
+                     &#39;aborting current replication; future replication may reproduce this message&#39;,
+                 )
+<a href="#h0-4-18" id="h0-4-18" class="d">-                return
+</a><a href="#h0-4-19" id="h0-4-19" class="i">+                return self.metrics.emit_kafka_publish(
+</a><a href="#h0-4-20" id="h0-4-20" class="i">+                    success=False,
+</a><a href="#h0-4-21" id="h0-4-21" class="i">+                    topic=self.kafka_topic,
+</a><a href="#h0-4-22" id="h0-4-22" class="i">+                    duration=exec_timer.duration(),
+</a><a href="#h0-4-23" id="h0-4-23" class="i">+                )
+</a> 
+             self.logger.debug(&#39;storing next primary key offset: offset={}&#39;.format(next_offset))
+<a href="#h0-4-26" id="h0-4-26" class="d">-            kv_closure.set(next_offset)
+</a><a href="#h0-4-27" id="h0-4-27" class="i">+            with exec_timer.timer():
+</a><a href="#h0-4-28" id="h0-4-28" class="i">+                kv_closure.set(next_offset)
+</a><a href="#h0-4-29" id="h0-4-29" class="i">+            self.metrics.emit_store_write(success=True, duration=exec_timer.duration())
+</a></pre>
+</div>
+</body>
+</html>
