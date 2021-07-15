@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>push more parsing logic into the interface classes - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/e9bdf41881be31e692242580c4d3283b431910c3">e9bdf41881be31e692242580c4d3283b431910c3</a>
+<b>parent</b> <a href="../commit/d0dc483285d6fbd00fc8438053219010a379dae8">d0dc483285d6fbd00fc8438053219010a379dae8</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Wed, 14 May 2014 14:42:23 -0700
+
+push more parsing logic into the interface classes
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">src/codesearch.cc</a></td><td> | </td><td class="num">26</td><td><span class="i">+++++++++++++</span><span class="d">-------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">src/codesearch.h</a></td><td> | </td><td class="num">6</td><td><span class="i">+++</span><span class="d">---</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">src/tools/codesearch.cc</a></td><td> | </td><td class="num">32</td><td><span class="i">+++++</span><span class="d">---------------------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">src/tools/interface.cc</a></td><td> | </td><td class="num">24</td><td><span class="i">++++++++++++++++++</span><span class="d">------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h4">src/tools/interface.h</a></td><td> | </td><td class="num">5</td><td><span class="i">++</span><span class="d">---</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h5">src/tools/json_interface.cc</a></td><td> | </td><td class="num">50</td><td><span class="i">++++++++++++++++++++++++++++++++++++</span><span class="d">--------------</span></td></tr>
+</table></pre><pre>6 files changed, 77 insertions(+), 66 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/src/codesearch.cc">src/codesearch.cc</a> b/<a href="../file/src/codesearch.cc">src/codesearch.cc</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -100,7 +100,7 @@ class searcher {
+</a> public:
+     searcher(const code_searcher *cc, thread_queue&lt;match_result*&gt;&amp; queue,
+              const query &amp;q) :
+<a href="#h0-0-3" id="h0-0-3" class="d">-        cc_(cc), query_(q), queue_(queue),
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+        cc_(cc), query_(&amp;q), queue_(queue),
+</a>         matches_(0), re2_time_(false), git_time_(false),
+         index_time_(false), sort_time_(false), analyze_time_(false),
+         exit_reason_(kExitNone), files_(new uint8_t[cc-&gt;files_.size()]),
+<a href="#h0-1" id="h0-1" class="h">@@ -109,7 +109,7 @@ public:
+</a>         memset(files_, 0xff, cc-&gt;files_.size());
+         {
+             run_timer run(analyze_time_);
+<a href="#h0-1-3" id="h0-1-3" class="d">-            index_ = indexRE(*query_.line_pat);
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+            index_ = indexRE(*query_-&gt;line_pat);
+</a>         }
+ 
+         if (FLAGS_timeout &lt;= 0) {
+<a href="#h0-2" id="h0-2" class="h">@@ -167,16 +167,16 @@ protected:
+</a>     void search_lines(uint32_t *left, int count, const chunk *chunk);
+ 
+     bool accept(const indexed_path &amp;path) {
+<a href="#h0-2-3" id="h0-2-3" class="d">-        if (!query_.file_pat &amp;&amp; !query_.tree_pat)
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+        if (!query_-&gt;file_pat &amp;&amp; !query_-&gt;tree_pat)
+</a>             return true;
+ 
+<a href="#h0-2-7" id="h0-2-7" class="d">-        if (query_.file_pat &amp;&amp;
+</a><a href="#h0-2-8" id="h0-2-8" class="d">-            !query_.file_pat-&gt;Match(path.path, 0, path.path.size(),
+</a><a href="#h0-2-9" id="h0-2-9" class="d">-                                    RE2::UNANCHORED, 0, 0))
+</a><a href="#h0-2-10" id="h0-2-10" class="i">+        if (query_-&gt;file_pat &amp;&amp;
+</a><a href="#h0-2-11" id="h0-2-11" class="i">+            !query_-&gt;file_pat-&gt;Match(path.path, 0, path.path.size(),
+</a><a href="#h0-2-12" id="h0-2-12" class="i">+                                     RE2::UNANCHORED, 0, 0))
+</a>             return false;
+ 
+<a href="#h0-2-15" id="h0-2-15" class="d">-        if (query_.tree_pat &amp;&amp;
+</a><a href="#h0-2-16" id="h0-2-16" class="d">-            !query_.tree_pat-&gt;Match(path.tree-&gt;repo-&gt;name, 0,
+</a><a href="#h0-2-17" id="h0-2-17" class="i">+        if (query_-&gt;tree_pat &amp;&amp;
+</a><a href="#h0-2-18" id="h0-2-18" class="i">+            !query_-&gt;tree_pat-&gt;Match(path.tree-&gt;repo-&gt;name, 0,
+</a>                                     path.tree-&gt;repo-&gt;name.size(),
+                                     RE2::UNANCHORED, 0, 0))
+             return false;
+<a href="#h0-3" id="h0-3" class="h">@@ -185,7 +185,7 @@ protected:
+</a>     }
+ 
+     bool accept(indexed_file *sf) {
+<a href="#h0-3-3" id="h0-3-3" class="d">-        if (!query_.file_pat &amp;&amp; !query_.tree_pat)
+</a><a href="#h0-3-4" id="h0-3-4" class="i">+        if (!query_-&gt;file_pat &amp;&amp; !query_-&gt;tree_pat)
+</a>             return true;
+ 
+         assert(cc_-&gt;files_[sf-&gt;no] == sf);
+<a href="#h0-4" id="h0-4" class="h">@@ -317,7 +317,7 @@ protected:
+</a>     }
+ 
+     const code_searcher *cc_;
+<a href="#h0-4-3" id="h0-4-3" class="d">-    query query_;
+</a><a href="#h0-4-4" id="h0-4-4" class="i">+    const query *query_;
+</a>     thread_queue&lt;match_result*&gt;&amp; queue_;
+     atomic_int matches_;
+     intrusive_ptr&lt;IndexKey&gt; index_;
+<a href="#h0-5" id="h0-5" class="h">@@ -612,7 +612,7 @@ void searcher::search_lines(uint32_t *indexes, int count,
+</a>         return;
+     }
+ 
+<a href="#h0-5-3" id="h0-5-3" class="d">-    if ((query_.file_pat || query_.tree_pat) &amp;&amp;
+</a><a href="#h0-5-4" id="h0-5-4" class="i">+    if ((query_-&gt;file_pat || query_-&gt;tree_pat) &amp;&amp;
+</a>         double(count * 30) / chunk-&gt;size &gt; files_density()) {
+         full_search(chunk);
+         return;
+<a href="#h0-6" id="h0-6" class="h">@@ -656,7 +656,7 @@ void searcher::full_search(const chunk *chunk)
+</a> void searcher::next_range(match_finger *finger,
+                           int&amp; pos, int&amp; endpos, int maxpos)
+ {
+<a href="#h0-6-3" id="h0-6-3" class="d">-    if ((!query_.file_pat &amp;&amp; !query_.tree_pat) || !FLAGS_index)
+</a><a href="#h0-6-4" id="h0-6-4" class="i">+    if ((!query_-&gt;file_pat &amp;&amp; !query_-&gt;tree_pat) || !FLAGS_index)
+</a>         return;
+ 
+     debug(kDebugSearch, &quot;next_range(%d, %d, %d)&quot;, pos, endpos, maxpos);
+<a href="#h0-7" id="h0-7" class="h">@@ -724,7 +724,7 @@ void searcher::full_search(match_finger *finger,
+</a>             if (limit - pos &gt; kMaxScan)
+                 limit = line_end(chunk, pos + kMaxScan);
+             run_timer run(re2_time_);
+<a href="#h0-7-3" id="h0-7-3" class="d">-            if (!query_.line_pat-&gt;Match(str, pos, limit, RE2::UNANCHORED, &amp;match, 1)) {
+</a><a href="#h0-7-4" id="h0-7-4" class="i">+            if (!query_-&gt;line_pat-&gt;Match(str, pos, limit, RE2::UNANCHORED, &amp;match, 1)) {
+</a>                 pos = limit + 1;
+                 continue;
+             }
+<b>diff --git a/<a id="h1" href="../file/src/codesearch.h">src/codesearch.h</a> b/<a href="../file/src/codesearch.h">src/codesearch.h</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -143,9 +143,9 @@ struct match_result {
+</a> // non-NULL; line_pat and tree_pat may be NULL to specify &quot;no
+ // constraint&quot;
+ struct query {
+<a href="#h1-0-3" id="h1-0-3" class="d">-    RE2 *line_pat;
+</a><a href="#h1-0-4" id="h1-0-4" class="d">-    RE2 *file_pat;
+</a><a href="#h1-0-5" id="h1-0-5" class="d">-    RE2 *tree_pat;
+</a><a href="#h1-0-6" id="h1-0-6" class="i">+    std::unique_ptr&lt;RE2&gt; line_pat;
+</a><a href="#h1-0-7" id="h1-0-7" class="i">+    std::unique_ptr&lt;RE2&gt; file_pat;
+</a><a href="#h1-0-8" id="h1-0-8" class="i">+    std::unique_ptr&lt;RE2&gt; tree_pat;
+</a> };
+ 
+ class code_searcher {
+<b>diff --git a/<a id="h2" href="../file/src/tools/codesearch.cc">src/tools/codesearch.cc</a> b/<a href="../file/src/tools/codesearch.cc">src/tools/codesearch.cc</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -69,39 +69,21 @@ void interact(code_searcher *cs, codesearch_interface *ui) {
+</a>     code_searcher::search_thread search(cs);
+     WidthWalker width;
+ 
+<a href="#h2-0-3" id="h2-0-3" class="d">-    RE2::Options opts;
+</a><a href="#h2-0-4" id="h2-0-4" class="d">-    default_re2_options(opts);
+</a><a href="#h2-0-5" id="h2-0-5" class="d">-
+</a>     while (true) {
+         ui-&gt;print_prompt(cs);
+         string input;
+         if (!ui-&gt;getline(input))
+             break;
+ 
+<a href="#h2-0-12" id="h2-0-12" class="d">-        string line, file, tree;
+</a><a href="#h2-0-13" id="h2-0-13" class="d">-        if (!ui-&gt;parse_query(input, line, file, tree))
+</a><a href="#h2-0-14" id="h2-0-14" class="i">+        query q;
+</a><a href="#h2-0-15" id="h2-0-15" class="i">+        if (!ui-&gt;parse_query(input, &amp;q))
+</a>             continue;
+ 
+<a href="#h2-0-18" id="h2-0-18" class="d">-        RE2 re(line, opts);
+</a><a href="#h2-0-19" id="h2-0-19" class="d">-        RE2 file_re(file, opts);
+</a><a href="#h2-0-20" id="h2-0-20" class="d">-        RE2 tree_re(tree, opts);
+</a><a href="#h2-0-21" id="h2-0-21" class="d">-        if (!re.ok()) {
+</a><a href="#h2-0-22" id="h2-0-22" class="d">-            ui-&gt;print_error(re.error());
+</a><a href="#h2-0-23" id="h2-0-23" class="d">-            continue;
+</a><a href="#h2-0-24" id="h2-0-24" class="d">-        }
+</a><a href="#h2-0-25" id="h2-0-25" class="d">-        if (!file_re.ok()) {
+</a><a href="#h2-0-26" id="h2-0-26" class="d">-            ui-&gt;print_error(file_re.error());
+</a><a href="#h2-0-27" id="h2-0-27" class="d">-            continue;
+</a><a href="#h2-0-28" id="h2-0-28" class="d">-        }
+</a><a href="#h2-0-29" id="h2-0-29" class="d">-        if (!tree_re.ok()) {
+</a><a href="#h2-0-30" id="h2-0-30" class="d">-            ui-&gt;print_error(tree_re.error());
+</a><a href="#h2-0-31" id="h2-0-31" class="d">-            continue;
+</a><a href="#h2-0-32" id="h2-0-32" class="d">-        }
+</a><a href="#h2-0-33" id="h2-0-33" class="d">-        if (re.ProgramSize() &gt; kMaxProgramSize) {
+</a><a href="#h2-0-34" id="h2-0-34" class="i">+        if (q.line_pat-&gt;ProgramSize() &gt; kMaxProgramSize) {
+</a>             ui-&gt;print_error(&quot;Parse error.&quot;);
+             continue;
+         }
+<a href="#h2-0-38" id="h2-0-38" class="d">-        int w = width.Walk(re.Regexp(), 0);
+</a><a href="#h2-0-39" id="h2-0-39" class="i">+        int w = width.Walk(q.line_pat-&gt;Regexp(), 0);
+</a>         if (w &gt; kMaxWidth) {
+             ui-&gt;print_error(&quot;Parse error.&quot;);
+             continue;
+<a href="#h2-1" id="h2-1" class="h">@@ -111,14 +93,10 @@ void interact(code_searcher *cs, codesearch_interface *ui) {
+</a>             struct timeval elapsed;
+             match_stats stats;
+ 
+<a href="#h2-1-3" id="h2-1-3" class="d">-            ui-&gt;info(&quot;ProgramSize: %d\n&quot;, re.ProgramSize());
+</a><a href="#h2-1-4" id="h2-1-4" class="i">+            ui-&gt;info(&quot;ProgramSize: %d\n&quot;, q.line_pat-&gt;ProgramSize());
+</a> 
+             {
+                 sem_wait(&amp;interact_sem);
+<a href="#h2-1-8" id="h2-1-8" class="d">-                query q = { &amp;re,
+</a><a href="#h2-1-9" id="h2-1-9" class="d">-                            file.size() ? &amp;file_re : 0,
+</a><a href="#h2-1-10" id="h2-1-10" class="d">-                            tree.size() ? &amp;tree_re : 0,
+</a><a href="#h2-1-11" id="h2-1-11" class="d">-                };
+</a>                 search.match(q, print_match(ui), &amp;stats);
+                 sem_post(&amp;interact_sem);
+             }
+<b>diff --git a/<a id="h3" href="../file/src/tools/interface.cc">src/tools/interface.cc</a> b/<a href="../file/src/tools/interface.cc">src/tools/interface.cc</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -6,6 +6,10 @@
+</a> 
+ #include &lt;stdarg.h&gt;
+ #include &lt;gflags/gflags.h&gt;
+<a href="#h3-0-3" id="h3-0-3" class="i">+#include &lt;re2/re2.h&gt;
+</a><a href="#h3-0-4" id="h3-0-4" class="i">+
+</a><a href="#h3-0-5" id="h3-0-5" class="i">+using re2::RE2;
+</a><a href="#h3-0-6" id="h3-0-6" class="i">+using std::unique_ptr;
+</a> 
+ DEFINE_bool(filesystem, false, &quot;Analyze a filesystem tree instead of a git repo.&quot;);
+ 
+<a href="#h3-1" id="h3-1" class="h">@@ -120,12 +124,20 @@ public:
+</a>     }
+ 
+     virtual bool parse_query(const std::string &amp;input,
+<a href="#h3-1-3" id="h3-1-3" class="d">-                             std::string &amp;line,
+</a><a href="#h3-1-4" id="h3-1-4" class="d">-                             std::string &amp;file,
+</a><a href="#h3-1-5" id="h3-1-5" class="d">-                             std::string &amp;tree) {
+</a><a href="#h3-1-6" id="h3-1-6" class="d">-        line = input;
+</a><a href="#h3-1-7" id="h3-1-7" class="d">-        file.clear();
+</a><a href="#h3-1-8" id="h3-1-8" class="d">-        tree.clear();
+</a><a href="#h3-1-9" id="h3-1-9" class="i">+                             query *out) {
+</a><a href="#h3-1-10" id="h3-1-10" class="i">+        RE2::Options opts;
+</a><a href="#h3-1-11" id="h3-1-11" class="i">+        default_re2_options(opts);
+</a><a href="#h3-1-12" id="h3-1-12" class="i">+
+</a><a href="#h3-1-13" id="h3-1-13" class="i">+        out-&gt;line_pat.reset(new RE2(input, opts));
+</a><a href="#h3-1-14" id="h3-1-14" class="i">+
+</a><a href="#h3-1-15" id="h3-1-15" class="i">+        if (!out-&gt;line_pat-&gt;ok()) {
+</a><a href="#h3-1-16" id="h3-1-16" class="i">+            print_error(out-&gt;line_pat-&gt;error());
+</a><a href="#h3-1-17" id="h3-1-17" class="i">+            return false;
+</a><a href="#h3-1-18" id="h3-1-18" class="i">+        }
+</a><a href="#h3-1-19" id="h3-1-19" class="i">+
+</a><a href="#h3-1-20" id="h3-1-20" class="i">+        out-&gt;file_pat.reset(0);
+</a><a href="#h3-1-21" id="h3-1-21" class="i">+        out-&gt;tree_pat.reset(0);
+</a><a href="#h3-1-22" id="h3-1-22" class="i">+
+</a>         return true;
+     }
+ 
+<b>diff --git a/<a id="h4" href="../file/src/tools/interface.h">src/tools/interface.h</a> b/<a href="../file/src/tools/interface.h">src/tools/interface.h</a></b>
+<a href="#h4-0" id="h4-0" class="h">@@ -16,6 +16,7 @@
+</a> struct match_result;
+ struct match_stats;
+ class code_searcher;
+<a href="#h4-0-3" id="h4-0-3" class="i">+struct query;
+</a> 
+ class codesearch_interface {
+ public:
+<a href="#h4-1" id="h4-1" class="h">@@ -25,9 +26,7 @@ public:
+</a>     virtual void print_prompt(const code_searcher *cs) = 0;
+     virtual bool getline(std::string &amp;input) = 0;
+     virtual bool parse_query(const std::string &amp;input,
+<a href="#h4-1-3" id="h4-1-3" class="d">-                             std::string &amp;line,
+</a><a href="#h4-1-4" id="h4-1-4" class="d">-                             std::string &amp;file,
+</a><a href="#h4-1-5" id="h4-1-5" class="d">-                             std::string &amp;tree) = 0;
+</a><a href="#h4-1-6" id="h4-1-6" class="i">+                             query *out) = 0;
+</a>     virtual void print_stats(timeval elapsed, const match_stats *stats) = 0;
+     virtual void info(const char *msg, ...) = 0;
+     virtual ~codesearch_interface();
+<b>diff --git a/<a id="h5" href="../file/src/tools/json_interface.cc">src/tools/json_interface.cc</a> b/<a href="../file/src/tools/json_interface.cc">src/tools/json_interface.cc</a></b>
+<a href="#h5-0" id="h5-0" class="h">@@ -9,6 +9,10 @@
+</a> 
+ #include &lt;gflags/gflags.h&gt;
+ 
+<a href="#h5-0-3" id="h5-0-3" class="i">+#include &lt;re2/re2.h&gt;
+</a><a href="#h5-0-4" id="h5-0-4" class="i">+using re2::RE2;
+</a><a href="#h5-0-5" id="h5-0-5" class="i">+using std::unique_ptr;
+</a><a href="#h5-0-6" id="h5-0-6" class="i">+
+</a> namespace {
+ 
+ json_object *to_json(const string &amp;str) {
+<a href="#h5-1" id="h5-1" class="h">@@ -166,10 +170,29 @@ public:
+</a>         return ::getline(input, in_);
+     }
+ 
+<a href="#h5-1-3" id="h5-1-3" class="i">+    bool extract_regex(json_object *js, const std::string &amp;key,
+</a><a href="#h5-1-4" id="h5-1-4" class="i">+                       const RE2::Options &amp;opts, unique_ptr&lt;RE2&gt; *out) {
+</a><a href="#h5-1-5" id="h5-1-5" class="i">+        out-&gt;reset(0);
+</a><a href="#h5-1-6" id="h5-1-6" class="i">+        json_object *re_js = json_object_object_get(js, key.c_str());
+</a><a href="#h5-1-7" id="h5-1-7" class="i">+        if (re_js == NULL)
+</a><a href="#h5-1-8" id="h5-1-8" class="i">+            return true;
+</a><a href="#h5-1-9" id="h5-1-9" class="i">+
+</a><a href="#h5-1-10" id="h5-1-10" class="i">+        if (json_object_get_type(re_js) != json_type_string) {
+</a><a href="#h5-1-11" id="h5-1-11" class="i">+            print_error(std::string(&quot;Expected a JSON object: &quot;) + key);
+</a><a href="#h5-1-12" id="h5-1-12" class="i">+            return false;
+</a><a href="#h5-1-13" id="h5-1-13" class="i">+        }
+</a><a href="#h5-1-14" id="h5-1-14" class="i">+        unique_ptr&lt;RE2&gt; re(new RE2(json_object_get_string(re_js), opts));
+</a><a href="#h5-1-15" id="h5-1-15" class="i">+        if (!re-&gt;ok()) {
+</a><a href="#h5-1-16" id="h5-1-16" class="i">+            print_error(re-&gt;error());
+</a><a href="#h5-1-17" id="h5-1-17" class="i">+            return false;
+</a><a href="#h5-1-18" id="h5-1-18" class="i">+        }
+</a><a href="#h5-1-19" id="h5-1-19" class="i">+
+</a><a href="#h5-1-20" id="h5-1-20" class="i">+        *out = std::move(re);
+</a><a href="#h5-1-21" id="h5-1-21" class="i">+        return true;
+</a><a href="#h5-1-22" id="h5-1-22" class="i">+    }
+</a><a href="#h5-1-23" id="h5-1-23" class="i">+
+</a>     virtual bool parse_query(const std::string &amp;input,
+<a href="#h5-1-25" id="h5-1-25" class="d">-                             std::string &amp;line_re,
+</a><a href="#h5-1-26" id="h5-1-26" class="d">-                             std::string &amp;file_re,
+</a><a href="#h5-1-27" id="h5-1-27" class="d">-                             std::string &amp;tree_re) {
+</a><a href="#h5-1-28" id="h5-1-28" class="i">+                             query *out) {
+</a>         json_object *js = json_tokener_parse(input.c_str());
+         if (is_error(js)) {
+             print_error(&quot;Parse error: &quot; +
+<a href="#h5-2" id="h5-2" class="h">@@ -186,20 +209,19 @@ public:
+</a>             return false;
+         }
+ 
+<a href="#h5-2-3" id="h5-2-3" class="d">-        json_object *line_js = json_object_object_get(q, &quot;line&quot;);
+</a><a href="#h5-2-4" id="h5-2-4" class="d">-        if (!line_js || json_object_get_type(line_js) != json_type_string) {
+</a><a href="#h5-2-5" id="h5-2-5" class="d">-            print_error(&quot;No regex specified!&quot;);
+</a><a href="#h5-2-6" id="h5-2-6" class="i">+        RE2::Options opts;
+</a><a href="#h5-2-7" id="h5-2-7" class="i">+        default_re2_options(opts);
+</a><a href="#h5-2-8" id="h5-2-8" class="i">+
+</a><a href="#h5-2-9" id="h5-2-9" class="i">+        if (!extract_regex(q, &quot;line&quot;, opts, &amp;out-&gt;line_pat) ||
+</a><a href="#h5-2-10" id="h5-2-10" class="i">+            !extract_regex(q, &quot;file&quot;, opts, &amp;out-&gt;file_pat) ||
+</a><a href="#h5-2-11" id="h5-2-11" class="i">+            !extract_regex(q, &quot;repo&quot;, opts, &amp;out-&gt;tree_pat)) {
+</a>             return false;
+         }
+<a href="#h5-2-14" id="h5-2-14" class="d">-        line_re = json_object_get_string(line_js);
+</a> 
+<a href="#h5-2-16" id="h5-2-16" class="d">-        json_object *file_js = json_object_object_get(q, &quot;file&quot;);
+</a><a href="#h5-2-17" id="h5-2-17" class="d">-        if (file_js &amp;&amp; json_object_get_type(file_js) == json_type_string)
+</a><a href="#h5-2-18" id="h5-2-18" class="d">-            file_re = json_object_get_string(file_js);
+</a><a href="#h5-2-19" id="h5-2-19" class="d">-
+</a><a href="#h5-2-20" id="h5-2-20" class="d">-        json_object *tree_js = json_object_object_get(q, &quot;repo&quot;);
+</a><a href="#h5-2-21" id="h5-2-21" class="d">-        if (tree_js &amp;&amp; json_object_get_type(tree_js) == json_type_string)
+</a><a href="#h5-2-22" id="h5-2-22" class="d">-            tree_re = json_object_get_string(tree_js);
+</a><a href="#h5-2-23" id="h5-2-23" class="i">+        if (out-&gt;line_pat.get() == 0) {
+</a><a href="#h5-2-24" id="h5-2-24" class="i">+            print_error(&quot;No regex specified!&quot;);
+</a><a href="#h5-2-25" id="h5-2-25" class="i">+            return false;
+</a><a href="#h5-2-26" id="h5-2-26" class="i">+        }
+</a> 
+         json_object_put(js);
+ 
+</pre>
+</div>
+</body>
+</html>

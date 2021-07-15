@@ -1,0 +1,1351 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Merge pull request #75 from dropbox/file-search - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/ba23b0610f9c51bfde881bca723b3482f4df3388">ba23b0610f9c51bfde881bca723b3482f4df3388</a>
+<b>parent</b> <a href="../commit/144e1565799e32a4ac2820d850408004ccd8be9b">144e1565799e32a4ac2820d850408004ccd8be9b</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Sun, 16 Jul 2017 17:25:28 -0700
+
+Merge pull request #75 from dropbox/file-search
+
+Integrated file search
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">server/api.go</a></td><td> | </td><td class="num">14</td><td><span class="i">+++++++++++++</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">server/api/types.go</a></td><td> | </td><td class="num">12</td><td><span class="i">++++++++++</span><span class="d">--</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">src/codesearch.cc</a></td><td> | </td><td class="num">503</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">-------------------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">src/codesearch.h</a></td><td> | </td><td class="num">31</td><td><span class="i">+++++++++++++++++++++++++++++</span><span class="d">--</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h4">src/dump_load.cc</a></td><td> | </td><td class="num">2</td><td><span class="i">++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h5">src/proto/livegrep.proto</a></td><td> | </td><td class="num">8</td><td><span class="i">++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h6">src/tools/codesearch.cc</a></td><td> | </td><td class="num">2</td><td><span class="i">++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h7">src/tools/grpc_server.cc</a></td><td> | </td><td class="num">16</td><td><span class="i">++++++++++++++</span><span class="d">--</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h8">test/codesearch_test.cc</a></td><td> | </td><td class="num">17</td><td><span class="i">+++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h9">web/htdocs/assets/css/codesearch.css</a></td><td> | </td><td class="num">17</td><td><span class="i">++++++++++++</span><span class="d">-----</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h10">web/htdocs/assets/js/codesearch.js</a></td><td> | </td><td class="num">3</td><td><span class="i">+++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h11">web/htdocs/assets/js/codesearch_ui.js</a></td><td> | </td><td class="num">101</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">-</span></td></tr>
+</table></pre><pre>12 files changed, 552 insertions(+), 174 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/server/api.go">server/api.go</a> b/<a href="../file/server/api.go">server/api.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -99,7 +99,10 @@ func (s *server) doSearch(ctx context.Context, backend *Backend, q *pb.Query) (*
+</a> 		return nil, err
+ 	}
+ 
+<a href="#h0-0-3" id="h0-0-3" class="d">-	reply := &amp;api.ReplySearch{Results: make([]*api.Result, 0)}
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+	reply := &amp;api.ReplySearch{
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+		Results:     make([]*api.Result, 0),
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+		FileResults: make([]*api.FileResult, 0),
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+	}
+</a> 
+ 	for _, r := range search.Results {
+ 		reply.Results = append(reply.Results, &amp;api.Result{
+<a href="#h0-1" id="h0-1" class="h">@@ -114,6 +117,15 @@ func (s *server) doSearch(ctx context.Context, backend *Backend, q *pb.Query) (*
+</a> 		})
+ 	}
+ 
+<a href="#h0-1-3" id="h0-1-3" class="i">+	for _, r := range search.FileResults {
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+		reply.FileResults = append(reply.FileResults, &amp;api.FileResult{
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+			Tree:    r.Tree,
+</a><a href="#h0-1-6" id="h0-1-6" class="i">+			Version: r.Version,
+</a><a href="#h0-1-7" id="h0-1-7" class="i">+			Path:    r.Path,
+</a><a href="#h0-1-8" id="h0-1-8" class="i">+			Bounds:  [2]int{int(r.Bounds.Left), int(r.Bounds.Right)},
+</a><a href="#h0-1-9" id="h0-1-9" class="i">+		})
+</a><a href="#h0-1-10" id="h0-1-10" class="i">+	}
+</a><a href="#h0-1-11" id="h0-1-11" class="i">+
+</a> 	reply.Info = &amp;api.Stats{
+ 		RE2Time:     search.Stats.Re2Time,
+ 		GitTime:     search.Stats.GitTime,
+<b>diff --git a/<a id="h1" href="../file/server/api/types.go">server/api/types.go</a> b/<a href="../file/server/api/types.go">server/api/types.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -12,8 +12,9 @@ type ReplyError struct {
+</a> 
+ // ReplySearch is returned to /api/v1/search/:backend
+ type ReplySearch struct {
+<a href="#h1-0-3" id="h1-0-3" class="d">-	Info    *Stats    `json:&quot;info&quot;`
+</a><a href="#h1-0-4" id="h1-0-4" class="d">-	Results []*Result `json:&quot;results&quot;`
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+	Info        *Stats        `json:&quot;info&quot;`
+</a><a href="#h1-0-6" id="h1-0-6" class="i">+	Results     []*Result     `json:&quot;results&quot;`
+</a><a href="#h1-0-7" id="h1-0-7" class="i">+	FileResults []*FileResult `json:&quot;file_results&quot;`
+</a> }
+ 
+ type Stats struct {
+<a href="#h1-1" id="h1-1" class="h">@@ -35,3 +36,10 @@ type Result struct {
+</a> 	Bounds        [2]int   `json:&quot;bounds&quot;`
+ 	Line          string   `json:&quot;line&quot;`
+ }
+<a href="#h1-1-3" id="h1-1-3" class="i">+
+</a><a href="#h1-1-4" id="h1-1-4" class="i">+type FileResult struct {
+</a><a href="#h1-1-5" id="h1-1-5" class="i">+	Tree    string `json:&quot;tree&quot;`
+</a><a href="#h1-1-6" id="h1-1-6" class="i">+	Version string `json:&quot;version&quot;`
+</a><a href="#h1-1-7" id="h1-1-7" class="i">+	Path    string `json:&quot;path&quot;`
+</a><a href="#h1-1-8" id="h1-1-8" class="i">+	Bounds  [2]int `json:&quot;bounds&quot;`
+</a><a href="#h1-1-9" id="h1-1-9" class="i">+}
+</a><b>diff --git a/<a id="h2" href="../file/src/codesearch.cc">src/codesearch.cc</a> b/<a href="../file/src/codesearch.cc">src/codesearch.cc</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -31,6 +31,7 @@
+</a> #include &quot;src/indexer.h&quot;
+ #include &quot;src/content.h&quot;
+ 
+<a href="#h2-0-3" id="h2-0-3" class="i">+#include &quot;divsufsort.h&quot;
+</a> #include &quot;re2/re2.h&quot;
+ #include &quot;gflags/gflags.h&quot;
+ #include &lt;json-c/json.h&gt;
+<a href="#h2-1" id="h2-1" class="h">@@ -109,43 +110,120 @@ size_t hashstr::operator()(const StringPiece&amp; str) const {
+</a> 
+ const StringPiece empty_string(NULL, 0);
+ 
+<a href="#h2-1-3" id="h2-1-3" class="d">-class code_searcher;
+</a><a href="#h2-1-4" id="h2-1-4" class="d">-struct match_finger;
+</a><a href="#h2-1-5" id="h2-1-5" class="d">-
+</a><a href="#h2-1-6" id="h2-1-6" class="d">-class searcher {
+</a><a href="#h2-1-7" id="h2-1-7" class="i">+class search_limiter {
+</a> public:
+<a href="#h2-1-9" id="h2-1-9" class="d">-    searcher(const code_searcher *cc,
+</a><a href="#h2-1-10" id="h2-1-10" class="d">-             const query &amp;q,
+</a><a href="#h2-1-11" id="h2-1-11" class="d">-             const code_searcher::search_thread::transform_func&amp; func) :
+</a><a href="#h2-1-12" id="h2-1-12" class="d">-        cc_(cc), query_(&amp;q), transform_(func), queue_(),
+</a><a href="#h2-1-13" id="h2-1-13" class="d">-        matches_(0), re2_time_(false), git_time_(false),
+</a><a href="#h2-1-14" id="h2-1-14" class="d">-        index_time_(false), sort_time_(false), analyze_time_(false),
+</a><a href="#h2-1-15" id="h2-1-15" class="d">-        exit_reason_(kExitNone), files_(new uint8_t[cc-&gt;files_.size()]),
+</a><a href="#h2-1-16" id="h2-1-16" class="d">-        files_density_(-1)
+</a><a href="#h2-1-17" id="h2-1-17" class="d">-    {
+</a><a href="#h2-1-18" id="h2-1-18" class="d">-        memset(files_, 0xff, cc-&gt;files_.size());
+</a><a href="#h2-1-19" id="h2-1-19" class="d">-        {
+</a><a href="#h2-1-20" id="h2-1-20" class="d">-            run_timer run(analyze_time_);
+</a><a href="#h2-1-21" id="h2-1-21" class="d">-            index_ = indexRE(*query_-&gt;line_pat);
+</a><a href="#h2-1-22" id="h2-1-22" class="d">-        }
+</a><a href="#h2-1-23" id="h2-1-23" class="d">-
+</a><a href="#h2-1-24" id="h2-1-24" class="d">-        if (FLAGS_max_matches &amp;&amp; !query_-&gt;max_matches) {
+</a><a href="#h2-1-25" id="h2-1-25" class="i">+    search_limiter(int query_max_matches) : matches_(0), exit_reason_(kExitNone) {
+</a><a href="#h2-1-26" id="h2-1-26" class="i">+        if (FLAGS_max_matches &amp;&amp; !query_max_matches) {
+</a>             max_matches_ = FLAGS_max_matches;
+         } else {
+<a href="#h2-1-29" id="h2-1-29" class="d">-            max_matches_ = std::min(FLAGS_max_matches, query_-&gt;max_matches);
+</a><a href="#h2-1-30" id="h2-1-30" class="i">+            max_matches_ = std::min(FLAGS_max_matches, query_max_matches);
+</a>         }
+ 
+         if (FLAGS_timeout &lt;= 0) {
+<a href="#h2-1-34" id="h2-1-34" class="d">-            limit_.tv_sec = numeric_limits&lt;time_t&gt;::max();
+</a><a href="#h2-1-35" id="h2-1-35" class="i">+            deadline_.tv_sec = numeric_limits&lt;time_t&gt;::max();
+</a>         } else {
+             timeval timeout = {
+                 0, FLAGS_timeout * 1000
+             }, now;
+             gettimeofday(&amp;now, NULL);
+<a href="#h2-1-41" id="h2-1-41" class="d">-            timeval_add(&amp;limit_, &amp;now, &amp;timeout);
+</a><a href="#h2-1-42" id="h2-1-42" class="i">+            timeval_add(&amp;deadline_, &amp;now, &amp;timeout);
+</a>         }
+     }
+ 
+<a href="#h2-1-46" id="h2-1-46" class="i">+    exit_reason why() {
+</a><a href="#h2-1-47" id="h2-1-47" class="i">+        return exit_reason_;
+</a><a href="#h2-1-48" id="h2-1-48" class="i">+    }
+</a><a href="#h2-1-49" id="h2-1-49" class="i">+
+</a><a href="#h2-1-50" id="h2-1-50" class="i">+    bool exit_early() {
+</a><a href="#h2-1-51" id="h2-1-51" class="i">+        if (exit_reason_)
+</a><a href="#h2-1-52" id="h2-1-52" class="i">+            return true;
+</a><a href="#h2-1-53" id="h2-1-53" class="i">+
+</a><a href="#h2-1-54" id="h2-1-54" class="i">+#ifdef CODESEARCH_SLOWGTOD
+</a><a href="#h2-1-55" id="h2-1-55" class="i">+        static int counter = 1000;
+</a><a href="#h2-1-56" id="h2-1-56" class="i">+        if (--counter)
+</a><a href="#h2-1-57" id="h2-1-57" class="i">+            return false;
+</a><a href="#h2-1-58" id="h2-1-58" class="i">+        counter = 1000;
+</a><a href="#h2-1-59" id="h2-1-59" class="i">+#endif
+</a><a href="#h2-1-60" id="h2-1-60" class="i">+        timeval now;
+</a><a href="#h2-1-61" id="h2-1-61" class="i">+        gettimeofday(&amp;now, NULL);
+</a><a href="#h2-1-62" id="h2-1-62" class="i">+        if (now.tv_sec &gt; deadline_.tv_sec ||
+</a><a href="#h2-1-63" id="h2-1-63" class="i">+            (now.tv_sec == deadline_.tv_sec &amp;&amp; now.tv_usec &gt; deadline_.tv_usec)) {
+</a><a href="#h2-1-64" id="h2-1-64" class="i">+            exit_reason_ = kExitTimeout;
+</a><a href="#h2-1-65" id="h2-1-65" class="i">+            return true;
+</a><a href="#h2-1-66" id="h2-1-66" class="i">+        }
+</a><a href="#h2-1-67" id="h2-1-67" class="i">+        return false;
+</a><a href="#h2-1-68" id="h2-1-68" class="i">+    }
+</a><a href="#h2-1-69" id="h2-1-69" class="i">+
+</a><a href="#h2-1-70" id="h2-1-70" class="i">+    void record_match() {
+</a><a href="#h2-1-71" id="h2-1-71" class="i">+        int matches = ++matches_;
+</a><a href="#h2-1-72" id="h2-1-72" class="i">+        if (exit_reason_)
+</a><a href="#h2-1-73" id="h2-1-73" class="i">+            return;
+</a><a href="#h2-1-74" id="h2-1-74" class="i">+        if (max_matches_ &amp;&amp; matches &gt;= max_matches_) {
+</a><a href="#h2-1-75" id="h2-1-75" class="i">+            exit_reason_ = kExitMatchLimit;
+</a><a href="#h2-1-76" id="h2-1-76" class="i">+        }
+</a><a href="#h2-1-77" id="h2-1-77" class="i">+    }
+</a><a href="#h2-1-78" id="h2-1-78" class="i">+
+</a><a href="#h2-1-79" id="h2-1-79" class="i">+protected:
+</a><a href="#h2-1-80" id="h2-1-80" class="i">+    atomic_int matches_;
+</a><a href="#h2-1-81" id="h2-1-81" class="i">+    int max_matches_;
+</a><a href="#h2-1-82" id="h2-1-82" class="i">+    timeval deadline_;
+</a><a href="#h2-1-83" id="h2-1-83" class="i">+    exit_reason exit_reason_;
+</a><a href="#h2-1-84" id="h2-1-84" class="i">+};
+</a><a href="#h2-1-85" id="h2-1-85" class="i">+
+</a><a href="#h2-1-86" id="h2-1-86" class="i">+class code_searcher;
+</a><a href="#h2-1-87" id="h2-1-87" class="i">+struct match_finger;
+</a><a href="#h2-1-88" id="h2-1-88" class="i">+
+</a><a href="#h2-1-89" id="h2-1-89" class="i">+bool accept(const query *q, const indexed_file *file) {
+</a><a href="#h2-1-90" id="h2-1-90" class="i">+    if (q-&gt;file_pat &amp;&amp;
+</a><a href="#h2-1-91" id="h2-1-91" class="i">+        !q-&gt;file_pat-&gt;Match(file-&gt;path, 0, file-&gt;path.size(),
+</a><a href="#h2-1-92" id="h2-1-92" class="i">+                            RE2::UNANCHORED, 0, 0))
+</a><a href="#h2-1-93" id="h2-1-93" class="i">+        return false;
+</a><a href="#h2-1-94" id="h2-1-94" class="i">+
+</a><a href="#h2-1-95" id="h2-1-95" class="i">+    if (q-&gt;tree_pat &amp;&amp;
+</a><a href="#h2-1-96" id="h2-1-96" class="i">+        !q-&gt;tree_pat-&gt;Match(file-&gt;tree-&gt;name, 0,
+</a><a href="#h2-1-97" id="h2-1-97" class="i">+                            file-&gt;tree-&gt;name.size(),
+</a><a href="#h2-1-98" id="h2-1-98" class="i">+                            RE2::UNANCHORED, 0, 0))
+</a><a href="#h2-1-99" id="h2-1-99" class="i">+        return false;
+</a><a href="#h2-1-100" id="h2-1-100" class="i">+
+</a><a href="#h2-1-101" id="h2-1-101" class="i">+    if (q-&gt;negate.file_pat &amp;&amp;
+</a><a href="#h2-1-102" id="h2-1-102" class="i">+        q-&gt;negate.file_pat-&gt;Match(file-&gt;path, 0,
+</a><a href="#h2-1-103" id="h2-1-103" class="i">+                                  file-&gt;path.size(),
+</a><a href="#h2-1-104" id="h2-1-104" class="i">+                                  RE2::UNANCHORED, 0, 0))
+</a><a href="#h2-1-105" id="h2-1-105" class="i">+        return false;
+</a><a href="#h2-1-106" id="h2-1-106" class="i">+
+</a><a href="#h2-1-107" id="h2-1-107" class="i">+    if (q-&gt;negate.tree_pat &amp;&amp;
+</a><a href="#h2-1-108" id="h2-1-108" class="i">+        q-&gt;negate.tree_pat-&gt;Match(file-&gt;tree-&gt;name, 0,
+</a><a href="#h2-1-109" id="h2-1-109" class="i">+                                  file-&gt;tree-&gt;name.size(),
+</a><a href="#h2-1-110" id="h2-1-110" class="i">+                                  RE2::UNANCHORED, 0, 0))
+</a><a href="#h2-1-111" id="h2-1-111" class="i">+        return false;
+</a><a href="#h2-1-112" id="h2-1-112" class="i">+
+</a><a href="#h2-1-113" id="h2-1-113" class="i">+    return true;
+</a><a href="#h2-1-114" id="h2-1-114" class="i">+}
+</a><a href="#h2-1-115" id="h2-1-115" class="i">+
+</a><a href="#h2-1-116" id="h2-1-116" class="i">+bool accept(const query *q, const list&lt;indexed_file *&gt; &amp;sfs) {
+</a><a href="#h2-1-117" id="h2-1-117" class="i">+    for (list&lt;indexed_file *&gt;::const_iterator it = sfs.begin();
+</a><a href="#h2-1-118" id="h2-1-118" class="i">+         it != sfs.end(); ++it) {
+</a><a href="#h2-1-119" id="h2-1-119" class="i">+        if (accept(q, *it))
+</a><a href="#h2-1-120" id="h2-1-120" class="i">+            return true;
+</a><a href="#h2-1-121" id="h2-1-121" class="i">+    }
+</a><a href="#h2-1-122" id="h2-1-122" class="i">+    return false;
+</a><a href="#h2-1-123" id="h2-1-123" class="i">+}
+</a><a href="#h2-1-124" id="h2-1-124" class="i">+
+</a><a href="#h2-1-125" id="h2-1-125" class="i">+class searcher {
+</a><a href="#h2-1-126" id="h2-1-126" class="i">+public:
+</a><a href="#h2-1-127" id="h2-1-127" class="i">+    searcher(const code_searcher *cc,
+</a><a href="#h2-1-128" id="h2-1-128" class="i">+             const query &amp;q,
+</a><a href="#h2-1-129" id="h2-1-129" class="i">+             const intrusive_ptr&lt;IndexKey&gt; index_key,
+</a><a href="#h2-1-130" id="h2-1-130" class="i">+             const code_searcher::search_thread::transform_func&amp; func) :
+</a><a href="#h2-1-131" id="h2-1-131" class="i">+        cc_(cc), query_(&amp;q), transform_(func), queue_(),
+</a><a href="#h2-1-132" id="h2-1-132" class="i">+        limiter_(q.max_matches), index_key_(index_key), re2_time_(false),
+</a><a href="#h2-1-133" id="h2-1-133" class="i">+        git_time_(false), index_time_(false), sort_time_(false),
+</a><a href="#h2-1-134" id="h2-1-134" class="i">+        analyze_time_(false), files_(new uint8_t[cc-&gt;files_.size()]),
+</a><a href="#h2-1-135" id="h2-1-135" class="i">+        files_density_(-1)
+</a><a href="#h2-1-136" id="h2-1-136" class="i">+    {
+</a><a href="#h2-1-137" id="h2-1-137" class="i">+        memset(files_, 0xff, cc-&gt;files_.size());
+</a><a href="#h2-1-138" id="h2-1-138" class="i">+    }
+</a><a href="#h2-1-139" id="h2-1-139" class="i">+
+</a>     ~searcher() {
+         delete[] files_;
+ 
+<a href="#h2-2" id="h2-2" class="h">@@ -161,9 +239,6 @@ public:
+</a>         debug(kDebugProfile, &quot;sort time: %d.%06ds&quot;,
+               int(sort_time_.elapsed().tv_sec),
+               int(sort_time_.elapsed().tv_usec));
+<a href="#h2-2-3" id="h2-2-3" class="d">-        debug(kDebugProfile, &quot;analyze time: %d.%06ds&quot;,
+</a><a href="#h2-2-4" id="h2-2-4" class="d">-              int(analyze_time_.elapsed().tv_sec),
+</a><a href="#h2-2-5" id="h2-2-5" class="d">-              int(analyze_time_.elapsed().tv_usec));
+</a>     }
+ 
+     void operator()(const chunk *chunk);
+<a href="#h2-3" id="h2-3" class="h">@@ -177,7 +252,7 @@ public:
+</a>     }
+ 
+     exit_reason why() {
+<a href="#h2-3-3" id="h2-3-3" class="d">-        return exit_reason_;
+</a><a href="#h2-3-4" id="h2-3-4" class="i">+        return limiter_.why();
+</a>     }
+ 
+ protected:
+<a href="#h2-4" id="h2-4" class="h">@@ -189,42 +264,6 @@ protected:
+</a>     void filtered_search(const chunk *chunk);
+     void search_lines(uint32_t *left, int count, const chunk *chunk);
+ 
+<a href="#h2-4-3" id="h2-4-3" class="d">-    bool accept(const indexed_file *file) {
+</a><a href="#h2-4-4" id="h2-4-4" class="d">-        if (query_-&gt;file_pat &amp;&amp;
+</a><a href="#h2-4-5" id="h2-4-5" class="d">-            !query_-&gt;file_pat-&gt;Match(file-&gt;path, 0, file-&gt;path.size(),
+</a><a href="#h2-4-6" id="h2-4-6" class="d">-                                     RE2::UNANCHORED, 0, 0))
+</a><a href="#h2-4-7" id="h2-4-7" class="d">-            return false;
+</a><a href="#h2-4-8" id="h2-4-8" class="d">-
+</a><a href="#h2-4-9" id="h2-4-9" class="d">-        if (query_-&gt;tree_pat &amp;&amp;
+</a><a href="#h2-4-10" id="h2-4-10" class="d">-            !query_-&gt;tree_pat-&gt;Match(file-&gt;tree-&gt;name, 0,
+</a><a href="#h2-4-11" id="h2-4-11" class="d">-                                     file-&gt;tree-&gt;name.size(),
+</a><a href="#h2-4-12" id="h2-4-12" class="d">-                                     RE2::UNANCHORED, 0, 0))
+</a><a href="#h2-4-13" id="h2-4-13" class="d">-            return false;
+</a><a href="#h2-4-14" id="h2-4-14" class="d">-
+</a><a href="#h2-4-15" id="h2-4-15" class="d">-        if (query_-&gt;negate.file_pat &amp;&amp;
+</a><a href="#h2-4-16" id="h2-4-16" class="d">-            query_-&gt;negate.file_pat-&gt;Match(file-&gt;path, 0,
+</a><a href="#h2-4-17" id="h2-4-17" class="d">-                                           file-&gt;path.size(),
+</a><a href="#h2-4-18" id="h2-4-18" class="d">-                                           RE2::UNANCHORED, 0, 0))
+</a><a href="#h2-4-19" id="h2-4-19" class="d">-            return false;
+</a><a href="#h2-4-20" id="h2-4-20" class="d">-
+</a><a href="#h2-4-21" id="h2-4-21" class="d">-        if (query_-&gt;negate.tree_pat &amp;&amp;
+</a><a href="#h2-4-22" id="h2-4-22" class="d">-            query_-&gt;negate.tree_pat-&gt;Match(file-&gt;tree-&gt;name, 0,
+</a><a href="#h2-4-23" id="h2-4-23" class="d">-                                           file-&gt;tree-&gt;name.size(),
+</a><a href="#h2-4-24" id="h2-4-24" class="d">-                                           RE2::UNANCHORED, 0, 0))
+</a><a href="#h2-4-25" id="h2-4-25" class="d">-            return false;
+</a><a href="#h2-4-26" id="h2-4-26" class="d">-
+</a><a href="#h2-4-27" id="h2-4-27" class="d">-        return true;
+</a><a href="#h2-4-28" id="h2-4-28" class="d">-    }
+</a><a href="#h2-4-29" id="h2-4-29" class="d">-
+</a><a href="#h2-4-30" id="h2-4-30" class="d">-    bool accept(const list&lt;indexed_file *&gt; &amp;sfs) {
+</a><a href="#h2-4-31" id="h2-4-31" class="d">-        for (list&lt;indexed_file *&gt;::const_iterator it = sfs.begin();
+</a><a href="#h2-4-32" id="h2-4-32" class="d">-             it != sfs.end(); ++it) {
+</a><a href="#h2-4-33" id="h2-4-33" class="d">-            if (accept(*it))
+</a><a href="#h2-4-34" id="h2-4-34" class="d">-                return true;
+</a><a href="#h2-4-35" id="h2-4-35" class="d">-        }
+</a><a href="#h2-4-36" id="h2-4-36" class="d">-        return false;
+</a><a href="#h2-4-37" id="h2-4-37" class="d">-    }
+</a><a href="#h2-4-38" id="h2-4-38" class="d">-
+</a>     double files_density(void) {
+         std::unique_lock&lt;std::mutex&gt; locked(mtx_);
+         if (files_density_ &gt;= 0)
+<a href="#h2-5" id="h2-5" class="h">@@ -233,7 +272,7 @@ protected:
+</a>         int hits = 0;
+         int sample = min(1000, int(cc_-&gt;files_.size()));
+         for (int i = 0; i &lt; sample; i++) {
+<a href="#h2-5-3" id="h2-5-3" class="d">-            if (accept(cc_-&gt;files_[rand() % cc_-&gt;files_.size()]))
+</a><a href="#h2-5-4" id="h2-5-4" class="i">+            if (accept(query_, cc_-&gt;files_[rand() % cc_-&gt;files_.size()]))
+</a>                 hits++;
+         }
+         return (files_density_ = double(hits) / sample);
+<a href="#h2-6" id="h2-6" class="h">@@ -301,44 +340,17 @@ protected:
+</a>         return StringPiece(start, end - start);
+     }
+ 
+<a href="#h2-6-3" id="h2-6-3" class="d">-    bool exit_early() {
+</a><a href="#h2-6-4" id="h2-6-4" class="d">-        if (exit_reason_)
+</a><a href="#h2-6-5" id="h2-6-5" class="d">-            return true;
+</a><a href="#h2-6-6" id="h2-6-6" class="d">-
+</a><a href="#h2-6-7" id="h2-6-7" class="d">-        if (max_matches_ &amp;&amp; matches_.load() &gt;= max_matches_) {
+</a><a href="#h2-6-8" id="h2-6-8" class="d">-            exit_reason_ = kExitMatchLimit;
+</a><a href="#h2-6-9" id="h2-6-9" class="d">-            return true;
+</a><a href="#h2-6-10" id="h2-6-10" class="d">-        }
+</a><a href="#h2-6-11" id="h2-6-11" class="d">-#ifdef CODESEARCH_SLOWGTOD
+</a><a href="#h2-6-12" id="h2-6-12" class="d">-        static int counter = 1000;
+</a><a href="#h2-6-13" id="h2-6-13" class="d">-        if (--counter)
+</a><a href="#h2-6-14" id="h2-6-14" class="d">-            return false;
+</a><a href="#h2-6-15" id="h2-6-15" class="d">-        counter = 1000;
+</a><a href="#h2-6-16" id="h2-6-16" class="d">-#endif
+</a><a href="#h2-6-17" id="h2-6-17" class="d">-        timeval now;
+</a><a href="#h2-6-18" id="h2-6-18" class="d">-        gettimeofday(&amp;now, NULL);
+</a><a href="#h2-6-19" id="h2-6-19" class="d">-        if (now.tv_sec &gt; limit_.tv_sec ||
+</a><a href="#h2-6-20" id="h2-6-20" class="d">-            (now.tv_sec == limit_.tv_sec &amp;&amp; now.tv_usec &gt; limit_.tv_usec)) {
+</a><a href="#h2-6-21" id="h2-6-21" class="d">-            exit_reason_ = kExitTimeout;
+</a><a href="#h2-6-22" id="h2-6-22" class="d">-            return true;
+</a><a href="#h2-6-23" id="h2-6-23" class="d">-        }
+</a><a href="#h2-6-24" id="h2-6-24" class="d">-        return false;
+</a><a href="#h2-6-25" id="h2-6-25" class="d">-    }
+</a><a href="#h2-6-26" id="h2-6-26" class="d">-
+</a>     const code_searcher *cc_;
+     const query *query_;
+     const code_searcher::search_thread::transform_func transform_;
+     thread_queue&lt;match_result*&gt; queue_;
+<a href="#h2-6-31" id="h2-6-31" class="d">-    atomic_int matches_;
+</a><a href="#h2-6-32" id="h2-6-32" class="d">-    int max_matches_;
+</a><a href="#h2-6-33" id="h2-6-33" class="d">-    intrusive_ptr&lt;IndexKey&gt; index_;
+</a><a href="#h2-6-34" id="h2-6-34" class="i">+    search_limiter limiter_;
+</a><a href="#h2-6-35" id="h2-6-35" class="i">+    intrusive_ptr&lt;IndexKey&gt; index_key_;
+</a>     timer re2_time_;
+     timer git_time_;
+     timer index_time_;
+     timer sort_time_;
+     timer analyze_time_;
+<a href="#h2-6-41" id="h2-6-41" class="d">-    timeval limit_;
+</a><a href="#h2-6-42" id="h2-6-42" class="d">-    exit_reason exit_reason_;
+</a>     uint8_t *files_;
+ 
+     /*
+<a href="#h2-7" id="h2-7" class="h">@@ -352,8 +364,105 @@ protected:
+</a>     friend class code_searcher::search_thread;
+ };
+ 
+<a href="#h2-7-3" id="h2-7-3" class="i">+class filename_searcher {
+</a><a href="#h2-7-4" id="h2-7-4" class="i">+public:
+</a><a href="#h2-7-5" id="h2-7-5" class="i">+    filename_searcher(const code_searcher *cc,
+</a><a href="#h2-7-6" id="h2-7-6" class="i">+                      const query &amp;q,
+</a><a href="#h2-7-7" id="h2-7-7" class="i">+                      intrusive_ptr&lt;IndexKey&gt; index_key) :
+</a><a href="#h2-7-8" id="h2-7-8" class="i">+        cc_(cc), query_(&amp;q), index_key_(index_key), queue_(), limiter_(q.max_matches)
+</a><a href="#h2-7-9" id="h2-7-9" class="i">+    {}
+</a><a href="#h2-7-10" id="h2-7-10" class="i">+
+</a><a href="#h2-7-11" id="h2-7-11" class="i">+    void operator()();
+</a><a href="#h2-7-12" id="h2-7-12" class="i">+
+</a><a href="#h2-7-13" id="h2-7-13" class="i">+protected:
+</a><a href="#h2-7-14" id="h2-7-14" class="i">+    void match_filename(indexed_file *file);
+</a><a href="#h2-7-15" id="h2-7-15" class="i">+
+</a><a href="#h2-7-16" id="h2-7-16" class="i">+    const code_searcher *cc_;
+</a><a href="#h2-7-17" id="h2-7-17" class="i">+    const query *query_;
+</a><a href="#h2-7-18" id="h2-7-18" class="i">+    intrusive_ptr&lt;IndexKey&gt; index_key_;
+</a><a href="#h2-7-19" id="h2-7-19" class="i">+    thread_queue&lt;file_result*&gt; queue_;
+</a><a href="#h2-7-20" id="h2-7-20" class="i">+    search_limiter limiter_;
+</a><a href="#h2-7-21" id="h2-7-21" class="i">+
+</a><a href="#h2-7-22" id="h2-7-22" class="i">+    friend class code_searcher::search_thread;
+</a><a href="#h2-7-23" id="h2-7-23" class="i">+};
+</a><a href="#h2-7-24" id="h2-7-24" class="i">+
+</a><a href="#h2-7-25" id="h2-7-25" class="i">+int suffix_search(const unsigned char *data,
+</a><a href="#h2-7-26" id="h2-7-26" class="i">+                  uint32_t *suffixes,
+</a><a href="#h2-7-27" id="h2-7-27" class="i">+                  int size,
+</a><a href="#h2-7-28" id="h2-7-28" class="i">+                  intrusive_ptr&lt;IndexKey&gt; index,
+</a><a href="#h2-7-29" id="h2-7-29" class="i">+                  vector&lt;uint32_t&gt; &amp;indexes_out);
+</a><a href="#h2-7-30" id="h2-7-30" class="i">+
+</a><a href="#h2-7-31" id="h2-7-31" class="i">+void filename_searcher::operator()()
+</a><a href="#h2-7-32" id="h2-7-32" class="i">+{
+</a><a href="#h2-7-33" id="h2-7-33" class="i">+    static per_thread&lt;vector&lt;uint32_t&gt; &gt; indexes;
+</a><a href="#h2-7-34" id="h2-7-34" class="i">+    if (!indexes.get()) {
+</a><a href="#h2-7-35" id="h2-7-35" class="i">+        indexes.put(new vector&lt;uint32_t&gt;(cc_-&gt;filename_data_size_ / kMinFilterRatio / 10));
+</a><a href="#h2-7-36" id="h2-7-36" class="i">+    }
+</a><a href="#h2-7-37" id="h2-7-37" class="i">+
+</a><a href="#h2-7-38" id="h2-7-38" class="i">+    int count = suffix_search(cc_-&gt;filename_data_, cc_-&gt;filename_suffixes_, cc_-&gt;filename_data_size_, index_key_, *indexes);
+</a><a href="#h2-7-39" id="h2-7-39" class="i">+
+</a><a href="#h2-7-40" id="h2-7-40" class="i">+    if (count &gt; indexes-&gt;size()) {
+</a><a href="#h2-7-41" id="h2-7-41" class="i">+        for (auto it = cc_-&gt;files_.begin(); it &lt; cc_-&gt;files_.end(); it++) {
+</a><a href="#h2-7-42" id="h2-7-42" class="i">+            if (limiter_.exit_early()) {
+</a><a href="#h2-7-43" id="h2-7-43" class="i">+                return;
+</a><a href="#h2-7-44" id="h2-7-44" class="i">+            }
+</a><a href="#h2-7-45" id="h2-7-45" class="i">+            match_filename(*it);
+</a><a href="#h2-7-46" id="h2-7-46" class="i">+        }
+</a><a href="#h2-7-47" id="h2-7-47" class="i">+        return;
+</a><a href="#h2-7-48" id="h2-7-48" class="i">+    }
+</a><a href="#h2-7-49" id="h2-7-49" class="i">+
+</a><a href="#h2-7-50" id="h2-7-50" class="i">+    lsd_radix_sort(indexes-&gt;data(), indexes-&gt;data() + count);
+</a><a href="#h2-7-51" id="h2-7-51" class="i">+
+</a><a href="#h2-7-52" id="h2-7-52" class="i">+    // find candidate indexed_files from the positions of the candidate matches.
+</a><a href="#h2-7-53" id="h2-7-53" class="i">+    // This is O(candidate_matches * log(indexed_files)), but it could probably
+</a><a href="#h2-7-54" id="h2-7-54" class="i">+    // be done more cleverly in something like O(candidate_matches + log(indexed_files))
+</a><a href="#h2-7-55" id="h2-7-55" class="i">+
+</a><a href="#h2-7-56" id="h2-7-56" class="i">+    // moving the left bound as we go isn&#39;t a big-O improvement, but may help a little bit.
+</a><a href="#h2-7-57" id="h2-7-57" class="i">+    auto left_bound = cc_-&gt;filename_positions_.begin();
+</a><a href="#h2-7-58" id="h2-7-58" class="i">+
+</a><a href="#h2-7-59" id="h2-7-59" class="i">+    for (int i = 0; i &lt; count; i++) {
+</a><a href="#h2-7-60" id="h2-7-60" class="i">+        if (limiter_.exit_early()) {
+</a><a href="#h2-7-61" id="h2-7-61" class="i">+            break;
+</a><a href="#h2-7-62" id="h2-7-62" class="i">+        }
+</a><a href="#h2-7-63" id="h2-7-63" class="i">+
+</a><a href="#h2-7-64" id="h2-7-64" class="i">+        int target_index = (*indexes)[i];
+</a><a href="#h2-7-65" id="h2-7-65" class="i">+        pair&lt;int, indexed_file*&gt; target(target_index, NULL);
+</a><a href="#h2-7-66" id="h2-7-66" class="i">+        auto lb = lower_bound(left_bound, cc_-&gt;filename_positions_.end(), target);
+</a><a href="#h2-7-67" id="h2-7-67" class="i">+
+</a><a href="#h2-7-68" id="h2-7-68" class="i">+        if (lb-&gt;first != target_index) {
+</a><a href="#h2-7-69" id="h2-7-69" class="i">+            assert(lb-&gt;first &gt; target_index);
+</a><a href="#h2-7-70" id="h2-7-70" class="i">+            assert(lb != left_bound);
+</a><a href="#h2-7-71" id="h2-7-71" class="i">+            lb--;
+</a><a href="#h2-7-72" id="h2-7-72" class="i">+        }
+</a><a href="#h2-7-73" id="h2-7-73" class="i">+        assert(lb-&gt;first &lt;= (*indexes)[i]);
+</a><a href="#h2-7-74" id="h2-7-74" class="i">+        assert((*indexes)[i] &lt; lb-&gt;first + lb-&gt;second-&gt;path.size());
+</a><a href="#h2-7-75" id="h2-7-75" class="i">+        match_filename(lb-&gt;second);
+</a><a href="#h2-7-76" id="h2-7-76" class="i">+
+</a><a href="#h2-7-77" id="h2-7-77" class="i">+        left_bound = lb;
+</a><a href="#h2-7-78" id="h2-7-78" class="i">+    }
+</a><a href="#h2-7-79" id="h2-7-79" class="i">+}
+</a><a href="#h2-7-80" id="h2-7-80" class="i">+
+</a><a href="#h2-7-81" id="h2-7-81" class="i">+void filename_searcher::match_filename(indexed_file *file) {
+</a><a href="#h2-7-82" id="h2-7-82" class="i">+    if (!accept(query_, file))
+</a><a href="#h2-7-83" id="h2-7-83" class="i">+        return;
+</a><a href="#h2-7-84" id="h2-7-84" class="i">+
+</a><a href="#h2-7-85" id="h2-7-85" class="i">+    StringPiece filepath = StringPiece(file-&gt;path);
+</a><a href="#h2-7-86" id="h2-7-86" class="i">+    StringPiece match;
+</a><a href="#h2-7-87" id="h2-7-87" class="i">+    if (!query_-&gt;line_pat-&gt;Match(filepath, 0, filepath.size(),
+</a><a href="#h2-7-88" id="h2-7-88" class="i">+                                 RE2::UNANCHORED, &amp;match, 1))
+</a><a href="#h2-7-89" id="h2-7-89" class="i">+        return;
+</a><a href="#h2-7-90" id="h2-7-90" class="i">+
+</a><a href="#h2-7-91" id="h2-7-91" class="i">+    file_result *f = new file_result;
+</a><a href="#h2-7-92" id="h2-7-92" class="i">+    f-&gt;file = file;
+</a><a href="#h2-7-93" id="h2-7-93" class="i">+    f-&gt;matchleft = utf8::distance(filepath.data(), match.data());
+</a><a href="#h2-7-94" id="h2-7-94" class="i">+    f-&gt;matchright = f-&gt;matchleft + utf8::distance(match.data(), match.data() + match.size());
+</a><a href="#h2-7-95" id="h2-7-95" class="i">+
+</a><a href="#h2-7-96" id="h2-7-96" class="i">+    queue_.push(f);
+</a><a href="#h2-7-97" id="h2-7-97" class="i">+    limiter_.record_match();
+</a><a href="#h2-7-98" id="h2-7-98" class="i">+}
+</a><a href="#h2-7-99" id="h2-7-99" class="i">+
+</a> code_searcher::code_searcher()
+<a href="#h2-7-101" id="h2-7-101" class="d">-    : alloc_(0), finalized_(false)
+</a><a href="#h2-7-102" id="h2-7-102" class="i">+    : alloc_(0), finalized_(false), filename_data_(NULL), filename_suffixes_(NULL)
+</a> {
+ #ifdef USE_DENSE_HASH_SET
+     lines_.set_empty_key(empty_string);
+<a href="#h2-8" id="h2-8" class="h">@@ -378,6 +487,34 @@ code_searcher::~code_searcher() {
+</a>     for (auto file : files_) {
+         delete file;
+     }
+<a href="#h2-8-3" id="h2-8-3" class="i">+    if (filename_data_ != NULL) {
+</a><a href="#h2-8-4" id="h2-8-4" class="i">+        delete[] filename_data_;
+</a><a href="#h2-8-5" id="h2-8-5" class="i">+    }
+</a><a href="#h2-8-6" id="h2-8-6" class="i">+    if (filename_suffixes_ != NULL) {
+</a><a href="#h2-8-7" id="h2-8-7" class="i">+        delete[] filename_suffixes_;
+</a><a href="#h2-8-8" id="h2-8-8" class="i">+    }
+</a><a href="#h2-8-9" id="h2-8-9" class="i">+}
+</a><a href="#h2-8-10" id="h2-8-10" class="i">+
+</a><a href="#h2-8-11" id="h2-8-11" class="i">+void code_searcher::index_filenames() {
+</a><a href="#h2-8-12" id="h2-8-12" class="i">+    log(&quot;Building filename index...&quot;);
+</a><a href="#h2-8-13" id="h2-8-13" class="i">+    filename_positions_.reserve(files_.size());
+</a><a href="#h2-8-14" id="h2-8-14" class="i">+
+</a><a href="#h2-8-15" id="h2-8-15" class="i">+    filename_data_size_ = 0;
+</a><a href="#h2-8-16" id="h2-8-16" class="i">+    for (auto it = files_.begin(); it != files_.end(); ++it) {
+</a><a href="#h2-8-17" id="h2-8-17" class="i">+        filename_data_size_ += (*it)-&gt;path.size() + 1;
+</a><a href="#h2-8-18" id="h2-8-18" class="i">+    }
+</a><a href="#h2-8-19" id="h2-8-19" class="i">+
+</a><a href="#h2-8-20" id="h2-8-20" class="i">+    filename_data_ = new unsigned char[filename_data_size_];
+</a><a href="#h2-8-21" id="h2-8-21" class="i">+    int offset = 0;
+</a><a href="#h2-8-22" id="h2-8-22" class="i">+    for (auto it = files_.begin(); it != files_.end(); ++it) {
+</a><a href="#h2-8-23" id="h2-8-23" class="i">+        memcpy(filename_data_ + offset, (*it)-&gt;path.data(), (*it)-&gt;path.size());
+</a><a href="#h2-8-24" id="h2-8-24" class="i">+        filename_data_[offset + (*it)-&gt;path.size()] = &#39;\0&#39;;
+</a><a href="#h2-8-25" id="h2-8-25" class="i">+        filename_positions_.emplace_back(offset, *it);
+</a><a href="#h2-8-26" id="h2-8-26" class="i">+        offset += (*it)-&gt;path.size() + 1;
+</a><a href="#h2-8-27" id="h2-8-27" class="i">+    }
+</a><a href="#h2-8-28" id="h2-8-28" class="i">+
+</a><a href="#h2-8-29" id="h2-8-29" class="i">+    filename_suffixes_ = new uint32_t[filename_data_size_];
+</a><a href="#h2-8-30" id="h2-8-30" class="i">+    divsufsort(filename_data_, reinterpret_cast&lt;saidx_t*&gt;(filename_suffixes_), filename_data_size_);
+</a> }
+ 
+ void code_searcher::finalize() {
+<a href="#h2-9" id="h2-9" class="h">@@ -389,6 +526,8 @@ void code_searcher::finalize() {
+</a>     gettimeofday(&amp;now, NULL);
+     index_timestamp_ = now.tv_sec;
+ 
+<a href="#h2-9-3" id="h2-9-3" class="i">+    index_filenames();
+</a><a href="#h2-9-4" id="h2-9-4" class="i">+
+</a>     idx_data_chunks.inc(alloc_-&gt;end() - alloc_-&gt;begin());
+     idx_content_chunks.inc(alloc_-&gt;end_content() - alloc_-&gt;begin_content());
+ }
+<a href="#h2-10" id="h2-10" class="h">@@ -518,10 +657,10 @@ void code_searcher::index_file(const indexed_tree *tree,
+</a> 
+ void searcher::operator()(const chunk *chunk)
+ {
+<a href="#h2-10-3" id="h2-10-3" class="d">-    if (exit_reason_)
+</a><a href="#h2-10-4" id="h2-10-4" class="i">+    if (limiter_.exit_early())
+</a>         return;
+ 
+<a href="#h2-10-7" id="h2-10-7" class="d">-    if (FLAGS_index &amp;&amp; index_ &amp;&amp; !index_-&gt;empty())
+</a><a href="#h2-10-8" id="h2-10-8" class="i">+    if (FLAGS_index &amp;&amp; index_key_ &amp;&amp; !index_key_-&gt;empty())
+</a>         filtered_search(chunk);
+     else
+         full_search(chunk);
+<a href="#h2-11" id="h2-11" class="h">@@ -534,7 +673,7 @@ struct walk_state {
+</a> };
+ 
+ struct lt_index {
+<a href="#h2-11-3" id="h2-11-3" class="d">-    const chunk *chunk_;
+</a><a href="#h2-11-4" id="h2-11-4" class="i">+    const unsigned char *data_;
+</a>     int idx_;
+ 
+     bool operator()(uint32_t lhs, unsigned char rhs) {
+<a href="#h2-12" id="h2-12" class="h">@@ -546,73 +685,82 @@ struct lt_index {
+</a>     }
+ 
+     int cmp(uint32_t lhs, unsigned char rhs) {
+<a href="#h2-12-3" id="h2-12-3" class="d">-        unsigned char lc = chunk_-&gt;data[lhs + idx_];
+</a><a href="#h2-12-4" id="h2-12-4" class="i">+        unsigned char lc = data_[lhs + idx_];
+</a>         if (lc == &#39;\n&#39;)
+             return -1;
+         return (int)lc - (int)rhs;
+     }
+ };
+ 
+<a href="#h2-12-11" id="h2-12-11" class="d">-
+</a><a href="#h2-12-12" id="h2-12-12" class="d">-void searcher::filtered_search(const chunk *chunk)
+</a><a href="#h2-12-13" id="h2-12-13" class="d">-{
+</a><a href="#h2-12-14" id="h2-12-14" class="d">-    static per_thread&lt;vector&lt;uint32_t&gt; &gt; indexes;
+</a><a href="#h2-12-15" id="h2-12-15" class="d">-    if (!indexes.get()) {
+</a><a href="#h2-12-16" id="h2-12-16" class="d">-        indexes.put(new vector&lt;uint32_t&gt;(cc_-&gt;alloc_-&gt;chunk_size() / kMinFilterRatio));
+</a><a href="#h2-12-17" id="h2-12-17" class="d">-    }
+</a><a href="#h2-12-18" id="h2-12-18" class="i">+int suffix_search(const unsigned char *data,
+</a><a href="#h2-12-19" id="h2-12-19" class="i">+                  uint32_t *suffixes,
+</a><a href="#h2-12-20" id="h2-12-20" class="i">+                  int size,
+</a><a href="#h2-12-21" id="h2-12-21" class="i">+                  intrusive_ptr&lt;IndexKey&gt; index,
+</a><a href="#h2-12-22" id="h2-12-22" class="i">+                  vector&lt;uint32_t&gt; &amp;indexes_out) {
+</a>     int count = 0;
+<a href="#h2-12-24" id="h2-12-24" class="d">-    {
+</a><a href="#h2-12-25" id="h2-12-25" class="d">-        run_timer run(index_time_);
+</a><a href="#h2-12-26" id="h2-12-26" class="d">-        vector&lt;walk_state&gt; stack;
+</a><a href="#h2-12-27" id="h2-12-27" class="d">-        stack.push_back((walk_state){
+</a><a href="#h2-12-28" id="h2-12-28" class="d">-                chunk-&gt;suffixes, chunk-&gt;suffixes + chunk-&gt;size, index_, 0});
+</a><a href="#h2-12-29" id="h2-12-29" class="d">-
+</a><a href="#h2-12-30" id="h2-12-30" class="d">-        while (!stack.empty()) {
+</a><a href="#h2-12-31" id="h2-12-31" class="d">-            walk_state st = stack.back();
+</a><a href="#h2-12-32" id="h2-12-32" class="d">-            stack.pop_back();
+</a><a href="#h2-12-33" id="h2-12-33" class="d">-            if (!st.key || st.key-&gt;empty() || (st.right - st.left) &lt;= 100) {
+</a><a href="#h2-12-34" id="h2-12-34" class="d">-                if ((count + st.right - st.left) &gt; indexes-&gt;size()) {
+</a><a href="#h2-12-35" id="h2-12-35" class="d">-                    count = indexes-&gt;size() + 1;
+</a><a href="#h2-12-36" id="h2-12-36" class="d">-                    break;
+</a><a href="#h2-12-37" id="h2-12-37" class="d">-                }
+</a><a href="#h2-12-38" id="h2-12-38" class="d">-                memcpy(&amp;(*indexes)[count], st.left,
+</a><a href="#h2-12-39" id="h2-12-39" class="d">-                       (st.right - st.left) * sizeof(uint32_t));
+</a><a href="#h2-12-40" id="h2-12-40" class="d">-                count += (st.right - st.left);
+</a><a href="#h2-12-41" id="h2-12-41" class="d">-                continue;
+</a><a href="#h2-12-42" id="h2-12-42" class="i">+    vector&lt;walk_state&gt; stack;
+</a><a href="#h2-12-43" id="h2-12-43" class="i">+    stack.push_back((walk_state){
+</a><a href="#h2-12-44" id="h2-12-44" class="i">+            suffixes, suffixes + size, index, 0});
+</a><a href="#h2-12-45" id="h2-12-45" class="i">+
+</a><a href="#h2-12-46" id="h2-12-46" class="i">+    while (!stack.empty()) {
+</a><a href="#h2-12-47" id="h2-12-47" class="i">+        walk_state st = stack.back();
+</a><a href="#h2-12-48" id="h2-12-48" class="i">+        stack.pop_back();
+</a><a href="#h2-12-49" id="h2-12-49" class="i">+        if (!st.key || st.key-&gt;empty() || (st.right - st.left) &lt;= 100) {
+</a><a href="#h2-12-50" id="h2-12-50" class="i">+            if ((count + st.right - st.left) &gt; indexes_out.size()) {
+</a><a href="#h2-12-51" id="h2-12-51" class="i">+                count = indexes_out.size() + 1;
+</a><a href="#h2-12-52" id="h2-12-52" class="i">+                break;
+</a>             }
+<a href="#h2-12-54" id="h2-12-54" class="d">-            lt_index lt = {chunk, st.depth};
+</a><a href="#h2-12-55" id="h2-12-55" class="d">-            for (IndexKey::iterator it = st.key-&gt;begin();
+</a><a href="#h2-12-56" id="h2-12-56" class="d">-                 it != st.key-&gt;end(); ++it) {
+</a><a href="#h2-12-57" id="h2-12-57" class="d">-                uint32_t *l, *r;
+</a><a href="#h2-12-58" id="h2-12-58" class="d">-                l = lower_bound(st.left, st.right, it-&gt;first.first, lt);
+</a><a href="#h2-12-59" id="h2-12-59" class="d">-                uint32_t *right = lower_bound(l, st.right,
+</a><a href="#h2-12-60" id="h2-12-60" class="d">-                                              (unsigned char)(it-&gt;first.second + 1),
+</a><a href="#h2-12-61" id="h2-12-61" class="d">-                                              lt);
+</a><a href="#h2-12-62" id="h2-12-62" class="d">-                if (l == right)
+</a><a href="#h2-12-63" id="h2-12-63" class="d">-                    continue;
+</a><a href="#h2-12-64" id="h2-12-64" class="i">+            memcpy(&amp;indexes_out[count], st.left,
+</a><a href="#h2-12-65" id="h2-12-65" class="i">+                   (st.right - st.left) * sizeof(uint32_t));
+</a><a href="#h2-12-66" id="h2-12-66" class="i">+            count += (st.right - st.left);
+</a><a href="#h2-12-67" id="h2-12-67" class="i">+            continue;
+</a><a href="#h2-12-68" id="h2-12-68" class="i">+        }
+</a><a href="#h2-12-69" id="h2-12-69" class="i">+        lt_index lt = {data, st.depth};
+</a><a href="#h2-12-70" id="h2-12-70" class="i">+        for (IndexKey::iterator it = st.key-&gt;begin();
+</a><a href="#h2-12-71" id="h2-12-71" class="i">+             it != st.key-&gt;end(); ++it) {
+</a><a href="#h2-12-72" id="h2-12-72" class="i">+            uint32_t *l, *r;
+</a><a href="#h2-12-73" id="h2-12-73" class="i">+            l = lower_bound(st.left, st.right, it-&gt;first.first, lt);
+</a><a href="#h2-12-74" id="h2-12-74" class="i">+            uint32_t *right = lower_bound(l, st.right,
+</a><a href="#h2-12-75" id="h2-12-75" class="i">+                                          (unsigned char)(it-&gt;first.second + 1),
+</a><a href="#h2-12-76" id="h2-12-76" class="i">+                                          lt);
+</a><a href="#h2-12-77" id="h2-12-77" class="i">+            if (l == right)
+</a><a href="#h2-12-78" id="h2-12-78" class="i">+                continue;
+</a> 
+<a href="#h2-12-80" id="h2-12-80" class="d">-                if (st.depth)
+</a><a href="#h2-12-81" id="h2-12-81" class="d">-                    assert(chunk-&gt;data[*l + st.depth - 1] ==
+</a><a href="#h2-12-82" id="h2-12-82" class="d">-                           chunk-&gt;data[*(right - 1) + st.depth - 1]);
+</a><a href="#h2-12-83" id="h2-12-83" class="i">+            if (st.depth)
+</a><a href="#h2-12-84" id="h2-12-84" class="i">+                assert(data[*l + st.depth - 1] ==
+</a><a href="#h2-12-85" id="h2-12-85" class="i">+                       data[*(right - 1) + st.depth - 1]);
+</a> 
+<a href="#h2-12-87" id="h2-12-87" class="d">-                assert(l == st.left ||
+</a><a href="#h2-12-88" id="h2-12-88" class="d">-                       chunk-&gt;data[*(l-1) + st.depth] == &#39;\n&#39; ||
+</a><a href="#h2-12-89" id="h2-12-89" class="d">-                       chunk-&gt;data[*(l-1) + st.depth] &lt; it-&gt;first.first);
+</a><a href="#h2-12-90" id="h2-12-90" class="d">-                assert(chunk-&gt;data[*l + st.depth] &gt;= it-&gt;first.first);
+</a><a href="#h2-12-91" id="h2-12-91" class="d">-                assert(right == st.right ||
+</a><a href="#h2-12-92" id="h2-12-92" class="d">-                       chunk-&gt;data[*right + st.depth] &gt; it-&gt;first.second);
+</a><a href="#h2-12-93" id="h2-12-93" class="i">+            assert(l == st.left ||
+</a><a href="#h2-12-94" id="h2-12-94" class="i">+                   data[*(l-1) + st.depth] == &#39;\n&#39; ||
+</a><a href="#h2-12-95" id="h2-12-95" class="i">+                   data[*(l-1) + st.depth] &lt; it-&gt;first.first);
+</a><a href="#h2-12-96" id="h2-12-96" class="i">+            assert(data[*l + st.depth] &gt;= it-&gt;first.first);
+</a><a href="#h2-12-97" id="h2-12-97" class="i">+            assert(right == st.right ||
+</a><a href="#h2-12-98" id="h2-12-98" class="i">+                   data[*right + st.depth] &gt; it-&gt;first.second);
+</a> 
+<a href="#h2-12-100" id="h2-12-100" class="d">-                for (unsigned char ch = it-&gt;first.first; ch &lt;= it-&gt;first.second;
+</a><a href="#h2-12-101" id="h2-12-101" class="d">-                     ch++, l = r) {
+</a><a href="#h2-12-102" id="h2-12-102" class="d">-                    r = lower_bound(l, right, (unsigned char)(ch + 1), lt);
+</a><a href="#h2-12-103" id="h2-12-103" class="i">+            for (unsigned char ch = it-&gt;first.first; ch &lt;= it-&gt;first.second;
+</a><a href="#h2-12-104" id="h2-12-104" class="i">+                 ch++, l = r) {
+</a><a href="#h2-12-105" id="h2-12-105" class="i">+                r = lower_bound(l, right, (unsigned char)(ch + 1), lt);
+</a> 
+<a href="#h2-12-107" id="h2-12-107" class="d">-                    if (r != l) {
+</a><a href="#h2-12-108" id="h2-12-108" class="d">-                        stack.push_back((walk_state){l, r, it-&gt;second, st.depth + 1});
+</a><a href="#h2-12-109" id="h2-12-109" class="d">-                    }
+</a><a href="#h2-12-110" id="h2-12-110" class="i">+                if (r != l) {
+</a><a href="#h2-12-111" id="h2-12-111" class="i">+                    stack.push_back((walk_state){l, r, it-&gt;second, st.depth + 1});
+</a>                 }
+             }
+         }
+     }
+<a href="#h2-12-116" id="h2-12-116" class="i">+    return count;
+</a><a href="#h2-12-117" id="h2-12-117" class="i">+}
+</a><a href="#h2-12-118" id="h2-12-118" class="i">+
+</a><a href="#h2-12-119" id="h2-12-119" class="i">+void searcher::filtered_search(const chunk *chunk)
+</a><a href="#h2-12-120" id="h2-12-120" class="i">+{
+</a><a href="#h2-12-121" id="h2-12-121" class="i">+    static per_thread&lt;vector&lt;uint32_t&gt; &gt; indexes;
+</a><a href="#h2-12-122" id="h2-12-122" class="i">+    if (!indexes.get()) {
+</a><a href="#h2-12-123" id="h2-12-123" class="i">+        indexes.put(new vector&lt;uint32_t&gt;(cc_-&gt;alloc_-&gt;chunk_size() / kMinFilterRatio));
+</a><a href="#h2-12-124" id="h2-12-124" class="i">+    }
+</a><a href="#h2-12-125" id="h2-12-125" class="i">+    int count;
+</a><a href="#h2-12-126" id="h2-12-126" class="i">+    {
+</a><a href="#h2-12-127" id="h2-12-127" class="i">+        run_timer run(index_time_);
+</a><a href="#h2-12-128" id="h2-12-128" class="i">+        count = suffix_search(chunk-&gt;data, chunk-&gt;suffixes, chunk-&gt;size, index_key_, *indexes);
+</a><a href="#h2-12-129" id="h2-12-129" class="i">+    }
+</a> 
+     search_lines(&amp;(*indexes)[0], count, chunk);
+ }
+<a href="#h2-13" id="h2-13" class="h">@@ -653,7 +801,7 @@ void searcher::search_lines(uint32_t *indexes, int count,
+</a>     StringPiece search((char*)chunk-&gt;data, chunk-&gt;size);
+     uint32_t max = indexes[0];
+     uint32_t min = line_start(chunk, indexes[0]);
+<a href="#h2-13-3" id="h2-13-3" class="d">-    for (int i = 0; i &lt;= count &amp;&amp; !exit_early(); i++) {
+</a><a href="#h2-13-4" id="h2-13-4" class="i">+    for (int i = 0; i &lt;= count &amp;&amp; !limiter_.exit_early(); i++) {
+</a>         if (i != count) {
+             if (indexes[i] &lt; max) continue;
+             if (indexes[i] &lt; max + kMinSkip) {
+<a href="#h2-14" id="h2-14" class="h">@@ -691,7 +839,7 @@ void searcher::next_range(match_finger *finger,
+</a> 
+     /* Find the first matching range that intersects [pos, maxpos) */
+     while (it != end &amp;&amp;
+<a href="#h2-14-3" id="h2-14-3" class="d">-           (it-&gt;right &lt; pos || !accept(it-&gt;files)) &amp;&amp;
+</a><a href="#h2-14-4" id="h2-14-4" class="i">+           (it-&gt;right &lt; pos || !accept(query_, it-&gt;files)) &amp;&amp;
+</a>            it-&gt;left &lt; maxpos)
+         ++it;
+ 
+<a href="#h2-15" id="h2-15" class="h">@@ -712,7 +860,7 @@ void searcher::next_range(match_finger *finger,
+</a>     do {
+         if (it-&gt;left &gt;= endpos + kMinSkip)
+             break;
+<a href="#h2-15-3" id="h2-15-3" class="d">-        if (it-&gt;right &gt;= endpos &amp;&amp; accept(it-&gt;files)) {
+</a><a href="#h2-15-4" id="h2-15-4" class="i">+        if (it-&gt;right &gt;= endpos &amp;&amp; accept(query_, it-&gt;files)) {
+</a>             endpos = max(endpos, it-&gt;right);
+             if (endpos &gt;= maxpos)
+                 /*
+<a href="#h2-16" id="h2-16" class="h">@@ -732,7 +880,7 @@ void searcher::full_search(match_finger *finger,
+</a>     StringPiece str((char*)chunk-&gt;data, chunk-&gt;size);
+     StringPiece match;
+     int pos = minpos, new_pos, end = minpos;
+<a href="#h2-16-3" id="h2-16-3" class="d">-    while (pos &lt; maxpos &amp;&amp; !exit_early()) {
+</a><a href="#h2-16-4" id="h2-16-4" class="i">+    while (pos &lt; maxpos &amp;&amp; !limiter_.exit_early()) {
+</a>         if (pos &gt;= end) {
+             end = maxpos;
+             next_range(finger, pos, end, maxpos);
+<a href="#h2-17" id="h2-17" class="h">@@ -777,10 +925,10 @@ void searcher::find_match_brute(const chunk *chunk,
+</a>         if (off &gt;= it-&gt;left &amp;&amp; off &lt;= it-&gt;right) {
+             for (list&lt;indexed_file *&gt;::const_iterator fit = it-&gt;files.begin();
+                  fit != it-&gt;files.end(); ++fit) {
+<a href="#h2-17-3" id="h2-17-3" class="d">-                if (!accept(*fit))
+</a><a href="#h2-17-4" id="h2-17-4" class="i">+                if (!accept(query_, *fit))
+</a>                     continue;
+                 searched++;
+<a href="#h2-17-7" id="h2-17-7" class="d">-                if (exit_early())
+</a><a href="#h2-17-8" id="h2-17-8" class="i">+                if (limiter_.exit_early())
+</a>                     break;
+                 try_match(line, match, *fit);
+             }
+<a href="#h2-18" id="h2-18" class="h">@@ -811,7 +959,7 @@ void searcher::find_match(const chunk *chunk,
+</a> 
+     debug(kDebugSearch, &quot;find_match(%d)&quot;, loff);
+ 
+<a href="#h2-18-3" id="h2-18-3" class="d">-    while (!stack.empty() &amp;&amp; !exit_reason_) {
+</a><a href="#h2-18-4" id="h2-18-4" class="i">+    while (!stack.empty() &amp;&amp; !limiter_.exit_early()) {
+</a>         chunk_file_node *n = stack.back();
+         stack.pop_back();
+ 
+<a href="#h2-19" id="h2-19" class="h">@@ -829,9 +977,9 @@ void searcher::find_match(const chunk *chunk,
+</a>                 assert(loff &gt;= n-&gt;chunk-&gt;left &amp;&amp; loff &lt;= n-&gt;chunk-&gt;right);
+                 for (list&lt;indexed_file *&gt;::const_iterator it = n-&gt;chunk-&gt;files.begin();
+                      it != n-&gt;chunk-&gt;files.end(); ++it) {
+<a href="#h2-19-3" id="h2-19-3" class="d">-                    if (!accept(*it))
+</a><a href="#h2-19-4" id="h2-19-4" class="i">+                    if (!accept(query_, *it))
+</a>                         continue;
+<a href="#h2-19-6" id="h2-19-6" class="d">-                    if (exit_early())
+</a><a href="#h2-19-7" id="h2-19-7" class="i">+                    if (limiter_.exit_early())
+</a>                         break;
+                     try_match(line, match, *it);
+                 }
+<a href="#h2-20" id="h2-20" class="h">@@ -904,9 +1052,9 @@ void searcher::try_match(const StringPiece&amp; line,
+</a> 
+         if (!transform_ || transform_(m)) {
+             queue_.push(m);
+<a href="#h2-20-3" id="h2-20-3" class="d">-            ++matches_;
+</a><a href="#h2-20-4" id="h2-20-4" class="i">+            limiter_.record_match();
+</a>         }
+<a href="#h2-20-6" id="h2-20-6" class="d">-        if (exit_early())
+</a><a href="#h2-20-7" id="h2-20-7" class="i">+        if (limiter_.exit_early())
+</a>             break;
+ 
+         ++it;
+<a href="#h2-21" id="h2-21" class="h">@@ -917,16 +1065,20 @@ void searcher::try_match(const StringPiece&amp; line,
+</a> code_searcher::search_thread::search_thread(code_searcher *cs)
+     : cs_(cs) {
+     if (FLAGS_search) {
+<a href="#h2-21-3" id="h2-21-3" class="d">-        for (int i = 0; i &lt; FLAGS_threads; ++i)
+</a><a href="#h2-21-4" id="h2-21-4" class="i">+        for (int i = 0; i &lt; FLAGS_threads; ++i) {
+</a>             threads_.push_back(std::move(std::thread(search_one, this)));
+<a href="#h2-21-6" id="h2-21-6" class="i">+        }
+</a><a href="#h2-21-7" id="h2-21-7" class="i">+        threads_.push_back(std::move(std::thread(search_file_one, this)));
+</a>     }
+ }
+ 
+ void code_searcher::search_thread::match(const query &amp;q,
+                                          const callback_func&amp; cb,
+<a href="#h2-21-13" id="h2-21-13" class="i">+                                         const file_callback_func&amp; fcb,
+</a>                                          const transform_func&amp; func,
+                                          match_stats *stats) {
+     match_result *m;
+<a href="#h2-21-17" id="h2-21-17" class="i">+    file_result *f;
+</a>     int matches = 0;
+ 
+     assert(cs_-&gt;finalized_);
+<a href="#h2-22" id="h2-22" class="h">@@ -939,16 +1091,29 @@ void code_searcher::search_thread::match(const query &amp;q,
+</a>         cs_-&gt;alloc_-&gt;drop_caches();
+     }
+ 
+<a href="#h2-22-3" id="h2-22-3" class="d">-    searcher search(cs_, q, func);
+</a><a href="#h2-22-4" id="h2-22-4" class="i">+    timer analyze_time(false);
+</a><a href="#h2-22-5" id="h2-22-5" class="i">+    intrusive_ptr&lt;IndexKey&gt; index_key;
+</a><a href="#h2-22-6" id="h2-22-6" class="i">+    {
+</a><a href="#h2-22-7" id="h2-22-7" class="i">+        run_timer run(analyze_time);
+</a><a href="#h2-22-8" id="h2-22-8" class="i">+        index_key = indexRE(*q.line_pat);
+</a><a href="#h2-22-9" id="h2-22-9" class="i">+    }
+</a><a href="#h2-22-10" id="h2-22-10" class="i">+    debug(kDebugProfile, &quot;analyze time: %d.%06ds&quot;,
+</a><a href="#h2-22-11" id="h2-22-11" class="i">+          int(analyze_time.elapsed().tv_sec),
+</a><a href="#h2-22-12" id="h2-22-12" class="i">+          int(analyze_time.elapsed().tv_usec));
+</a><a href="#h2-22-13" id="h2-22-13" class="i">+
+</a><a href="#h2-22-14" id="h2-22-14" class="i">+    searcher search(cs_, q, index_key, func);
+</a><a href="#h2-22-15" id="h2-22-15" class="i">+    filename_searcher file_search(cs_, q, index_key);
+</a>     job j;
+     j.trace_id = current_trace_id();
+     j.search = &amp;search;
+<a href="#h2-22-19" id="h2-22-19" class="i">+    j.file_search = &amp;file_search;
+</a>     j.pending = 0;
+ 
+     for (int i = 0; i &lt; FLAGS_threads; ++i) {
+         ++j.pending;
+         queue_.push(&amp;j);
+     }
+<a href="#h2-22-26" id="h2-22-26" class="i">+    file_queue_.push(&amp;j);
+</a> 
+     for (auto it = cs_-&gt;alloc_-&gt;begin(); it != cs_-&gt;alloc_-&gt;end(); it++) {
+         j.chunks.push(*it);
+<a href="#h2-23" id="h2-23" class="h">@@ -963,7 +1128,13 @@ void code_searcher::search_thread::match(const query &amp;q,
+</a>         delete m;
+     }
+ 
+<a href="#h2-23-3" id="h2-23-3" class="i">+    while (file_search.queue_.pop(&amp;f)) {
+</a><a href="#h2-23-4" id="h2-23-4" class="i">+        fcb(f);
+</a><a href="#h2-23-5" id="h2-23-5" class="i">+        delete f;
+</a><a href="#h2-23-6" id="h2-23-6" class="i">+    }
+</a><a href="#h2-23-7" id="h2-23-7" class="i">+
+</a>     search.get_stats(stats);
+<a href="#h2-23-9" id="h2-23-9" class="i">+    stats-&gt;analyze_time = analyze_time.elapsed();
+</a>     stats-&gt;why = search.why();
+     stats-&gt;matches = matches;
+ }
+<a href="#h2-24" id="h2-24" class="h">@@ -971,6 +1142,7 @@ void code_searcher::search_thread::match(const query &amp;q,
+</a> 
+ code_searcher::search_thread::~search_thread() {
+     queue_.close();
+<a href="#h2-24-3" id="h2-24-3" class="i">+    file_queue_.close();
+</a>     for (auto it = threads_.begin(); it != threads_.end(); ++it)
+         it-&gt;join();
+ }
+<a href="#h2-25" id="h2-25" class="h">@@ -990,6 +1162,15 @@ void code_searcher::search_thread::search_one(search_thread *me) {
+</a>     }
+ }
+ 
+<a href="#h2-25-3" id="h2-25-3" class="i">+void code_searcher::search_thread::search_file_one(search_thread *me) {
+</a><a href="#h2-25-4" id="h2-25-4" class="i">+    job *j;
+</a><a href="#h2-25-5" id="h2-25-5" class="i">+    while (me-&gt;file_queue_.pop(&amp;j)) {
+</a><a href="#h2-25-6" id="h2-25-6" class="i">+        scoped_trace_id trace(j-&gt;trace_id);
+</a><a href="#h2-25-7" id="h2-25-7" class="i">+        (*j-&gt;file_search)();
+</a><a href="#h2-25-8" id="h2-25-8" class="i">+        j-&gt;file_search-&gt;queue_.close();
+</a><a href="#h2-25-9" id="h2-25-9" class="i">+    }
+</a><a href="#h2-25-10" id="h2-25-10" class="i">+}
+</a><a href="#h2-25-11" id="h2-25-11" class="i">+
+</a> void default_re2_options(RE2::Options &amp;opts) {
+     opts.set_never_nl(true);
+     opts.set_one_line(false);
+<b>diff --git a/<a id="h3" href="../file/src/codesearch.h">src/codesearch.h</a> b/<a href="../file/src/codesearch.h">src/codesearch.h</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -30,6 +30,7 @@
+</a> #include &quot;src/lib/thread_queue.h&quot;
+ 
+ class searcher;
+<a href="#h3-0-3" id="h3-0-3" class="i">+class filename_searcher;
+</a> class chunk_allocator;
+ class file_contents;
+ struct match_result;
+<a href="#h3-1" id="h3-1" class="h">@@ -114,6 +115,11 @@ struct match_result {
+</a>     int matchleft, matchright;
+ };
+ 
+<a href="#h3-1-3" id="h3-1-3" class="i">+struct file_result {
+</a><a href="#h3-1-4" id="h3-1-4" class="i">+    indexed_file *file;
+</a><a href="#h3-1-5" id="h3-1-5" class="i">+    int matchleft, matchright;
+</a><a href="#h3-1-6" id="h3-1-6" class="i">+};
+</a><a href="#h3-1-7" id="h3-1-7" class="i">+
+</a> // A query specification passed to match(). line_pat is required to be
+ // non-NULL; file_pat, tree_pat and tag_pat may be NULL to specify &quot;no
+ // constraint&quot;
+<a href="#h3-2" id="h3-2" class="h">@@ -174,16 +180,22 @@ public:
+</a> 
+         // function that will be called to record a match
+         typedef std::function&lt;void (const struct match_result*)&gt; callback_func;
+<a href="#h3-2-3" id="h3-2-3" class="i">+        // function that will be called to record a filename match
+</a><a href="#h3-2-4" id="h3-2-4" class="i">+        typedef std::function&lt;void (const struct file_result*)&gt; file_callback_func;
+</a>         // function that will be called to transform a match
+         typedef std::function&lt;bool (struct match_result*)&gt; transform_func;
+ 
+         /* file_pat may be NULL */
+<a href="#h3-2-9" id="h3-2-9" class="d">-        void match(const query&amp; q, const callback_func&amp; cb, match_stats *stats)
+</a><a href="#h3-2-10" id="h3-2-10" class="i">+        void match(const query&amp; q,
+</a><a href="#h3-2-11" id="h3-2-11" class="i">+                   const callback_func&amp; cb,
+</a><a href="#h3-2-12" id="h3-2-12" class="i">+                   const file_callback_func&amp; fcb,
+</a><a href="#h3-2-13" id="h3-2-13" class="i">+                   match_stats *stats)
+</a>         {
+<a href="#h3-2-15" id="h3-2-15" class="d">-            match(q, cb, transform_func(), stats);
+</a><a href="#h3-2-16" id="h3-2-16" class="i">+            match(q, cb, fcb, transform_func(), stats);
+</a>         }
+         void match(const query&amp; q,
+                    const callback_func&amp; cb,
+<a href="#h3-2-20" id="h3-2-20" class="i">+                   const file_callback_func&amp; fcb,
+</a>                    const transform_func&amp; func,
+                    match_stats *stats);
+     protected:
+<a href="#h3-3" id="h3-3" class="h">@@ -191,14 +203,17 @@ public:
+</a>             std::string trace_id;
+             atomic_int pending;
+             searcher *search;
+<a href="#h3-3-3" id="h3-3-3" class="i">+            filename_searcher *file_search;
+</a>             thread_queue&lt;chunk*&gt; chunks;
+         };
+ 
+         const code_searcher *cs_;
+         vector&lt;std::thread&gt; threads_;
+         thread_queue&lt;job*&gt; queue_;
+<a href="#h3-3-10" id="h3-3-10" class="i">+        thread_queue&lt;job*&gt; file_queue_;
+</a> 
+         static void search_one(search_thread *);
+<a href="#h3-3-13" id="h3-3-13" class="i">+        static void search_file_one(search_thread *);
+</a>     private:
+         search_thread(const search_thread&amp;);
+         void operator=(const search_thread&amp;);
+<a href="#h3-4" id="h3-4" class="h">@@ -222,11 +237,23 @@ protected:
+</a>     // Timestamp representing the end of index construction.
+     int64_t index_timestamp_;
+ 
+<a href="#h3-4-3" id="h3-4-3" class="i">+    // Structures for fast filename search; somewhat similar to a single chunk.
+</a><a href="#h3-4-4" id="h3-4-4" class="i">+    // Built from files_ at finalization, not serialized or anything like that.
+</a><a href="#h3-4-5" id="h3-4-5" class="i">+    unsigned char *filename_data_;
+</a><a href="#h3-4-6" id="h3-4-6" class="i">+    int filename_data_size_;
+</a><a href="#h3-4-7" id="h3-4-7" class="i">+    uint32_t *filename_suffixes_;
+</a><a href="#h3-4-8" id="h3-4-8" class="i">+    // pairs (i, file), where file-&gt;path starts at filename_data_[i]
+</a><a href="#h3-4-9" id="h3-4-9" class="i">+    vector&lt;pair&lt;int, indexed_file*&gt;&gt; filename_positions_;
+</a><a href="#h3-4-10" id="h3-4-10" class="i">+
+</a>     vector&lt;indexed_tree*&gt; trees_;
+     vector&lt;indexed_file*&gt; files_;
+ 
+<a href="#h3-4-14" id="h3-4-14" class="i">+private:
+</a><a href="#h3-4-15" id="h3-4-15" class="i">+    void index_filenames();
+</a><a href="#h3-4-16" id="h3-4-16" class="i">+
+</a>     friend class search_thread;
+     friend class searcher;
+<a href="#h3-4-19" id="h3-4-19" class="i">+    friend class filename_searcher;
+</a>     friend class codesearch_index;
+     friend class load_allocator;
+     friend class tag_searcher;
+<b>diff --git a/<a id="h4" href="../file/src/dump_load.cc">src/dump_load.cc</a> b/<a href="../file/src/dump_load.cc">src/dump_load.cc</a></b>
+<a href="#h4-0" id="h4-0" class="h">@@ -471,6 +471,8 @@ void load_allocator::load(code_searcher *cs) {
+</a>     assert(fstat(fd_, &amp;st) == 0);
+     cs-&gt;index_timestamp_ = st.st_mtime;
+ 
+<a href="#h4-0-3" id="h4-0-3" class="i">+    cs-&gt;index_filenames();
+</a><a href="#h4-0-4" id="h4-0-4" class="i">+
+</a>     cs-&gt;finalized_ = true;
+ }
+ 
+<b>diff --git a/<a id="h5" href="../file/src/proto/livegrep.proto">src/proto/livegrep.proto</a> b/<a href="../file/src/proto/livegrep.proto">src/proto/livegrep.proto</a></b>
+<a href="#h5-0" id="h5-0" class="h">@@ -28,6 +28,13 @@ message SearchResult {
+</a>     string line = 8;
+ }
+ 
+<a href="#h5-0-3" id="h5-0-3" class="i">+message FileResult {
+</a><a href="#h5-0-4" id="h5-0-4" class="i">+    string tree = 1;
+</a><a href="#h5-0-5" id="h5-0-5" class="i">+    string version = 2;
+</a><a href="#h5-0-6" id="h5-0-6" class="i">+    string path = 3;
+</a><a href="#h5-0-7" id="h5-0-7" class="i">+    Bounds bounds = 4;
+</a><a href="#h5-0-8" id="h5-0-8" class="i">+}
+</a><a href="#h5-0-9" id="h5-0-9" class="i">+
+</a> message SearchStats {
+     int64 re2_time = 1;
+     int64 git_time = 2;
+<a href="#h5-1" id="h5-1" class="h">@@ -58,6 +65,7 @@ message ServerInfo {
+</a> message CodeSearchResult {
+     SearchStats stats = 1;
+     repeated SearchResult results = 2;
+<a href="#h5-1-3" id="h5-1-3" class="i">+    repeated FileResult file_results = 3;
+</a> }
+ 
+ message InfoRequest {
+<b>diff --git a/<a id="h6" href="../file/src/tools/codesearch.cc">src/tools/codesearch.cc</a> b/<a href="../file/src/tools/codesearch.cc">src/tools/codesearch.cc</a></b>
+<a href="#h6-0" id="h6-0" class="h">@@ -150,6 +150,8 @@ void listen_grpc(code_searcher *search, code_searcher *tags, const string&amp; addr)
+</a>     builder.RegisterService(service.get());
+     std::unique_ptr&lt;Server&gt; server(builder.BuildAndStart());
+ 
+<a href="#h6-0-3" id="h6-0-3" class="i">+    log(&quot;Serving...&quot;);
+</a><a href="#h6-0-4" id="h6-0-4" class="i">+
+</a>     if (FLAGS_reload_rpc) {
+         thread shutdown_thread([&amp;]() {
+             reload_request.get_future().wait();
+<b>diff --git a/<a id="h7" href="../file/src/tools/grpc_server.cc">src/tools/grpc_server.cc</a> b/<a href="../file/src/tools/grpc_server.cc">src/tools/grpc_server.cc</a></b>
+<a href="#h7-0" id="h7-0" class="h">@@ -178,6 +178,15 @@ public:
+</a>         result-&gt;set_line(m-&gt;line.ToString());
+     }
+ 
+<a href="#h7-0-3" id="h7-0-3" class="i">+    void operator()(const file_result *f) const {
+</a><a href="#h7-0-4" id="h7-0-4" class="i">+        auto result = response_-&gt;add_file_results();
+</a><a href="#h7-0-5" id="h7-0-5" class="i">+        result-&gt;set_tree(f-&gt;file-&gt;tree-&gt;name);
+</a><a href="#h7-0-6" id="h7-0-6" class="i">+        result-&gt;set_version(f-&gt;file-&gt;tree-&gt;version);
+</a><a href="#h7-0-7" id="h7-0-7" class="i">+        result-&gt;set_path(f-&gt;file-&gt;path);
+</a><a href="#h7-0-8" id="h7-0-8" class="i">+        result-&gt;mutable_bounds()-&gt;set_left(f-&gt;matchleft);
+</a><a href="#h7-0-9" id="h7-0-9" class="i">+        result-&gt;mutable_bounds()-&gt;set_right(f-&gt;matchright);
+</a><a href="#h7-0-10" id="h7-0-10" class="i">+    }
+</a><a href="#h7-0-11" id="h7-0-11" class="i">+
+</a> private:
+     CodeSearchResult* response_;
+ };
+<a href="#h7-1" id="h7-1" class="h">@@ -230,7 +239,8 @@ Status CodeSearchImpl::Search(ServerContext* context, const ::Query* request, ::
+</a>         code_searcher::search_thread *search;
+         if (!pool_.try_pop(&amp;search))
+             search = new code_searcher::search_thread(cs_);
+<a href="#h7-1-3" id="h7-1-3" class="d">-        search-&gt;match(q, add_match(response), &amp;stats);
+</a><a href="#h7-1-4" id="h7-1-4" class="i">+        add_match cb(response);
+</a><a href="#h7-1-5" id="h7-1-5" class="i">+        search-&gt;match(q, cb, cb, &amp;stats);
+</a>         pool_.push(search);
+     } else {
+         if (tagdata_ == NULL)
+<a href="#h7-2" id="h7-2" class="h">@@ -250,8 +260,10 @@ Status CodeSearchImpl::Search(ServerContext* context, const ::Query* request, ::
+</a>         q.file_pat.reset();
+         q.tags_pat.reset();
+ 
+<a href="#h7-2-3" id="h7-2-3" class="i">+        add_match cb(response);
+</a>         search.match(q,
+<a href="#h7-2-5" id="h7-2-5" class="d">-                     add_match(response),
+</a><a href="#h7-2-6" id="h7-2-6" class="i">+                     cb,
+</a><a href="#h7-2-7" id="h7-2-7" class="i">+                     cb,
+</a>                      boost::bind(&amp;tag_searcher::transform, tagmatch_, &amp;constraints, _1),
+                      &amp;stats);
+     }
+<b>diff --git a/<a id="h8" href="../file/test/codesearch_test.cc">test/codesearch_test.cc</a> b/<a href="../file/test/codesearch_test.cc">test/codesearch_test.cc</a></b>
+<a href="#h8-0" id="h8-0" class="h">@@ -296,3 +296,20 @@ TEST_F(codesearch_test, LineCaseAndRepoCaseAreIndependent) {
+</a>         ASSERT_EQ(1, matches.results_size());
+     }
+ }
+<a href="#h8-0-3" id="h8-0-3" class="i">+
+</a><a href="#h8-0-4" id="h8-0-4" class="i">+TEST_F(codesearch_test, FilenameTest) {
+</a><a href="#h8-0-5" id="h8-0-5" class="i">+    const indexed_tree *other = cs_.open_tree(&quot;OTHER&quot;, 0, &quot;REV0&quot;);
+</a><a href="#h8-0-6" id="h8-0-6" class="i">+    cs_.index_file(tree_, &quot;/file1&quot;, &quot;contents&quot;);
+</a><a href="#h8-0-7" id="h8-0-7" class="i">+    cs_.index_file(tree_, &quot;/file2&quot;, &quot;mention of file1&quot;);
+</a><a href="#h8-0-8" id="h8-0-8" class="i">+    cs_.finalize();
+</a><a href="#h8-0-9" id="h8-0-9" class="i">+
+</a><a href="#h8-0-10" id="h8-0-10" class="i">+    std::unique_ptr&lt;CodeSearch::Service&gt; srv(build_grpc_server(&amp;cs_, nullptr, nullptr));
+</a><a href="#h8-0-11" id="h8-0-11" class="i">+    CodeSearchResult matches;
+</a><a href="#h8-0-12" id="h8-0-12" class="i">+    Query request;
+</a><a href="#h8-0-13" id="h8-0-13" class="i">+    request.set_line(&quot;file1&quot;);
+</a><a href="#h8-0-14" id="h8-0-14" class="i">+    grpc::ServerContext ctx;
+</a><a href="#h8-0-15" id="h8-0-15" class="i">+    grpc::Status st = srv-&gt;Search(&amp;ctx, &amp;request, &amp;matches);
+</a><a href="#h8-0-16" id="h8-0-16" class="i">+    ASSERT_TRUE(st.ok());
+</a><a href="#h8-0-17" id="h8-0-17" class="i">+    ASSERT_EQ(1, matches.file_results_size());
+</a><a href="#h8-0-18" id="h8-0-18" class="i">+    ASSERT_EQ(&quot;/file1&quot;, matches.file_results(0).path());
+</a><a href="#h8-0-19" id="h8-0-19" class="i">+}
+</a><b>diff --git a/<a id="h9" href="../file/web/htdocs/assets/css/codesearch.css">web/htdocs/assets/css/codesearch.css</a> b/<a href="../file/web/htdocs/assets/css/codesearch.css">web/htdocs/assets/css/codesearch.css</a></b>
+<a href="#h9-0" id="h9-0" class="h">@@ -73,6 +73,10 @@ a:hover {
+</a>     margin-top: 10px;
+ }
+ 
+<a href="#h9-0-3" id="h9-0-3" class="i">+.path-results {
+</a><a href="#h9-0-4" id="h9-0-4" class="i">+    margin-bottom: 15px;
+</a><a href="#h9-0-5" id="h9-0-5" class="i">+}
+</a><a href="#h9-0-6" id="h9-0-6" class="i">+
+</a> .file-group {
+     background: rgba(34, 76, 89, 0.05);
+     margin-bottom: 15px;
+<a href="#h9-1" id="h9-1" class="h">@@ -81,19 +85,22 @@ a:hover {
+</a> }
+ 
+ .file-group .header {
+<a href="#h9-1-3" id="h9-1-3" class="d">-    color: #3d464d;
+</a><a href="#h9-1-4" id="h9-1-4" class="d">-    font-family: monospace;
+</a><a href="#h9-1-5" id="h9-1-5" class="d">-    font-weight: normal;
+</a>     display: block;
+     background: rgba(0, 126, 229, 0.04);
+     padding: 3px 5px;
+ }
+ 
+<a href="#h9-1-11" id="h9-1-11" class="d">-.file-group .header .filename {
+</a><a href="#h9-1-12" id="h9-1-12" class="i">+.result-path {
+</a><a href="#h9-1-13" id="h9-1-13" class="i">+    color: #3d464d;
+</a><a href="#h9-1-14" id="h9-1-14" class="i">+    font-family: monospace;
+</a><a href="#h9-1-15" id="h9-1-15" class="i">+    font-weight: normal;
+</a><a href="#h9-1-16" id="h9-1-16" class="i">+}
+</a><a href="#h9-1-17" id="h9-1-17" class="i">+
+</a><a href="#h9-1-18" id="h9-1-18" class="i">+.result-path .filename {
+</a>     font-weight: bold;
+ }
+ 
+<a href="#h9-1-22" id="h9-1-22" class="d">-.file-group .header .repo, .file-group .header .version {
+</a><a href="#h9-1-23" id="h9-1-23" class="i">+.result-path .repo, .result-path .version {
+</a>     color: rgba(0, 0, 0, 0.5);
+ }
+ 
+<b>diff --git a/<a id="h10" href="../file/web/htdocs/assets/js/codesearch.js">web/htdocs/assets/js/codesearch.js</a> b/<a href="../file/web/htdocs/assets/js/codesearch.js">web/htdocs/assets/js/codesearch.js</a></b>
+<a href="#h10-0" id="h10-0" class="h">@@ -39,6 +39,9 @@ var Codesearch = function() {
+</a>         data.results.forEach(function (r) {
+           Codesearch.delegate.match(opts.id, r);
+         });
+<a href="#h10-0-3" id="h10-0-3" class="i">+        data.file_results.forEach(function (r) {
+</a><a href="#h10-0-4" id="h10-0-4" class="i">+          Codesearch.delegate.file_match(opts.id, r);
+</a><a href="#h10-0-5" id="h10-0-5" class="i">+        });
+</a>         Codesearch.delegate.search_done(opts.id, elapsed, data.info.why);
+       });
+       xhr.error(function(data) {
+<b>diff --git a/<a id="h11" href="../file/web/htdocs/assets/js/codesearch_ui.js">web/htdocs/assets/js/codesearch_ui.js</a> b/<a href="../file/web/htdocs/assets/js/codesearch_ui.js">web/htdocs/assets/js/codesearch_ui.js</a></b>
+<a href="#h11-0" id="h11-0" class="h">@@ -250,6 +250,79 @@ var SearchResultSet = Backbone.Collection.extend({
+</a>   }
+ });
+ 
+<a href="#h11-0-3" id="h11-0-3" class="i">+/**
+</a><a href="#h11-0-4" id="h11-0-4" class="i">+ * A FileMatch represents a single filename match in the code base.
+</a><a href="#h11-0-5" id="h11-0-5" class="i">+ *
+</a><a href="#h11-0-6" id="h11-0-6" class="i">+ * This model wraps the JSON response from the Codesearch backend for an individual match.
+</a><a href="#h11-0-7" id="h11-0-7" class="i">+ *
+</a><a href="#h11-0-8" id="h11-0-8" class="i">+ * XXX almost identical to Match
+</a><a href="#h11-0-9" id="h11-0-9" class="i">+ */
+</a><a href="#h11-0-10" id="h11-0-10" class="i">+var FileMatch = Backbone.Model.extend({
+</a><a href="#h11-0-11" id="h11-0-11" class="i">+  path_info: function() {
+</a><a href="#h11-0-12" id="h11-0-12" class="i">+    var tree = this.get(&#39;tree&#39;);
+</a><a href="#h11-0-13" id="h11-0-13" class="i">+    var version = this.get(&#39;version&#39;);
+</a><a href="#h11-0-14" id="h11-0-14" class="i">+    var path = this.get(&#39;path&#39;);
+</a><a href="#h11-0-15" id="h11-0-15" class="i">+    return {
+</a><a href="#h11-0-16" id="h11-0-16" class="i">+      id: tree + &#39;:&#39; + version + &#39;:&#39; + path,
+</a><a href="#h11-0-17" id="h11-0-17" class="i">+      tree: tree,
+</a><a href="#h11-0-18" id="h11-0-18" class="i">+      version: version,
+</a><a href="#h11-0-19" id="h11-0-19" class="i">+      path: path,
+</a><a href="#h11-0-20" id="h11-0-20" class="i">+      bounds: this.get(&#39;bounds&#39;)
+</a><a href="#h11-0-21" id="h11-0-21" class="i">+    }
+</a><a href="#h11-0-22" id="h11-0-22" class="i">+  },
+</a><a href="#h11-0-23" id="h11-0-23" class="i">+
+</a><a href="#h11-0-24" id="h11-0-24" class="i">+  url: function() {
+</a><a href="#h11-0-25" id="h11-0-25" class="i">+    var name = this.get(&#39;tree&#39;);
+</a><a href="#h11-0-26" id="h11-0-26" class="i">+    var ref = this.get(&#39;version&#39;);
+</a><a href="#h11-0-27" id="h11-0-27" class="i">+
+</a><a href="#h11-0-28" id="h11-0-28" class="i">+    var repo_map;
+</a><a href="#h11-0-29" id="h11-0-29" class="i">+    var backend = Codesearch.in_flight.backend;
+</a><a href="#h11-0-30" id="h11-0-30" class="i">+    repo_map = CodesearchUI.repo_urls[backend];
+</a><a href="#h11-0-31" id="h11-0-31" class="i">+    if (!repo_map) {
+</a><a href="#h11-0-32" id="h11-0-32" class="i">+      return null;
+</a><a href="#h11-0-33" id="h11-0-33" class="i">+    }
+</a><a href="#h11-0-34" id="h11-0-34" class="i">+    if (!repo_map[name]) {
+</a><a href="#h11-0-35" id="h11-0-35" class="i">+      return null;
+</a><a href="#h11-0-36" id="h11-0-36" class="i">+    }
+</a><a href="#h11-0-37" id="h11-0-37" class="i">+
+</a><a href="#h11-0-38" id="h11-0-38" class="i">+    var lno = 1;
+</a><a href="#h11-0-39" id="h11-0-39" class="i">+
+</a><a href="#h11-0-40" id="h11-0-40" class="i">+    // the order of these replacements is used to minimize conflicts
+</a><a href="#h11-0-41" id="h11-0-41" class="i">+    var url = repo_map[name];
+</a><a href="#h11-0-42" id="h11-0-42" class="i">+    url = url.replace(&#39;{lno}&#39;, lno);
+</a><a href="#h11-0-43" id="h11-0-43" class="i">+    url = url.replace(&#39;{version}&#39;, shorten(ref));
+</a><a href="#h11-0-44" id="h11-0-44" class="i">+    url = url.replace(&#39;{name}&#39;, name);
+</a><a href="#h11-0-45" id="h11-0-45" class="i">+    url = url.replace(&#39;{path}&#39;, this.get(&#39;path&#39;));
+</a><a href="#h11-0-46" id="h11-0-46" class="i">+    return url;
+</a><a href="#h11-0-47" id="h11-0-47" class="i">+  }
+</a><a href="#h11-0-48" id="h11-0-48" class="i">+});
+</a><a href="#h11-0-49" id="h11-0-49" class="i">+
+</a><a href="#h11-0-50" id="h11-0-50" class="i">+var FileMatchView = Backbone.View.extend({
+</a><a href="#h11-0-51" id="h11-0-51" class="i">+  tagName: &#39;div&#39;,
+</a><a href="#h11-0-52" id="h11-0-52" class="i">+
+</a><a href="#h11-0-53" id="h11-0-53" class="i">+  render: function() {
+</a><a href="#h11-0-54" id="h11-0-54" class="i">+    var path_info = this.model.path_info();
+</a><a href="#h11-0-55" id="h11-0-55" class="i">+    var pieces = [
+</a><a href="#h11-0-56" id="h11-0-56" class="i">+      path_info.path.substring(0, path_info.bounds[0]),
+</a><a href="#h11-0-57" id="h11-0-57" class="i">+      path_info.path.substring(path_info.bounds[0], path_info.bounds[1]),
+</a><a href="#h11-0-58" id="h11-0-58" class="i">+      path_info.path.substring(path_info.bounds[1])
+</a><a href="#h11-0-59" id="h11-0-59" class="i">+    ];
+</a><a href="#h11-0-60" id="h11-0-60" class="i">+    var repoLabel = [
+</a><a href="#h11-0-61" id="h11-0-61" class="i">+      h.span({cls: &quot;repo&quot;}, [path_info.tree, &#39;:&#39;]),
+</a><a href="#h11-0-62" id="h11-0-62" class="i">+      h.span({cls: &quot;version&quot;}, [shorten(path_info.version), &#39;:&#39;]),
+</a><a href="#h11-0-63" id="h11-0-63" class="i">+      pieces[0],
+</a><a href="#h11-0-64" id="h11-0-64" class="i">+      h.span({cls: &quot;matchstr&quot;}, [pieces[1]]),
+</a><a href="#h11-0-65" id="h11-0-65" class="i">+      pieces[2]
+</a><a href="#h11-0-66" id="h11-0-66" class="i">+    ];
+</a><a href="#h11-0-67" id="h11-0-67" class="i">+
+</a><a href="#h11-0-68" id="h11-0-68" class="i">+    var el = this.$el;
+</a><a href="#h11-0-69" id="h11-0-69" class="i">+    el.empty();
+</a><a href="#h11-0-70" id="h11-0-70" class="i">+    el.addClass(&#39;filename-match&#39;);
+</a><a href="#h11-0-71" id="h11-0-71" class="i">+    el.append(h.a({cls: &#39;label header result-path&#39;, href: this.model.url()}, repoLabel));
+</a><a href="#h11-0-72" id="h11-0-72" class="i">+    return this;
+</a><a href="#h11-0-73" id="h11-0-73" class="i">+  }
+</a><a href="#h11-0-74" id="h11-0-74" class="i">+});
+</a><a href="#h11-0-75" id="h11-0-75" class="i">+
+</a> var SearchState = Backbone.Model.extend({
+   defaults: function() {
+     return {
+<a href="#h11-1" id="h11-1" class="h">@@ -263,6 +336,7 @@ var SearchState = Backbone.Model.extend({
+</a>   initialize: function() {
+     this.search_map = {};
+     this.search_results = new SearchResultSet();
+<a href="#h11-1-3" id="h11-1-3" class="i">+    this.file_search_results = new Backbone.Collection();
+</a>     this.search_id = 0;
+     this.on(&#39;change:displaying&#39;, this.new_search, this);
+   },
+<a href="#h11-2" id="h11-2" class="h">@@ -274,6 +348,7 @@ var SearchState = Backbone.Model.extend({
+</a>         why: null
+     });
+     this.search_results.reset();
+<a href="#h11-2-3" id="h11-2-3" class="i">+    this.file_search_results.reset();
+</a>     for (var k in this.search_map) {
+       if (parseInt(k) &lt; this.get(&#39;displaying&#39;))
+         delete this.search_map[k];
+<a href="#h11-3" id="h11-3" class="h">@@ -339,6 +414,19 @@ var SearchState = Backbone.Model.extend({
+</a>     m.backend = this.search_map[search].backend;
+     this.search_results.add_match(new Match(m));
+   },
+<a href="#h11-3-3" id="h11-3-3" class="i">+  handle_file_match: function (search, file_match) {
+</a><a href="#h11-3-4" id="h11-3-4" class="i">+    if (search &lt; this.get(&#39;displaying&#39;))
+</a><a href="#h11-3-5" id="h11-3-5" class="i">+      return false;
+</a><a href="#h11-3-6" id="h11-3-6" class="i">+    this.set(&#39;displaying&#39;, search);
+</a><a href="#h11-3-7" id="h11-3-7" class="i">+    var fm = _.clone(file_match);
+</a><a href="#h11-3-8" id="h11-3-8" class="i">+    fm.backend = this.search_map[search].backend;
+</a><a href="#h11-3-9" id="h11-3-9" class="i">+    // TODO: Currently we hackily limit the display to 10 file-path results.
+</a><a href="#h11-3-10" id="h11-3-10" class="i">+    // We should do something nicer, like a &quot;...&quot; the user can click to extend
+</a><a href="#h11-3-11" id="h11-3-11" class="i">+    // the list.
+</a><a href="#h11-3-12" id="h11-3-12" class="i">+    if (this.file_search_results.length &lt; 10) {
+</a><a href="#h11-3-13" id="h11-3-13" class="i">+        this.file_search_results.add(new FileMatch(fm));
+</a><a href="#h11-3-14" id="h11-3-14" class="i">+    }
+</a><a href="#h11-3-15" id="h11-3-15" class="i">+  },
+</a>   handle_done: function (search, time, why) {
+     this.set(&#39;displaying&#39;, search);
+     this.set({time: time, why: why});
+<a href="#h11-4" id="h11-4" class="h">@@ -367,7 +455,7 @@ var FileGroupView = Backbone.View.extend({
+</a>       dirname,
+       h.span({cls: &quot;filename&quot;}, [basename])
+     ];
+<a href="#h11-4-3" id="h11-4-3" class="d">-    return h.a({cls: &#39;label header&#39;, href: this.model.matches[0].url()}, repoLabel);
+</a><a href="#h11-4-4" id="h11-4-4" class="i">+    return h.a({cls: &#39;label header result-path&#39;, href: this.model.matches[0].url()}, repoLabel);
+</a>   },
+ 
+   render: function() {
+<a href="#h11-5" id="h11-5" class="h">@@ -392,6 +480,14 @@ var MatchesView = Backbone.View.extend({
+</a>   },
+   render: function() {
+     this.$el.empty();
+<a href="#h11-5-3" id="h11-5-3" class="i">+
+</a><a href="#h11-5-4" id="h11-5-4" class="i">+    var pathResults = h.div({&#39;cls&#39;: &#39;path-results&#39;});
+</a><a href="#h11-5-5" id="h11-5-5" class="i">+    this.model.file_search_results.each(function(file) {
+</a><a href="#h11-5-6" id="h11-5-6" class="i">+        var view = new FileMatchView({model: file});
+</a><a href="#h11-5-7" id="h11-5-7" class="i">+        pathResults.append(view.render().el);
+</a><a href="#h11-5-8" id="h11-5-8" class="i">+    }, this);
+</a><a href="#h11-5-9" id="h11-5-9" class="i">+    this.$el.append(pathResults);
+</a><a href="#h11-5-10" id="h11-5-10" class="i">+
+</a>     this.model.search_results.each(function(file_group) {
+       file_group.process_context_overlaps();
+       var view = new FileGroupView({model: file_group});
+<a href="#h11-6" id="h11-6" class="h">@@ -554,6 +650,9 @@ var CodesearchUI = function() {
+</a>     match: function(search, match) {
+       CodesearchUI.state.handle_match(search, match);
+     },
+<a href="#h11-6-3" id="h11-6-3" class="i">+    file_match: function(search, file_match) {
+</a><a href="#h11-6-4" id="h11-6-4" class="i">+      CodesearchUI.state.handle_file_match(search, file_match);
+</a><a href="#h11-6-5" id="h11-6-5" class="i">+    },
+</a>     search_done: function(search, time, why) {
+       CodesearchUI.state.handle_done(search, time, why);
+     },
+</pre>
+</div>
+</body>
+</html>

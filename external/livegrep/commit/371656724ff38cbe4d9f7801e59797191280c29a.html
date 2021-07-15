@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Refactor backendds and connection logic. - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/371656724ff38cbe4d9f7801e59797191280c29a">371656724ff38cbe4d9f7801e59797191280c29a</a>
+<b>parent</b> <a href="../commit/29808c0b6f430ff2ad9d10400f1e070aeacc2f7a">29808c0b6f430ff2ad9d10400f1e070aeacc2f7a</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Thu, 27 Mar 2014 17:32:10 -0700
+
+Refactor backendds and connection logic.
+
+<b>Diffstat:</b>
+<table><tr><td class="A">A</td><td><a href="#h0">server/backend.go</a></td><td> | </td><td class="num">21</td><td><span class="i">+++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">server/search.go</a></td><td> | </td><td class="num">32</td><td><span class="i">++++++++++</span><span class="d">----------------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">server/server.go</a></td><td> | </td><td class="num">15</td><td><span class="i">++++++++++++++</span><span class="d">-</span></td></tr>
+</table></pre><pre>3 files changed, 45 insertions(+), 23 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/server/backend.go">server/backend.go</a> b/<a href="../file/server/backend.go">server/backend.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -0,0 +1,21 @@
+</a><a href="#h0-0-0" id="h0-0-0" class="i">+package server
+</a><a href="#h0-0-1" id="h0-0-1" class="i">+
+</a><a href="#h0-0-2" id="h0-0-2" class="i">+import (
+</a><a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;github.com/nelhage/livegrep/client&quot;
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+	&quot;github.com/nelhage/livegrep/config&quot;
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+)
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+type backend struct {
+</a><a href="#h0-0-8" id="h0-0-8" class="i">+	config  *config.Backend
+</a><a href="#h0-0-9" id="h0-0-9" class="i">+	clients chan client.Client
+</a><a href="#h0-0-10" id="h0-0-10" class="i">+}
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+
+</a><a href="#h0-0-12" id="h0-0-12" class="i">+func (bk *backend) connect() (client.Client, error) {
+</a><a href="#h0-0-13" id="h0-0-13" class="i">+	return client.ClientWithRetry(func() (client.Client, error) {
+</a><a href="#h0-0-14" id="h0-0-14" class="i">+		return client.Dial(&quot;tcp&quot;, bk.config.Addr)
+</a><a href="#h0-0-15" id="h0-0-15" class="i">+	}), nil
+</a><a href="#h0-0-16" id="h0-0-16" class="i">+}
+</a><a href="#h0-0-17" id="h0-0-17" class="i">+
+</a><a href="#h0-0-18" id="h0-0-18" class="i">+func (b *backend) checkIn(c client.Client) {
+</a><a href="#h0-0-19" id="h0-0-19" class="i">+	c.Close()
+</a><a href="#h0-0-20" id="h0-0-20" class="i">+}
+</a><b>diff --git a/<a id="h1" href="../file/server/search.go">server/search.go</a> b/<a href="../file/server/search.go">server/search.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -11,7 +11,7 @@ import (
+</a> type searchConnection struct {
+ 	srv      *server
+ 	ws       *websocket.Conn
+<a href="#h1-0-3" id="h1-0-3" class="d">-	backend  string
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+	backend  *backend
+</a> 	client   client.Client
+ 	errors   chan error
+ 	incoming chan Op
+<a href="#h1-1" id="h1-1" class="h">@@ -99,6 +99,9 @@ SearchLoop:
+</a> 				s.outgoing &lt;- &amp;OpResult{s.q.last.Id, res}
+ 			} else {
+ 				st, err := search.Close()
+<a href="#h1-1-3" id="h1-1-3" class="i">+				s.backend.checkIn(s.client)
+</a><a href="#h1-1-4" id="h1-1-4" class="i">+				s.client = nil
+</a><a href="#h1-1-5" id="h1-1-5" class="i">+				s.backend = nil
+</a> 				if err == nil {
+ 					duration := time.Since(s.q.t)
+ 					glog.Infof(&quot;search done remote=%s id=%d query=%s millis=%d&quot;,
+<a href="#h1-2" id="h1-2" class="h">@@ -119,7 +122,7 @@ SearchLoop:
+</a> 				s.q.next = nil
+ 				continue
+ 			}
+<a href="#h1-2-3" id="h1-2-3" class="d">-			if err := s.connectBackend(s.q.next.Backend); err != nil {
+</a><a href="#h1-2-4" id="h1-2-4" class="i">+			if s.client, err = s.connectBackend(s.q.next.Backend); err != nil {
+</a> 				s.outgoing &lt;- &amp;OpQueryError{s.q.next.Id, err.Error()}
+ 				s.q.next = nil
+ 				continue
+<a href="#h1-3" id="h1-3" class="h">@@ -160,27 +163,12 @@ func (s *searchConnection) shouldDispatch(q *OpQuery) bool {
+</a> 	return false
+ }
+ 
+<a href="#h1-3-3" id="h1-3-3" class="d">-func (s *searchConnection) connectBackend(backend string) error {
+</a><a href="#h1-3-4" id="h1-3-4" class="d">-	if s.client == nil || s.backend != backend {
+</a><a href="#h1-3-5" id="h1-3-5" class="d">-		if s.client != nil {
+</a><a href="#h1-3-6" id="h1-3-6" class="d">-			s.client.Close()
+</a><a href="#h1-3-7" id="h1-3-7" class="d">-		}
+</a><a href="#h1-3-8" id="h1-3-8" class="d">-		s.backend = backend
+</a><a href="#h1-3-9" id="h1-3-9" class="d">-		addr := &quot;&quot;
+</a><a href="#h1-3-10" id="h1-3-10" class="d">-		for _, bk := range s.srv.config.Backends {
+</a><a href="#h1-3-11" id="h1-3-11" class="d">-			if bk.Id == backend {
+</a><a href="#h1-3-12" id="h1-3-12" class="d">-				addr = bk.Addr
+</a><a href="#h1-3-13" id="h1-3-13" class="d">-				break
+</a><a href="#h1-3-14" id="h1-3-14" class="d">-			}
+</a><a href="#h1-3-15" id="h1-3-15" class="d">-		}
+</a><a href="#h1-3-16" id="h1-3-16" class="d">-		if addr == &quot;&quot; {
+</a><a href="#h1-3-17" id="h1-3-17" class="d">-			return fmt.Errorf(&quot;No such backend: %s&quot;, backend)
+</a><a href="#h1-3-18" id="h1-3-18" class="d">-		}
+</a><a href="#h1-3-19" id="h1-3-19" class="d">-		s.client = client.ClientWithRetry(func() (client.Client, error) {
+</a><a href="#h1-3-20" id="h1-3-20" class="d">-			return client.Dial(&quot;tcp&quot;, addr)
+</a><a href="#h1-3-21" id="h1-3-21" class="d">-		})
+</a><a href="#h1-3-22" id="h1-3-22" class="i">+func (s *searchConnection) connectBackend(backend string) (client.Client, error) {
+</a><a href="#h1-3-23" id="h1-3-23" class="i">+	bk, ok := s.srv.bk[backend]
+</a><a href="#h1-3-24" id="h1-3-24" class="i">+	if !ok {
+</a><a href="#h1-3-25" id="h1-3-25" class="i">+		return nil, fmt.Errorf(&quot;No such backend: %s&quot;, backend)
+</a> 	}
+<a href="#h1-3-27" id="h1-3-27" class="d">-	return nil
+</a><a href="#h1-3-28" id="h1-3-28" class="i">+	return bk.connect()
+</a> }
+ 
+ func (s *server) HandleWebsocket(ws *websocket.Conn) {
+<b>diff --git a/<a id="h2" href="../file/server/server.go">server/server.go</a> b/<a href="../file/server/server.go">server/server.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -3,14 +3,20 @@ package server
+</a> import (
+ 	&quot;code.google.com/p/go.net/websocket&quot;
+ 	&quot;github.com/bmizerany/pat&quot;
+<a href="#h2-0-3" id="h2-0-3" class="i">+	&quot;github.com/nelhage/livegrep/client&quot;
+</a> 	&quot;github.com/nelhage/livegrep/config&quot;
+ 	&quot;html/template&quot;
+ 	&quot;net/http&quot;
+ 	&quot;path&quot;
+ )
+ 
+<a href="#h2-0-10" id="h2-0-10" class="i">+const (
+</a><a href="#h2-0-11" id="h2-0-11" class="i">+	ClientPoolSize = 4
+</a><a href="#h2-0-12" id="h2-0-12" class="i">+)
+</a><a href="#h2-0-13" id="h2-0-13" class="i">+
+</a> type server struct {
+ 	config *config.Config
+<a href="#h2-0-16" id="h2-0-16" class="i">+	bk     map[string]backend
+</a> 	inner  http.Handler
+ 	t      templates
+ }
+<a href="#h2-1" id="h2-1" class="h">@@ -94,9 +100,16 @@ func (s *server) ServeFeedback(w http.ResponseWriter, r *http.Request) {
+</a> }
+ 
+ func New(cfg *config.Config) (http.Handler, error) {
+<a href="#h2-1-3" id="h2-1-3" class="d">-	srv := &amp;server{config: cfg}
+</a><a href="#h2-1-4" id="h2-1-4" class="i">+	srv := &amp;server{config: cfg, bk: make(map[string]backend)}
+</a> 	srv.loadTemplates()
+ 
+<a href="#h2-1-7" id="h2-1-7" class="i">+	for _, bk := range srv.config.Backends {
+</a><a href="#h2-1-8" id="h2-1-8" class="i">+		srv.bk[bk.Id] = backend{
+</a><a href="#h2-1-9" id="h2-1-9" class="i">+			config:  &amp;bk,
+</a><a href="#h2-1-10" id="h2-1-10" class="i">+			clients: make(chan client.Client, ClientPoolSize),
+</a><a href="#h2-1-11" id="h2-1-11" class="i">+		}
+</a><a href="#h2-1-12" id="h2-1-12" class="i">+	}
+</a><a href="#h2-1-13" id="h2-1-13" class="i">+
+</a> 	m := pat.New()
+ 	m.Add(&quot;GET&quot;, &quot;/&quot;, http.HandlerFunc(srv.ServeRoot))
+ 	m.Add(&quot;GET&quot;, &quot;/search&quot;, http.HandlerFunc(srv.ServeSearch))
+</pre>
+</div>
+</body>
+</html>

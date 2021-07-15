@@ -1,0 +1,1379 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>[wip] refactor JSON handling - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/f9c59e6b8dc2bb21f38af37203008981e2fefc69">f9c59e6b8dc2bb21f38af37203008981e2fefc69</a>
+<b>parent</b> <a href="../commit/8b316adb08b06f73827c89c21b92c5beb117d1a9">8b316adb08b06f73827c89c21b92c5beb117d1a9</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Sat, 13 Dec 2014 12:14:45 -0800
+
+[wip] refactor JSON handling
+
+And rip out --cli.
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">src/codesearch.h</a></td><td> | </td><td class="num">7</td><td><span class="i">++++++</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">src/tools/Makefrag</a></td><td> | </td><td class="num">2</td><td><span class="i">+</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">src/tools/codesearch.cc</a></td><td> | </td><td class="num">117</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">---------------------------</span></td></tr>
+<tr><td class="D">D</td><td><a href="#h3">src/tools/interface-impl.h</a></td><td> | </td><td class="num">6</td><td><span class="i"></span><span class="d">------</span></td></tr>
+<tr><td class="D">D</td><td><a href="#h4">src/tools/interface.cc</a></td><td> | </td><td class="num">173</td><td><span class="i"></span><span class="d">-------------------------------------------------------------------------------</span></td></tr>
+<tr><td class="D">D</td><td><a href="#h5">src/tools/interface.h</a></td><td> | </td><td class="num">38</td><td><span class="i"></span><span class="d">--------------------------------------</span></td></tr>
+<tr><td class="D">D</td><td><a href="#h6">src/tools/json_interface.cc</a></td><td> | </td><td class="num">351</td><td><span class="i"></span><span class="d">-------------------------------------------------------------------------------</span></td></tr>
+<tr><td class="A">A</td><td><a href="#h7">src/tools/transport.cc</a></td><td> | </td><td class="num">343</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="A">A</td><td><a href="#h8">src/tools/transport.h</a></td><td> | </td><td class="num">52</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+</table></pre><pre>9 files changed, 479 insertions(+), 610 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/src/codesearch.h">src/codesearch.h</a> b/<a href="../file/src/codesearch.h">src/codesearch.h</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -111,6 +111,11 @@ struct indexed_file {
+</a>     int no;
+ };
+ 
+<a href="#h0-0-3" id="h0-0-3" class="i">+struct index_info {
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+    std::string name;
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+    vector&lt;indexed_tree&gt; trees;
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+};
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+
+</a> struct match_result {
+     indexed_file *file;
+     int lno;
+<a href="#h0-1" id="h0-1" class="h">@@ -121,7 +126,7 @@ struct match_result {
+</a> };
+ 
+ // A query specification passed to match(). line_pat is required to be
+<a href="#h0-1-3" id="h0-1-3" class="d">-// non-NULL; line_pat and tree_pat may be NULL to specify &quot;no
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+// non-NULL; file_pat and tree_pat may be NULL to specify &quot;no
+</a> // constraint&quot;
+ struct query {
+     std::unique_ptr&lt;RE2&gt; line_pat;
+<b>diff --git a/<a id="h1" href="../file/src/tools/Makefrag">src/tools/Makefrag</a> b/<a href="../file/src/tools/Makefrag">src/tools/Makefrag</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -1,5 +1,5 @@
+</a> TOOLS := bin/codesearch bin/codesearchtool
+<a href="#h1-0-1" id="h1-0-1" class="d">-bin/codesearch_SRC := src/tools/codesearch.cc src/tools/interface.c src/tools/json_interface.c
+</a><a href="#h1-0-2" id="h1-0-2" class="i">+bin/codesearch_SRC := src/tools/codesearch.cc src/tools/transport.cc
+</a> bin/codesearchtool_SRC := src/tools/codesearchtool.cc \
+ 			src/tools/inspect-index.cc \
+ 			src/tools/analyze-re.cc \
+<b>diff --git a/<a id="h2" href="../file/src/tools/codesearch.cc">src/tools/codesearch.cc</a> b/<a href="../file/src/tools/codesearch.cc">src/tools/codesearch.cc</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -1,6 +1,6 @@
+</a> /********************************************************************
+<a href="#h2-0-1" id="h2-0-1" class="d">- * livegrep -- main.cc
+</a><a href="#h2-0-2" id="h2-0-2" class="d">- * Copyright (c) 2011-2013 Nelson Elhage
+</a><a href="#h2-0-3" id="h2-0-3" class="i">+ * livegrep -- tools/codesearch.cc
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+ * Copyright (c) 2011-2014 Nelson Elhage
+</a>  *
+  * This program is free software. You may use, redistribute, and/or
+  * modify it under the terms listed in the COPYING file.
+<a href="#h2-1" id="h2-1" class="h">@@ -10,8 +10,10 @@
+</a> #include &quot;metrics.h&quot;
+ #include &quot;re_width.h&quot;
+ #include &quot;debug.h&quot;
+<a href="#h2-1-3" id="h2-1-3" class="i">+#include &quot;git_indexer.h&quot;
+</a><a href="#h2-1-4" id="h2-1-4" class="i">+#include &quot;fs_indexer.h&quot;
+</a> 
+<a href="#h2-1-6" id="h2-1-6" class="d">-#include &quot;interface.h&quot;
+</a><a href="#h2-1-7" id="h2-1-7" class="i">+#include &quot;transport.h&quot;
+</a> 
+ #include &lt;stdio.h&gt;
+ #include &lt;sys/socket.h&gt;
+<a href="#h2-2" id="h2-2" class="h">@@ -29,7 +31,8 @@
+</a> #include &lt;re2/regexp.h&gt;
+ #include &quot;re2/walker-inl.h&quot;
+ 
+<a href="#h2-2-3" id="h2-2-3" class="d">-DEFINE_bool(cli, false, &quot;Use an interactive CLI format instead of JSON.&quot;);
+</a><a href="#h2-2-4" id="h2-2-4" class="i">+#include &lt;json/json.h&gt;
+</a><a href="#h2-2-5" id="h2-2-5" class="i">+
+</a> DEFINE_int32(concurrency, 16, &quot;Number of concurrent queries to allow.&quot;);
+ DEFINE_string(dump_index, &quot;&quot;, &quot;Dump the produced index to a specified file&quot;);
+ DEFINE_string(load_index, &quot;&quot;, &quot;Load the index from a file instead of walking the repository&quot;);
+<a href="#h2-3" id="h2-3" class="h">@@ -44,23 +47,16 @@ void die_errno(const char *str) {
+</a>     exit(1);
+ }
+ 
+<a href="#h2-3-3" id="h2-3-3" class="d">-codesearch_interface *build_interface(FILE *in, FILE *out) {
+</a><a href="#h2-3-4" id="h2-3-4" class="d">-    if (FLAGS_cli)
+</a><a href="#h2-3-5" id="h2-3-5" class="d">-        return make_cli_interface(in, out);
+</a><a href="#h2-3-6" id="h2-3-6" class="d">-    else
+</a><a href="#h2-3-7" id="h2-3-7" class="d">-        return make_json_interface(in, out);
+</a><a href="#h2-3-8" id="h2-3-8" class="d">-}
+</a><a href="#h2-3-9" id="h2-3-9" class="d">-
+</a> struct print_match {
+<a href="#h2-3-11" id="h2-3-11" class="d">-    print_match(codesearch_interface *ui) : ui_(ui) {}
+</a><a href="#h2-3-12" id="h2-3-12" class="i">+    print_match(codesearch_transport *tx) : tx_(tx) {}
+</a> 
+     void operator()(const match_result *m) const {
+         if (FLAGS_quiet)
+             return;
+<a href="#h2-3-17" id="h2-3-17" class="d">-        ui_-&gt;print_match(m);
+</a><a href="#h2-3-18" id="h2-3-18" class="i">+        tx_-&gt;write_match(m);
+</a>     }
+ protected:
+<a href="#h2-3-21" id="h2-3-21" class="d">-    codesearch_interface *ui_;
+</a><a href="#h2-3-22" id="h2-3-22" class="i">+    codesearch_transport *tx_;
+</a> };
+ 
+ const int kMaxProgramSize = 4000;
+<a href="#h2-4" id="h2-4" class="h">@@ -68,27 +64,29 @@ const int kMaxWidth       = 200;
+</a> 
+ sem_t interact_sem;
+ 
+<a href="#h2-4-3" id="h2-4-3" class="d">-void interact(code_searcher *cs, codesearch_interface *ui) {
+</a><a href="#h2-4-4" id="h2-4-4" class="i">+void interact(code_searcher *cs, codesearch_transport *tx) {
+</a>     code_searcher::search_thread search(cs);
+     WidthWalker width;
+ 
+<a href="#h2-4-8" id="h2-4-8" class="d">-    while (true) {
+</a><a href="#h2-4-9" id="h2-4-9" class="d">-        ui-&gt;print_prompt(cs);
+</a><a href="#h2-4-10" id="h2-4-10" class="d">-        string input;
+</a><a href="#h2-4-11" id="h2-4-11" class="d">-        if (!ui-&gt;getline(input))
+</a><a href="#h2-4-12" id="h2-4-12" class="d">-            break;
+</a><a href="#h2-4-13" id="h2-4-13" class="i">+    index_info info;
+</a><a href="#h2-4-14" id="h2-4-14" class="i">+    info.name = cs-&gt;name();
+</a><a href="#h2-4-15" id="h2-4-15" class="i">+    info.trees = cs-&gt;trees();
+</a><a href="#h2-4-16" id="h2-4-16" class="i">+    bool done = false;
+</a><a href="#h2-4-17" id="h2-4-17" class="i">+
+</a><a href="#h2-4-18" id="h2-4-18" class="i">+    while (!done) {
+</a><a href="#h2-4-19" id="h2-4-19" class="i">+        tx-&gt;write_ready(&amp;info);
+</a> 
+         query q;
+<a href="#h2-4-22" id="h2-4-22" class="d">-        if (!ui-&gt;parse_query(input, &amp;q))
+</a><a href="#h2-4-23" id="h2-4-23" class="i">+        if (!tx-&gt;read_query(&amp;q, &amp;done))
+</a>             continue;
+ 
+         if (q.line_pat-&gt;ProgramSize() &gt; kMaxProgramSize) {
+<a href="#h2-4-27" id="h2-4-27" class="d">-            ui-&gt;print_error(&quot;Parse error.&quot;);
+</a><a href="#h2-4-28" id="h2-4-28" class="i">+            tx-&gt;write_error(&quot;Parse error.&quot;);
+</a>             continue;
+         }
+         int w = width.Walk(q.line_pat-&gt;Regexp(), 0);
+         if (w &gt; kMaxWidth) {
+<a href="#h2-4-33" id="h2-4-33" class="d">-            ui-&gt;print_error(&quot;Parse error.&quot;);
+</a><a href="#h2-4-34" id="h2-4-34" class="i">+            tx-&gt;write_error(&quot;Parse error.&quot;);
+</a>             continue;
+         }
+         {
+<a href="#h2-5" id="h2-5" class="h">@@ -96,21 +94,58 @@ void interact(code_searcher *cs, codesearch_interface *ui) {
+</a>             struct timeval elapsed;
+             match_stats stats;
+ 
+<a href="#h2-5-3" id="h2-5-3" class="d">-            ui-&gt;info(&quot;ProgramSize: %d\n&quot;, q.line_pat-&gt;ProgramSize());
+</a><a href="#h2-5-4" id="h2-5-4" class="i">+            fprintf(stderr, &quot;ProgramSize: %d\n&quot;, q.line_pat-&gt;ProgramSize());
+</a> 
+             {
+                 sem_wait(&amp;interact_sem);
+<a href="#h2-5-8" id="h2-5-8" class="d">-                search.match(q, print_match(ui), &amp;stats);
+</a><a href="#h2-5-9" id="h2-5-9" class="i">+                search.match(q, print_match(tx), &amp;stats);
+</a>                 sem_post(&amp;interact_sem);
+             }
+             elapsed = tm.elapsed();
+<a href="#h2-5-13" id="h2-5-13" class="d">-            ui-&gt;print_stats(elapsed, &amp;stats);
+</a><a href="#h2-5-14" id="h2-5-14" class="i">+            tx-&gt;write_done(elapsed, &amp;stats);
+</a><a href="#h2-5-15" id="h2-5-15" class="i">+        }
+</a><a href="#h2-5-16" id="h2-5-16" class="i">+    }
+</a><a href="#h2-5-17" id="h2-5-17" class="i">+}
+</a><a href="#h2-5-18" id="h2-5-18" class="i">+
+</a><a href="#h2-5-19" id="h2-5-19" class="i">+void build_index(code_searcher *cs, const vector&lt;std::string&gt; &amp;argv) {
+</a><a href="#h2-5-20" id="h2-5-20" class="i">+    if (argv.size() != 2) {
+</a><a href="#h2-5-21" id="h2-5-21" class="i">+        fprintf(stderr, &quot;Usage: %s --json [OPTIONS] config.json\n&quot;, argv[0].c_str());
+</a><a href="#h2-5-22" id="h2-5-22" class="i">+        exit(1);
+</a><a href="#h2-5-23" id="h2-5-23" class="i">+    }
+</a><a href="#h2-5-24" id="h2-5-24" class="i">+    json_object *obj = json_object_from_file(const_cast&lt;char*&gt;(argv[1].c_str()));
+</a><a href="#h2-5-25" id="h2-5-25" class="i">+    if (is_error(obj)) {
+</a><a href="#h2-5-26" id="h2-5-26" class="i">+        fprintf(stderr, &quot;Error parsing `%s&#39;: %s\n&quot;,
+</a><a href="#h2-5-27" id="h2-5-27" class="i">+                argv[1].c_str(), json_tokener_errors[-(unsigned long)obj]);
+</a><a href="#h2-5-28" id="h2-5-28" class="i">+        exit(1);
+</a><a href="#h2-5-29" id="h2-5-29" class="i">+    }
+</a><a href="#h2-5-30" id="h2-5-30" class="i">+    index_spec spec;
+</a><a href="#h2-5-31" id="h2-5-31" class="i">+    if (!parse_index_spec(obj, &amp;spec)) {
+</a><a href="#h2-5-32" id="h2-5-32" class="i">+        exit(1);
+</a><a href="#h2-5-33" id="h2-5-33" class="i">+    }
+</a><a href="#h2-5-34" id="h2-5-34" class="i">+    json_object_put(obj);
+</a><a href="#h2-5-35" id="h2-5-35" class="i">+    if (spec.name.size())
+</a><a href="#h2-5-36" id="h2-5-36" class="i">+        cs-&gt;set_name(spec.name);
+</a><a href="#h2-5-37" id="h2-5-37" class="i">+    for (auto it = spec.paths.begin(); it != spec.paths.end(); ++it) {
+</a><a href="#h2-5-38" id="h2-5-38" class="i">+        fprintf(stderr, &quot;Walking `%s&#39;... &quot;, it-&gt;c_str());
+</a><a href="#h2-5-39" id="h2-5-39" class="i">+        fs_indexer indexer(cs, *it);
+</a><a href="#h2-5-40" id="h2-5-40" class="i">+        indexer.walk(*it);
+</a><a href="#h2-5-41" id="h2-5-41" class="i">+        fprintf(stderr, &quot;done.\n&quot;);
+</a><a href="#h2-5-42" id="h2-5-42" class="i">+    }
+</a><a href="#h2-5-43" id="h2-5-43" class="i">+
+</a><a href="#h2-5-44" id="h2-5-44" class="i">+    for (auto it = spec.repos.begin(); it != spec.repos.end(); ++it) {
+</a><a href="#h2-5-45" id="h2-5-45" class="i">+        fprintf(stderr, &quot;Walking name=%s, path=%s&quot;,
+</a><a href="#h2-5-46" id="h2-5-46" class="i">+                it-&gt;name.c_str(), it-&gt;path.c_str());
+</a><a href="#h2-5-47" id="h2-5-47" class="i">+        git_indexer indexer(cs, it-&gt;path, it-&gt;name, it-&gt;metadata);
+</a><a href="#h2-5-48" id="h2-5-48" class="i">+        for (auto rev = it-&gt;revisions.begin();
+</a><a href="#h2-5-49" id="h2-5-49" class="i">+             rev != it-&gt;revisions.end(); ++rev) {
+</a><a href="#h2-5-50" id="h2-5-50" class="i">+            fprintf(stderr, &quot;  walking %s... &quot;, rev-&gt;c_str());
+</a><a href="#h2-5-51" id="h2-5-51" class="i">+            indexer.walk(*rev);
+</a><a href="#h2-5-52" id="h2-5-52" class="i">+            fprintf(stderr, &quot;done\n&quot;);
+</a>         }
+     }
+ }
+ 
+ void initialize_search(code_searcher *search,
+<a href="#h2-5-58" id="h2-5-58" class="d">-                       codesearch_interface *ui,
+</a>                        int argc, char **argv) {
+     if (FLAGS_load_index.size() == 0) {
+         if (FLAGS_dump_index.size())
+<a href="#h2-6" id="h2-6" class="h">@@ -124,16 +159,16 @@ void initialize_search(code_searcher *search,
+</a> 
+         timer tm;
+         struct timeval elapsed;
+<a href="#h2-6-3" id="h2-6-3" class="d">-        ui-&gt;build_index(search, args);
+</a><a href="#h2-6-4" id="h2-6-4" class="d">-        ui-&gt;info(&quot;Finalizing...\n&quot;);
+</a><a href="#h2-6-5" id="h2-6-5" class="i">+        build_index(search, args);
+</a><a href="#h2-6-6" id="h2-6-6" class="i">+        fprintf(stderr, &quot;Finalizing...\n&quot;);
+</a>         search-&gt;finalize();
+         elapsed = tm.elapsed();
+<a href="#h2-6-9" id="h2-6-9" class="d">-        ui-&gt;info(&quot;repository indexed in %d.%06ds\n&quot;,
+</a><a href="#h2-6-10" id="h2-6-10" class="d">-                 (int)elapsed.tv_sec, (int)elapsed.tv_usec);
+</a><a href="#h2-6-11" id="h2-6-11" class="i">+        fprintf(stderr, &quot;repository indexed in %d.%06ds\n&quot;,
+</a><a href="#h2-6-12" id="h2-6-12" class="i">+                (int)elapsed.tv_sec, (int)elapsed.tv_usec);
+</a><a href="#h2-6-13" id="h2-6-13" class="i">+        metric::dump_all();
+</a>     } else {
+         search-&gt;load_index(FLAGS_load_index);
+     }
+<a href="#h2-6-17" id="h2-6-17" class="d">-    metric::dump_all();
+</a>     if (FLAGS_dump_index.size() &amp;&amp; FLAGS_load_index.size())
+         search-&gt;dump_index(FLAGS_dump_index);
+ }
+<a href="#h2-7" id="h2-7" class="h">@@ -166,9 +201,9 @@ void *handle_client(void *data) {
+</a>     }
+ 
+ 
+<a href="#h2-7-3" id="h2-7-3" class="d">-    codesearch_interface *interface = build_interface(r, w);
+</a><a href="#h2-7-4" id="h2-7-4" class="d">-    interact(child-&gt;search, interface);
+</a><a href="#h2-7-5" id="h2-7-5" class="d">-    delete interface;
+</a><a href="#h2-7-6" id="h2-7-6" class="i">+    codesearch_transport *tx = new codesearch_transport(r, w);
+</a><a href="#h2-7-7" id="h2-7-7" class="i">+    interact(child-&gt;search, tx);
+</a><a href="#h2-7-8" id="h2-7-8" class="i">+    delete tx;
+</a>     delete child;
+     fclose(r);
+     fclose(w);
+<a href="#h2-8" id="h2-8" class="h">@@ -264,19 +299,21 @@ int main(int argc, char **argv) {
+</a>     prctl(PR_SET_PDEATHSIG, SIGINT);
+ 
+     code_searcher search;
+<a href="#h2-8-3" id="h2-8-3" class="d">-    codesearch_interface *interface = build_interface(stdin, stdout);
+</a> 
+     signal(SIGPIPE, SIG_IGN);
+ 
+<a href="#h2-8-7" id="h2-8-7" class="d">-    initialize_search(&amp;search, interface, argc, argv);
+</a><a href="#h2-8-8" id="h2-8-8" class="i">+    initialize_search(&amp;search, argc, argv);
+</a> 
+     if (sem_init(&amp;interact_sem, 0, FLAGS_concurrency) &lt; 0)
+         die_errno(&quot;sem_init&quot;);
+ 
+<a href="#h2-8-13" id="h2-8-13" class="d">-    if (FLAGS_listen.size())
+</a><a href="#h2-8-14" id="h2-8-14" class="i">+    if (FLAGS_listen.size()) {
+</a>         listen(&amp;search, FLAGS_listen);
+<a href="#h2-8-16" id="h2-8-16" class="d">-    else
+</a><a href="#h2-8-17" id="h2-8-17" class="d">-        interact(&amp;search, interface);
+</a><a href="#h2-8-18" id="h2-8-18" class="i">+    } else {
+</a><a href="#h2-8-19" id="h2-8-19" class="i">+        codesearch_transport *tx = new codesearch_transport(stdin, stdout);
+</a><a href="#h2-8-20" id="h2-8-20" class="i">+        interact(&amp;search, tx);
+</a><a href="#h2-8-21" id="h2-8-21" class="i">+        delete tx;
+</a><a href="#h2-8-22" id="h2-8-22" class="i">+    }
+</a> 
+     return 0;
+ }
+<b>diff --git a/<a id="h3" href="../file/src/tools/interface-impl.h">src/tools/interface-impl.h</a> b/<a href="../file/src/tools/interface-impl.h">src/tools/interface-impl.h</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -1,6 +0,0 @@
+</a><a href="#h3-0-0" id="h3-0-0" class="d">-#ifndef CODESEARCH_INTERFACE_IMPL_H
+</a><a href="#h3-0-1" id="h3-0-1" class="d">-#define CODESEARCH_INTERFACE_IMPL_H
+</a><a href="#h3-0-2" id="h3-0-2" class="d">-
+</a><a href="#h3-0-3" id="h3-0-3" class="d">-bool getline(std::string &amp;out, FILE *in);
+</a><a href="#h3-0-4" id="h3-0-4" class="d">-
+</a><a href="#h3-0-5" id="h3-0-5" class="d">-#endif
+</a><b>diff --git a/<a id="h4" href="../file/src/tools/interface.cc">src/tools/interface.cc</a> b/<a href="../file/src/tools/interface.cc">src/tools/interface.cc</a></b>
+<a href="#h4-0" id="h4-0" class="h">@@ -1,173 +0,0 @@
+</a><a href="#h4-0-0" id="h4-0-0" class="d">-#include &quot;codesearch.h&quot;
+</a><a href="#h4-0-1" id="h4-0-1" class="d">-#include &quot;git_indexer.h&quot;
+</a><a href="#h4-0-2" id="h4-0-2" class="d">-#include &quot;fs_indexer.h&quot;
+</a><a href="#h4-0-3" id="h4-0-3" class="d">-#include &quot;interface.h&quot;
+</a><a href="#h4-0-4" id="h4-0-4" class="d">-#include &quot;interface-impl.h&quot;
+</a><a href="#h4-0-5" id="h4-0-5" class="d">-
+</a><a href="#h4-0-6" id="h4-0-6" class="d">-#include &lt;stdarg.h&gt;
+</a><a href="#h4-0-7" id="h4-0-7" class="d">-#include &lt;gflags/gflags.h&gt;
+</a><a href="#h4-0-8" id="h4-0-8" class="d">-#include &lt;re2/re2.h&gt;
+</a><a href="#h4-0-9" id="h4-0-9" class="d">-
+</a><a href="#h4-0-10" id="h4-0-10" class="d">-using re2::RE2;
+</a><a href="#h4-0-11" id="h4-0-11" class="d">-using std::unique_ptr;
+</a><a href="#h4-0-12" id="h4-0-12" class="d">-
+</a><a href="#h4-0-13" id="h4-0-13" class="d">-DEFINE_bool(filesystem, false, &quot;Analyze a filesystem tree instead of a git repo.&quot;);
+</a><a href="#h4-0-14" id="h4-0-14" class="d">-
+</a><a href="#h4-0-15" id="h4-0-15" class="d">-bool getline(std::string &amp;out, FILE *in) {
+</a><a href="#h4-0-16" id="h4-0-16" class="d">-    char *line = 0;
+</a><a href="#h4-0-17" id="h4-0-17" class="d">-    size_t n = 0;
+</a><a href="#h4-0-18" id="h4-0-18" class="d">-    ssize_t r;
+</a><a href="#h4-0-19" id="h4-0-19" class="d">-    r = getline(&amp;line, &amp;n, in);
+</a><a href="#h4-0-20" id="h4-0-20" class="d">-    if (r == 0 || r == -1)
+</a><a href="#h4-0-21" id="h4-0-21" class="d">-        out.clear();
+</a><a href="#h4-0-22" id="h4-0-22" class="d">-    else
+</a><a href="#h4-0-23" id="h4-0-23" class="d">-        out.assign(line, r - 1);
+</a><a href="#h4-0-24" id="h4-0-24" class="d">-
+</a><a href="#h4-0-25" id="h4-0-25" class="d">-    return (r != -1) &amp;&amp; !feof(in) &amp;&amp; !ferror(in) ;
+</a><a href="#h4-0-26" id="h4-0-26" class="d">-}
+</a><a href="#h4-0-27" id="h4-0-27" class="d">-
+</a><a href="#h4-0-28" id="h4-0-28" class="d">-codesearch_interface::~codesearch_interface() {}
+</a><a href="#h4-0-29" id="h4-0-29" class="d">-
+</a><a href="#h4-0-30" id="h4-0-30" class="d">-namespace {
+</a><a href="#h4-0-31" id="h4-0-31" class="d">-
+</a><a href="#h4-0-32" id="h4-0-32" class="d">-struct parse_spec {
+</a><a href="#h4-0-33" id="h4-0-33" class="d">-    string path;
+</a><a href="#h4-0-34" id="h4-0-34" class="d">-    string name;
+</a><a href="#h4-0-35" id="h4-0-35" class="d">-    vector&lt;string&gt; revs;
+</a><a href="#h4-0-36" id="h4-0-36" class="d">-};
+</a><a href="#h4-0-37" id="h4-0-37" class="d">-
+</a><a href="#h4-0-38" id="h4-0-38" class="d">-parse_spec parse_walk_spec(string spec) {
+</a><a href="#h4-0-39" id="h4-0-39" class="d">-    /* [name@]path[:rev1,rev2,rev3] */
+</a><a href="#h4-0-40" id="h4-0-40" class="d">-    parse_spec out;
+</a><a href="#h4-0-41" id="h4-0-41" class="d">-    int idx;
+</a><a href="#h4-0-42" id="h4-0-42" class="d">-    if ((idx = spec.find(&#39;@&#39;)) != -1) {
+</a><a href="#h4-0-43" id="h4-0-43" class="d">-        out.name = spec.substr(0, idx);
+</a><a href="#h4-0-44" id="h4-0-44" class="d">-        spec = spec.substr(idx + 1);
+</a><a href="#h4-0-45" id="h4-0-45" class="d">-    }
+</a><a href="#h4-0-46" id="h4-0-46" class="d">-    if ((idx = spec.find(&#39;:&#39;)) != -1) {
+</a><a href="#h4-0-47" id="h4-0-47" class="d">-        string revs = spec.substr(idx + 1);
+</a><a href="#h4-0-48" id="h4-0-48" class="d">-        spec = spec.substr(0, idx);
+</a><a href="#h4-0-49" id="h4-0-49" class="d">-        while ((idx = revs.find(&#39;,&#39;)) != -1) {
+</a><a href="#h4-0-50" id="h4-0-50" class="d">-            out.revs.push_back(revs.substr(0, idx));
+</a><a href="#h4-0-51" id="h4-0-51" class="d">-            revs = revs.substr(idx + 1);
+</a><a href="#h4-0-52" id="h4-0-52" class="d">-        }
+</a><a href="#h4-0-53" id="h4-0-53" class="d">-        if (revs.size())
+</a><a href="#h4-0-54" id="h4-0-54" class="d">-            out.revs.push_back(revs);
+</a><a href="#h4-0-55" id="h4-0-55" class="d">-    }
+</a><a href="#h4-0-56" id="h4-0-56" class="d">-    if (out.revs.empty()) {
+</a><a href="#h4-0-57" id="h4-0-57" class="d">-        out.revs.push_back(&quot;HEAD&quot;);
+</a><a href="#h4-0-58" id="h4-0-58" class="d">-    }
+</a><a href="#h4-0-59" id="h4-0-59" class="d">-    out.path = spec;
+</a><a href="#h4-0-60" id="h4-0-60" class="d">-    return out;
+</a><a href="#h4-0-61" id="h4-0-61" class="d">-}
+</a><a href="#h4-0-62" id="h4-0-62" class="d">-
+</a><a href="#h4-0-63" id="h4-0-63" class="d">-class cli_interface : public codesearch_interface {
+</a><a href="#h4-0-64" id="h4-0-64" class="d">-public:
+</a><a href="#h4-0-65" id="h4-0-65" class="d">-    cli_interface(FILE *in, FILE *out) : in_(in), out_(out) { }
+</a><a href="#h4-0-66" id="h4-0-66" class="d">-
+</a><a href="#h4-0-67" id="h4-0-67" class="d">-    virtual void build_index(code_searcher *cs, const vector&lt;std::string&gt; &amp;argv) {
+</a><a href="#h4-0-68" id="h4-0-68" class="d">-        if (argv.size() &lt; 2) {
+</a><a href="#h4-0-69" id="h4-0-69" class="d">-            print_error(&quot;Usage: &quot; + argv[0] + &quot; [OPTIONS] &lt;REPOSPEC [...] | -filesystem PATH [...]&gt;&quot;);
+</a><a href="#h4-0-70" id="h4-0-70" class="d">-            exit(1);
+</a><a href="#h4-0-71" id="h4-0-71" class="d">-        }
+</a><a href="#h4-0-72" id="h4-0-72" class="d">-        for (auto it = ++argv.begin(); it != argv.end(); ++it) {
+</a><a href="#h4-0-73" id="h4-0-73" class="d">-            const std::string &amp;arg = *it;
+</a><a href="#h4-0-74" id="h4-0-74" class="d">-            if (FLAGS_filesystem) {
+</a><a href="#h4-0-75" id="h4-0-75" class="d">-                this-&gt;info(&quot;Walking `%s&#39;...\n&quot;,
+</a><a href="#h4-0-76" id="h4-0-76" class="d">-                           arg.c_str());
+</a><a href="#h4-0-77" id="h4-0-77" class="d">-                fs_indexer indexer(cs, arg.c_str());
+</a><a href="#h4-0-78" id="h4-0-78" class="d">-                indexer.walk(arg);
+</a><a href="#h4-0-79" id="h4-0-79" class="d">-                this-&gt;info(&quot;done\n&quot;);
+</a><a href="#h4-0-80" id="h4-0-80" class="d">-            } else {
+</a><a href="#h4-0-81" id="h4-0-81" class="d">-                parse_spec parsed = parse_walk_spec(arg);
+</a><a href="#h4-0-82" id="h4-0-82" class="d">-                this-&gt;info(&quot;Walking `%s&#39; (name: %s, path: %s)...\n&quot;,
+</a><a href="#h4-0-83" id="h4-0-83" class="d">-                           arg.c_str(),
+</a><a href="#h4-0-84" id="h4-0-84" class="d">-                           parsed.name.c_str(),
+</a><a href="#h4-0-85" id="h4-0-85" class="d">-                           parsed.path.c_str());
+</a><a href="#h4-0-86" id="h4-0-86" class="d">-                git_indexer indexer(cs, parsed.path, parsed.name);
+</a><a href="#h4-0-87" id="h4-0-87" class="d">-                for (auto it = parsed.revs.begin(); it != parsed.revs.end(); ++it) {
+</a><a href="#h4-0-88" id="h4-0-88" class="d">-                    this-&gt;info(&quot;  %s...&quot;, it-&gt;c_str());
+</a><a href="#h4-0-89" id="h4-0-89" class="d">-                    indexer.walk(*it);
+</a><a href="#h4-0-90" id="h4-0-90" class="d">-                    this-&gt;info(&quot;done\n&quot;);
+</a><a href="#h4-0-91" id="h4-0-91" class="d">-                }
+</a><a href="#h4-0-92" id="h4-0-92" class="d">-            }
+</a><a href="#h4-0-93" id="h4-0-93" class="d">-        }
+</a><a href="#h4-0-94" id="h4-0-94" class="d">-    }
+</a><a href="#h4-0-95" id="h4-0-95" class="d">-
+</a><a href="#h4-0-96" id="h4-0-96" class="d">-    virtual void print_match(const match_result *m) {
+</a><a href="#h4-0-97" id="h4-0-97" class="d">-        fprintf(out_,
+</a><a href="#h4-0-98" id="h4-0-98" class="d">-                &quot;%s:%s:%s:%d:%d-%d: %.*s\n&quot;,
+</a><a href="#h4-0-99" id="h4-0-99" class="d">-                m-&gt;file-&gt;tree-&gt;name.c_str(),
+</a><a href="#h4-0-100" id="h4-0-100" class="d">-                m-&gt;file-&gt;tree-&gt;version.c_str(),
+</a><a href="#h4-0-101" id="h4-0-101" class="d">-                m-&gt;file-&gt;path.c_str(),
+</a><a href="#h4-0-102" id="h4-0-102" class="d">-                m-&gt;lno,
+</a><a href="#h4-0-103" id="h4-0-103" class="d">-                m-&gt;matchleft, m-&gt;matchright,
+</a><a href="#h4-0-104" id="h4-0-104" class="d">-                m-&gt;line.size(), m-&gt;line.data());
+</a><a href="#h4-0-105" id="h4-0-105" class="d">-    }
+</a><a href="#h4-0-106" id="h4-0-106" class="d">-
+</a><a href="#h4-0-107" id="h4-0-107" class="d">-    virtual void print_error(const std::string &amp;err) {
+</a><a href="#h4-0-108" id="h4-0-108" class="d">-        fprintf(out_, &quot;Error: %s\n&quot;, err.c_str());
+</a><a href="#h4-0-109" id="h4-0-109" class="d">-    }
+</a><a href="#h4-0-110" id="h4-0-110" class="d">-
+</a><a href="#h4-0-111" id="h4-0-111" class="d">-    virtual void print_prompt(const code_searcher *cs) {
+</a><a href="#h4-0-112" id="h4-0-112" class="d">-        fprintf(out_, &quot;regex&gt; &quot;);
+</a><a href="#h4-0-113" id="h4-0-113" class="d">-        fflush(out_);
+</a><a href="#h4-0-114" id="h4-0-114" class="d">-    }
+</a><a href="#h4-0-115" id="h4-0-115" class="d">-
+</a><a href="#h4-0-116" id="h4-0-116" class="d">-    virtual bool getline(std::string &amp;input) {
+</a><a href="#h4-0-117" id="h4-0-117" class="d">-        return ::getline(input, in_);
+</a><a href="#h4-0-118" id="h4-0-118" class="d">-    }
+</a><a href="#h4-0-119" id="h4-0-119" class="d">-
+</a><a href="#h4-0-120" id="h4-0-120" class="d">-    virtual bool parse_query(const std::string &amp;input,
+</a><a href="#h4-0-121" id="h4-0-121" class="d">-                             query *out) {
+</a><a href="#h4-0-122" id="h4-0-122" class="d">-        RE2::Options opts;
+</a><a href="#h4-0-123" id="h4-0-123" class="d">-        default_re2_options(opts);
+</a><a href="#h4-0-124" id="h4-0-124" class="d">-
+</a><a href="#h4-0-125" id="h4-0-125" class="d">-        out-&gt;line_pat.reset(new RE2(input, opts));
+</a><a href="#h4-0-126" id="h4-0-126" class="d">-
+</a><a href="#h4-0-127" id="h4-0-127" class="d">-        if (!out-&gt;line_pat-&gt;ok()) {
+</a><a href="#h4-0-128" id="h4-0-128" class="d">-            print_error(out-&gt;line_pat-&gt;error());
+</a><a href="#h4-0-129" id="h4-0-129" class="d">-            return false;
+</a><a href="#h4-0-130" id="h4-0-130" class="d">-        }
+</a><a href="#h4-0-131" id="h4-0-131" class="d">-
+</a><a href="#h4-0-132" id="h4-0-132" class="d">-        out-&gt;file_pat.reset(0);
+</a><a href="#h4-0-133" id="h4-0-133" class="d">-        out-&gt;tree_pat.reset(0);
+</a><a href="#h4-0-134" id="h4-0-134" class="d">-
+</a><a href="#h4-0-135" id="h4-0-135" class="d">-        return true;
+</a><a href="#h4-0-136" id="h4-0-136" class="d">-    }
+</a><a href="#h4-0-137" id="h4-0-137" class="d">-
+</a><a href="#h4-0-138" id="h4-0-138" class="d">-    virtual void print_stats(timeval elapsed, const match_stats *stats) {
+</a><a href="#h4-0-139" id="h4-0-139" class="d">-                fprintf(out_,
+</a><a href="#h4-0-140" id="h4-0-140" class="d">-                        &quot;Match completed in %d.%06ds.&quot;,
+</a><a href="#h4-0-141" id="h4-0-141" class="d">-                        (int)elapsed.tv_sec, (int)elapsed.tv_usec);
+</a><a href="#h4-0-142" id="h4-0-142" class="d">-                switch (stats-&gt;why) {
+</a><a href="#h4-0-143" id="h4-0-143" class="d">-                case kExitNone:
+</a><a href="#h4-0-144" id="h4-0-144" class="d">-                    fprintf(out_, &quot;\n&quot;);
+</a><a href="#h4-0-145" id="h4-0-145" class="d">-                    break;
+</a><a href="#h4-0-146" id="h4-0-146" class="d">-                case kExitMatchLimit:
+</a><a href="#h4-0-147" id="h4-0-147" class="d">-                    fprintf(out_, &quot; (match limit)\n&quot;);
+</a><a href="#h4-0-148" id="h4-0-148" class="d">-                    break;
+</a><a href="#h4-0-149" id="h4-0-149" class="d">-                case kExitTimeout:
+</a><a href="#h4-0-150" id="h4-0-150" class="d">-                    fprintf(out_, &quot; (timeout)\n&quot;);
+</a><a href="#h4-0-151" id="h4-0-151" class="d">-                    break;
+</a><a href="#h4-0-152" id="h4-0-152" class="d">-                }
+</a><a href="#h4-0-153" id="h4-0-153" class="d">-    }
+</a><a href="#h4-0-154" id="h4-0-154" class="d">-
+</a><a href="#h4-0-155" id="h4-0-155" class="d">-    virtual void info(const char *msg, ...) {
+</a><a href="#h4-0-156" id="h4-0-156" class="d">-        va_list ap;
+</a><a href="#h4-0-157" id="h4-0-157" class="d">-        va_start(ap, msg);
+</a><a href="#h4-0-158" id="h4-0-158" class="d">-        vfprintf(out_, msg, ap);
+</a><a href="#h4-0-159" id="h4-0-159" class="d">-        va_end(ap);
+</a><a href="#h4-0-160" id="h4-0-160" class="d">-    }
+</a><a href="#h4-0-161" id="h4-0-161" class="d">-
+</a><a href="#h4-0-162" id="h4-0-162" class="d">-    virtual ~cli_interface() {}
+</a><a href="#h4-0-163" id="h4-0-163" class="d">-
+</a><a href="#h4-0-164" id="h4-0-164" class="d">-protected:
+</a><a href="#h4-0-165" id="h4-0-165" class="d">-    FILE *in_, *out_;
+</a><a href="#h4-0-166" id="h4-0-166" class="d">-};
+</a><a href="#h4-0-167" id="h4-0-167" class="d">-
+</a><a href="#h4-0-168" id="h4-0-168" class="d">-};
+</a><a href="#h4-0-169" id="h4-0-169" class="d">-
+</a><a href="#h4-0-170" id="h4-0-170" class="d">-codesearch_interface *make_cli_interface(FILE *in, FILE *out) {
+</a><a href="#h4-0-171" id="h4-0-171" class="d">-    return new cli_interface(in, out);
+</a><a href="#h4-0-172" id="h4-0-172" class="d">-}
+</a><b>diff --git a/<a id="h5" href="../file/src/tools/interface.h">src/tools/interface.h</a> b/<a href="../file/src/tools/interface.h">src/tools/interface.h</a></b>
+<a href="#h5-0" id="h5-0" class="h">@@ -1,38 +0,0 @@
+</a><a href="#h5-0-0" id="h5-0-0" class="d">-/********************************************************************
+</a><a href="#h5-0-1" id="h5-0-1" class="d">- * livegrep -- tools/interface.h
+</a><a href="#h5-0-2" id="h5-0-2" class="d">- * Copyright (c) 2011-2013 Nelson Elhage
+</a><a href="#h5-0-3" id="h5-0-3" class="d">- *
+</a><a href="#h5-0-4" id="h5-0-4" class="d">- * This program is free software. You may use, redistribute, and/or
+</a><a href="#h5-0-5" id="h5-0-5" class="d">- * modify it under the terms listed in the COPYING file.
+</a><a href="#h5-0-6" id="h5-0-6" class="d">- ********************************************************************/
+</a><a href="#h5-0-7" id="h5-0-7" class="d">-#ifndef CODESEARCH_INTERFACE_H
+</a><a href="#h5-0-8" id="h5-0-8" class="d">-#define CODESEARCH_INTERFACE_H
+</a><a href="#h5-0-9" id="h5-0-9" class="d">-
+</a><a href="#h5-0-10" id="h5-0-10" class="d">-#include &lt;string&gt;
+</a><a href="#h5-0-11" id="h5-0-11" class="d">-#include &lt;vector&gt;
+</a><a href="#h5-0-12" id="h5-0-12" class="d">-#include &lt;stdlib.h&gt;
+</a><a href="#h5-0-13" id="h5-0-13" class="d">-#include &lt;sys/time.h&gt;
+</a><a href="#h5-0-14" id="h5-0-14" class="d">-
+</a><a href="#h5-0-15" id="h5-0-15" class="d">-struct match_result;
+</a><a href="#h5-0-16" id="h5-0-16" class="d">-struct match_stats;
+</a><a href="#h5-0-17" id="h5-0-17" class="d">-class code_searcher;
+</a><a href="#h5-0-18" id="h5-0-18" class="d">-struct query;
+</a><a href="#h5-0-19" id="h5-0-19" class="d">-
+</a><a href="#h5-0-20" id="h5-0-20" class="d">-class codesearch_interface {
+</a><a href="#h5-0-21" id="h5-0-21" class="d">-public:
+</a><a href="#h5-0-22" id="h5-0-22" class="d">-    virtual void build_index(code_searcher *cs, const std::vector&lt;std::string&gt; &amp;argv) = 0;
+</a><a href="#h5-0-23" id="h5-0-23" class="d">-    virtual void print_match(const match_result *m) = 0;
+</a><a href="#h5-0-24" id="h5-0-24" class="d">-    virtual void print_error(const std::string &amp;err) = 0;
+</a><a href="#h5-0-25" id="h5-0-25" class="d">-    virtual void print_prompt(const code_searcher *cs) = 0;
+</a><a href="#h5-0-26" id="h5-0-26" class="d">-    virtual bool getline(std::string &amp;input) = 0;
+</a><a href="#h5-0-27" id="h5-0-27" class="d">-    virtual bool parse_query(const std::string &amp;input,
+</a><a href="#h5-0-28" id="h5-0-28" class="d">-                             query *out) = 0;
+</a><a href="#h5-0-29" id="h5-0-29" class="d">-    virtual void print_stats(timeval elapsed, const match_stats *stats) = 0;
+</a><a href="#h5-0-30" id="h5-0-30" class="d">-    virtual void info(const char *msg, ...) = 0;
+</a><a href="#h5-0-31" id="h5-0-31" class="d">-    virtual ~codesearch_interface();
+</a><a href="#h5-0-32" id="h5-0-32" class="d">-};
+</a><a href="#h5-0-33" id="h5-0-33" class="d">-
+</a><a href="#h5-0-34" id="h5-0-34" class="d">-codesearch_interface *make_json_interface(FILE *in, FILE *out);
+</a><a href="#h5-0-35" id="h5-0-35" class="d">-codesearch_interface *make_cli_interface(FILE *in, FILE *out);
+</a><a href="#h5-0-36" id="h5-0-36" class="d">-
+</a><a href="#h5-0-37" id="h5-0-37" class="d">-#endif
+</a><b>diff --git a/<a id="h6" href="../file/src/tools/json_interface.cc">src/tools/json_interface.cc</a> b/<a href="../file/src/tools/json_interface.cc">src/tools/json_interface.cc</a></b>
+<a href="#h6-0" id="h6-0" class="h">@@ -1,351 +0,0 @@
+</a><a href="#h6-0-0" id="h6-0-0" class="d">-#include &quot;codesearch.h&quot;
+</a><a href="#h6-0-1" id="h6-0-1" class="d">-#include &quot;interface.h&quot;
+</a><a href="#h6-0-2" id="h6-0-2" class="d">-#include &quot;debug.h&quot;
+</a><a href="#h6-0-3" id="h6-0-3" class="d">-#include &quot;git_indexer.h&quot;
+</a><a href="#h6-0-4" id="h6-0-4" class="d">-#include &quot;fs_indexer.h&quot;
+</a><a href="#h6-0-5" id="h6-0-5" class="d">-#include &quot;interface-impl.h&quot;
+</a><a href="#h6-0-6" id="h6-0-6" class="d">-
+</a><a href="#h6-0-7" id="h6-0-7" class="d">-#include &lt;json/json.h&gt;
+</a><a href="#h6-0-8" id="h6-0-8" class="d">-
+</a><a href="#h6-0-9" id="h6-0-9" class="d">-#include &lt;gflags/gflags.h&gt;
+</a><a href="#h6-0-10" id="h6-0-10" class="d">-
+</a><a href="#h6-0-11" id="h6-0-11" class="d">-#include &lt;re2/re2.h&gt;
+</a><a href="#h6-0-12" id="h6-0-12" class="d">-using re2::RE2;
+</a><a href="#h6-0-13" id="h6-0-13" class="d">-using std::unique_ptr;
+</a><a href="#h6-0-14" id="h6-0-14" class="d">-
+</a><a href="#h6-0-15" id="h6-0-15" class="d">-namespace {
+</a><a href="#h6-0-16" id="h6-0-16" class="d">-
+</a><a href="#h6-0-17" id="h6-0-17" class="d">-json_object *to_json(const string &amp;str) {
+</a><a href="#h6-0-18" id="h6-0-18" class="d">-    return json_object_new_string(str.c_str());
+</a><a href="#h6-0-19" id="h6-0-19" class="d">-}
+</a><a href="#h6-0-20" id="h6-0-20" class="d">-
+</a><a href="#h6-0-21" id="h6-0-21" class="d">-json_object *to_json(const StringPiece &amp;str) {
+</a><a href="#h6-0-22" id="h6-0-22" class="d">-    return json_object_new_string_len(str.data(),
+</a><a href="#h6-0-23" id="h6-0-23" class="d">-                                      str.size());
+</a><a href="#h6-0-24" id="h6-0-24" class="d">-}
+</a><a href="#h6-0-25" id="h6-0-25" class="d">-
+</a><a href="#h6-0-26" id="h6-0-26" class="d">-json_object *to_json(int i) {
+</a><a href="#h6-0-27" id="h6-0-27" class="d">-    return json_object_new_int(i);
+</a><a href="#h6-0-28" id="h6-0-28" class="d">-}
+</a><a href="#h6-0-29" id="h6-0-29" class="d">-
+</a><a href="#h6-0-30" id="h6-0-30" class="d">-json_object *to_json(const indexed_tree &amp;tree) {
+</a><a href="#h6-0-31" id="h6-0-31" class="d">-    json_object *out = json_object_new_object();
+</a><a href="#h6-0-32" id="h6-0-32" class="d">-    json_object_object_add(out, &quot;name&quot;, to_json(tree.name));
+</a><a href="#h6-0-33" id="h6-0-33" class="d">-    json_object_object_add(out, &quot;version&quot;, to_json(tree.version));
+</a><a href="#h6-0-34" id="h6-0-34" class="d">-    if (tree.metadata)
+</a><a href="#h6-0-35" id="h6-0-35" class="d">-        json_object_object_add(out, &quot;metadata&quot;, json_object_get(tree.metadata));
+</a><a href="#h6-0-36" id="h6-0-36" class="d">-    return out;
+</a><a href="#h6-0-37" id="h6-0-37" class="d">-}
+</a><a href="#h6-0-38" id="h6-0-38" class="d">-
+</a><a href="#h6-0-39" id="h6-0-39" class="d">-template &lt;class T&gt;
+</a><a href="#h6-0-40" id="h6-0-40" class="d">-json_object *to_json(vector&lt;T&gt; vec) {
+</a><a href="#h6-0-41" id="h6-0-41" class="d">-    json_object *out = json_object_new_array();
+</a><a href="#h6-0-42" id="h6-0-42" class="d">-    for (auto it = vec.begin(); it != vec.end(); it++)
+</a><a href="#h6-0-43" id="h6-0-43" class="d">-        json_object_array_add(out, to_json(*it));
+</a><a href="#h6-0-44" id="h6-0-44" class="d">-    return out;
+</a><a href="#h6-0-45" id="h6-0-45" class="d">-}
+</a><a href="#h6-0-46" id="h6-0-46" class="d">-
+</a><a href="#h6-0-47" id="h6-0-47" class="d">-json_object *json_frame(const std::string op, json_object *body) {
+</a><a href="#h6-0-48" id="h6-0-48" class="d">-    json_object *frame = json_object_new_object();
+</a><a href="#h6-0-49" id="h6-0-49" class="d">-    json_object_object_add(frame, &quot;opcode&quot;, to_json(op));
+</a><a href="#h6-0-50" id="h6-0-50" class="d">-    json_object_object_add(frame, &quot;body&quot;, body);
+</a><a href="#h6-0-51" id="h6-0-51" class="d">-    return frame;
+</a><a href="#h6-0-52" id="h6-0-52" class="d">-}
+</a><a href="#h6-0-53" id="h6-0-53" class="d">-
+</a><a href="#h6-0-54" id="h6-0-54" class="d">-json_object *json_info(const code_searcher *cs) {
+</a><a href="#h6-0-55" id="h6-0-55" class="d">-    json_object *obj = json_object_new_object();
+</a><a href="#h6-0-56" id="h6-0-56" class="d">-    json_object_object_add(obj, &quot;trees&quot;, to_json(cs-&gt;trees()));
+</a><a href="#h6-0-57" id="h6-0-57" class="d">-    json_object_object_add(obj, &quot;name&quot;, to_json(cs-&gt;name()));
+</a><a href="#h6-0-58" id="h6-0-58" class="d">-    return obj;
+</a><a href="#h6-0-59" id="h6-0-59" class="d">-}
+</a><a href="#h6-0-60" id="h6-0-60" class="d">-
+</a><a href="#h6-0-61" id="h6-0-61" class="d">-long timeval_ms (struct timeval tv) {
+</a><a href="#h6-0-62" id="h6-0-62" class="d">-    return tv.tv_sec * 1000 + tv.tv_usec / 1000;
+</a><a href="#h6-0-63" id="h6-0-63" class="d">-}
+</a><a href="#h6-0-64" id="h6-0-64" class="d">-
+</a><a href="#h6-0-65" id="h6-0-65" class="d">-struct repo_spec {
+</a><a href="#h6-0-66" id="h6-0-66" class="d">-    string path;
+</a><a href="#h6-0-67" id="h6-0-67" class="d">-    string name;
+</a><a href="#h6-0-68" id="h6-0-68" class="d">-    vector&lt;string&gt; revisions;
+</a><a href="#h6-0-69" id="h6-0-69" class="d">-    json_object *metadata;
+</a><a href="#h6-0-70" id="h6-0-70" class="d">-};
+</a><a href="#h6-0-71" id="h6-0-71" class="d">-
+</a><a href="#h6-0-72" id="h6-0-72" class="d">-
+</a><a href="#h6-0-73" id="h6-0-73" class="d">-// Reimplement this for compatibility with old libjson
+</a><a href="#h6-0-74" id="h6-0-74" class="d">-const char *compat_json_type_to_name(enum json_type o_type) {
+</a><a href="#h6-0-75" id="h6-0-75" class="d">-    switch (o_type) {
+</a><a href="#h6-0-76" id="h6-0-76" class="d">-    case json_type_null:
+</a><a href="#h6-0-77" id="h6-0-77" class="d">-        return &quot;null&quot;;
+</a><a href="#h6-0-78" id="h6-0-78" class="d">-    case json_type_boolean:
+</a><a href="#h6-0-79" id="h6-0-79" class="d">-        return &quot;boolean&quot;;
+</a><a href="#h6-0-80" id="h6-0-80" class="d">-    case json_type_double:
+</a><a href="#h6-0-81" id="h6-0-81" class="d">-        return &quot;double&quot;;
+</a><a href="#h6-0-82" id="h6-0-82" class="d">-    case json_type_int:
+</a><a href="#h6-0-83" id="h6-0-83" class="d">-        return &quot;int&quot;;
+</a><a href="#h6-0-84" id="h6-0-84" class="d">-    case json_type_object:
+</a><a href="#h6-0-85" id="h6-0-85" class="d">-        return &quot;object&quot;;
+</a><a href="#h6-0-86" id="h6-0-86" class="d">-    case json_type_array:
+</a><a href="#h6-0-87" id="h6-0-87" class="d">-        return &quot;array&quot;;
+</a><a href="#h6-0-88" id="h6-0-88" class="d">-    case json_type_string:
+</a><a href="#h6-0-89" id="h6-0-89" class="d">-        return &quot;string&quot;;
+</a><a href="#h6-0-90" id="h6-0-90" class="d">-    default:
+</a><a href="#h6-0-91" id="h6-0-91" class="d">-        return &quot;&lt;unknown&gt;&quot;;
+</a><a href="#h6-0-92" id="h6-0-92" class="d">-    }
+</a><a href="#h6-0-93" id="h6-0-93" class="d">-}
+</a><a href="#h6-0-94" id="h6-0-94" class="d">-
+</a><a href="#h6-0-95" id="h6-0-95" class="d">-json_object *get_with_type(json_object *parent, const char *key, json_type type) {
+</a><a href="#h6-0-96" id="h6-0-96" class="d">-    json_object *val = json_object_object_get(parent, key);
+</a><a href="#h6-0-97" id="h6-0-97" class="d">-    if (val == NULL || json_object_is_type(val, type)) {
+</a><a href="#h6-0-98" id="h6-0-98" class="d">-        return val;
+</a><a href="#h6-0-99" id="h6-0-99" class="d">-    }
+</a><a href="#h6-0-100" id="h6-0-100" class="d">-    die(&quot;Error: &#39;%s&#39;: expected %s, got %s&quot;, key,
+</a><a href="#h6-0-101" id="h6-0-101" class="d">-        compat_json_type_to_name(type),
+</a><a href="#h6-0-102" id="h6-0-102" class="d">-        compat_json_type_to_name(json_object_get_type(val)));
+</a><a href="#h6-0-103" id="h6-0-103" class="d">-    return NULL;
+</a><a href="#h6-0-104" id="h6-0-104" class="d">-}
+</a><a href="#h6-0-105" id="h6-0-105" class="d">-
+</a><a href="#h6-0-106" id="h6-0-106" class="d">-repo_spec parse_repo_spec(json_object *js) {
+</a><a href="#h6-0-107" id="h6-0-107" class="d">-    debug(kDebugUI, &quot;Parsing: %s&quot;, json_object_to_json_string(js));
+</a><a href="#h6-0-108" id="h6-0-108" class="d">-    if (!json_object_is_type(js, json_type_object)) {
+</a><a href="#h6-0-109" id="h6-0-109" class="d">-        die(&quot;repository spec must be an object.&quot;);
+</a><a href="#h6-0-110" id="h6-0-110" class="d">-    }
+</a><a href="#h6-0-111" id="h6-0-111" class="d">-
+</a><a href="#h6-0-112" id="h6-0-112" class="d">-    repo_spec spec;
+</a><a href="#h6-0-113" id="h6-0-113" class="d">-    json_object *prop;
+</a><a href="#h6-0-114" id="h6-0-114" class="d">-    if ((prop = get_with_type(js, &quot;path&quot;, json_type_string)))
+</a><a href="#h6-0-115" id="h6-0-115" class="d">-        spec.path = json_object_get_string(prop);
+</a><a href="#h6-0-116" id="h6-0-116" class="d">-    if ((prop = get_with_type(js, &quot;name&quot;, json_type_string)))
+</a><a href="#h6-0-117" id="h6-0-117" class="d">-        spec.name = json_object_get_string(prop);
+</a><a href="#h6-0-118" id="h6-0-118" class="d">-    spec.metadata = json_object_get(get_with_type(js, &quot;metadata&quot;, json_type_object));
+</a><a href="#h6-0-119" id="h6-0-119" class="d">-
+</a><a href="#h6-0-120" id="h6-0-120" class="d">-    json_object *js_revs = get_with_type(js, &quot;revisions&quot;, json_type_array);
+</a><a href="#h6-0-121" id="h6-0-121" class="d">-    if (js_revs &amp;&amp; json_object_is_type(js_revs, json_type_array)) {
+</a><a href="#h6-0-122" id="h6-0-122" class="d">-        for (int i = 0; i &lt; json_object_array_length(js_revs); ++i) {
+</a><a href="#h6-0-123" id="h6-0-123" class="d">-            json_object *elt = json_object_array_get_idx(js_revs, i);
+</a><a href="#h6-0-124" id="h6-0-124" class="d">-            if (!json_object_is_type(elt, json_type_string))
+</a><a href="#h6-0-125" id="h6-0-125" class="d">-                die(&quot;repository: &#39;revisions&#39; must be list of strings&quot;);
+</a><a href="#h6-0-126" id="h6-0-126" class="d">-            spec.revisions.push_back(json_object_get_string(elt));
+</a><a href="#h6-0-127" id="h6-0-127" class="d">-        }
+</a><a href="#h6-0-128" id="h6-0-128" class="d">-    }
+</a><a href="#h6-0-129" id="h6-0-129" class="d">-
+</a><a href="#h6-0-130" id="h6-0-130" class="d">-    return spec;
+</a><a href="#h6-0-131" id="h6-0-131" class="d">-}
+</a><a href="#h6-0-132" id="h6-0-132" class="d">-
+</a><a href="#h6-0-133" id="h6-0-133" class="d">-void extract_repo_specs(vector&lt;repo_spec&gt; &amp;out, json_object *js) {
+</a><a href="#h6-0-134" id="h6-0-134" class="d">-    switch(json_object_get_type(js)) {
+</a><a href="#h6-0-135" id="h6-0-135" class="d">-    case json_type_object:
+</a><a href="#h6-0-136" id="h6-0-136" class="d">-        debug(kDebugUI, &quot;Parsing a single repo&quot;);
+</a><a href="#h6-0-137" id="h6-0-137" class="d">-        out.push_back(parse_repo_spec(js));
+</a><a href="#h6-0-138" id="h6-0-138" class="d">-        break;
+</a><a href="#h6-0-139" id="h6-0-139" class="d">-    case json_type_array:
+</a><a href="#h6-0-140" id="h6-0-140" class="d">-        debug(kDebugUI, &quot;Parsing an array of repos...&quot;);
+</a><a href="#h6-0-141" id="h6-0-141" class="d">-        for (int i = 0; i &lt; json_object_array_length(js); ++i) {
+</a><a href="#h6-0-142" id="h6-0-142" class="d">-            out.push_back(parse_repo_spec(json_object_array_get_idx(js, i)));
+</a><a href="#h6-0-143" id="h6-0-143" class="d">-        }
+</a><a href="#h6-0-144" id="h6-0-144" class="d">-        break;
+</a><a href="#h6-0-145" id="h6-0-145" class="d">-    default:
+</a><a href="#h6-0-146" id="h6-0-146" class="d">-        die(&quot;unrecognized type for repo spec: %s&quot;,
+</a><a href="#h6-0-147" id="h6-0-147" class="d">-            json_object_to_json_string(js));
+</a><a href="#h6-0-148" id="h6-0-148" class="d">-        exit(1);
+</a><a href="#h6-0-149" id="h6-0-149" class="d">-    }
+</a><a href="#h6-0-150" id="h6-0-150" class="d">-}
+</a><a href="#h6-0-151" id="h6-0-151" class="d">-
+</a><a href="#h6-0-152" id="h6-0-152" class="d">-class json_interface : public codesearch_interface {
+</a><a href="#h6-0-153" id="h6-0-153" class="d">-public:
+</a><a href="#h6-0-154" id="h6-0-154" class="d">-    json_interface(FILE *in, FILE *out) : in_(in), out_(out) {
+</a><a href="#h6-0-155" id="h6-0-155" class="d">-        assert(!setvbuf(in_,  NULL, _IOFBF, 4096*4));
+</a><a href="#h6-0-156" id="h6-0-156" class="d">-        assert(!setvbuf(out_, NULL, _IOLBF, 4096));
+</a><a href="#h6-0-157" id="h6-0-157" class="d">-    }
+</a><a href="#h6-0-158" id="h6-0-158" class="d">-
+</a><a href="#h6-0-159" id="h6-0-159" class="d">-    void write_frame(const std::string &amp;opcode, json_object *body) {
+</a><a href="#h6-0-160" id="h6-0-160" class="d">-        json_object *frame = json_frame(opcode, body);
+</a><a href="#h6-0-161" id="h6-0-161" class="d">-        fprintf(out_, &quot;%s\n&quot;, json_object_to_json_string(frame));
+</a><a href="#h6-0-162" id="h6-0-162" class="d">-        json_object_put(frame);
+</a><a href="#h6-0-163" id="h6-0-163" class="d">-    }
+</a><a href="#h6-0-164" id="h6-0-164" class="d">-
+</a><a href="#h6-0-165" id="h6-0-165" class="d">-    virtual void print_match(const match_result *m) {
+</a><a href="#h6-0-166" id="h6-0-166" class="d">-        json_object *obj = json_object_new_object();
+</a><a href="#h6-0-167" id="h6-0-167" class="d">-
+</a><a href="#h6-0-168" id="h6-0-168" class="d">-        json_object_object_add(obj, &quot;tree&quot;,  to_json(m-&gt;file-&gt;tree-&gt;name));
+</a><a href="#h6-0-169" id="h6-0-169" class="d">-        json_object_object_add(obj, &quot;version&quot;,  to_json(m-&gt;file-&gt;tree-&gt;version));
+</a><a href="#h6-0-170" id="h6-0-170" class="d">-        json_object_object_add(obj, &quot;path&quot;,  to_json(m-&gt;file-&gt;path));
+</a><a href="#h6-0-171" id="h6-0-171" class="d">-        json_object_object_add(obj, &quot;lno&quot;, to_json(m-&gt;lno));
+</a><a href="#h6-0-172" id="h6-0-172" class="d">-        json_object_object_add(obj, &quot;context_before&quot;,
+</a><a href="#h6-0-173" id="h6-0-173" class="d">-                               to_json(m-&gt;context_before));
+</a><a href="#h6-0-174" id="h6-0-174" class="d">-        json_object_object_add(obj, &quot;context_after&quot;,
+</a><a href="#h6-0-175" id="h6-0-175" class="d">-                               to_json(m-&gt;context_after));
+</a><a href="#h6-0-176" id="h6-0-176" class="d">-        json_object *bounds = json_object_new_array();
+</a><a href="#h6-0-177" id="h6-0-177" class="d">-        json_object_array_add(bounds, to_json(m-&gt;matchleft));
+</a><a href="#h6-0-178" id="h6-0-178" class="d">-        json_object_array_add(bounds, to_json(m-&gt;matchright));
+</a><a href="#h6-0-179" id="h6-0-179" class="d">-        json_object_object_add(obj, &quot;bounds&quot;, bounds);
+</a><a href="#h6-0-180" id="h6-0-180" class="d">-        json_object_object_add(obj, &quot;line&quot;, to_json(m-&gt;line));
+</a><a href="#h6-0-181" id="h6-0-181" class="d">-        write_frame(&quot;match&quot;, obj);
+</a><a href="#h6-0-182" id="h6-0-182" class="d">-    }
+</a><a href="#h6-0-183" id="h6-0-183" class="d">-
+</a><a href="#h6-0-184" id="h6-0-184" class="d">-    virtual void print_error(const std::string &amp;err) {
+</a><a href="#h6-0-185" id="h6-0-185" class="d">-        write_frame(&quot;error&quot;, to_json(err));
+</a><a href="#h6-0-186" id="h6-0-186" class="d">-    }
+</a><a href="#h6-0-187" id="h6-0-187" class="d">-
+</a><a href="#h6-0-188" id="h6-0-188" class="d">-    virtual void print_prompt(const code_searcher *cs) {
+</a><a href="#h6-0-189" id="h6-0-189" class="d">-        write_frame(&quot;ready&quot;, json_info(cs));
+</a><a href="#h6-0-190" id="h6-0-190" class="d">-    }
+</a><a href="#h6-0-191" id="h6-0-191" class="d">-
+</a><a href="#h6-0-192" id="h6-0-192" class="d">-    virtual bool getline(std::string &amp;input) {
+</a><a href="#h6-0-193" id="h6-0-193" class="d">-        return ::getline(input, in_);
+</a><a href="#h6-0-194" id="h6-0-194" class="d">-    }
+</a><a href="#h6-0-195" id="h6-0-195" class="d">-
+</a><a href="#h6-0-196" id="h6-0-196" class="d">-    bool extract_regex(json_object *js, const std::string &amp;key,
+</a><a href="#h6-0-197" id="h6-0-197" class="d">-                       const RE2::Options &amp;opts, unique_ptr&lt;RE2&gt; *out) {
+</a><a href="#h6-0-198" id="h6-0-198" class="d">-        out-&gt;reset(0);
+</a><a href="#h6-0-199" id="h6-0-199" class="d">-        json_object *re_js = json_object_object_get(js, key.c_str());
+</a><a href="#h6-0-200" id="h6-0-200" class="d">-        if (re_js == NULL)
+</a><a href="#h6-0-201" id="h6-0-201" class="d">-            return true;
+</a><a href="#h6-0-202" id="h6-0-202" class="d">-
+</a><a href="#h6-0-203" id="h6-0-203" class="d">-        if (json_object_get_type(re_js) != json_type_string) {
+</a><a href="#h6-0-204" id="h6-0-204" class="d">-            print_error(std::string(&quot;Expected a JSON object: &quot;) + key);
+</a><a href="#h6-0-205" id="h6-0-205" class="d">-            return false;
+</a><a href="#h6-0-206" id="h6-0-206" class="d">-        }
+</a><a href="#h6-0-207" id="h6-0-207" class="d">-        unique_ptr&lt;RE2&gt; re(new RE2(json_object_get_string(re_js), opts));
+</a><a href="#h6-0-208" id="h6-0-208" class="d">-        if (!re-&gt;ok()) {
+</a><a href="#h6-0-209" id="h6-0-209" class="d">-            print_error(re-&gt;error());
+</a><a href="#h6-0-210" id="h6-0-210" class="d">-            return false;
+</a><a href="#h6-0-211" id="h6-0-211" class="d">-        }
+</a><a href="#h6-0-212" id="h6-0-212" class="d">-
+</a><a href="#h6-0-213" id="h6-0-213" class="d">-        *out = std::move(re);
+</a><a href="#h6-0-214" id="h6-0-214" class="d">-        return true;
+</a><a href="#h6-0-215" id="h6-0-215" class="d">-    }
+</a><a href="#h6-0-216" id="h6-0-216" class="d">-
+</a><a href="#h6-0-217" id="h6-0-217" class="d">-    virtual bool parse_query(const std::string &amp;input,
+</a><a href="#h6-0-218" id="h6-0-218" class="d">-                             query *out) {
+</a><a href="#h6-0-219" id="h6-0-219" class="d">-        json_object *js = json_tokener_parse(input.c_str());
+</a><a href="#h6-0-220" id="h6-0-220" class="d">-        if (is_error(js)) {
+</a><a href="#h6-0-221" id="h6-0-221" class="d">-            print_error(&quot;Parse error: &quot; +
+</a><a href="#h6-0-222" id="h6-0-222" class="d">-                        string(json_tokener_errors[-(unsigned long)js]));
+</a><a href="#h6-0-223" id="h6-0-223" class="d">-            return false;
+</a><a href="#h6-0-224" id="h6-0-224" class="d">-        }
+</a><a href="#h6-0-225" id="h6-0-225" class="d">-        if (json_object_get_type(js) != json_type_object) {
+</a><a href="#h6-0-226" id="h6-0-226" class="d">-            print_error(&quot;Expected a JSON object&quot;);
+</a><a href="#h6-0-227" id="h6-0-227" class="d">-            return false;
+</a><a href="#h6-0-228" id="h6-0-228" class="d">-        }
+</a><a href="#h6-0-229" id="h6-0-229" class="d">-        json_object *q = json_object_object_get(js, &quot;body&quot;);
+</a><a href="#h6-0-230" id="h6-0-230" class="d">-        if (q == NULL || json_object_get_type(q) != json_type_object) {
+</a><a href="#h6-0-231" id="h6-0-231" class="d">-            print_error(&quot;Expected a JSON object&quot;);
+</a><a href="#h6-0-232" id="h6-0-232" class="d">-            return false;
+</a><a href="#h6-0-233" id="h6-0-233" class="d">-        }
+</a><a href="#h6-0-234" id="h6-0-234" class="d">-
+</a><a href="#h6-0-235" id="h6-0-235" class="d">-        RE2::Options opts;
+</a><a href="#h6-0-236" id="h6-0-236" class="d">-        default_re2_options(opts);
+</a><a href="#h6-0-237" id="h6-0-237" class="d">-
+</a><a href="#h6-0-238" id="h6-0-238" class="d">-        json_object *fold_case = json_object_object_get(q, &quot;fold_case&quot;);
+</a><a href="#h6-0-239" id="h6-0-239" class="d">-        if (fold_case &amp;&amp;
+</a><a href="#h6-0-240" id="h6-0-240" class="d">-            json_object_get_type(fold_case) == json_type_boolean &amp;&amp;
+</a><a href="#h6-0-241" id="h6-0-241" class="d">-            json_object_get_boolean(fold_case))
+</a><a href="#h6-0-242" id="h6-0-242" class="d">-            opts.set_case_sensitive(false);
+</a><a href="#h6-0-243" id="h6-0-243" class="d">-
+</a><a href="#h6-0-244" id="h6-0-244" class="d">-        if (!extract_regex(q, &quot;line&quot;, opts, &amp;out-&gt;line_pat))
+</a><a href="#h6-0-245" id="h6-0-245" class="d">-            return false;
+</a><a href="#h6-0-246" id="h6-0-246" class="d">-        if (out-&gt;line_pat.get() == 0) {
+</a><a href="#h6-0-247" id="h6-0-247" class="d">-            print_error(&quot;No regex specified!&quot;);
+</a><a href="#h6-0-248" id="h6-0-248" class="d">-            return false;
+</a><a href="#h6-0-249" id="h6-0-249" class="d">-        }
+</a><a href="#h6-0-250" id="h6-0-250" class="d">-
+</a><a href="#h6-0-251" id="h6-0-251" class="d">-        opts.set_case_sensitive(true);
+</a><a href="#h6-0-252" id="h6-0-252" class="d">-
+</a><a href="#h6-0-253" id="h6-0-253" class="d">-        if (!extract_regex(q, &quot;file&quot;, opts, &amp;out-&gt;file_pat) ||
+</a><a href="#h6-0-254" id="h6-0-254" class="d">-            !extract_regex(q, &quot;repo&quot;, opts, &amp;out-&gt;tree_pat)) {
+</a><a href="#h6-0-255" id="h6-0-255" class="d">-            return false;
+</a><a href="#h6-0-256" id="h6-0-256" class="d">-        }
+</a><a href="#h6-0-257" id="h6-0-257" class="d">-
+</a><a href="#h6-0-258" id="h6-0-258" class="d">-
+</a><a href="#h6-0-259" id="h6-0-259" class="d">-        json_object_put(js);
+</a><a href="#h6-0-260" id="h6-0-260" class="d">-
+</a><a href="#h6-0-261" id="h6-0-261" class="d">-        return true;
+</a><a href="#h6-0-262" id="h6-0-262" class="d">-    }
+</a><a href="#h6-0-263" id="h6-0-263" class="d">-
+</a><a href="#h6-0-264" id="h6-0-264" class="d">-    virtual void print_stats(timeval elapsed, const match_stats *stats) {
+</a><a href="#h6-0-265" id="h6-0-265" class="d">-        json_object *obj = json_object_new_object();
+</a><a href="#h6-0-266" id="h6-0-266" class="d">-        json_object_object_add(obj, &quot;re2_time&quot;, json_object_new_int
+</a><a href="#h6-0-267" id="h6-0-267" class="d">-                               (timeval_ms(stats-&gt;re2_time)));
+</a><a href="#h6-0-268" id="h6-0-268" class="d">-        json_object_object_add(obj, &quot;git_time&quot;, json_object_new_int
+</a><a href="#h6-0-269" id="h6-0-269" class="d">-                               (timeval_ms(stats-&gt;git_time)));
+</a><a href="#h6-0-270" id="h6-0-270" class="d">-        json_object_object_add(obj, &quot;sort_time&quot;, json_object_new_int
+</a><a href="#h6-0-271" id="h6-0-271" class="d">-                               (timeval_ms(stats-&gt;sort_time)));
+</a><a href="#h6-0-272" id="h6-0-272" class="d">-        json_object_object_add(obj, &quot;index_time&quot;, json_object_new_int
+</a><a href="#h6-0-273" id="h6-0-273" class="d">-                               (timeval_ms(stats-&gt;index_time)));
+</a><a href="#h6-0-274" id="h6-0-274" class="d">-        json_object_object_add(obj, &quot;analyze_time&quot;, json_object_new_int
+</a><a href="#h6-0-275" id="h6-0-275" class="d">-                               (timeval_ms(stats-&gt;analyze_time)));
+</a><a href="#h6-0-276" id="h6-0-276" class="d">-        switch(stats-&gt;why) {
+</a><a href="#h6-0-277" id="h6-0-277" class="d">-        case kExitNone: break;
+</a><a href="#h6-0-278" id="h6-0-278" class="d">-        case kExitMatchLimit:
+</a><a href="#h6-0-279" id="h6-0-279" class="d">-            json_object_object_add(obj, &quot;why&quot;, json_object_new_string(&quot;limit&quot;));
+</a><a href="#h6-0-280" id="h6-0-280" class="d">-            break;
+</a><a href="#h6-0-281" id="h6-0-281" class="d">-        case kExitTimeout:
+</a><a href="#h6-0-282" id="h6-0-282" class="d">-            json_object_object_add(obj, &quot;why&quot;, json_object_new_string(&quot;timeout&quot;));
+</a><a href="#h6-0-283" id="h6-0-283" class="d">-            break;
+</a><a href="#h6-0-284" id="h6-0-284" class="d">-        }
+</a><a href="#h6-0-285" id="h6-0-285" class="d">-        write_frame(&quot;done&quot;, obj);
+</a><a href="#h6-0-286" id="h6-0-286" class="d">-    }
+</a><a href="#h6-0-287" id="h6-0-287" class="d">-
+</a><a href="#h6-0-288" id="h6-0-288" class="d">-    virtual void build_index(code_searcher *cs, const vector&lt;std::string&gt; &amp;argv) {
+</a><a href="#h6-0-289" id="h6-0-289" class="d">-        if (argv.size() != 2) {
+</a><a href="#h6-0-290" id="h6-0-290" class="d">-            print_error(&quot;Usage: &quot; + argv[0] + &quot; --json [OPTIONS] config.json&quot;);
+</a><a href="#h6-0-291" id="h6-0-291" class="d">-            exit(1);
+</a><a href="#h6-0-292" id="h6-0-292" class="d">-        }
+</a><a href="#h6-0-293" id="h6-0-293" class="d">-        json_object *obj = json_object_from_file(const_cast&lt;char*&gt;(argv[1].c_str()));
+</a><a href="#h6-0-294" id="h6-0-294" class="d">-        if (is_error(obj)) {
+</a><a href="#h6-0-295" id="h6-0-295" class="d">-            print_error(string(&quot;Error parsing `&quot;) + argv[1] + string(&quot;&#39;: &quot;) +
+</a><a href="#h6-0-296" id="h6-0-296" class="d">-                        string(json_tokener_errors[-(unsigned long)obj]));
+</a><a href="#h6-0-297" id="h6-0-297" class="d">-            exit(1);
+</a><a href="#h6-0-298" id="h6-0-298" class="d">-        }
+</a><a href="#h6-0-299" id="h6-0-299" class="d">-
+</a><a href="#h6-0-300" id="h6-0-300" class="d">-        json_object *name = json_object_object_get(obj, &quot;name&quot;);
+</a><a href="#h6-0-301" id="h6-0-301" class="d">-        if (json_object_is_type(name, json_type_string))
+</a><a href="#h6-0-302" id="h6-0-302" class="d">-            cs-&gt;set_name(json_object_get_string(name));
+</a><a href="#h6-0-303" id="h6-0-303" class="d">-
+</a><a href="#h6-0-304" id="h6-0-304" class="d">-        string path;
+</a><a href="#h6-0-305" id="h6-0-305" class="d">-        json_object *js_paths = json_object_object_get(obj, &quot;fs_paths&quot;);
+</a><a href="#h6-0-306" id="h6-0-306" class="d">-        if (js_paths &amp;&amp; json_object_is_type(js_paths, json_type_array)) {
+</a><a href="#h6-0-307" id="h6-0-307" class="d">-            for (int i = 0; i &lt; json_object_array_length(js_paths); ++i) {
+</a><a href="#h6-0-308" id="h6-0-308" class="d">-                json_object *elt = json_object_array_get_idx(js_paths, i);
+</a><a href="#h6-0-309" id="h6-0-309" class="d">-                if (json_object_is_type(elt, json_type_string)) {
+</a><a href="#h6-0-310" id="h6-0-310" class="d">-                    path = json_object_get_string(elt);
+</a><a href="#h6-0-311" id="h6-0-311" class="d">-                    debug(kDebugUI, &quot;Walking `%s&#39;...\n&quot;,
+</a><a href="#h6-0-312" id="h6-0-312" class="d">-                        path.c_str());
+</a><a href="#h6-0-313" id="h6-0-313" class="d">-                    fs_indexer indexer(cs, path);
+</a><a href="#h6-0-314" id="h6-0-314" class="d">-                    indexer.walk(path);
+</a><a href="#h6-0-315" id="h6-0-315" class="d">-                    debug(kDebugUI, &quot;done\n&quot;);
+</a><a href="#h6-0-316" id="h6-0-316" class="d">-                }
+</a><a href="#h6-0-317" id="h6-0-317" class="d">-            }
+</a><a href="#h6-0-318" id="h6-0-318" class="d">-        }
+</a><a href="#h6-0-319" id="h6-0-319" class="d">-
+</a><a href="#h6-0-320" id="h6-0-320" class="d">-        vector&lt;repo_spec&gt; repos;
+</a><a href="#h6-0-321" id="h6-0-321" class="d">-        json_object *repo_spec = json_object_object_get(obj, &quot;repositories&quot;);
+</a><a href="#h6-0-322" id="h6-0-322" class="d">-        if (repo_spec) {
+</a><a href="#h6-0-323" id="h6-0-323" class="d">-            extract_repo_specs(repos, repo_spec);
+</a><a href="#h6-0-324" id="h6-0-324" class="d">-            json_object_put(obj);
+</a><a href="#h6-0-325" id="h6-0-325" class="d">-
+</a><a href="#h6-0-326" id="h6-0-326" class="d">-            for (auto it = repos.begin(); it != repos.end(); ++it) {
+</a><a href="#h6-0-327" id="h6-0-327" class="d">-                debug(kDebugUI, &quot;Walking name=%s, path=%s&quot;,
+</a><a href="#h6-0-328" id="h6-0-328" class="d">-                      it-&gt;name.c_str(), it-&gt;path.c_str());
+</a><a href="#h6-0-329" id="h6-0-329" class="d">-                git_indexer indexer(cs, it-&gt;path, it-&gt;name, it-&gt;metadata);
+</a><a href="#h6-0-330" id="h6-0-330" class="d">-                for (auto rev = it-&gt;revisions.begin();
+</a><a href="#h6-0-331" id="h6-0-331" class="d">-                     rev != it-&gt;revisions.end(); ++rev) {
+</a><a href="#h6-0-332" id="h6-0-332" class="d">-                    debug(kDebugUI, &quot;  walking %s..&quot;, rev-&gt;c_str());
+</a><a href="#h6-0-333" id="h6-0-333" class="d">-                    indexer.walk(*rev);
+</a><a href="#h6-0-334" id="h6-0-334" class="d">-                }
+</a><a href="#h6-0-335" id="h6-0-335" class="d">-            }
+</a><a href="#h6-0-336" id="h6-0-336" class="d">-        }
+</a><a href="#h6-0-337" id="h6-0-337" class="d">-    }
+</a><a href="#h6-0-338" id="h6-0-338" class="d">-
+</a><a href="#h6-0-339" id="h6-0-339" class="d">-    virtual void info(const char *msg, ...) {}
+</a><a href="#h6-0-340" id="h6-0-340" class="d">-    virtual ~json_interface() {}
+</a><a href="#h6-0-341" id="h6-0-341" class="d">-
+</a><a href="#h6-0-342" id="h6-0-342" class="d">-protected:
+</a><a href="#h6-0-343" id="h6-0-343" class="d">-    FILE *in_, *out_;
+</a><a href="#h6-0-344" id="h6-0-344" class="d">-};
+</a><a href="#h6-0-345" id="h6-0-345" class="d">-
+</a><a href="#h6-0-346" id="h6-0-346" class="d">-};
+</a><a href="#h6-0-347" id="h6-0-347" class="d">-
+</a><a href="#h6-0-348" id="h6-0-348" class="d">-codesearch_interface *make_json_interface(FILE *in, FILE *out) {
+</a><a href="#h6-0-349" id="h6-0-349" class="d">-    return new json_interface(in, out);
+</a><a href="#h6-0-350" id="h6-0-350" class="d">-}
+</a><b>diff --git a/<a id="h7" href="../file/src/tools/transport.cc">src/tools/transport.cc</a> b/<a href="../file/src/tools/transport.cc">src/tools/transport.cc</a></b>
+<a href="#h7-0" id="h7-0" class="h">@@ -0,0 +1,343 @@
+</a><a href="#h7-0-0" id="h7-0-0" class="i">+/********************************************************************
+</a><a href="#h7-0-1" id="h7-0-1" class="i">+ * livegrep -- tools/transport.cc
+</a><a href="#h7-0-2" id="h7-0-2" class="i">+ * Copyright (c) 2011-2014 Nelson Elhage
+</a><a href="#h7-0-3" id="h7-0-3" class="i">+ *
+</a><a href="#h7-0-4" id="h7-0-4" class="i">+ * This program is free software. You may use, redistribute, and/or
+</a><a href="#h7-0-5" id="h7-0-5" class="i">+ * modify it under the terms listed in the COPYING file.
+</a><a href="#h7-0-6" id="h7-0-6" class="i">+ ********************************************************************/
+</a><a href="#h7-0-7" id="h7-0-7" class="i">+#include &quot;codesearch.h&quot;
+</a><a href="#h7-0-8" id="h7-0-8" class="i">+#include &quot;transport.h&quot;
+</a><a href="#h7-0-9" id="h7-0-9" class="i">+#include &quot;debug.h&quot;
+</a><a href="#h7-0-10" id="h7-0-10" class="i">+
+</a><a href="#h7-0-11" id="h7-0-11" class="i">+#include &lt;json/json.h&gt;
+</a><a href="#h7-0-12" id="h7-0-12" class="i">+
+</a><a href="#h7-0-13" id="h7-0-13" class="i">+#include &lt;gflags/gflags.h&gt;
+</a><a href="#h7-0-14" id="h7-0-14" class="i">+
+</a><a href="#h7-0-15" id="h7-0-15" class="i">+#include &lt;re2/re2.h&gt;
+</a><a href="#h7-0-16" id="h7-0-16" class="i">+using re2::RE2;
+</a><a href="#h7-0-17" id="h7-0-17" class="i">+using std::unique_ptr;
+</a><a href="#h7-0-18" id="h7-0-18" class="i">+
+</a><a href="#h7-0-19" id="h7-0-19" class="i">+namespace {
+</a><a href="#h7-0-20" id="h7-0-20" class="i">+
+</a><a href="#h7-0-21" id="h7-0-21" class="i">+json_object *to_json(const string &amp;str) {
+</a><a href="#h7-0-22" id="h7-0-22" class="i">+    return json_object_new_string(str.c_str());
+</a><a href="#h7-0-23" id="h7-0-23" class="i">+}
+</a><a href="#h7-0-24" id="h7-0-24" class="i">+
+</a><a href="#h7-0-25" id="h7-0-25" class="i">+json_object *to_json(const StringPiece &amp;str) {
+</a><a href="#h7-0-26" id="h7-0-26" class="i">+    return json_object_new_string_len(str.data(),
+</a><a href="#h7-0-27" id="h7-0-27" class="i">+                                      str.size());
+</a><a href="#h7-0-28" id="h7-0-28" class="i">+}
+</a><a href="#h7-0-29" id="h7-0-29" class="i">+
+</a><a href="#h7-0-30" id="h7-0-30" class="i">+json_object *to_json(int i) {
+</a><a href="#h7-0-31" id="h7-0-31" class="i">+    return json_object_new_int(i);
+</a><a href="#h7-0-32" id="h7-0-32" class="i">+}
+</a><a href="#h7-0-33" id="h7-0-33" class="i">+
+</a><a href="#h7-0-34" id="h7-0-34" class="i">+json_object *to_json(const indexed_tree &amp;tree) {
+</a><a href="#h7-0-35" id="h7-0-35" class="i">+    json_object *out = json_object_new_object();
+</a><a href="#h7-0-36" id="h7-0-36" class="i">+    json_object_object_add(out, &quot;name&quot;, to_json(tree.name));
+</a><a href="#h7-0-37" id="h7-0-37" class="i">+    json_object_object_add(out, &quot;version&quot;, to_json(tree.version));
+</a><a href="#h7-0-38" id="h7-0-38" class="i">+    if (tree.metadata)
+</a><a href="#h7-0-39" id="h7-0-39" class="i">+        json_object_object_add(out, &quot;metadata&quot;, json_object_get(tree.metadata));
+</a><a href="#h7-0-40" id="h7-0-40" class="i">+    return out;
+</a><a href="#h7-0-41" id="h7-0-41" class="i">+}
+</a><a href="#h7-0-42" id="h7-0-42" class="i">+
+</a><a href="#h7-0-43" id="h7-0-43" class="i">+template &lt;class T&gt;
+</a><a href="#h7-0-44" id="h7-0-44" class="i">+json_object *to_json(vector&lt;T&gt; vec) {
+</a><a href="#h7-0-45" id="h7-0-45" class="i">+    json_object *out = json_object_new_array();
+</a><a href="#h7-0-46" id="h7-0-46" class="i">+    for (auto it = vec.begin(); it != vec.end(); it++)
+</a><a href="#h7-0-47" id="h7-0-47" class="i">+        json_object_array_add(out, to_json(*it));
+</a><a href="#h7-0-48" id="h7-0-48" class="i">+    return out;
+</a><a href="#h7-0-49" id="h7-0-49" class="i">+}
+</a><a href="#h7-0-50" id="h7-0-50" class="i">+
+</a><a href="#h7-0-51" id="h7-0-51" class="i">+json_object *to_json(const index_info *info) {
+</a><a href="#h7-0-52" id="h7-0-52" class="i">+    json_object *out = json_object_new_object();
+</a><a href="#h7-0-53" id="h7-0-53" class="i">+    json_object_object_add(out, &quot;name&quot;, to_json(info-&gt;name));
+</a><a href="#h7-0-54" id="h7-0-54" class="i">+    json_object_object_add(out, &quot;trees&quot;, to_json(info-&gt;trees));
+</a><a href="#h7-0-55" id="h7-0-55" class="i">+    return out;
+</a><a href="#h7-0-56" id="h7-0-56" class="i">+}
+</a><a href="#h7-0-57" id="h7-0-57" class="i">+
+</a><a href="#h7-0-58" id="h7-0-58" class="i">+long timeval_ms (struct timeval tv) {
+</a><a href="#h7-0-59" id="h7-0-59" class="i">+    return tv.tv_sec * 1000 + tv.tv_usec / 1000;
+</a><a href="#h7-0-60" id="h7-0-60" class="i">+}
+</a><a href="#h7-0-61" id="h7-0-61" class="i">+
+</a><a href="#h7-0-62" id="h7-0-62" class="i">+json_object *to_json(timeval t) {
+</a><a href="#h7-0-63" id="h7-0-63" class="i">+    return json_object_new_int(timeval_ms(t));
+</a><a href="#h7-0-64" id="h7-0-64" class="i">+}
+</a><a href="#h7-0-65" id="h7-0-65" class="i">+
+</a><a href="#h7-0-66" id="h7-0-66" class="i">+json_object *to_json(const match_stats *stats) {
+</a><a href="#h7-0-67" id="h7-0-67" class="i">+    json_object *obj = json_object_new_object();
+</a><a href="#h7-0-68" id="h7-0-68" class="i">+    json_object_object_add(obj, &quot;re2_time&quot;, to_json(stats-&gt;re2_time));
+</a><a href="#h7-0-69" id="h7-0-69" class="i">+    json_object_object_add(obj, &quot;git_time&quot;,  to_json(stats-&gt;git_time));
+</a><a href="#h7-0-70" id="h7-0-70" class="i">+    json_object_object_add(obj, &quot;sort_time&quot;, to_json(stats-&gt;sort_time));
+</a><a href="#h7-0-71" id="h7-0-71" class="i">+    json_object_object_add(obj, &quot;index_time&quot;, to_json(stats-&gt;index_time));
+</a><a href="#h7-0-72" id="h7-0-72" class="i">+    json_object_object_add(obj, &quot;analyze_time&quot;, to_json(stats-&gt;analyze_time));
+</a><a href="#h7-0-73" id="h7-0-73" class="i">+    switch(stats-&gt;why) {
+</a><a href="#h7-0-74" id="h7-0-74" class="i">+    case kExitNone: break;
+</a><a href="#h7-0-75" id="h7-0-75" class="i">+    case kExitMatchLimit:
+</a><a href="#h7-0-76" id="h7-0-76" class="i">+        json_object_object_add(obj, &quot;why&quot;, json_object_new_string(&quot;limit&quot;));
+</a><a href="#h7-0-77" id="h7-0-77" class="i">+        break;
+</a><a href="#h7-0-78" id="h7-0-78" class="i">+    case kExitTimeout:
+</a><a href="#h7-0-79" id="h7-0-79" class="i">+        json_object_object_add(obj, &quot;why&quot;, json_object_new_string(&quot;timeout&quot;));
+</a><a href="#h7-0-80" id="h7-0-80" class="i">+        break;
+</a><a href="#h7-0-81" id="h7-0-81" class="i">+    }
+</a><a href="#h7-0-82" id="h7-0-82" class="i">+    return obj;
+</a><a href="#h7-0-83" id="h7-0-83" class="i">+}
+</a><a href="#h7-0-84" id="h7-0-84" class="i">+
+</a><a href="#h7-0-85" id="h7-0-85" class="i">+json_object *json_frame(const std::string op, json_object *body) {
+</a><a href="#h7-0-86" id="h7-0-86" class="i">+    json_object *frame = json_object_new_object();
+</a><a href="#h7-0-87" id="h7-0-87" class="i">+    json_object_object_add(frame, &quot;opcode&quot;, to_json(op));
+</a><a href="#h7-0-88" id="h7-0-88" class="i">+    json_object_object_add(frame, &quot;body&quot;, body);
+</a><a href="#h7-0-89" id="h7-0-89" class="i">+    return frame;
+</a><a href="#h7-0-90" id="h7-0-90" class="i">+}
+</a><a href="#h7-0-91" id="h7-0-91" class="i">+
+</a><a href="#h7-0-92" id="h7-0-92" class="i">+json_object *json_info(const code_searcher *cs) {
+</a><a href="#h7-0-93" id="h7-0-93" class="i">+    json_object *obj = json_object_new_object();
+</a><a href="#h7-0-94" id="h7-0-94" class="i">+    json_object_object_add(obj, &quot;trees&quot;, to_json(cs-&gt;trees()));
+</a><a href="#h7-0-95" id="h7-0-95" class="i">+    json_object_object_add(obj, &quot;name&quot;, to_json(cs-&gt;name()));
+</a><a href="#h7-0-96" id="h7-0-96" class="i">+    return obj;
+</a><a href="#h7-0-97" id="h7-0-97" class="i">+}
+</a><a href="#h7-0-98" id="h7-0-98" class="i">+
+</a><a href="#h7-0-99" id="h7-0-99" class="i">+bool getline(std::string &amp;out, FILE *in) {
+</a><a href="#h7-0-100" id="h7-0-100" class="i">+    char *line = 0;
+</a><a href="#h7-0-101" id="h7-0-101" class="i">+    size_t n = 0;
+</a><a href="#h7-0-102" id="h7-0-102" class="i">+    ssize_t r;
+</a><a href="#h7-0-103" id="h7-0-103" class="i">+    r = getline(&amp;line, &amp;n, in);
+</a><a href="#h7-0-104" id="h7-0-104" class="i">+    if (r == 0 || r == -1)
+</a><a href="#h7-0-105" id="h7-0-105" class="i">+        out.clear();
+</a><a href="#h7-0-106" id="h7-0-106" class="i">+    else
+</a><a href="#h7-0-107" id="h7-0-107" class="i">+        out.assign(line, r - 1);
+</a><a href="#h7-0-108" id="h7-0-108" class="i">+
+</a><a href="#h7-0-109" id="h7-0-109" class="i">+    return (r != -1) &amp;&amp; !feof(in) &amp;&amp; !ferror(in) ;
+</a><a href="#h7-0-110" id="h7-0-110" class="i">+}
+</a><a href="#h7-0-111" id="h7-0-111" class="i">+
+</a><a href="#h7-0-112" id="h7-0-112" class="i">+struct json_parse_error {
+</a><a href="#h7-0-113" id="h7-0-113" class="i">+    json_parse_error() : ok_(true) {}
+</a><a href="#h7-0-114" id="h7-0-114" class="i">+    json_parse_error(const std::string &amp;err) : ok_(false), error(err) {}
+</a><a href="#h7-0-115" id="h7-0-115" class="i">+
+</a><a href="#h7-0-116" id="h7-0-116" class="i">+    bool ok() {
+</a><a href="#h7-0-117" id="h7-0-117" class="i">+        return ok_;
+</a><a href="#h7-0-118" id="h7-0-118" class="i">+    }
+</a><a href="#h7-0-119" id="h7-0-119" class="i">+
+</a><a href="#h7-0-120" id="h7-0-120" class="i">+    std::string err() {
+</a><a href="#h7-0-121" id="h7-0-121" class="i">+        if (path.size()) {
+</a><a href="#h7-0-122" id="h7-0-122" class="i">+            return path + &quot;: &quot; + error;
+</a><a href="#h7-0-123" id="h7-0-123" class="i">+        } else {
+</a><a href="#h7-0-124" id="h7-0-124" class="i">+            return error;
+</a><a href="#h7-0-125" id="h7-0-125" class="i">+        }
+</a><a href="#h7-0-126" id="h7-0-126" class="i">+    }
+</a><a href="#h7-0-127" id="h7-0-127" class="i">+
+</a><a href="#h7-0-128" id="h7-0-128" class="i">+    json_parse_error wrap(string path) {
+</a><a href="#h7-0-129" id="h7-0-129" class="i">+        json_parse_error wrapped = *this;
+</a><a href="#h7-0-130" id="h7-0-130" class="i">+        if (wrapped.path.size()) {
+</a><a href="#h7-0-131" id="h7-0-131" class="i">+            wrapped.path = path + &quot;.&quot; + wrapped.path;
+</a><a href="#h7-0-132" id="h7-0-132" class="i">+        } else {
+</a><a href="#h7-0-133" id="h7-0-133" class="i">+            wrapped.path = path;
+</a><a href="#h7-0-134" id="h7-0-134" class="i">+        }
+</a><a href="#h7-0-135" id="h7-0-135" class="i">+        return wrapped;
+</a><a href="#h7-0-136" id="h7-0-136" class="i">+    }
+</a><a href="#h7-0-137" id="h7-0-137" class="i">+private:
+</a><a href="#h7-0-138" id="h7-0-138" class="i">+    bool ok_;
+</a><a href="#h7-0-139" id="h7-0-139" class="i">+    std::string error;
+</a><a href="#h7-0-140" id="h7-0-140" class="i">+    std::string path;
+</a><a href="#h7-0-141" id="h7-0-141" class="i">+};
+</a><a href="#h7-0-142" id="h7-0-142" class="i">+
+</a><a href="#h7-0-143" id="h7-0-143" class="i">+json_parse_error parse_object(json_object *j, bool *);
+</a><a href="#h7-0-144" id="h7-0-144" class="i">+json_parse_error parse_object(json_object *j, std::string *);
+</a><a href="#h7-0-145" id="h7-0-145" class="i">+json_parse_error parse_object(json_object *j, repo_spec *);
+</a><a href="#h7-0-146" id="h7-0-146" class="i">+json_parse_error parse_object(json_object *j, json_object **);
+</a><a href="#h7-0-147" id="h7-0-147" class="i">+
+</a><a href="#h7-0-148" id="h7-0-148" class="i">+template &lt;class T&gt;
+</a><a href="#h7-0-149" id="h7-0-149" class="i">+json_parse_error parse_object(json_object *j, std::vector&lt;T&gt; *);
+</a><a href="#h7-0-150" id="h7-0-150" class="i">+template&lt;class T&gt;
+</a><a href="#h7-0-151" id="h7-0-151" class="i">+json_parse_error parse_object(json_object *j, const char *key, T *t);
+</a><a href="#h7-0-152" id="h7-0-152" class="i">+
+</a><a href="#h7-0-153" id="h7-0-153" class="i">+json_parse_error parse_object(json_object *j, bool *b) {
+</a><a href="#h7-0-154" id="h7-0-154" class="i">+    if (json_object_get_type(j) != json_type_boolean)
+</a><a href="#h7-0-155" id="h7-0-155" class="i">+        return json_parse_error(&quot;expected boolean&quot;);
+</a><a href="#h7-0-156" id="h7-0-156" class="i">+    *b = json_object_get_boolean(j);
+</a><a href="#h7-0-157" id="h7-0-157" class="i">+    return json_parse_error();
+</a><a href="#h7-0-158" id="h7-0-158" class="i">+}
+</a><a href="#h7-0-159" id="h7-0-159" class="i">+
+</a><a href="#h7-0-160" id="h7-0-160" class="i">+json_parse_error parse_object(json_object *j, std::string *s) {
+</a><a href="#h7-0-161" id="h7-0-161" class="i">+    if (json_object_get_type(j) != json_type_string)
+</a><a href="#h7-0-162" id="h7-0-162" class="i">+        return json_parse_error(&quot;expected string&quot;);
+</a><a href="#h7-0-163" id="h7-0-163" class="i">+    *s = json_object_get_string(j);
+</a><a href="#h7-0-164" id="h7-0-164" class="i">+    return json_parse_error();
+</a><a href="#h7-0-165" id="h7-0-165" class="i">+}
+</a><a href="#h7-0-166" id="h7-0-166" class="i">+
+</a><a href="#h7-0-167" id="h7-0-167" class="i">+template &lt;class T&gt;
+</a><a href="#h7-0-168" id="h7-0-168" class="i">+json_parse_error parse_object(json_object *j, std::vector&lt;T&gt; *out) {
+</a><a href="#h7-0-169" id="h7-0-169" class="i">+    if (json_object_get_type(j) != json_type_array)
+</a><a href="#h7-0-170" id="h7-0-170" class="i">+        return json_parse_error(&quot;expected array&quot;);
+</a><a href="#h7-0-171" id="h7-0-171" class="i">+    for (int i = 0; i &lt; json_object_array_length(j); ++i) {
+</a><a href="#h7-0-172" id="h7-0-172" class="i">+        json_object *elt = json_object_array_get_idx(j, i);
+</a><a href="#h7-0-173" id="h7-0-173" class="i">+        T t;
+</a><a href="#h7-0-174" id="h7-0-174" class="i">+        json_parse_error err = parse_object(elt, &amp;t);
+</a><a href="#h7-0-175" id="h7-0-175" class="i">+        if (!err.ok())
+</a><a href="#h7-0-176" id="h7-0-176" class="i">+            return err;
+</a><a href="#h7-0-177" id="h7-0-177" class="i">+        out-&gt;push_back(t);
+</a><a href="#h7-0-178" id="h7-0-178" class="i">+    }
+</a><a href="#h7-0-179" id="h7-0-179" class="i">+    return json_parse_error();
+</a><a href="#h7-0-180" id="h7-0-180" class="i">+}
+</a><a href="#h7-0-181" id="h7-0-181" class="i">+
+</a><a href="#h7-0-182" id="h7-0-182" class="i">+template&lt;class T&gt;
+</a><a href="#h7-0-183" id="h7-0-183" class="i">+json_parse_error parse_object(json_object *j, const char *key, T *t) {
+</a><a href="#h7-0-184" id="h7-0-184" class="i">+    json_object *o = json_object_object_get(j, key);
+</a><a href="#h7-0-185" id="h7-0-185" class="i">+    if (o == NULL)
+</a><a href="#h7-0-186" id="h7-0-186" class="i">+        return json_parse_error();
+</a><a href="#h7-0-187" id="h7-0-187" class="i">+    json_parse_error err = parse_object(o, t);
+</a><a href="#h7-0-188" id="h7-0-188" class="i">+    if (!err.ok())
+</a><a href="#h7-0-189" id="h7-0-189" class="i">+        return err.wrap(key);
+</a><a href="#h7-0-190" id="h7-0-190" class="i">+    return json_parse_error();
+</a><a href="#h7-0-191" id="h7-0-191" class="i">+}
+</a><a href="#h7-0-192" id="h7-0-192" class="i">+
+</a><a href="#h7-0-193" id="h7-0-193" class="i">+json_parse_error parse_regex(json_object *js, const char *key,
+</a><a href="#h7-0-194" id="h7-0-194" class="i">+                             const RE2::Options &amp;opts, unique_ptr&lt;RE2&gt; *out) {
+</a><a href="#h7-0-195" id="h7-0-195" class="i">+    std::string str;
+</a><a href="#h7-0-196" id="h7-0-196" class="i">+    json_parse_error err;
+</a><a href="#h7-0-197" id="h7-0-197" class="i">+    err = parse_object(js, key, &amp;str);
+</a><a href="#h7-0-198" id="h7-0-198" class="i">+    if (!err.ok())
+</a><a href="#h7-0-199" id="h7-0-199" class="i">+        return err;
+</a><a href="#h7-0-200" id="h7-0-200" class="i">+    unique_ptr&lt;RE2&gt; re(new RE2(str, opts));
+</a><a href="#h7-0-201" id="h7-0-201" class="i">+    if (!re-&gt;ok()) {
+</a><a href="#h7-0-202" id="h7-0-202" class="i">+        return json_parse_error(re-&gt;error()).wrap(key);
+</a><a href="#h7-0-203" id="h7-0-203" class="i">+    }
+</a><a href="#h7-0-204" id="h7-0-204" class="i">+    *out = std::move(re);
+</a><a href="#h7-0-205" id="h7-0-205" class="i">+    return json_parse_error();
+</a><a href="#h7-0-206" id="h7-0-206" class="i">+}
+</a><a href="#h7-0-207" id="h7-0-207" class="i">+
+</a><a href="#h7-0-208" id="h7-0-208" class="i">+json_parse_error parse_object(json_object *js, query *q) {
+</a><a href="#h7-0-209" id="h7-0-209" class="i">+    if (json_object_get_type(js) != json_type_object)
+</a><a href="#h7-0-210" id="h7-0-210" class="i">+        return json_parse_error(&quot;expected a JSON object&quot;);
+</a><a href="#h7-0-211" id="h7-0-211" class="i">+    json_object *b = json_object_object_get(js, &quot;body&quot;);
+</a><a href="#h7-0-212" id="h7-0-212" class="i">+    if (b == NULL || json_object_get_type(b) != json_type_object)
+</a><a href="#h7-0-213" id="h7-0-213" class="i">+        return json_parse_error(&quot;expected a JSON object&quot;).wrap(&quot;body&quot;);
+</a><a href="#h7-0-214" id="h7-0-214" class="i">+    RE2::Options opts;
+</a><a href="#h7-0-215" id="h7-0-215" class="i">+    default_re2_options(opts);
+</a><a href="#h7-0-216" id="h7-0-216" class="i">+    bool fold_case = false;
+</a><a href="#h7-0-217" id="h7-0-217" class="i">+    json_parse_error err = parse_object(b, &quot;fold_case&quot;, &amp;fold_case);
+</a><a href="#h7-0-218" id="h7-0-218" class="i">+    if (!err.ok())
+</a><a href="#h7-0-219" id="h7-0-219" class="i">+        return err;
+</a><a href="#h7-0-220" id="h7-0-220" class="i">+    opts.set_case_sensitive(!fold_case);
+</a><a href="#h7-0-221" id="h7-0-221" class="i">+    err = parse_regex(b, &quot;line&quot;, opts, &amp;q-&gt;line_pat);
+</a><a href="#h7-0-222" id="h7-0-222" class="i">+
+</a><a href="#h7-0-223" id="h7-0-223" class="i">+    // file and repo are always case-sensitive
+</a><a href="#h7-0-224" id="h7-0-224" class="i">+    opts.set_case_sensitive(false);
+</a><a href="#h7-0-225" id="h7-0-225" class="i">+
+</a><a href="#h7-0-226" id="h7-0-226" class="i">+    if (err.ok())
+</a><a href="#h7-0-227" id="h7-0-227" class="i">+        err = parse_regex(b, &quot;file&quot;, opts, &amp;q-&gt;file_pat);
+</a><a href="#h7-0-228" id="h7-0-228" class="i">+    if (err.ok())
+</a><a href="#h7-0-229" id="h7-0-229" class="i">+        err = parse_regex(b, &quot;repo&quot;, opts, &amp;q-&gt;tree_pat);
+</a><a href="#h7-0-230" id="h7-0-230" class="i">+    return err;
+</a><a href="#h7-0-231" id="h7-0-231" class="i">+}
+</a><a href="#h7-0-232" id="h7-0-232" class="i">+
+</a><a href="#h7-0-233" id="h7-0-233" class="i">+json_parse_error parse_object(json_object *js, json_object **out) {
+</a><a href="#h7-0-234" id="h7-0-234" class="i">+    if (json_object_get_type(js) != json_type_object)
+</a><a href="#h7-0-235" id="h7-0-235" class="i">+        return json_parse_error(&quot;expected a JSON object&quot;);
+</a><a href="#h7-0-236" id="h7-0-236" class="i">+    *out = json_object_get(js);
+</a><a href="#h7-0-237" id="h7-0-237" class="i">+    return json_parse_error();
+</a><a href="#h7-0-238" id="h7-0-238" class="i">+}
+</a><a href="#h7-0-239" id="h7-0-239" class="i">+
+</a><a href="#h7-0-240" id="h7-0-240" class="i">+json_parse_error parse_object(json_object *js, repo_spec *r) {
+</a><a href="#h7-0-241" id="h7-0-241" class="i">+    if (json_object_get_type(js) != json_type_object)
+</a><a href="#h7-0-242" id="h7-0-242" class="i">+        return json_parse_error(&quot;expected a JSON object&quot;);
+</a><a href="#h7-0-243" id="h7-0-243" class="i">+    json_parse_error err;
+</a><a href="#h7-0-244" id="h7-0-244" class="i">+    err = parse_object(js, &quot;path&quot;, &amp;r-&gt;path);
+</a><a href="#h7-0-245" id="h7-0-245" class="i">+    if (!err.ok()) return err;
+</a><a href="#h7-0-246" id="h7-0-246" class="i">+    err = parse_object(js, &quot;name&quot;, &amp;r-&gt;name);
+</a><a href="#h7-0-247" id="h7-0-247" class="i">+    if (!err.ok()) return err;
+</a><a href="#h7-0-248" id="h7-0-248" class="i">+    err = parse_object(js, &quot;metadata&quot;, &amp;r-&gt;metadata);
+</a><a href="#h7-0-249" id="h7-0-249" class="i">+    if (!err.ok()) return err;
+</a><a href="#h7-0-250" id="h7-0-250" class="i">+    err = parse_object(js, &quot;revisions&quot;, &amp;r-&gt;revisions);
+</a><a href="#h7-0-251" id="h7-0-251" class="i">+    return err;
+</a><a href="#h7-0-252" id="h7-0-252" class="i">+}
+</a><a href="#h7-0-253" id="h7-0-253" class="i">+
+</a><a href="#h7-0-254" id="h7-0-254" class="i">+};
+</a><a href="#h7-0-255" id="h7-0-255" class="i">+
+</a><a href="#h7-0-256" id="h7-0-256" class="i">+codesearch_transport::codesearch_transport(FILE *in, FILE *out) : in_(in), out_(out) {
+</a><a href="#h7-0-257" id="h7-0-257" class="i">+    assert(!setvbuf(in_,  NULL, _IOFBF, 4096*4));
+</a><a href="#h7-0-258" id="h7-0-258" class="i">+    assert(!setvbuf(out_, NULL, _IOLBF, 4096));
+</a><a href="#h7-0-259" id="h7-0-259" class="i">+}
+</a><a href="#h7-0-260" id="h7-0-260" class="i">+
+</a><a href="#h7-0-261" id="h7-0-261" class="i">+void codesearch_transport::write_frame(const std::string &amp;opcode, json_object *body) {
+</a><a href="#h7-0-262" id="h7-0-262" class="i">+    json_object *frame = json_frame(opcode, body);
+</a><a href="#h7-0-263" id="h7-0-263" class="i">+    fprintf(out_, &quot;%s\n&quot;, json_object_to_json_string(frame));
+</a><a href="#h7-0-264" id="h7-0-264" class="i">+    json_object_put(frame);
+</a><a href="#h7-0-265" id="h7-0-265" class="i">+}
+</a><a href="#h7-0-266" id="h7-0-266" class="i">+
+</a><a href="#h7-0-267" id="h7-0-267" class="i">+void codesearch_transport::write_match(const match_result *m) {
+</a><a href="#h7-0-268" id="h7-0-268" class="i">+    json_object *obj = json_object_new_object();
+</a><a href="#h7-0-269" id="h7-0-269" class="i">+
+</a><a href="#h7-0-270" id="h7-0-270" class="i">+    json_object_object_add(obj, &quot;tree&quot;,  to_json(m-&gt;file-&gt;tree-&gt;name));
+</a><a href="#h7-0-271" id="h7-0-271" class="i">+    json_object_object_add(obj, &quot;version&quot;,  to_json(m-&gt;file-&gt;tree-&gt;version));
+</a><a href="#h7-0-272" id="h7-0-272" class="i">+    json_object_object_add(obj, &quot;path&quot;,  to_json(m-&gt;file-&gt;path));
+</a><a href="#h7-0-273" id="h7-0-273" class="i">+    json_object_object_add(obj, &quot;lno&quot;, to_json(m-&gt;lno));
+</a><a href="#h7-0-274" id="h7-0-274" class="i">+    json_object_object_add(obj, &quot;context_before&quot;,
+</a><a href="#h7-0-275" id="h7-0-275" class="i">+                           to_json(m-&gt;context_before));
+</a><a href="#h7-0-276" id="h7-0-276" class="i">+    json_object_object_add(obj, &quot;context_after&quot;,
+</a><a href="#h7-0-277" id="h7-0-277" class="i">+                           to_json(m-&gt;context_after));
+</a><a href="#h7-0-278" id="h7-0-278" class="i">+    json_object *bounds = json_object_new_array();
+</a><a href="#h7-0-279" id="h7-0-279" class="i">+    json_object_array_add(bounds, to_json(m-&gt;matchleft));
+</a><a href="#h7-0-280" id="h7-0-280" class="i">+    json_object_array_add(bounds, to_json(m-&gt;matchright));
+</a><a href="#h7-0-281" id="h7-0-281" class="i">+    json_object_object_add(obj, &quot;bounds&quot;, bounds);
+</a><a href="#h7-0-282" id="h7-0-282" class="i">+    json_object_object_add(obj, &quot;line&quot;, to_json(m-&gt;line));
+</a><a href="#h7-0-283" id="h7-0-283" class="i">+    write_frame(&quot;match&quot;, obj);
+</a><a href="#h7-0-284" id="h7-0-284" class="i">+}
+</a><a href="#h7-0-285" id="h7-0-285" class="i">+
+</a><a href="#h7-0-286" id="h7-0-286" class="i">+void codesearch_transport::write_error(const std::string &amp;err) {
+</a><a href="#h7-0-287" id="h7-0-287" class="i">+    write_frame(&quot;error&quot;, to_json(err));
+</a><a href="#h7-0-288" id="h7-0-288" class="i">+}
+</a><a href="#h7-0-289" id="h7-0-289" class="i">+
+</a><a href="#h7-0-290" id="h7-0-290" class="i">+void codesearch_transport::write_ready (const index_info *info) {
+</a><a href="#h7-0-291" id="h7-0-291" class="i">+    write_frame(&quot;ready&quot;, to_json(info));
+</a><a href="#h7-0-292" id="h7-0-292" class="i">+}
+</a><a href="#h7-0-293" id="h7-0-293" class="i">+
+</a><a href="#h7-0-294" id="h7-0-294" class="i">+void codesearch_transport::write_done(timeval elapsed, const match_stats *stats) {
+</a><a href="#h7-0-295" id="h7-0-295" class="i">+    write_frame(&quot;done&quot;, to_json(stats));
+</a><a href="#h7-0-296" id="h7-0-296" class="i">+}
+</a><a href="#h7-0-297" id="h7-0-297" class="i">+
+</a><a href="#h7-0-298" id="h7-0-298" class="i">+bool codesearch_transport::read_query(query *q, bool *done) {
+</a><a href="#h7-0-299" id="h7-0-299" class="i">+    std::string line;
+</a><a href="#h7-0-300" id="h7-0-300" class="i">+    if (!getline(line, in_)) {
+</a><a href="#h7-0-301" id="h7-0-301" class="i">+        *done = true;
+</a><a href="#h7-0-302" id="h7-0-302" class="i">+        return false;
+</a><a href="#h7-0-303" id="h7-0-303" class="i">+    }
+</a><a href="#h7-0-304" id="h7-0-304" class="i">+    json_object *js = json_tokener_parse(line.c_str());
+</a><a href="#h7-0-305" id="h7-0-305" class="i">+    if (is_error(js)) {
+</a><a href="#h7-0-306" id="h7-0-306" class="i">+        write_error(&quot;Parse error: &quot; +
+</a><a href="#h7-0-307" id="h7-0-307" class="i">+                    string(json_tokener_errors[-(unsigned long)js]));
+</a><a href="#h7-0-308" id="h7-0-308" class="i">+        return false;
+</a><a href="#h7-0-309" id="h7-0-309" class="i">+    }
+</a><a href="#h7-0-310" id="h7-0-310" class="i">+
+</a><a href="#h7-0-311" id="h7-0-311" class="i">+    auto err = parse_object(js, q);
+</a><a href="#h7-0-312" id="h7-0-312" class="i">+    json_object_put(js);
+</a><a href="#h7-0-313" id="h7-0-313" class="i">+    if (!err.ok()) {
+</a><a href="#h7-0-314" id="h7-0-314" class="i">+        write_error(err.err());
+</a><a href="#h7-0-315" id="h7-0-315" class="i">+    }
+</a><a href="#h7-0-316" id="h7-0-316" class="i">+
+</a><a href="#h7-0-317" id="h7-0-317" class="i">+    return err.ok();
+</a><a href="#h7-0-318" id="h7-0-318" class="i">+}
+</a><a href="#h7-0-319" id="h7-0-319" class="i">+
+</a><a href="#h7-0-320" id="h7-0-320" class="i">+bool parse_index_spec(json_object *in, index_spec *out) {
+</a><a href="#h7-0-321" id="h7-0-321" class="i">+    json_parse_error err = parse_object(in, &quot;name&quot;, &amp;out-&gt;name);
+</a><a href="#h7-0-322" id="h7-0-322" class="i">+    if (!err.ok())
+</a><a href="#h7-0-323" id="h7-0-323" class="i">+        return false;
+</a><a href="#h7-0-324" id="h7-0-324" class="i">+    err = parse_object(in, &quot;fs_paths&quot;, &amp;out-&gt;paths);
+</a><a href="#h7-0-325" id="h7-0-325" class="i">+    if (!err.ok())
+</a><a href="#h7-0-326" id="h7-0-326" class="i">+        return false;
+</a><a href="#h7-0-327" id="h7-0-327" class="i">+    json_object *repos = json_object_object_get(in, &quot;repositories&quot;);
+</a><a href="#h7-0-328" id="h7-0-328" class="i">+    if (repos == NULL)
+</a><a href="#h7-0-329" id="h7-0-329" class="i">+        return true;
+</a><a href="#h7-0-330" id="h7-0-330" class="i">+    if (json_object_get_type(repos) == json_type_object) {
+</a><a href="#h7-0-331" id="h7-0-331" class="i">+        repo_spec s;
+</a><a href="#h7-0-332" id="h7-0-332" class="i">+        err = parse_object(in, &quot;repositories&quot;, &amp;s);
+</a><a href="#h7-0-333" id="h7-0-333" class="i">+        if (!err.ok())
+</a><a href="#h7-0-334" id="h7-0-334" class="i">+            return false;
+</a><a href="#h7-0-335" id="h7-0-335" class="i">+        out-&gt;repos.push_back(s);
+</a><a href="#h7-0-336" id="h7-0-336" class="i">+    } else {
+</a><a href="#h7-0-337" id="h7-0-337" class="i">+        err = parse_object(in, &quot;repositories&quot;, &amp;out-&gt;repos);
+</a><a href="#h7-0-338" id="h7-0-338" class="i">+        if (!err.ok())
+</a><a href="#h7-0-339" id="h7-0-339" class="i">+            return false;
+</a><a href="#h7-0-340" id="h7-0-340" class="i">+    }
+</a><a href="#h7-0-341" id="h7-0-341" class="i">+    return true;
+</a><a href="#h7-0-342" id="h7-0-342" class="i">+}
+</a><b>diff --git a/<a id="h8" href="../file/src/tools/transport.h">src/tools/transport.h</a> b/<a href="../file/src/tools/transport.h">src/tools/transport.h</a></b>
+<a href="#h8-0" id="h8-0" class="h">@@ -0,0 +1,52 @@
+</a><a href="#h8-0-0" id="h8-0-0" class="i">+/********************************************************************
+</a><a href="#h8-0-1" id="h8-0-1" class="i">+ * livegrep -- tools/transport.h
+</a><a href="#h8-0-2" id="h8-0-2" class="i">+ * Copyright (c) 2011-2014 Nelson Elhage
+</a><a href="#h8-0-3" id="h8-0-3" class="i">+ *
+</a><a href="#h8-0-4" id="h8-0-4" class="i">+ * This program is free software. You may use, redistribute, and/or
+</a><a href="#h8-0-5" id="h8-0-5" class="i">+ * modify it under the terms listed in the COPYING file.
+</a><a href="#h8-0-6" id="h8-0-6" class="i">+ ********************************************************************/
+</a><a href="#h8-0-7" id="h8-0-7" class="i">+#ifndef CODESEARCH_TRANSPORT_H
+</a><a href="#h8-0-8" id="h8-0-8" class="i">+#define CODESEARCH_TRANSPORT_H
+</a><a href="#h8-0-9" id="h8-0-9" class="i">+
+</a><a href="#h8-0-10" id="h8-0-10" class="i">+#include &lt;sys/time.h&gt;
+</a><a href="#h8-0-11" id="h8-0-11" class="i">+#include &lt;string&gt;
+</a><a href="#h8-0-12" id="h8-0-12" class="i">+#include &lt;vector&gt;
+</a><a href="#h8-0-13" id="h8-0-13" class="i">+#include &lt;stdio.h&gt;
+</a><a href="#h8-0-14" id="h8-0-14" class="i">+
+</a><a href="#h8-0-15" id="h8-0-15" class="i">+struct match_result;
+</a><a href="#h8-0-16" id="h8-0-16" class="i">+struct match_stats;
+</a><a href="#h8-0-17" id="h8-0-17" class="i">+struct json_object;
+</a><a href="#h8-0-18" id="h8-0-18" class="i">+struct index_info;
+</a><a href="#h8-0-19" id="h8-0-19" class="i">+struct query;
+</a><a href="#h8-0-20" id="h8-0-20" class="i">+
+</a><a href="#h8-0-21" id="h8-0-21" class="i">+struct repo_spec {
+</a><a href="#h8-0-22" id="h8-0-22" class="i">+    std::string path;
+</a><a href="#h8-0-23" id="h8-0-23" class="i">+    std::string name;
+</a><a href="#h8-0-24" id="h8-0-24" class="i">+    std::vector&lt;std::string&gt; revisions;
+</a><a href="#h8-0-25" id="h8-0-25" class="i">+    json_object *metadata;
+</a><a href="#h8-0-26" id="h8-0-26" class="i">+
+</a><a href="#h8-0-27" id="h8-0-27" class="i">+    repo_spec() : metadata(NULL) {}
+</a><a href="#h8-0-28" id="h8-0-28" class="i">+};
+</a><a href="#h8-0-29" id="h8-0-29" class="i">+
+</a><a href="#h8-0-30" id="h8-0-30" class="i">+struct index_spec {
+</a><a href="#h8-0-31" id="h8-0-31" class="i">+    std::string name;
+</a><a href="#h8-0-32" id="h8-0-32" class="i">+    std::vector&lt;std::string&gt; paths;
+</a><a href="#h8-0-33" id="h8-0-33" class="i">+    std::vector&lt;repo_spec&gt; repos;
+</a><a href="#h8-0-34" id="h8-0-34" class="i">+};
+</a><a href="#h8-0-35" id="h8-0-35" class="i">+
+</a><a href="#h8-0-36" id="h8-0-36" class="i">+bool parse_index_spec(json_object *in, index_spec *out);
+</a><a href="#h8-0-37" id="h8-0-37" class="i">+
+</a><a href="#h8-0-38" id="h8-0-38" class="i">+class codesearch_transport {
+</a><a href="#h8-0-39" id="h8-0-39" class="i">+public:
+</a><a href="#h8-0-40" id="h8-0-40" class="i">+    codesearch_transport(FILE *in, FILE *out);
+</a><a href="#h8-0-41" id="h8-0-41" class="i">+    void write_match(const match_result *m);
+</a><a href="#h8-0-42" id="h8-0-42" class="i">+    void write_error(const std::string &amp;err);
+</a><a href="#h8-0-43" id="h8-0-43" class="i">+    void write_ready(const index_info *info);
+</a><a href="#h8-0-44" id="h8-0-44" class="i">+    void write_done(timeval, const match_stats *);
+</a><a href="#h8-0-45" id="h8-0-45" class="i">+    bool read_query(query *, bool *done);
+</a><a href="#h8-0-46" id="h8-0-46" class="i">+protected:
+</a><a href="#h8-0-47" id="h8-0-47" class="i">+    void write_frame(const std::string &amp;opcode, json_object *body);
+</a><a href="#h8-0-48" id="h8-0-48" class="i">+    FILE *in_, *out_;
+</a><a href="#h8-0-49" id="h8-0-49" class="i">+};
+</a><a href="#h8-0-50" id="h8-0-50" class="i">+
+</a><a href="#h8-0-51" id="h8-0-51" class="i">+#endif
+</a></pre>
+</div>
+</body>
+</html>

@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>fewer null deref - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/43e1b9607262aab517d829289331f84730d5db17">43e1b9607262aab517d829289331f84730d5db17</a>
+<b>parent</b> <a href="../commit/0cba844bb62b3767040f7fe06313d23d70804f7d">0cba844bb62b3767040f7fe06313d23d70804f7d</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Sun, 17 Jan 2016 20:34:39 -0800
+
+fewer null deref
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">src/tools/codesearch.cc</a></td><td> | </td><td class="num">16</td><td><span class="i">+++++++++++</span><span class="d">-----</span></td></tr>
+</table></pre><pre>1 file changed, 11 insertions(+), 5 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/src/tools/codesearch.cc">src/tools/codesearch.cc</a> b/<a href="../file/src/tools/codesearch.cc">src/tools/codesearch.cc</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -64,6 +64,12 @@ const int kMaxWidth       = 200;
+</a> 
+ sem_t interact_sem;
+ 
+<a href="#h0-0-3" id="h0-0-3" class="i">+std::string pat(const std::unique_ptr&lt;RE2&gt; &amp;p) {
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+    if (p.get() == 0)
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+        return &quot;&quot;;
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+    return p-&gt;pattern();
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+}
+</a><a href="#h0-0-8" id="h0-0-8" class="i">+
+</a> void interact(code_searcher *cs, codesearch_transport *tx) {
+     code_searcher::search_thread search(cs);
+     WidthWalker width;
+<a href="#h0-1" id="h0-1" class="h">@@ -82,11 +88,11 @@ void interact(code_searcher *cs, codesearch_transport *tx) {
+</a> 
+         log(q.trace_id,
+             &quot;processing query line=&#39;%s&#39; file=&#39;%s&#39; tree=&#39;%s&#39; not_file=&#39;%s&#39; not_tree=&#39;%s&#39;&quot;,
+<a href="#h0-1-3" id="h0-1-3" class="d">-            q.line_pat-&gt;pattern().c_str(),
+</a><a href="#h0-1-4" id="h0-1-4" class="d">-            q.file_pat-&gt;pattern().c_str(),
+</a><a href="#h0-1-5" id="h0-1-5" class="d">-            q.tree_pat-&gt;pattern().c_str(),
+</a><a href="#h0-1-6" id="h0-1-6" class="d">-            q.negate.file_pat-&gt;pattern().c_str(),
+</a><a href="#h0-1-7" id="h0-1-7" class="d">-            q.negate.tree_pat-&gt;pattern().c_str());
+</a><a href="#h0-1-8" id="h0-1-8" class="i">+            pat(q.line_pat).c_str(),
+</a><a href="#h0-1-9" id="h0-1-9" class="i">+            pat(q.file_pat).c_str(),
+</a><a href="#h0-1-10" id="h0-1-10" class="i">+            pat(q.tree_pat).c_str(),
+</a><a href="#h0-1-11" id="h0-1-11" class="i">+            pat(q.negate.file_pat).c_str(),
+</a><a href="#h0-1-12" id="h0-1-12" class="i">+            pat(q.negate.tree_pat).c_str());
+</a> 
+         if (q.line_pat-&gt;ProgramSize() &gt; kMaxProgramSize) {
+             log(q.trace_id, &quot;program too large size=%d&quot;, q.line_pat-&gt;ProgramSize());
+</pre>
+</div>
+</body>
+</html>

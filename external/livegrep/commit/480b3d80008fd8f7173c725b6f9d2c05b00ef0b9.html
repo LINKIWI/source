@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Switch to raw socket.io for communication with the browser. - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/480b3d80008fd8f7173c725b6f9d2c05b00ef0b9">480b3d80008fd8f7173c725b6f9d2c05b00ef0b9</a>
+<b>parent</b> <a href="../commit/c025c0b3a3ecb22d26311e311a0f381452d9ae48">c025c0b3a3ecb22d26311e311a0f381452d9ae48</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Thu, 19 Jan 2012 22:20:20 -0500
+
+Switch to raw socket.io for communication with the browser.
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">web/appserver.js</a></td><td> | </td><td class="num">37</td><td><span class="i">+++++++++++++++++++++</span><span class="d">----------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">web/config.js</a></td><td> | </td><td class="num">3</td><td><span class="i">++</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">web/static/_bench_one.html</a></td><td> | </td><td class="num">2</td><td><span class="i">+</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">web/static/codesearch.js</a></td><td> | </td><td class="num">29</td><td><span class="i">+++++++++++++</span><span class="d">----------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h4">web/static/codesearch_ui.js</a></td><td> | </td><td class="num">1</td><td><span class="i"></span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h5">web/static/index.html</a></td><td> | </td><td class="num">2</td><td><span class="i">+</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h6">web/web_server.js</a></td><td> | </td><td class="num">14</td><td><span class="i">+++++++</span><span class="d">-------</span></td></tr>
+</table></pre><pre>7 files changed, 45 insertions(+), 43 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/web/appserver.js">web/appserver.js</a> b/<a href="../file/web/appserver.js">web/appserver.js</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -4,9 +4,9 @@ var dnode  = require(&#39;dnode&#39;),
+</a>     util   = require(&#39;./util.js&#39;),
+     config = require(&#39;./config.js&#39;);
+ 
+<a href="#h0-0-3" id="h0-0-3" class="d">-function Client(parent, remote) {
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+function Client(parent, sock) {
+</a>   this.parent = parent;
+<a href="#h0-0-6" id="h0-0-6" class="d">-  this.remote = remote;
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+  this.socket = sock;
+</a>   this.pending_search = null;
+   this.last_search = null;
+ }
+<a href="#h0-1" id="h0-1" class="h">@@ -30,13 +30,13 @@ Client.prototype.dispatch_search = function() {
+</a>     var search = this.pending_search;
+     this.pending_search = null;
+     var self   = this;
+<a href="#h0-1-3" id="h0-1-3" class="d">-    var remote = this.remote;
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+    var sock   = this.socket;
+</a>     var matches = [];
+     var last_flush = new Date();
+     function flush(force) {
+       if (force || (new Date() - last_flush) &gt; 10) {
+         matches.forEach(function (m) {
+<a href="#h0-1-10" id="h0-1-10" class="d">-                          util.remote_call(remote, &#39;match&#39;, search, m);
+</a><a href="#h0-1-11" id="h0-1-11" class="i">+                          sock.emit(&#39;match&#39;, search, m);
+</a>                         });
+         last_flush = new Date();
+         matches = [];
+<a href="#h0-2" id="h0-2" class="h">@@ -49,7 +49,7 @@ Client.prototype.dispatch_search = function() {
+</a>           self.pending_search = search;
+       },
+       error: function (err) {
+<a href="#h0-2-3" id="h0-2-3" class="d">-        util.remote_call(remote, &#39;error&#39;, search, err);
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+        sock.emit(&#39;error&#39;, search, err);
+</a>       },
+       match: function (match) {
+         match = JSON.parse(match);
+<a href="#h0-3" id="h0-3" class="h">@@ -62,7 +62,7 @@ Client.prototype.dispatch_search = function() {
+</a>         stats = JSON.parse(stats);
+         var time = (new Date()) - start;
+         flush(true);
+<a href="#h0-3-3" id="h0-3-3" class="d">-        util.remote_call(remote, &#39;search_done&#39;, search, time, stats.why);
+</a><a href="#h0-3-4" id="h0-3-4" class="i">+        sock.emit(&#39;search_done&#39;, search, time, stats.why);
+</a>         self.parent.logger.debug(&quot;Search done: %s: %s: %j&quot;,
+                                 search, time, stats);
+       }
+<a href="#h0-4" id="h0-4" class="h">@@ -72,14 +72,15 @@ Client.prototype.dispatch_search = function() {
+</a>   }
+ }
+ 
+<a href="#h0-4-3" id="h0-4-3" class="d">-function SearchServer() {
+</a><a href="#h0-4-4" id="h0-4-4" class="i">+function SearchServer(config, io) {
+</a>   var parent = this;
+<a href="#h0-4-6" id="h0-4-6" class="i">+  this.config  = config;
+</a>   this.remotes = [];
+   this.connections = [];
+   this.clients = {};
+   this.logger  = log4js.getLogger(&#39;appserver&#39;);
+ 
+<a href="#h0-4-12" id="h0-4-12" class="d">-  for (var i = 0; i &lt; 4; i++) {
+</a><a href="#h0-4-13" id="h0-4-13" class="i">+  for (var i = 0; i &lt; config.BACKEND_CONNECTIONS; i++) {
+</a>     (function() {
+        var remote = null;
+ 
+<a href="#h0-5" id="h0-5" class="h">@@ -110,15 +111,19 @@ function SearchServer() {
+</a>      })();
+   }
+ 
+<a href="#h0-5-3" id="h0-5-3" class="d">-  this.Server = function (remote, conn) {
+</a><a href="#h0-5-4" id="h0-5-4" class="d">-    parent.clients[conn.id] = new Client(parent, remote);
+</a><a href="#h0-5-5" id="h0-5-5" class="d">-    this.new_search = function(str) {
+</a><a href="#h0-5-6" id="h0-5-6" class="d">-      parent.clients[conn.id].new_search(str);
+</a><a href="#h0-5-7" id="h0-5-7" class="d">-    }
+</a><a href="#h0-5-8" id="h0-5-8" class="d">-    conn.on(&#39;end&#39;, function() {
+</a><a href="#h0-5-9" id="h0-5-9" class="d">-              delete parent.clients[conn.id];
+</a><a href="#h0-5-10" id="h0-5-10" class="i">+  var Server = function (sock) {
+</a><a href="#h0-5-11" id="h0-5-11" class="i">+    parent.clients[sock.id] = new Client(parent, sock);
+</a><a href="#h0-5-12" id="h0-5-12" class="i">+    sock.on(&#39;new_search&#39;, function(str) {
+</a><a href="#h0-5-13" id="h0-5-13" class="i">+      parent.clients[sock.id].new_search(str);
+</a><a href="#h0-5-14" id="h0-5-14" class="i">+    });
+</a><a href="#h0-5-15" id="h0-5-15" class="i">+    sock.on(&#39;disconnect&#39;, function() {
+</a><a href="#h0-5-16" id="h0-5-16" class="i">+              delete parent.clients[sock.id];
+</a>             });
+<a href="#h0-5-18" id="h0-5-18" class="d">-  }
+</a><a href="#h0-5-19" id="h0-5-19" class="i">+  };
+</a><a href="#h0-5-20" id="h0-5-20" class="i">+
+</a><a href="#h0-5-21" id="h0-5-21" class="i">+  io.sockets.on(&#39;connection&#39;, function(sock) {
+</a><a href="#h0-5-22" id="h0-5-22" class="i">+    new Server(sock);
+</a><a href="#h0-5-23" id="h0-5-23" class="i">+  });
+</a> }
+ 
+ function shuffle(lst) {
+<b>diff --git a/<a id="h1" href="../file/web/config.js">web/config.js</a> b/<a href="../file/web/config.js">web/config.js</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -8,7 +8,8 @@ var config = {
+</a>   DNODE_PORT: 0xC5EA,
+   SEARCH_REPO: path.join(__dirname, &quot;../../linux&quot;),
+   SEARCH_REF:  &quot;v3.0&quot;,
+<a href="#h1-0-3" id="h1-0-3" class="d">-  SEARCH_ARGS: []
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+  SEARCH_ARGS: [],
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+  BACKEND_CONNECTIONS: 8
+</a> };
+ 
+ try {
+<b>diff --git a/<a id="h2" href="../file/web/static/_bench_one.html">web/static/_bench_one.html</a> b/<a href="../file/web/static/_bench_one.html">web/static/_bench_one.html</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -2,7 +2,7 @@
+</a>   &lt;head&gt;
+     &lt;title&gt;code search&lt;/title&gt;
+     &lt;script language=&quot;javascript&quot; type=&quot;text/javascript&quot; src=&quot;js/jquery.js&quot;&gt;&lt;/script&gt;
+<a href="#h2-0-3" id="h2-0-3" class="d">-    &lt;script language=&quot;javascript&quot; type=&quot;text/javascript&quot; src=&quot;/dnode.js&quot;&gt;&lt;/script&gt;
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+    &lt;script language=&quot;javascript&quot; type=&quot;text/javascript&quot; src=&quot;/socket.io/socket.io.js&quot;&gt;&lt;/script&gt;
+</a>     &lt;script language=&quot;javascript&quot; type=&quot;text/javascript&quot; src=&quot;js/html.js&quot;&gt;&lt;/script&gt;
+     &lt;script language=&quot;javascript&quot; type=&quot;text/javascript&quot; src=&quot;codesearch.js&quot;&gt;&lt;/script&gt;
+     &lt;script language=&quot;javascript&quot; type=&quot;text/javascript&quot; src=&quot;bench.js&quot;&gt;&lt;/script&gt;
+<b>diff --git a/<a id="h3" href="../file/web/static/codesearch.js">web/static/codesearch.js</a> b/<a href="../file/web/static/codesearch.js">web/static/codesearch.js</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -1,30 +1,27 @@
+</a> &quot;use strict&quot;;
+ var Codesearch = function() {
+   return {
+<a href="#h3-0-3" id="h3-0-3" class="d">-    remote: null,
+</a><a href="#h3-0-4" id="h3-0-4" class="i">+    socket: null,
+</a>     delegate: null,
+     connect: function(delegate) {
+<a href="#h3-0-7" id="h3-0-7" class="d">-      if (Codesearch.remote !== null)
+</a><a href="#h3-0-8" id="h3-0-8" class="i">+      if (Codesearch.socket !== null)
+</a>         return;
+       console.log(&quot;Connecting...&quot;);
+       Codesearch.remote = null;
+       Codesearch.delegate = delegate;
+<a href="#h3-0-13" id="h3-0-13" class="d">-      DNode({ error: Codesearch.delegate.error,
+</a><a href="#h3-0-14" id="h3-0-14" class="d">-              match: Codesearch.delegate.match,
+</a><a href="#h3-0-15" id="h3-0-15" class="d">-              search_done: Codesearch.delegate.search_done,
+</a><a href="#h3-0-16" id="h3-0-16" class="d">-            }).connect(
+</a><a href="#h3-0-17" id="h3-0-17" class="d">-              function (remote, conn) {
+</a><a href="#h3-0-18" id="h3-0-18" class="d">-                Codesearch.remote = remote;
+</a><a href="#h3-0-19" id="h3-0-19" class="d">-                if (Codesearch.delegate.on_connect)
+</a><a href="#h3-0-20" id="h3-0-20" class="d">-                  Codesearch.delegate.on_connect();
+</a><a href="#h3-0-21" id="h3-0-21" class="d">-              },
+</a><a href="#h3-0-22" id="h3-0-22" class="d">-              {
+</a><a href="#h3-0-23" id="h3-0-23" class="d">-                transports: [&quot;htmlfile&quot;, &quot;xhr-polling&quot;, &quot;jsonp-polling&quot;]
+</a><a href="#h3-0-24" id="h3-0-24" class="d">-              });
+</a><a href="#h3-0-25" id="h3-0-25" class="i">+      var socket = io.connect();
+</a><a href="#h3-0-26" id="h3-0-26" class="i">+      socket.on(&#39;connect&#39;, function () {
+</a><a href="#h3-0-27" id="h3-0-27" class="i">+                  Codesearch.socket = socket;
+</a><a href="#h3-0-28" id="h3-0-28" class="i">+                  if (Codesearch.delegate.on_connect)
+</a><a href="#h3-0-29" id="h3-0-29" class="i">+                    Codesearch.delegate.on_connect();
+</a><a href="#h3-0-30" id="h3-0-30" class="i">+                });
+</a><a href="#h3-0-31" id="h3-0-31" class="i">+      socket.on(&#39;error&#39;, Codesearch.delegate.error);
+</a><a href="#h3-0-32" id="h3-0-32" class="i">+      socket.on(&#39;match&#39;, Codesearch.delegate.match);
+</a><a href="#h3-0-33" id="h3-0-33" class="i">+      socket.on(&#39;search_done&#39;, Codesearch.delegate.search_done);
+</a>     },
+     new_search: function(re) {
+<a href="#h3-0-36" id="h3-0-36" class="d">-      if (Codesearch.remote !== null)
+</a><a href="#h3-0-37" id="h3-0-37" class="d">-        Codesearch.remote.new_search(re);
+</a><a href="#h3-0-38" id="h3-0-38" class="i">+      if (Codesearch.socket !== null)
+</a><a href="#h3-0-39" id="h3-0-39" class="i">+        Codesearch.socket.emit(&#39;new_search&#39;, re);
+</a>     }
+   };
+ }();
+<b>diff --git a/<a id="h4" href="../file/web/static/codesearch_ui.js">web/static/codesearch_ui.js</a> b/<a href="../file/web/static/codesearch_ui.js">web/static/codesearch_ui.js</a></b>
+<a href="#h4-0" id="h4-0" class="h">@@ -76,7 +76,6 @@ var CodesearchUI = function() {
+</a>       $(&#39;#regex-error&#39;).hide();
+     },
+     match: function(search, match) {
+<a href="#h4-0-3" id="h4-0-3" class="d">-      match = JSON.parse(match);
+</a>       CodesearchUI.handle_result(search);
+       CodesearchUI.results++;
+       $(&#39;#results&#39;).append(render_match(match));
+<b>diff --git a/<a id="h5" href="../file/web/static/index.html">web/static/index.html</a> b/<a href="../file/web/static/index.html">web/static/index.html</a></b>
+<a href="#h5-0" id="h5-0" class="h">@@ -2,7 +2,7 @@
+</a>   &lt;head&gt;
+     &lt;title&gt;code search&lt;/title&gt;
+     &lt;script language=&quot;javascript&quot; type=&quot;text/javascript&quot; src=&quot;js/jquery.js&quot;&gt;&lt;/script&gt;
+<a href="#h5-0-3" id="h5-0-3" class="d">-    &lt;script language=&quot;javascript&quot; type=&quot;text/javascript&quot; src=&quot;/dnode.js&quot;&gt;&lt;/script&gt;
+</a><a href="#h5-0-4" id="h5-0-4" class="i">+    &lt;script language=&quot;javascript&quot; type=&quot;text/javascript&quot; src=&quot;/socket.io/socket.io.js&quot;&gt;&lt;/script&gt;
+</a>     &lt;script language=&quot;javascript&quot; type=&quot;text/javascript&quot; src=&quot;js/html.js&quot;&gt;&lt;/script&gt;
+     &lt;script language=&quot;javascript&quot; type=&quot;text/javascript&quot; src=&quot;codesearch.js&quot;&gt;&lt;/script&gt;
+     &lt;script language=&quot;javascript&quot; type=&quot;text/javascript&quot; src=&quot;codesearch_ui.js&quot;&gt;&lt;/script&gt;
+<b>diff --git a/<a id="h6" href="../file/web/web_server.js">web/web_server.js</a> b/<a href="../file/web/web_server.js">web/web_server.js</a></b>
+<a href="#h6-0" id="h6-0" class="h">@@ -4,7 +4,8 @@ var express = require(&#39;express&#39;),
+</a>     path    = require(&#39;path&#39;),
+     parseopt= require(&#39;parseopt&#39;),
+     log4js = require(&#39;log4js&#39;),
+<a href="#h6-0-3" id="h6-0-3" class="d">-    Server  = require(&#39;./appserver.js&#39;);
+</a><a href="#h6-0-4" id="h6-0-4" class="i">+    Server  = require(&#39;./appserver.js&#39;),
+</a><a href="#h6-0-5" id="h6-0-5" class="i">+    config  = require(&#39;./config.js&#39;);
+</a> 
+ var parser = new parseopt.OptionParser(
+   {
+<a href="#h6-1" id="h6-1" class="h">@@ -43,9 +44,8 @@ app.get(&#39;/&#39;, function (req, res) {
+</a> app.listen(8910);
+ console.log(&quot;http://localhost:8910&quot;);
+ 
+<a href="#h6-1-3" id="h6-1-3" class="d">-var server = dnode(new Server().Server);
+</a><a href="#h6-1-4" id="h6-1-4" class="d">-server.listen(app, {
+</a><a href="#h6-1-5" id="h6-1-5" class="d">-                io: {
+</a><a href="#h6-1-6" id="h6-1-6" class="d">-                  transports: [&quot;htmlfile&quot;, &quot;xhr-polling&quot;, &quot;jsonp-polling&quot;]
+</a><a href="#h6-1-7" id="h6-1-7" class="d">-                }
+</a><a href="#h6-1-8" id="h6-1-8" class="d">-              });
+</a><a href="#h6-1-9" id="h6-1-9" class="i">+var io = require(&#39;socket.io&#39;).listen(app, {
+</a><a href="#h6-1-10" id="h6-1-10" class="i">+                                       &#39;log level&#39;: 0
+</a><a href="#h6-1-11" id="h6-1-11" class="i">+                                     });
+</a><a href="#h6-1-12" id="h6-1-12" class="i">+
+</a><a href="#h6-1-13" id="h6-1-13" class="i">+var server = new Server(config, io);
+</a></pre>
+</div>
+</body>
+</html>

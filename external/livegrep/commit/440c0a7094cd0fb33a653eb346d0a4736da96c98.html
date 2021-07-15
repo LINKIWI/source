@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>bench.js: Refactor output code. - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/440c0a7094cd0fb33a653eb346d0a4736da96c98">440c0a7094cd0fb33a653eb346d0a4736da96c98</a>
+<b>parent</b> <a href="../commit/7df4b46d36f2a5c0fcc960cb60f15539cc4a5d80">7df4b46d36f2a5c0fcc960cb60f15539cc4a5d80</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Mon, 26 Dec 2011 17:37:57 -0500
+
+bench.js: Refactor output code.
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">test/bench.js</a></td><td> | </td><td class="num">66</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++</span><span class="d">-------------------------</span></td></tr>
+</table></pre><pre>1 file changed, 41 insertions(+), 25 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/test/bench.js">test/bench.js</a> b/<a href="../file/test/bench.js">test/bench.js</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -60,38 +60,55 @@ function rpad(str, len, chr) {
+</a> }
+ 
+ function done() {
+<a href="#h0-0-3" id="h0-0-3" class="d">-  var results = [];
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+  var results;
+</a>   if (options.dump_stats)
+     fs.writeFileSync(options.dump_stats,
+                      JSON.stringify(times))
+<a href="#h0-0-8" id="h0-0-8" class="i">+
+</a><a href="#h0-0-9" id="h0-0-9" class="i">+  results = collate(times);
+</a><a href="#h0-0-10" id="h0-0-10" class="i">+  print_one(results);
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+
+</a><a href="#h0-0-12" id="h0-0-12" class="i">+  process.exit(0);
+</a><a href="#h0-0-13" id="h0-0-13" class="i">+}
+</a><a href="#h0-0-14" id="h0-0-14" class="i">+
+</a><a href="#h0-0-15" id="h0-0-15" class="i">+function collate(times) {
+</a><a href="#h0-0-16" id="h0-0-16" class="i">+  var out = [];
+</a>   for (q in times) {
+<a href="#h0-0-18" id="h0-0-18" class="d">-    results.push([q, times[q], average(times[q], &#39;time&#39;)]);
+</a><a href="#h0-0-19" id="h0-0-19" class="i">+    out.push([q, times[q], average(times[q], &#39;time&#39;)]);
+</a>   }
+<a href="#h0-0-21" id="h0-0-21" class="i">+  return out;
+</a><a href="#h0-0-22" id="h0-0-22" class="i">+}
+</a><a href="#h0-0-23" id="h0-0-23" class="i">+
+</a><a href="#h0-0-24" id="h0-0-24" class="i">+function fmt(re) {
+</a><a href="#h0-0-25" id="h0-0-25" class="i">+  var WIDTH = 20;
+</a><a href="#h0-0-26" id="h0-0-26" class="i">+  if (re.length &lt; WIDTH) {
+</a><a href="#h0-0-27" id="h0-0-27" class="i">+    re = rpad(re, WIDTH);
+</a><a href="#h0-0-28" id="h0-0-28" class="i">+  }
+</a><a href="#h0-0-29" id="h0-0-29" class="i">+  if (re.length &gt; WIDTH) {
+</a><a href="#h0-0-30" id="h0-0-30" class="i">+    var start = re.substr(0, WIDTH / 2);
+</a><a href="#h0-0-31" id="h0-0-31" class="i">+    var end   = re.substring(re.length - (WIDTH - start.length - 3));
+</a><a href="#h0-0-32" id="h0-0-32" class="i">+    re = start + &#39;...&#39; + end;
+</a><a href="#h0-0-33" id="h0-0-33" class="i">+  }
+</a><a href="#h0-0-34" id="h0-0-34" class="i">+  return re;
+</a><a href="#h0-0-35" id="h0-0-35" class="i">+}
+</a><a href="#h0-0-36" id="h0-0-36" class="i">+
+</a><a href="#h0-0-37" id="h0-0-37" class="i">+function num(n) {
+</a><a href="#h0-0-38" id="h0-0-38" class="i">+  n = Math.round(n);
+</a><a href="#h0-0-39" id="h0-0-39" class="i">+  var str;
+</a><a href="#h0-0-40" id="h0-0-40" class="i">+  if (n === 0.0)
+</a><a href="#h0-0-41" id="h0-0-41" class="i">+    str = &#39;0.0&#39;
+</a><a href="#h0-0-42" id="h0-0-42" class="i">+  else
+</a><a href="#h0-0-43" id="h0-0-43" class="i">+    str = &#39;&#39;+(n/1000);
+</a><a href="#h0-0-44" id="h0-0-44" class="i">+  return rpad(str, 6, &#39;0&#39;)
+</a><a href="#h0-0-45" id="h0-0-45" class="i">+}
+</a><a href="#h0-0-46" id="h0-0-46" class="i">+
+</a><a href="#h0-0-47" id="h0-0-47" class="i">+function print_one(results) {
+</a><a href="#h0-0-48" id="h0-0-48" class="i">+  console.log(&quot;*** RESULTS ***&quot;)
+</a><a href="#h0-0-49" id="h0-0-49" class="i">+
+</a>   results.sort(function (a,b) {
+                  return b[2] - a[2]
+                });
+<a href="#h0-0-53" id="h0-0-53" class="d">-  console.log(&quot;*** RESULTS ***&quot;)
+</a><a href="#h0-0-54" id="h0-0-54" class="d">-  function fmt(re) {
+</a><a href="#h0-0-55" id="h0-0-55" class="d">-    var WIDTH = 20;
+</a><a href="#h0-0-56" id="h0-0-56" class="d">-    if (re.length &lt; WIDTH) {
+</a><a href="#h0-0-57" id="h0-0-57" class="d">-      re = rpad(re, WIDTH);
+</a><a href="#h0-0-58" id="h0-0-58" class="d">-    }
+</a><a href="#h0-0-59" id="h0-0-59" class="d">-    if (re.length &gt; WIDTH) {
+</a><a href="#h0-0-60" id="h0-0-60" class="d">-      var start = re.substr(0, WIDTH / 2);
+</a><a href="#h0-0-61" id="h0-0-61" class="d">-      var end   = re.substring(re.length - (WIDTH - start.length - 3));
+</a><a href="#h0-0-62" id="h0-0-62" class="d">-      re = start + &#39;...&#39; + end;
+</a><a href="#h0-0-63" id="h0-0-63" class="d">-    }
+</a><a href="#h0-0-64" id="h0-0-64" class="d">-    return re;
+</a><a href="#h0-0-65" id="h0-0-65" class="d">-  }
+</a><a href="#h0-0-66" id="h0-0-66" class="d">-  function num(n) {
+</a><a href="#h0-0-67" id="h0-0-67" class="d">-    n = Math.round(n);
+</a><a href="#h0-0-68" id="h0-0-68" class="d">-    var str;
+</a><a href="#h0-0-69" id="h0-0-69" class="d">-    if (n === 0.0)
+</a><a href="#h0-0-70" id="h0-0-70" class="d">-      str = &#39;0.0&#39;
+</a><a href="#h0-0-71" id="h0-0-71" class="d">-    else
+</a><a href="#h0-0-72" id="h0-0-72" class="d">-      str = &#39;&#39;+(n/1000);
+</a><a href="#h0-0-73" id="h0-0-73" class="d">-    return rpad(str, 6, &#39;0&#39;)
+</a><a href="#h0-0-74" id="h0-0-74" class="d">-  }
+</a><a href="#h0-0-75" id="h0-0-75" class="i">+
+</a>   results.forEach(function (r) {
+                     var min_time = Math.min.apply(
+                       Math, r[1].map(function(r) {return r.time}));
+<a href="#h0-1" id="h0-1" class="h">@@ -108,7 +125,6 @@ function done() {
+</a>                                 num(r[2]),
+                                 time(&#39;re2&#39;), time(&#39;index&#39;));
+                   });
+<a href="#h0-1-3" id="h0-1-3" class="d">-  process.exit(0);
+</a> }
+ 
+ cs.once(&#39;ready&#39;, function() {
+</pre>
+</div>
+</body>
+</html>

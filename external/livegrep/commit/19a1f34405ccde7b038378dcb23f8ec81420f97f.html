@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>New command: livegrep-github-reindex - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/19a1f34405ccde7b038378dcb23f8ec81420f97f">19a1f34405ccde7b038378dcb23f8ec81420f97f</a>
+<b>parent</b> <a href="../commit/47be1a25d373ff911823eabf883d91b52e55216c">47be1a25d373ff911823eabf883d91b52e55216c</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Sat, 18 Jul 2015 16:42:50 -0700
+
+New command: livegrep-github-reindex
+
+Add a helper command to fetch a set of github repositories and build an
+index. This is appropriate to run in a cron job periodically to rebuild
+an index from github.
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">.gitignore</a></td><td> | </td><td class="num">15</td><td><span class="i">++++++++</span><span class="d">-------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">Makefile</a></td><td> | </td><td class="num">17</td><td><span class="i">++++++++++</span><span class="d">-------</span></td></tr>
+<tr><td class="R">R</td><td><a href="#h2">lg/main.go -&gt; cmd/lg/main.go</a></td><td> | </td><td class="num">0</td><td><span class="i"></span><span class="d"></span></td></tr>
+<tr><td class="A">A</td><td><a href="#h3">cmd/livegrep-github-reindex/flags.go</a></td><td> | </td><td class="num">46</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="A">A</td><td><a href="#h4">cmd/livegrep-github-reindex/main.go</a></td><td> | </td><td class="num">360</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="R">R</td><td><a href="#h5">livegrep/livegrep.go -&gt; cmd/livegrep/livegrep.go</a></td><td> | </td><td class="num">0</td><td><span class="i"></span><span class="d"></span></td></tr>
+</table></pre><pre>6 files changed, 424 insertions(+), 14 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/.gitignore">.gitignore</a> b/<a href="../file/.gitignore">.gitignore</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -1,14 +1,15 @@
+</a><a href="#h0-0-0" id="h0-0-0" class="d">-/bin/
+</a><a href="#h0-0-1" id="h0-0-1" class="d">-/Makefile.config
+</a><a href="#h0-0-2" id="h0-0-2" class="i">+*.a
+</a> *.o
+<a href="#h0-0-4" id="h0-0-4" class="i">+*.test
+</a> .*.d
+<a href="#h0-0-6" id="h0-0-6" class="i">+/.gopath
+</a> /.makevars/
+<a href="#h0-0-8" id="h0-0-8" class="i">+/.vagrant
+</a><a href="#h0-0-9" id="h0-0-9" class="i">+/Makefile.config
+</a><a href="#h0-0-10" id="h0-0-10" class="i">+/bin/
+</a> /node_modules
+<a href="#h0-0-12" id="h0-0-12" class="i">+/repos/
+</a><a href="#h0-0-13" id="h0-0-13" class="i">+/src/vendor/libdivsufsort/build/
+</a> /web/log/
+<a href="#h0-0-15" id="h0-0-15" class="d">-*.test
+</a> config.json
+ vendor/re2/obj/libre2.a
+<a href="#h0-0-18" id="h0-0-18" class="d">-*.a
+</a><a href="#h0-0-19" id="h0-0-19" class="d">-/.gopath
+</a><a href="#h0-0-20" id="h0-0-20" class="d">-/.vagrant
+</a><a href="#h0-0-21" id="h0-0-21" class="d">-/src/vendor/libdivsufsort/build/
+</a><b>diff --git a/<a id="h1" href="../file/Makefile">Makefile</a> b/<a href="../file/Makefile">Makefile</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -49,6 +49,8 @@ else
+</a> gopath: FORCE
+ endif
+ 
+<a href="#h1-0-3" id="h1-0-3" class="i">+GOTOOLS := lg livegrep livegrep-github-reindex
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+
+</a> # It&#39;s important that we specify these in import-DAG order; `go get`
+ # has a bug where, if a package is imported by a package mentioned
+ # earlier on the command-line, it won&#39;t get test dependencies, even
+<a href="#h1-1" id="h1-1" class="h">@@ -56,16 +58,17 @@ endif
+</a> godep: gopath FORCE
+ 	go get -t -d github.com/livegrep/livegrep/client \
+ 			github.com/livegrep/livegrep/server \
+<a href="#h1-1-3" id="h1-1-3" class="d">-			github.com/livegrep/livegrep/livegrep \
+</a><a href="#h1-1-4" id="h1-1-4" class="d">-			github.com/livegrep/livegrep/lg
+</a><a href="#h1-1-5" id="h1-1-5" class="i">+			github.com/livegrep/livegrep/cmd/lg \
+</a><a href="#h1-1-6" id="h1-1-6" class="i">+			$(foreach t,$(GOTOOLS),github.com/livegrep/livegrep/cmd/$(t))
+</a> 
+<a href="#h1-1-8" id="h1-1-8" class="d">-bin/lg: godep FORCE
+</a><a href="#h1-1-9" id="h1-1-9" class="d">-	go build -o bin/lg github.com/livegrep/livegrep/lg
+</a><a href="#h1-1-10" id="h1-1-10" class="i">+define BUILD_go_tool
+</a><a href="#h1-1-11" id="h1-1-11" class="i">+bin/$(1): godep FORCE
+</a><a href="#h1-1-12" id="h1-1-12" class="i">+	go build -o $$@ github.com/livegrep/livegrep/cmd/$(1)
+</a><a href="#h1-1-13" id="h1-1-13" class="i">+endef
+</a> 
+<a href="#h1-1-15" id="h1-1-15" class="d">-bin/livegrep: godep FORCE
+</a><a href="#h1-1-16" id="h1-1-16" class="d">-	go build -o bin/livegrep github.com/livegrep/livegrep/livegrep
+</a><a href="#h1-1-17" id="h1-1-17" class="i">+$(foreach gotool,$(GOTOOLS),$(eval $(call BUILD_go_tool,$(gotool))))
+</a> 
+<a href="#h1-1-19" id="h1-1-19" class="d">-EXTRA_TARGETS := godep bin/lg bin/livegrep
+</a><a href="#h1-1-20" id="h1-1-20" class="i">+EXTRA_TARGETS := godep $(foreach t,$(GOTOOLS),bin/$(t))
+</a> EXTRA_CLEAN := bin/ .gopath/
+ 
+ clean: clean_vendor
+<b>diff --git a/<a id="h2" href="../file/lg/main.go">lg/main.go</a> b/<a href="../file/cmd/lg/main.go">cmd/lg/main.go</a></b>
+<b>diff --git a/<a id="h3" href="../file/cmd/livegrep-github-reindex/flags.go">cmd/livegrep-github-reindex/flags.go</a> b/<a href="../file/cmd/livegrep-github-reindex/flags.go">cmd/livegrep-github-reindex/flags.go</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -0,0 +1,46 @@
+</a><a href="#h3-0-0" id="h3-0-0" class="i">+// Implement some custom flag.Value instances for use in main.go
+</a><a href="#h3-0-1" id="h3-0-1" class="i">+package main
+</a><a href="#h3-0-2" id="h3-0-2" class="i">+
+</a><a href="#h3-0-3" id="h3-0-3" class="i">+import &quot;strings&quot;
+</a><a href="#h3-0-4" id="h3-0-4" class="i">+
+</a><a href="#h3-0-5" id="h3-0-5" class="i">+type stringList struct {
+</a><a href="#h3-0-6" id="h3-0-6" class="i">+	strings []string
+</a><a href="#h3-0-7" id="h3-0-7" class="i">+}
+</a><a href="#h3-0-8" id="h3-0-8" class="i">+
+</a><a href="#h3-0-9" id="h3-0-9" class="i">+func (s *stringList) String() string {
+</a><a href="#h3-0-10" id="h3-0-10" class="i">+	return strings.Join(s.strings, &quot;, &quot;)
+</a><a href="#h3-0-11" id="h3-0-11" class="i">+}
+</a><a href="#h3-0-12" id="h3-0-12" class="i">+
+</a><a href="#h3-0-13" id="h3-0-13" class="i">+func (s *stringList) Set(str string) error {
+</a><a href="#h3-0-14" id="h3-0-14" class="i">+	s.strings = append(s.strings, str)
+</a><a href="#h3-0-15" id="h3-0-15" class="i">+	return nil
+</a><a href="#h3-0-16" id="h3-0-16" class="i">+}
+</a><a href="#h3-0-17" id="h3-0-17" class="i">+
+</a><a href="#h3-0-18" id="h3-0-18" class="i">+func (s *stringList) Get() interface{} {
+</a><a href="#h3-0-19" id="h3-0-19" class="i">+	return s.strings
+</a><a href="#h3-0-20" id="h3-0-20" class="i">+}
+</a><a href="#h3-0-21" id="h3-0-21" class="i">+
+</a><a href="#h3-0-22" id="h3-0-22" class="i">+type dynamicDefault struct {
+</a><a href="#h3-0-23" id="h3-0-23" class="i">+	val     string
+</a><a href="#h3-0-24" id="h3-0-24" class="i">+	display string
+</a><a href="#h3-0-25" id="h3-0-25" class="i">+	fn      func() string
+</a><a href="#h3-0-26" id="h3-0-26" class="i">+}
+</a><a href="#h3-0-27" id="h3-0-27" class="i">+
+</a><a href="#h3-0-28" id="h3-0-28" class="i">+func (d *dynamicDefault) String() string {
+</a><a href="#h3-0-29" id="h3-0-29" class="i">+	if d.val != &quot;&quot; {
+</a><a href="#h3-0-30" id="h3-0-30" class="i">+		return d.val
+</a><a href="#h3-0-31" id="h3-0-31" class="i">+	}
+</a><a href="#h3-0-32" id="h3-0-32" class="i">+	return d.display
+</a><a href="#h3-0-33" id="h3-0-33" class="i">+}
+</a><a href="#h3-0-34" id="h3-0-34" class="i">+
+</a><a href="#h3-0-35" id="h3-0-35" class="i">+func (d *dynamicDefault) Get() interface{} {
+</a><a href="#h3-0-36" id="h3-0-36" class="i">+	if d.val != &quot;&quot; {
+</a><a href="#h3-0-37" id="h3-0-37" class="i">+		return d.val
+</a><a href="#h3-0-38" id="h3-0-38" class="i">+	}
+</a><a href="#h3-0-39" id="h3-0-39" class="i">+	return d.fn()
+</a><a href="#h3-0-40" id="h3-0-40" class="i">+}
+</a><a href="#h3-0-41" id="h3-0-41" class="i">+
+</a><a href="#h3-0-42" id="h3-0-42" class="i">+func (d *dynamicDefault) Set(str string) error {
+</a><a href="#h3-0-43" id="h3-0-43" class="i">+	d.val = str
+</a><a href="#h3-0-44" id="h3-0-44" class="i">+	return nil
+</a><a href="#h3-0-45" id="h3-0-45" class="i">+}
+</a><b>diff --git a/<a id="h4" href="../file/cmd/livegrep-github-reindex/main.go">cmd/livegrep-github-reindex/main.go</a> b/<a href="../file/cmd/livegrep-github-reindex/main.go">cmd/livegrep-github-reindex/main.go</a></b>
+<a href="#h4-0" id="h4-0" class="h">@@ -0,0 +1,360 @@
+</a><a href="#h4-0-0" id="h4-0-0" class="i">+package main
+</a><a href="#h4-0-1" id="h4-0-1" class="i">+
+</a><a href="#h4-0-2" id="h4-0-2" class="i">+import (
+</a><a href="#h4-0-3" id="h4-0-3" class="i">+	&quot;encoding/json&quot;
+</a><a href="#h4-0-4" id="h4-0-4" class="i">+	&quot;flag&quot;
+</a><a href="#h4-0-5" id="h4-0-5" class="i">+	&quot;fmt&quot;
+</a><a href="#h4-0-6" id="h4-0-6" class="i">+	&quot;io/ioutil&quot;
+</a><a href="#h4-0-7" id="h4-0-7" class="i">+	&quot;log&quot;
+</a><a href="#h4-0-8" id="h4-0-8" class="i">+	&quot;net/http&quot;
+</a><a href="#h4-0-9" id="h4-0-9" class="i">+	&quot;os&quot;
+</a><a href="#h4-0-10" id="h4-0-10" class="i">+	&quot;os/exec&quot;
+</a><a href="#h4-0-11" id="h4-0-11" class="i">+	&quot;path&quot;
+</a><a href="#h4-0-12" id="h4-0-12" class="i">+	&quot;sort&quot;
+</a><a href="#h4-0-13" id="h4-0-13" class="i">+	&quot;strings&quot;
+</a><a href="#h4-0-14" id="h4-0-14" class="i">+	&quot;sync&quot;
+</a><a href="#h4-0-15" id="h4-0-15" class="i">+
+</a><a href="#h4-0-16" id="h4-0-16" class="i">+	&quot;github.com/google/go-github/github&quot;
+</a><a href="#h4-0-17" id="h4-0-17" class="i">+
+</a><a href="#h4-0-18" id="h4-0-18" class="i">+	&quot;code.google.com/p/goauth2/oauth&quot;
+</a><a href="#h4-0-19" id="h4-0-19" class="i">+)
+</a><a href="#h4-0-20" id="h4-0-20" class="i">+
+</a><a href="#h4-0-21" id="h4-0-21" class="i">+var (
+</a><a href="#h4-0-22" id="h4-0-22" class="i">+	flagGithubKey = flag.String(&quot;github-key&quot;, os.Getenv(&quot;GITHUB_KEY&quot;), &quot;Github API key&quot;)
+</a><a href="#h4-0-23" id="h4-0-23" class="i">+	flagRepoDir   = flag.String(&quot;dir&quot;, &quot;repos&quot;, &quot;Directory to store repos&quot;)
+</a><a href="#h4-0-24" id="h4-0-24" class="i">+	flagBlacklist = flag.String(&quot;blacklist&quot;, &quot;&quot;, &quot;File containing a list of repositories to blacklist indexing&quot;)
+</a><a href="#h4-0-25" id="h4-0-25" class="i">+	flagIndexPath = dynamicDefault{
+</a><a href="#h4-0-26" id="h4-0-26" class="i">+		display: &quot;${dir}/livegrep.idx&quot;,
+</a><a href="#h4-0-27" id="h4-0-27" class="i">+		fn:      func() string { return path.Join(*flagRepoDir, &quot;livegrep.idx&quot;) },
+</a><a href="#h4-0-28" id="h4-0-28" class="i">+	}
+</a><a href="#h4-0-29" id="h4-0-29" class="i">+	flagName  = flag.String(&quot;name&quot;, &quot;livegrep index&quot;, &quot;The name to be stored in the index file&quot;)
+</a><a href="#h4-0-30" id="h4-0-30" class="i">+	flagForks = flag.Bool(&quot;forks&quot;, true, &quot;whether to index repositories that are github forks, and not original repos&quot;)
+</a><a href="#h4-0-31" id="h4-0-31" class="i">+	flagRepos = stringList{}
+</a><a href="#h4-0-32" id="h4-0-32" class="i">+	flagOrgs  = stringList{}
+</a><a href="#h4-0-33" id="h4-0-33" class="i">+	flagUsers = stringList{}
+</a><a href="#h4-0-34" id="h4-0-34" class="i">+)
+</a><a href="#h4-0-35" id="h4-0-35" class="i">+
+</a><a href="#h4-0-36" id="h4-0-36" class="i">+func init() {
+</a><a href="#h4-0-37" id="h4-0-37" class="i">+	flag.Var(&amp;flagIndexPath, &quot;out&quot;, &quot;Path to write the index&quot;)
+</a><a href="#h4-0-38" id="h4-0-38" class="i">+	flag.Var(&amp;flagRepos, &quot;repo&quot;, &quot;Specify a repo to index (may be passed multiple times)&quot;)
+</a><a href="#h4-0-39" id="h4-0-39" class="i">+	flag.Var(&amp;flagOrgs, &quot;org&quot;, &quot;Specify a github organization to index (may be passed multiple times)&quot;)
+</a><a href="#h4-0-40" id="h4-0-40" class="i">+	flag.Var(&amp;flagUsers, &quot;user&quot;, &quot;Specify a github user to index (may be passed multiple times)&quot;)
+</a><a href="#h4-0-41" id="h4-0-41" class="i">+}
+</a><a href="#h4-0-42" id="h4-0-42" class="i">+
+</a><a href="#h4-0-43" id="h4-0-43" class="i">+func main() {
+</a><a href="#h4-0-44" id="h4-0-44" class="i">+	flag.Parse()
+</a><a href="#h4-0-45" id="h4-0-45" class="i">+	log.SetFlags(0)
+</a><a href="#h4-0-46" id="h4-0-46" class="i">+
+</a><a href="#h4-0-47" id="h4-0-47" class="i">+	if flagRepos.strings == nil &amp;&amp;
+</a><a href="#h4-0-48" id="h4-0-48" class="i">+		flagOrgs.strings == nil &amp;&amp;
+</a><a href="#h4-0-49" id="h4-0-49" class="i">+		flagUsers.strings == nil {
+</a><a href="#h4-0-50" id="h4-0-50" class="i">+		log.Fatal(&quot;You must specify at least one repo or organization to index&quot;)
+</a><a href="#h4-0-51" id="h4-0-51" class="i">+	}
+</a><a href="#h4-0-52" id="h4-0-52" class="i">+
+</a><a href="#h4-0-53" id="h4-0-53" class="i">+	var blacklist map[string]struct{}
+</a><a href="#h4-0-54" id="h4-0-54" class="i">+	if *flagBlacklist != &quot;&quot; {
+</a><a href="#h4-0-55" id="h4-0-55" class="i">+		var err error
+</a><a href="#h4-0-56" id="h4-0-56" class="i">+		blacklist, err = loadBlacklist(*flagBlacklist)
+</a><a href="#h4-0-57" id="h4-0-57" class="i">+		if err != nil {
+</a><a href="#h4-0-58" id="h4-0-58" class="i">+			log.Fatalf(&quot;loading %s: %s&quot;, *flagBlacklist, err)
+</a><a href="#h4-0-59" id="h4-0-59" class="i">+		}
+</a><a href="#h4-0-60" id="h4-0-60" class="i">+	}
+</a><a href="#h4-0-61" id="h4-0-61" class="i">+
+</a><a href="#h4-0-62" id="h4-0-62" class="i">+	var h *http.Client
+</a><a href="#h4-0-63" id="h4-0-63" class="i">+	if *flagGithubKey == &quot;&quot; {
+</a><a href="#h4-0-64" id="h4-0-64" class="i">+		h = http.DefaultClient
+</a><a href="#h4-0-65" id="h4-0-65" class="i">+	} else {
+</a><a href="#h4-0-66" id="h4-0-66" class="i">+		t := &amp;oauth.Transport{
+</a><a href="#h4-0-67" id="h4-0-67" class="i">+			Token: &amp;oauth.Token{AccessToken: *flagGithubKey},
+</a><a href="#h4-0-68" id="h4-0-68" class="i">+		}
+</a><a href="#h4-0-69" id="h4-0-69" class="i">+		h = t.Client()
+</a><a href="#h4-0-70" id="h4-0-70" class="i">+	}
+</a><a href="#h4-0-71" id="h4-0-71" class="i">+
+</a><a href="#h4-0-72" id="h4-0-72" class="i">+	gh := github.NewClient(h)
+</a><a href="#h4-0-73" id="h4-0-73" class="i">+
+</a><a href="#h4-0-74" id="h4-0-74" class="i">+	repos, err := loadRepos(gh,
+</a><a href="#h4-0-75" id="h4-0-75" class="i">+		flagRepos.strings,
+</a><a href="#h4-0-76" id="h4-0-76" class="i">+		flagOrgs.strings,
+</a><a href="#h4-0-77" id="h4-0-77" class="i">+		flagUsers.strings)
+</a><a href="#h4-0-78" id="h4-0-78" class="i">+	if err != nil {
+</a><a href="#h4-0-79" id="h4-0-79" class="i">+		log.Fatalln(err.Error())
+</a><a href="#h4-0-80" id="h4-0-80" class="i">+	}
+</a><a href="#h4-0-81" id="h4-0-81" class="i">+
+</a><a href="#h4-0-82" id="h4-0-82" class="i">+	repos = filterRepos(repos, blacklist, !*flagForks)
+</a><a href="#h4-0-83" id="h4-0-83" class="i">+
+</a><a href="#h4-0-84" id="h4-0-84" class="i">+	sort.Sort(ReposByName(repos))
+</a><a href="#h4-0-85" id="h4-0-85" class="i">+
+</a><a href="#h4-0-86" id="h4-0-86" class="i">+	if err := checkoutRepos(repos, *flagRepoDir); err != nil {
+</a><a href="#h4-0-87" id="h4-0-87" class="i">+		log.Fatalln(err.Error())
+</a><a href="#h4-0-88" id="h4-0-88" class="i">+	}
+</a><a href="#h4-0-89" id="h4-0-89" class="i">+
+</a><a href="#h4-0-90" id="h4-0-90" class="i">+	if err := writeConfig(*flagName, repos, *flagRepoDir); err != nil {
+</a><a href="#h4-0-91" id="h4-0-91" class="i">+		log.Fatalln(err.Error())
+</a><a href="#h4-0-92" id="h4-0-92" class="i">+	}
+</a><a href="#h4-0-93" id="h4-0-93" class="i">+
+</a><a href="#h4-0-94" id="h4-0-94" class="i">+	index := flagIndexPath.Get().(string)
+</a><a href="#h4-0-95" id="h4-0-95" class="i">+	tmp := index + &quot;.tmp&quot;
+</a><a href="#h4-0-96" id="h4-0-96" class="i">+
+</a><a href="#h4-0-97" id="h4-0-97" class="i">+	cmd := exec.Command(
+</a><a href="#h4-0-98" id="h4-0-98" class="i">+		path.Join(path.Dir(os.Args[0]), &quot;codesearch&quot;),
+</a><a href="#h4-0-99" id="h4-0-99" class="i">+		&quot;--debug=ui&quot;,
+</a><a href="#h4-0-100" id="h4-0-100" class="i">+		&quot;--dump_index&quot;,
+</a><a href="#h4-0-101" id="h4-0-101" class="i">+		tmp,
+</a><a href="#h4-0-102" id="h4-0-102" class="i">+		&quot;--revparse&quot;,
+</a><a href="#h4-0-103" id="h4-0-103" class="i">+		path.Join(*flagRepoDir, &quot;livegrep.json&quot;))
+</a><a href="#h4-0-104" id="h4-0-104" class="i">+	cmd.Stdout = os.Stdout
+</a><a href="#h4-0-105" id="h4-0-105" class="i">+	cmd.Stderr = os.Stderr
+</a><a href="#h4-0-106" id="h4-0-106" class="i">+	if err := cmd.Run(); err != nil {
+</a><a href="#h4-0-107" id="h4-0-107" class="i">+		log.Fatalln(err)
+</a><a href="#h4-0-108" id="h4-0-108" class="i">+	}
+</a><a href="#h4-0-109" id="h4-0-109" class="i">+
+</a><a href="#h4-0-110" id="h4-0-110" class="i">+	if err := os.Rename(tmp, index); err != nil {
+</a><a href="#h4-0-111" id="h4-0-111" class="i">+		log.Fatalln(&quot;rename:&quot;, err.Error())
+</a><a href="#h4-0-112" id="h4-0-112" class="i">+	}
+</a><a href="#h4-0-113" id="h4-0-113" class="i">+}
+</a><a href="#h4-0-114" id="h4-0-114" class="i">+
+</a><a href="#h4-0-115" id="h4-0-115" class="i">+type ReposByName []github.Repository
+</a><a href="#h4-0-116" id="h4-0-116" class="i">+
+</a><a href="#h4-0-117" id="h4-0-117" class="i">+func (r ReposByName) Len() int           { return len(r) }
+</a><a href="#h4-0-118" id="h4-0-118" class="i">+func (r ReposByName) Swap(i, j int)      { r[i], r[j] = r[j], r[i] }
+</a><a href="#h4-0-119" id="h4-0-119" class="i">+func (r ReposByName) Less(i, j int) bool { return *r[i].FullName &lt; *r[j].FullName }
+</a><a href="#h4-0-120" id="h4-0-120" class="i">+
+</a><a href="#h4-0-121" id="h4-0-121" class="i">+func loadBlacklist(path string) (map[string]struct{}, error) {
+</a><a href="#h4-0-122" id="h4-0-122" class="i">+	data, err := ioutil.ReadFile(path)
+</a><a href="#h4-0-123" id="h4-0-123" class="i">+	if err != nil {
+</a><a href="#h4-0-124" id="h4-0-124" class="i">+		return nil, err
+</a><a href="#h4-0-125" id="h4-0-125" class="i">+	}
+</a><a href="#h4-0-126" id="h4-0-126" class="i">+
+</a><a href="#h4-0-127" id="h4-0-127" class="i">+	lines := strings.Split(string(data), &quot;\n&quot;)
+</a><a href="#h4-0-128" id="h4-0-128" class="i">+	out := make(map[string]struct{}, len(lines))
+</a><a href="#h4-0-129" id="h4-0-129" class="i">+	for _, l := range lines {
+</a><a href="#h4-0-130" id="h4-0-130" class="i">+		out[l] = struct{}{}
+</a><a href="#h4-0-131" id="h4-0-131" class="i">+	}
+</a><a href="#h4-0-132" id="h4-0-132" class="i">+	return out, nil
+</a><a href="#h4-0-133" id="h4-0-133" class="i">+}
+</a><a href="#h4-0-134" id="h4-0-134" class="i">+
+</a><a href="#h4-0-135" id="h4-0-135" class="i">+func loadRepos(
+</a><a href="#h4-0-136" id="h4-0-136" class="i">+	client *github.Client,
+</a><a href="#h4-0-137" id="h4-0-137" class="i">+	repos []string,
+</a><a href="#h4-0-138" id="h4-0-138" class="i">+	orgs []string,
+</a><a href="#h4-0-139" id="h4-0-139" class="i">+	users []string) ([]github.Repository, error) {
+</a><a href="#h4-0-140" id="h4-0-140" class="i">+	var out []github.Repository
+</a><a href="#h4-0-141" id="h4-0-141" class="i">+	for _, repo := range repos {
+</a><a href="#h4-0-142" id="h4-0-142" class="i">+		bits := strings.SplitN(repo, &quot;/&quot;, 2)
+</a><a href="#h4-0-143" id="h4-0-143" class="i">+		if len(bits) != 2 {
+</a><a href="#h4-0-144" id="h4-0-144" class="i">+			return nil, fmt.Errorf(&quot;Bad repository: %s&quot;, repo)
+</a><a href="#h4-0-145" id="h4-0-145" class="i">+		}
+</a><a href="#h4-0-146" id="h4-0-146" class="i">+
+</a><a href="#h4-0-147" id="h4-0-147" class="i">+		ghRepo, _, err := client.Repositories.Get(bits[0], bits[1])
+</a><a href="#h4-0-148" id="h4-0-148" class="i">+		if err != nil {
+</a><a href="#h4-0-149" id="h4-0-149" class="i">+			return nil, err
+</a><a href="#h4-0-150" id="h4-0-150" class="i">+		}
+</a><a href="#h4-0-151" id="h4-0-151" class="i">+		out = append(out, *ghRepo)
+</a><a href="#h4-0-152" id="h4-0-152" class="i">+	}
+</a><a href="#h4-0-153" id="h4-0-153" class="i">+
+</a><a href="#h4-0-154" id="h4-0-154" class="i">+	for _, org := range orgs {
+</a><a href="#h4-0-155" id="h4-0-155" class="i">+		var err error
+</a><a href="#h4-0-156" id="h4-0-156" class="i">+		log.Printf(&quot;fetching repos in org %s...&quot;, org)
+</a><a href="#h4-0-157" id="h4-0-157" class="i">+		out, err = listOrgRepos(client, org, out)
+</a><a href="#h4-0-158" id="h4-0-158" class="i">+		if err != nil {
+</a><a href="#h4-0-159" id="h4-0-159" class="i">+			log.Fatalf(&quot;listing %s: %s&quot;, org, err.Error())
+</a><a href="#h4-0-160" id="h4-0-160" class="i">+		}
+</a><a href="#h4-0-161" id="h4-0-161" class="i">+	}
+</a><a href="#h4-0-162" id="h4-0-162" class="i">+
+</a><a href="#h4-0-163" id="h4-0-163" class="i">+	for _, user := range users {
+</a><a href="#h4-0-164" id="h4-0-164" class="i">+		var err error
+</a><a href="#h4-0-165" id="h4-0-165" class="i">+		log.Printf(&quot;fetching repos for user %s...&quot;, user)
+</a><a href="#h4-0-166" id="h4-0-166" class="i">+		out, err = listUserRepos(client, user, out)
+</a><a href="#h4-0-167" id="h4-0-167" class="i">+		if err != nil {
+</a><a href="#h4-0-168" id="h4-0-168" class="i">+			log.Fatalf(&quot;listing %s: %s&quot;, user, err.Error())
+</a><a href="#h4-0-169" id="h4-0-169" class="i">+		}
+</a><a href="#h4-0-170" id="h4-0-170" class="i">+	}
+</a><a href="#h4-0-171" id="h4-0-171" class="i">+
+</a><a href="#h4-0-172" id="h4-0-172" class="i">+	return out, nil
+</a><a href="#h4-0-173" id="h4-0-173" class="i">+}
+</a><a href="#h4-0-174" id="h4-0-174" class="i">+
+</a><a href="#h4-0-175" id="h4-0-175" class="i">+func filterRepos(repos []github.Repository,
+</a><a href="#h4-0-176" id="h4-0-176" class="i">+	blacklist map[string]struct{},
+</a><a href="#h4-0-177" id="h4-0-177" class="i">+	excludeForks bool) []github.Repository {
+</a><a href="#h4-0-178" id="h4-0-178" class="i">+	var out []github.Repository
+</a><a href="#h4-0-179" id="h4-0-179" class="i">+
+</a><a href="#h4-0-180" id="h4-0-180" class="i">+	for _, r := range repos {
+</a><a href="#h4-0-181" id="h4-0-181" class="i">+		if excludeForks &amp;&amp; r.Fork != nil &amp;&amp; *r.Fork {
+</a><a href="#h4-0-182" id="h4-0-182" class="i">+			log.Printf(&quot;Excluding fork %s...&quot;, *r.FullName)
+</a><a href="#h4-0-183" id="h4-0-183" class="i">+			continue
+</a><a href="#h4-0-184" id="h4-0-184" class="i">+		}
+</a><a href="#h4-0-185" id="h4-0-185" class="i">+		if blacklist != nil {
+</a><a href="#h4-0-186" id="h4-0-186" class="i">+			if _, ok := blacklist[*r.FullName]; ok {
+</a><a href="#h4-0-187" id="h4-0-187" class="i">+				continue
+</a><a href="#h4-0-188" id="h4-0-188" class="i">+			}
+</a><a href="#h4-0-189" id="h4-0-189" class="i">+		}
+</a><a href="#h4-0-190" id="h4-0-190" class="i">+		out = append(out, r)
+</a><a href="#h4-0-191" id="h4-0-191" class="i">+	}
+</a><a href="#h4-0-192" id="h4-0-192" class="i">+
+</a><a href="#h4-0-193" id="h4-0-193" class="i">+	return out
+</a><a href="#h4-0-194" id="h4-0-194" class="i">+}
+</a><a href="#h4-0-195" id="h4-0-195" class="i">+
+</a><a href="#h4-0-196" id="h4-0-196" class="i">+func listOrgRepos(client *github.Client, org string, buf []github.Repository) ([]github.Repository, error) {
+</a><a href="#h4-0-197" id="h4-0-197" class="i">+	opt := &amp;github.RepositoryListByOrgOptions{
+</a><a href="#h4-0-198" id="h4-0-198" class="i">+		ListOptions: github.ListOptions{PerPage: 50},
+</a><a href="#h4-0-199" id="h4-0-199" class="i">+	}
+</a><a href="#h4-0-200" id="h4-0-200" class="i">+	for {
+</a><a href="#h4-0-201" id="h4-0-201" class="i">+		repos, resp, err := client.Repositories.ListByOrg(org, opt)
+</a><a href="#h4-0-202" id="h4-0-202" class="i">+		if err != nil {
+</a><a href="#h4-0-203" id="h4-0-203" class="i">+			return nil, err
+</a><a href="#h4-0-204" id="h4-0-204" class="i">+		}
+</a><a href="#h4-0-205" id="h4-0-205" class="i">+		buf = append(buf, repos...)
+</a><a href="#h4-0-206" id="h4-0-206" class="i">+		if resp.NextPage == 0 {
+</a><a href="#h4-0-207" id="h4-0-207" class="i">+			break
+</a><a href="#h4-0-208" id="h4-0-208" class="i">+		}
+</a><a href="#h4-0-209" id="h4-0-209" class="i">+		opt.ListOptions.Page = resp.NextPage
+</a><a href="#h4-0-210" id="h4-0-210" class="i">+	}
+</a><a href="#h4-0-211" id="h4-0-211" class="i">+	return buf, nil
+</a><a href="#h4-0-212" id="h4-0-212" class="i">+}
+</a><a href="#h4-0-213" id="h4-0-213" class="i">+
+</a><a href="#h4-0-214" id="h4-0-214" class="i">+func listUserRepos(client *github.Client, user string, buf []github.Repository) ([]github.Repository, error) {
+</a><a href="#h4-0-215" id="h4-0-215" class="i">+	opt := &amp;github.RepositoryListOptions{
+</a><a href="#h4-0-216" id="h4-0-216" class="i">+		ListOptions: github.ListOptions{PerPage: 50},
+</a><a href="#h4-0-217" id="h4-0-217" class="i">+	}
+</a><a href="#h4-0-218" id="h4-0-218" class="i">+	for {
+</a><a href="#h4-0-219" id="h4-0-219" class="i">+		repos, resp, err := client.Repositories.List(user, opt)
+</a><a href="#h4-0-220" id="h4-0-220" class="i">+		if err != nil {
+</a><a href="#h4-0-221" id="h4-0-221" class="i">+			return nil, err
+</a><a href="#h4-0-222" id="h4-0-222" class="i">+		}
+</a><a href="#h4-0-223" id="h4-0-223" class="i">+		buf = append(buf, repos...)
+</a><a href="#h4-0-224" id="h4-0-224" class="i">+		if resp.NextPage == 0 {
+</a><a href="#h4-0-225" id="h4-0-225" class="i">+			break
+</a><a href="#h4-0-226" id="h4-0-226" class="i">+		}
+</a><a href="#h4-0-227" id="h4-0-227" class="i">+		opt.ListOptions.Page = resp.NextPage
+</a><a href="#h4-0-228" id="h4-0-228" class="i">+	}
+</a><a href="#h4-0-229" id="h4-0-229" class="i">+	return buf, nil
+</a><a href="#h4-0-230" id="h4-0-230" class="i">+}
+</a><a href="#h4-0-231" id="h4-0-231" class="i">+
+</a><a href="#h4-0-232" id="h4-0-232" class="i">+const Workers = 8
+</a><a href="#h4-0-233" id="h4-0-233" class="i">+
+</a><a href="#h4-0-234" id="h4-0-234" class="i">+func checkoutRepos(repos []github.Repository, dir string) error {
+</a><a href="#h4-0-235" id="h4-0-235" class="i">+	repoc := make(chan *github.Repository)
+</a><a href="#h4-0-236" id="h4-0-236" class="i">+	errc := make(chan error, Workers)
+</a><a href="#h4-0-237" id="h4-0-237" class="i">+	stop := make(chan struct{})
+</a><a href="#h4-0-238" id="h4-0-238" class="i">+	wg := sync.WaitGroup{}
+</a><a href="#h4-0-239" id="h4-0-239" class="i">+	wg.Add(Workers)
+</a><a href="#h4-0-240" id="h4-0-240" class="i">+	for i := 0; i &lt; Workers; i++ {
+</a><a href="#h4-0-241" id="h4-0-241" class="i">+		go func() {
+</a><a href="#h4-0-242" id="h4-0-242" class="i">+			defer wg.Done()
+</a><a href="#h4-0-243" id="h4-0-243" class="i">+			checkoutWorker(dir, repoc, stop, errc)
+</a><a href="#h4-0-244" id="h4-0-244" class="i">+		}()
+</a><a href="#h4-0-245" id="h4-0-245" class="i">+	}
+</a><a href="#h4-0-246" id="h4-0-246" class="i">+
+</a><a href="#h4-0-247" id="h4-0-247" class="i">+	var err error
+</a><a href="#h4-0-248" id="h4-0-248" class="i">+Repos:
+</a><a href="#h4-0-249" id="h4-0-249" class="i">+	for i := range repos {
+</a><a href="#h4-0-250" id="h4-0-250" class="i">+		select {
+</a><a href="#h4-0-251" id="h4-0-251" class="i">+		case repoc &lt;- &amp;repos[i]:
+</a><a href="#h4-0-252" id="h4-0-252" class="i">+		case err = &lt;-errc:
+</a><a href="#h4-0-253" id="h4-0-253" class="i">+			close(stop)
+</a><a href="#h4-0-254" id="h4-0-254" class="i">+			break Repos
+</a><a href="#h4-0-255" id="h4-0-255" class="i">+		}
+</a><a href="#h4-0-256" id="h4-0-256" class="i">+	}
+</a><a href="#h4-0-257" id="h4-0-257" class="i">+
+</a><a href="#h4-0-258" id="h4-0-258" class="i">+	close(repoc)
+</a><a href="#h4-0-259" id="h4-0-259" class="i">+	wg.Wait()
+</a><a href="#h4-0-260" id="h4-0-260" class="i">+	select {
+</a><a href="#h4-0-261" id="h4-0-261" class="i">+	case err = &lt;-errc:
+</a><a href="#h4-0-262" id="h4-0-262" class="i">+	default:
+</a><a href="#h4-0-263" id="h4-0-263" class="i">+	}
+</a><a href="#h4-0-264" id="h4-0-264" class="i">+
+</a><a href="#h4-0-265" id="h4-0-265" class="i">+	return err
+</a><a href="#h4-0-266" id="h4-0-266" class="i">+}
+</a><a href="#h4-0-267" id="h4-0-267" class="i">+
+</a><a href="#h4-0-268" id="h4-0-268" class="i">+func checkoutWorker(dir string,
+</a><a href="#h4-0-269" id="h4-0-269" class="i">+	c &lt;-chan *github.Repository,
+</a><a href="#h4-0-270" id="h4-0-270" class="i">+	stop &lt;-chan struct{}, errc chan error) {
+</a><a href="#h4-0-271" id="h4-0-271" class="i">+	for {
+</a><a href="#h4-0-272" id="h4-0-272" class="i">+		select {
+</a><a href="#h4-0-273" id="h4-0-273" class="i">+		case r, ok := &lt;-c:
+</a><a href="#h4-0-274" id="h4-0-274" class="i">+			if !ok {
+</a><a href="#h4-0-275" id="h4-0-275" class="i">+				return
+</a><a href="#h4-0-276" id="h4-0-276" class="i">+			}
+</a><a href="#h4-0-277" id="h4-0-277" class="i">+			err := checkoutOne(dir, r)
+</a><a href="#h4-0-278" id="h4-0-278" class="i">+			if err != nil {
+</a><a href="#h4-0-279" id="h4-0-279" class="i">+				errc &lt;- err
+</a><a href="#h4-0-280" id="h4-0-280" class="i">+			}
+</a><a href="#h4-0-281" id="h4-0-281" class="i">+		case &lt;-stop:
+</a><a href="#h4-0-282" id="h4-0-282" class="i">+			return
+</a><a href="#h4-0-283" id="h4-0-283" class="i">+		}
+</a><a href="#h4-0-284" id="h4-0-284" class="i">+	}
+</a><a href="#h4-0-285" id="h4-0-285" class="i">+}
+</a><a href="#h4-0-286" id="h4-0-286" class="i">+
+</a><a href="#h4-0-287" id="h4-0-287" class="i">+func checkoutOne(dir string, r *github.Repository) error {
+</a><a href="#h4-0-288" id="h4-0-288" class="i">+	log.Println(&quot;Updating&quot;, *r.FullName)
+</a><a href="#h4-0-289" id="h4-0-289" class="i">+	checkout := path.Join(dir, *r.FullName)
+</a><a href="#h4-0-290" id="h4-0-290" class="i">+	out, err := exec.Command(&quot;git&quot;, &quot;--git-dir&quot;, checkout, &quot;rev-parse&quot;, &quot;--is-bare-repository&quot;).Output()
+</a><a href="#h4-0-291" id="h4-0-291" class="i">+	if err != nil {
+</a><a href="#h4-0-292" id="h4-0-292" class="i">+		if _, ok := err.(*exec.ExitError); !ok {
+</a><a href="#h4-0-293" id="h4-0-293" class="i">+			return err
+</a><a href="#h4-0-294" id="h4-0-294" class="i">+		}
+</a><a href="#h4-0-295" id="h4-0-295" class="i">+	}
+</a><a href="#h4-0-296" id="h4-0-296" class="i">+	if strings.Trim(string(out), &quot; \n&quot;) != &quot;true&quot; {
+</a><a href="#h4-0-297" id="h4-0-297" class="i">+		if err := os.RemoveAll(checkout); err != nil {
+</a><a href="#h4-0-298" id="h4-0-298" class="i">+			return err
+</a><a href="#h4-0-299" id="h4-0-299" class="i">+		}
+</a><a href="#h4-0-300" id="h4-0-300" class="i">+		if err := os.MkdirAll(checkout, 0755); err != nil {
+</a><a href="#h4-0-301" id="h4-0-301" class="i">+			return err
+</a><a href="#h4-0-302" id="h4-0-302" class="i">+		}
+</a><a href="#h4-0-303" id="h4-0-303" class="i">+		cmd := exec.Command(&quot;git&quot;, &quot;clone&quot;, &quot;--mirror&quot;, *r.SSHURL, checkout)
+</a><a href="#h4-0-304" id="h4-0-304" class="i">+		cmd.Stdout = os.Stdout
+</a><a href="#h4-0-305" id="h4-0-305" class="i">+		cmd.Stderr = os.Stderr
+</a><a href="#h4-0-306" id="h4-0-306" class="i">+		if err := cmd.Run(); err != nil {
+</a><a href="#h4-0-307" id="h4-0-307" class="i">+			return err
+</a><a href="#h4-0-308" id="h4-0-308" class="i">+		}
+</a><a href="#h4-0-309" id="h4-0-309" class="i">+	}
+</a><a href="#h4-0-310" id="h4-0-310" class="i">+
+</a><a href="#h4-0-311" id="h4-0-311" class="i">+	cmd := exec.Command(&quot;git&quot;, &quot;--git-dir&quot;, checkout, &quot;fetch&quot;)
+</a><a href="#h4-0-312" id="h4-0-312" class="i">+	cmd.Stdout = os.Stdout
+</a><a href="#h4-0-313" id="h4-0-313" class="i">+	cmd.Stderr = os.Stderr
+</a><a href="#h4-0-314" id="h4-0-314" class="i">+	if err := cmd.Run(); err != nil {
+</a><a href="#h4-0-315" id="h4-0-315" class="i">+		return err
+</a><a href="#h4-0-316" id="h4-0-316" class="i">+	}
+</a><a href="#h4-0-317" id="h4-0-317" class="i">+	return nil
+</a><a href="#h4-0-318" id="h4-0-318" class="i">+}
+</a><a href="#h4-0-319" id="h4-0-319" class="i">+
+</a><a href="#h4-0-320" id="h4-0-320" class="i">+type IndexConfig struct {
+</a><a href="#h4-0-321" id="h4-0-321" class="i">+	Name         string       `json:&quot;name&quot;`
+</a><a href="#h4-0-322" id="h4-0-322" class="i">+	Repositories []RepoConfig `json:&quot;repositories&quot;`
+</a><a href="#h4-0-323" id="h4-0-323" class="i">+}
+</a><a href="#h4-0-324" id="h4-0-324" class="i">+
+</a><a href="#h4-0-325" id="h4-0-325" class="i">+type RepoConfig struct {
+</a><a href="#h4-0-326" id="h4-0-326" class="i">+	Path      string            `json:&quot;path&quot;`
+</a><a href="#h4-0-327" id="h4-0-327" class="i">+	Name      string            `json:&quot;name&quot;`
+</a><a href="#h4-0-328" id="h4-0-328" class="i">+	Revisions []string          `json:&quot;revisions&quot;`
+</a><a href="#h4-0-329" id="h4-0-329" class="i">+	Metadata  map[string]string `json:&quot;metadata&quot;`
+</a><a href="#h4-0-330" id="h4-0-330" class="i">+}
+</a><a href="#h4-0-331" id="h4-0-331" class="i">+
+</a><a href="#h4-0-332" id="h4-0-332" class="i">+func writeConfig(name string, repos []github.Repository, dir string) error {
+</a><a href="#h4-0-333" id="h4-0-333" class="i">+	if err := os.MkdirAll(dir, 0755); err != nil {
+</a><a href="#h4-0-334" id="h4-0-334" class="i">+		return err
+</a><a href="#h4-0-335" id="h4-0-335" class="i">+	}
+</a><a href="#h4-0-336" id="h4-0-336" class="i">+
+</a><a href="#h4-0-337" id="h4-0-337" class="i">+	cfg := IndexConfig{
+</a><a href="#h4-0-338" id="h4-0-338" class="i">+		Name: name,
+</a><a href="#h4-0-339" id="h4-0-339" class="i">+	}
+</a><a href="#h4-0-340" id="h4-0-340" class="i">+
+</a><a href="#h4-0-341" id="h4-0-341" class="i">+	for _, r := range repos {
+</a><a href="#h4-0-342" id="h4-0-342" class="i">+		cfg.Repositories = append(cfg.Repositories, RepoConfig{
+</a><a href="#h4-0-343" id="h4-0-343" class="i">+			Path:      path.Join(dir, *r.FullName),
+</a><a href="#h4-0-344" id="h4-0-344" class="i">+			Name:      *r.FullName,
+</a><a href="#h4-0-345" id="h4-0-345" class="i">+			Revisions: []string{&quot;HEAD&quot;},
+</a><a href="#h4-0-346" id="h4-0-346" class="i">+			Metadata: map[string]string{
+</a><a href="#h4-0-347" id="h4-0-347" class="i">+				&quot;github&quot;: *r.FullName,
+</a><a href="#h4-0-348" id="h4-0-348" class="i">+			},
+</a><a href="#h4-0-349" id="h4-0-349" class="i">+		})
+</a><a href="#h4-0-350" id="h4-0-350" class="i">+	}
+</a><a href="#h4-0-351" id="h4-0-351" class="i">+
+</a><a href="#h4-0-352" id="h4-0-352" class="i">+	data, err := json.MarshalIndent(cfg, &quot;&quot;, &quot;  &quot;)
+</a><a href="#h4-0-353" id="h4-0-353" class="i">+	if err != nil {
+</a><a href="#h4-0-354" id="h4-0-354" class="i">+		return err
+</a><a href="#h4-0-355" id="h4-0-355" class="i">+	}
+</a><a href="#h4-0-356" id="h4-0-356" class="i">+
+</a><a href="#h4-0-357" id="h4-0-357" class="i">+	return ioutil.WriteFile(path.Join(dir, &quot;livegrep.json&quot;),
+</a><a href="#h4-0-358" id="h4-0-358" class="i">+		data, 0644)
+</a><a href="#h4-0-359" id="h4-0-359" class="i">+}
+</a><b>diff --git a/<a id="h5" href="../file/livegrep/livegrep.go">livegrep/livegrep.go</a> b/<a href="../file/cmd/livegrep/livegrep.go">cmd/livegrep/livegrep.go</a></b>
+</pre>
+</div>
+</body>
+</html>

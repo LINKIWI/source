@@ -1,0 +1,1709 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Initial backbone conversion: Match model and view. - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/ab7f56b24b46d541a348ab3ba95751f99501d85d">ab7f56b24b46d541a348ab3ba95751f99501d85d</a>
+<b>parent</b> <a href="../commit/f81d2f5775a698ed48ca8162b68268bb88950b01">f81d2f5775a698ed48ca8162b68268bb88950b01</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Mon,  4 Jun 2012 21:22:52 -0400
+
+Initial backbone conversion: Match model and view.
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">web/htdocs/codesearch_ui.js</a></td><td> | </td><td class="num">84</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">------------------------------</span></td></tr>
+<tr><td class="A">A</td><td><a href="#h1">web/htdocs/js/backbone.js</a></td><td> | </td><td class="num">1431</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">web/templates/layout.html</a></td><td> | </td><td class="num">1</td><td><span class="i">+</span><span class="d"></span></td></tr>
+</table></pre><pre>3 files changed, 1484 insertions(+), 32 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/web/htdocs/codesearch_ui.js">web/htdocs/codesearch_ui.js</a> b/<a href="../file/web/htdocs/codesearch_ui.js">web/htdocs/codesearch_ui.js</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -1,62 +1,75 @@
+</a> &quot;use strict&quot;;
+<a href="#h0-0-1" id="h0-0-1" class="d">-var CodesearchUI = function() {
+</a><a href="#h0-0-2" id="h0-0-2" class="d">-  function shorten(ref) {
+</a><a href="#h0-0-3" id="h0-0-3" class="d">-    var match = /^refs\/(tags|branches)\/(.*)/.exec(ref);
+</a><a href="#h0-0-4" id="h0-0-4" class="d">-    if (match)
+</a><a href="#h0-0-5" id="h0-0-5" class="d">-      return match[2];
+</a><a href="#h0-0-6" id="h0-0-6" class="d">-    return ref;
+</a><a href="#h0-0-7" id="h0-0-7" class="d">-  }
+</a><a href="#h0-0-8" id="h0-0-8" class="d">-  function url_for(match) {
+</a><a href="#h0-0-9" id="h0-0-9" class="d">-    return &quot;https://github.com/torvalds/linux/blob/&quot; + shorten(match.ref) +
+</a><a href="#h0-0-10" id="h0-0-10" class="d">-      &quot;/&quot; + match.file + &quot;#L&quot; + match.lno;
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+var Match = Backbone.Model.extend({
+</a><a href="#h0-0-12" id="h0-0-12" class="i">+  url: function() {
+</a><a href="#h0-0-13" id="h0-0-13" class="i">+    return &quot;https://github.com/torvalds/linux/blob/&quot; + shorten(this.ref) +
+</a><a href="#h0-0-14" id="h0-0-14" class="i">+      &quot;/&quot; + this.get(&#39;path&#39;).path + &quot;#L&quot; + this.get(&#39;context&#39;).lno;
+</a>   }
+<a href="#h0-0-16" id="h0-0-16" class="d">-  function render_match(match) {
+</a><a href="#h0-0-17" id="h0-0-17" class="i">+});
+</a><a href="#h0-0-18" id="h0-0-18" class="i">+
+</a><a href="#h0-0-19" id="h0-0-19" class="i">+function shorten(ref) {
+</a><a href="#h0-0-20" id="h0-0-20" class="i">+  var match = /^refs\/(tags|branches)\/(.*)/.exec(ref);
+</a><a href="#h0-0-21" id="h0-0-21" class="i">+  if (match)
+</a><a href="#h0-0-22" id="h0-0-22" class="i">+    return match[2];
+</a><a href="#h0-0-23" id="h0-0-23" class="i">+  return ref;
+</a><a href="#h0-0-24" id="h0-0-24" class="i">+}
+</a><a href="#h0-0-25" id="h0-0-25" class="i">+
+</a><a href="#h0-0-26" id="h0-0-26" class="i">+var MatchView = Backbone.View.extend({
+</a><a href="#h0-0-27" id="h0-0-27" class="i">+  tagName: &#39;div&#39;,
+</a><a href="#h0-0-28" id="h0-0-28" class="i">+  render: function() {
+</a><a href="#h0-0-29" id="h0-0-29" class="i">+    var div = this._render();
+</a><a href="#h0-0-30" id="h0-0-30" class="i">+    this.$el.empty();
+</a><a href="#h0-0-31" id="h0-0-31" class="i">+    this.$el.append(div);
+</a><a href="#h0-0-32" id="h0-0-32" class="i">+    return this;
+</a><a href="#h0-0-33" id="h0-0-33" class="i">+  },
+</a><a href="#h0-0-34" id="h0-0-34" class="i">+  _render: function() {
+</a>     var h = new HTMLFactory();
+<a href="#h0-0-36" id="h0-0-36" class="d">-    var pieces = [match.line.substring(0, match.bounds[0]),
+</a><a href="#h0-0-37" id="h0-0-37" class="d">-                  match.line.substring(match.bounds[0], match.bounds[1]),
+</a><a href="#h0-0-38" id="h0-0-38" class="d">-                  match.line.substring(match.bounds[1])];
+</a><a href="#h0-0-39" id="h0-0-39" class="i">+    var ctx = this.model.get(&#39;context&#39;);
+</a>     var i;
+     var ctx_before = [], ctx_after = [];
+<a href="#h0-0-42" id="h0-0-42" class="d">-    for (i = 0; i &lt; match.context_before.length; i ++) {
+</a><a href="#h0-0-43" id="h0-0-43" class="i">+    for (i = 0; i &lt; ctx.context_before.length; i ++) {
+</a>       ctx_before.unshift(h.div([
+<a href="#h0-0-45" id="h0-0-45" class="d">-                                 h.span({cls: &#39;lno&#39;}, [match.lno - i - 1, &quot;:&quot;]),
+</a><a href="#h0-0-46" id="h0-0-46" class="d">-                                 match.context_before[i]
+</a><a href="#h0-0-47" id="h0-0-47" class="i">+                                 h.span({cls: &#39;lno&#39;}, [ctx.lno - i - 1, &quot;:&quot;]),
+</a><a href="#h0-0-48" id="h0-0-48" class="i">+                                 ctx.context_before[i]
+</a>                                ]));
+     }
+<a href="#h0-0-51" id="h0-0-51" class="d">-    for (i = 0; i &lt; match.context_after.length; i ++) {
+</a><a href="#h0-0-52" id="h0-0-52" class="i">+    for (i = 0; i &lt; ctx.context_after.length; i ++) {
+</a>       ctx_after.push(h.div([
+<a href="#h0-0-54" id="h0-0-54" class="d">-                             h.span({cls: &#39;lno&#39;}, [match.lno + i + 1, &quot;:&quot;]),
+</a><a href="#h0-0-55" id="h0-0-55" class="d">-                             match.context_after[i]
+</a><a href="#h0-0-56" id="h0-0-56" class="i">+                             h.span({cls: &#39;lno&#39;}, [ctx.lno + i + 1, &quot;:&quot;]),
+</a><a href="#h0-0-57" id="h0-0-57" class="i">+                             ctx.context_after[i]
+</a>                            ]));
+     }
+<a href="#h0-0-60" id="h0-0-60" class="d">-    var count = 0;
+</a><a href="#h0-0-61" id="h0-0-61" class="d">-    match.contexts.forEach(function (ctx) {count += ctx.paths.length;});
+</a><a href="#h0-0-62" id="h0-0-62" class="i">+    var line = this.model.get(&#39;line&#39;);
+</a><a href="#h0-0-63" id="h0-0-63" class="i">+    var bounds = this.model.get(&#39;bounds&#39;);
+</a><a href="#h0-0-64" id="h0-0-64" class="i">+    var pieces = [line.substring(0, bounds[0]),
+</a><a href="#h0-0-65" id="h0-0-65" class="i">+                  line.substring(bounds[0], bounds[1]),
+</a><a href="#h0-0-66" id="h0-0-66" class="i">+                  line.substring(bounds[1])];
+</a><a href="#h0-0-67" id="h0-0-67" class="i">+
+</a>     return h.div({cls: &#39;match&#39;},
+                  [
+                    h.div({},
+                          [h.span({cls: &#39;label&#39;},
+                                  [
+                                    h.a({
+<a href="#h0-0-74" id="h0-0-74" class="d">-                                         href: url_for(match)
+</a><a href="#h0-0-75" id="h0-0-75" class="d">-                                       }, [shorten(match.ref), &quot;:&quot;, match.file]),
+</a><a href="#h0-0-76" id="h0-0-76" class="d">-                                 ])
+</a><a href="#h0-0-77" id="h0-0-77" class="d">-                         ].concat(count &gt; 1 ?
+</a><a href="#h0-0-78" id="h0-0-78" class="d">-                                  [h.span({cls: &quot;more&quot;},
+</a><a href="#h0-0-79" id="h0-0-79" class="d">-                                          [&quot; (+&quot;, &quot;&quot; + (count - 1), &quot; identical)&quot;])] :
+</a><a href="#h0-0-80" id="h0-0-80" class="d">-                                  [])
+</a><a href="#h0-0-81" id="h0-0-81" class="d">-                        ),
+</a><a href="#h0-0-82" id="h0-0-82" class="i">+                                         href: this.model.url()
+</a><a href="#h0-0-83" id="h0-0-83" class="i">+                                       },
+</a><a href="#h0-0-84" id="h0-0-84" class="i">+                                   [ shorten(this.model.get(&#39;path&#39;).ref), &quot;:&quot;,
+</a><a href="#h0-0-85" id="h0-0-85" class="i">+                                     this.model.get(&#39;path&#39;).path])])
+</a><a href="#h0-0-86" id="h0-0-86" class="i">+                         ]),
+</a>                    h.div({cls: &#39;contents&#39;},
+                          [
+                            ctx_before,
+                            h.div({cls: &#39;matchline&#39;},
+                                  [
+<a href="#h0-0-92" id="h0-0-92" class="d">-                                   h.span({cls: &#39;lno&#39;}, [match.lno + &quot;:&quot;]),
+</a><a href="#h0-0-93" id="h0-0-93" class="i">+                                   h.span({cls: &#39;lno&#39;}, [ctx.lno + &quot;:&quot;]),
+</a>                                    pieces[0],
+                                    h.span({cls: &#39;matchstr&#39;}, [pieces[1]]),
+                                    pieces[2]
+                                  ]),
+                            ctx_after])]);
+   }
+<a href="#h0-0-100" id="h0-0-100" class="i">+});
+</a><a href="#h0-0-101" id="h0-0-101" class="i">+var CodesearchUI = function() {
+</a><a href="#h0-0-102" id="h0-0-102" class="i">+
+</a>   return {
+     displaying: null,
+     results: 0,
+<a href="#h0-1" id="h0-1" class="h">@@ -137,7 +150,14 @@ var CodesearchUI = function() {
+</a>     match: function(search, match) {
+       CodesearchUI.handle_result(search);
+       CodesearchUI.results++;
+<a href="#h0-1-3" id="h0-1-3" class="d">-      $(&#39;#results&#39;).append(render_match(match));
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+      var m  = new Match({
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+                           line: match.line,
+</a><a href="#h0-1-6" id="h0-1-6" class="i">+                           bounds: match.bounds,
+</a><a href="#h0-1-7" id="h0-1-7" class="i">+                           context: match.contexts[0],
+</a><a href="#h0-1-8" id="h0-1-8" class="i">+                           path: match.contexts[0].paths[0],
+</a><a href="#h0-1-9" id="h0-1-9" class="i">+                         });
+</a><a href="#h0-1-10" id="h0-1-10" class="i">+      window.match = m;
+</a><a href="#h0-1-11" id="h0-1-11" class="i">+      $(&#39;#results&#39;).append(new MatchView({model: m}).render().el);
+</a>       $(&#39;#numresults&#39;).text(CodesearchUI.results);
+     },
+     search_done: function(search, time, why) {
+<b>diff --git a/<a id="h1" href="../file/web/htdocs/js/backbone.js">web/htdocs/js/backbone.js</a> b/<a href="../file/web/htdocs/js/backbone.js">web/htdocs/js/backbone.js</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -0,0 +1,1431 @@
+</a><a href="#h1-0-0" id="h1-0-0" class="i">+//     Backbone.js 0.9.2
+</a><a href="#h1-0-1" id="h1-0-1" class="i">+
+</a><a href="#h1-0-2" id="h1-0-2" class="i">+//     (c) 2010-2012 Jeremy Ashkenas, DocumentCloud Inc.
+</a><a href="#h1-0-3" id="h1-0-3" class="i">+//     Backbone may be freely distributed under the MIT license.
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+//     For all details and documentation:
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+//     http://backbonejs.org
+</a><a href="#h1-0-6" id="h1-0-6" class="i">+
+</a><a href="#h1-0-7" id="h1-0-7" class="i">+(function(){
+</a><a href="#h1-0-8" id="h1-0-8" class="i">+
+</a><a href="#h1-0-9" id="h1-0-9" class="i">+  // Initial Setup
+</a><a href="#h1-0-10" id="h1-0-10" class="i">+  // -------------
+</a><a href="#h1-0-11" id="h1-0-11" class="i">+
+</a><a href="#h1-0-12" id="h1-0-12" class="i">+  // Save a reference to the global object (`window` in the browser, `global`
+</a><a href="#h1-0-13" id="h1-0-13" class="i">+  // on the server).
+</a><a href="#h1-0-14" id="h1-0-14" class="i">+  var root = this;
+</a><a href="#h1-0-15" id="h1-0-15" class="i">+
+</a><a href="#h1-0-16" id="h1-0-16" class="i">+  // Save the previous value of the `Backbone` variable, so that it can be
+</a><a href="#h1-0-17" id="h1-0-17" class="i">+  // restored later on, if `noConflict` is used.
+</a><a href="#h1-0-18" id="h1-0-18" class="i">+  var previousBackbone = root.Backbone;
+</a><a href="#h1-0-19" id="h1-0-19" class="i">+
+</a><a href="#h1-0-20" id="h1-0-20" class="i">+  // Create a local reference to slice/splice.
+</a><a href="#h1-0-21" id="h1-0-21" class="i">+  var slice = Array.prototype.slice;
+</a><a href="#h1-0-22" id="h1-0-22" class="i">+  var splice = Array.prototype.splice;
+</a><a href="#h1-0-23" id="h1-0-23" class="i">+
+</a><a href="#h1-0-24" id="h1-0-24" class="i">+  // The top-level namespace. All public Backbone classes and modules will
+</a><a href="#h1-0-25" id="h1-0-25" class="i">+  // be attached to this. Exported for both CommonJS and the browser.
+</a><a href="#h1-0-26" id="h1-0-26" class="i">+  var Backbone;
+</a><a href="#h1-0-27" id="h1-0-27" class="i">+  if (typeof exports !== &#39;undefined&#39;) {
+</a><a href="#h1-0-28" id="h1-0-28" class="i">+    Backbone = exports;
+</a><a href="#h1-0-29" id="h1-0-29" class="i">+  } else {
+</a><a href="#h1-0-30" id="h1-0-30" class="i">+    Backbone = root.Backbone = {};
+</a><a href="#h1-0-31" id="h1-0-31" class="i">+  }
+</a><a href="#h1-0-32" id="h1-0-32" class="i">+
+</a><a href="#h1-0-33" id="h1-0-33" class="i">+  // Current version of the library. Keep in sync with `package.json`.
+</a><a href="#h1-0-34" id="h1-0-34" class="i">+  Backbone.VERSION = &#39;0.9.2&#39;;
+</a><a href="#h1-0-35" id="h1-0-35" class="i">+
+</a><a href="#h1-0-36" id="h1-0-36" class="i">+  // Require Underscore, if we&#39;re on the server, and it&#39;s not already present.
+</a><a href="#h1-0-37" id="h1-0-37" class="i">+  var _ = root._;
+</a><a href="#h1-0-38" id="h1-0-38" class="i">+  if (!_ &amp;&amp; (typeof require !== &#39;undefined&#39;)) _ = require(&#39;underscore&#39;);
+</a><a href="#h1-0-39" id="h1-0-39" class="i">+
+</a><a href="#h1-0-40" id="h1-0-40" class="i">+  // For Backbone&#39;s purposes, jQuery, Zepto, or Ender owns the `$` variable.
+</a><a href="#h1-0-41" id="h1-0-41" class="i">+  var $ = root.jQuery || root.Zepto || root.ender;
+</a><a href="#h1-0-42" id="h1-0-42" class="i">+
+</a><a href="#h1-0-43" id="h1-0-43" class="i">+  // Set the JavaScript library that will be used for DOM manipulation and
+</a><a href="#h1-0-44" id="h1-0-44" class="i">+  // Ajax calls (a.k.a. the `$` variable). By default Backbone will use: jQuery,
+</a><a href="#h1-0-45" id="h1-0-45" class="i">+  // Zepto, or Ender; but the `setDomLibrary()` method lets you inject an
+</a><a href="#h1-0-46" id="h1-0-46" class="i">+  // alternate JavaScript library (or a mock library for testing your views
+</a><a href="#h1-0-47" id="h1-0-47" class="i">+  // outside of a browser).
+</a><a href="#h1-0-48" id="h1-0-48" class="i">+  Backbone.setDomLibrary = function(lib) {
+</a><a href="#h1-0-49" id="h1-0-49" class="i">+    $ = lib;
+</a><a href="#h1-0-50" id="h1-0-50" class="i">+  };
+</a><a href="#h1-0-51" id="h1-0-51" class="i">+
+</a><a href="#h1-0-52" id="h1-0-52" class="i">+  // Runs Backbone.js in *noConflict* mode, returning the `Backbone` variable
+</a><a href="#h1-0-53" id="h1-0-53" class="i">+  // to its previous owner. Returns a reference to this Backbone object.
+</a><a href="#h1-0-54" id="h1-0-54" class="i">+  Backbone.noConflict = function() {
+</a><a href="#h1-0-55" id="h1-0-55" class="i">+    root.Backbone = previousBackbone;
+</a><a href="#h1-0-56" id="h1-0-56" class="i">+    return this;
+</a><a href="#h1-0-57" id="h1-0-57" class="i">+  };
+</a><a href="#h1-0-58" id="h1-0-58" class="i">+
+</a><a href="#h1-0-59" id="h1-0-59" class="i">+  // Turn on `emulateHTTP` to support legacy HTTP servers. Setting this option
+</a><a href="#h1-0-60" id="h1-0-60" class="i">+  // will fake `&quot;PUT&quot;` and `&quot;DELETE&quot;` requests via the `_method` parameter and
+</a><a href="#h1-0-61" id="h1-0-61" class="i">+  // set a `X-Http-Method-Override` header.
+</a><a href="#h1-0-62" id="h1-0-62" class="i">+  Backbone.emulateHTTP = false;
+</a><a href="#h1-0-63" id="h1-0-63" class="i">+
+</a><a href="#h1-0-64" id="h1-0-64" class="i">+  // Turn on `emulateJSON` to support legacy servers that can&#39;t deal with direct
+</a><a href="#h1-0-65" id="h1-0-65" class="i">+  // `application/json` requests ... will encode the body as
+</a><a href="#h1-0-66" id="h1-0-66" class="i">+  // `application/x-www-form-urlencoded` instead and will send the model in a
+</a><a href="#h1-0-67" id="h1-0-67" class="i">+  // form param named `model`.
+</a><a href="#h1-0-68" id="h1-0-68" class="i">+  Backbone.emulateJSON = false;
+</a><a href="#h1-0-69" id="h1-0-69" class="i">+
+</a><a href="#h1-0-70" id="h1-0-70" class="i">+  // Backbone.Events
+</a><a href="#h1-0-71" id="h1-0-71" class="i">+  // -----------------
+</a><a href="#h1-0-72" id="h1-0-72" class="i">+
+</a><a href="#h1-0-73" id="h1-0-73" class="i">+  // Regular expression used to split event strings
+</a><a href="#h1-0-74" id="h1-0-74" class="i">+  var eventSplitter = /\s+/;
+</a><a href="#h1-0-75" id="h1-0-75" class="i">+
+</a><a href="#h1-0-76" id="h1-0-76" class="i">+  // A module that can be mixed in to *any object* in order to provide it with
+</a><a href="#h1-0-77" id="h1-0-77" class="i">+  // custom events. You may bind with `on` or remove with `off` callback functions
+</a><a href="#h1-0-78" id="h1-0-78" class="i">+  // to an event; trigger`-ing an event fires all callbacks in succession.
+</a><a href="#h1-0-79" id="h1-0-79" class="i">+  //
+</a><a href="#h1-0-80" id="h1-0-80" class="i">+  //     var object = {};
+</a><a href="#h1-0-81" id="h1-0-81" class="i">+  //     _.extend(object, Backbone.Events);
+</a><a href="#h1-0-82" id="h1-0-82" class="i">+  //     object.on(&#39;expand&#39;, function(){ alert(&#39;expanded&#39;); });
+</a><a href="#h1-0-83" id="h1-0-83" class="i">+  //     object.trigger(&#39;expand&#39;);
+</a><a href="#h1-0-84" id="h1-0-84" class="i">+  //
+</a><a href="#h1-0-85" id="h1-0-85" class="i">+  var Events = Backbone.Events = {
+</a><a href="#h1-0-86" id="h1-0-86" class="i">+
+</a><a href="#h1-0-87" id="h1-0-87" class="i">+    // Bind one or more space separated events, `events`, to a `callback`
+</a><a href="#h1-0-88" id="h1-0-88" class="i">+    // function. Passing `&quot;all&quot;` will bind the callback to all events fired.
+</a><a href="#h1-0-89" id="h1-0-89" class="i">+    on: function(events, callback, context) {
+</a><a href="#h1-0-90" id="h1-0-90" class="i">+
+</a><a href="#h1-0-91" id="h1-0-91" class="i">+      var calls, event, node, tail, list;
+</a><a href="#h1-0-92" id="h1-0-92" class="i">+      if (!callback) return this;
+</a><a href="#h1-0-93" id="h1-0-93" class="i">+      events = events.split(eventSplitter);
+</a><a href="#h1-0-94" id="h1-0-94" class="i">+      calls = this._callbacks || (this._callbacks = {});
+</a><a href="#h1-0-95" id="h1-0-95" class="i">+
+</a><a href="#h1-0-96" id="h1-0-96" class="i">+      // Create an immutable callback list, allowing traversal during
+</a><a href="#h1-0-97" id="h1-0-97" class="i">+      // modification.  The tail is an empty object that will always be used
+</a><a href="#h1-0-98" id="h1-0-98" class="i">+      // as the next node.
+</a><a href="#h1-0-99" id="h1-0-99" class="i">+      while (event = events.shift()) {
+</a><a href="#h1-0-100" id="h1-0-100" class="i">+        list = calls[event];
+</a><a href="#h1-0-101" id="h1-0-101" class="i">+        node = list ? list.tail : {};
+</a><a href="#h1-0-102" id="h1-0-102" class="i">+        node.next = tail = {};
+</a><a href="#h1-0-103" id="h1-0-103" class="i">+        node.context = context;
+</a><a href="#h1-0-104" id="h1-0-104" class="i">+        node.callback = callback;
+</a><a href="#h1-0-105" id="h1-0-105" class="i">+        calls[event] = {tail: tail, next: list ? list.next : node};
+</a><a href="#h1-0-106" id="h1-0-106" class="i">+      }
+</a><a href="#h1-0-107" id="h1-0-107" class="i">+
+</a><a href="#h1-0-108" id="h1-0-108" class="i">+      return this;
+</a><a href="#h1-0-109" id="h1-0-109" class="i">+    },
+</a><a href="#h1-0-110" id="h1-0-110" class="i">+
+</a><a href="#h1-0-111" id="h1-0-111" class="i">+    // Remove one or many callbacks. If `context` is null, removes all callbacks
+</a><a href="#h1-0-112" id="h1-0-112" class="i">+    // with that function. If `callback` is null, removes all callbacks for the
+</a><a href="#h1-0-113" id="h1-0-113" class="i">+    // event. If `events` is null, removes all bound callbacks for all events.
+</a><a href="#h1-0-114" id="h1-0-114" class="i">+    off: function(events, callback, context) {
+</a><a href="#h1-0-115" id="h1-0-115" class="i">+      var event, calls, node, tail, cb, ctx;
+</a><a href="#h1-0-116" id="h1-0-116" class="i">+
+</a><a href="#h1-0-117" id="h1-0-117" class="i">+      // No events, or removing *all* events.
+</a><a href="#h1-0-118" id="h1-0-118" class="i">+      if (!(calls = this._callbacks)) return;
+</a><a href="#h1-0-119" id="h1-0-119" class="i">+      if (!(events || callback || context)) {
+</a><a href="#h1-0-120" id="h1-0-120" class="i">+        delete this._callbacks;
+</a><a href="#h1-0-121" id="h1-0-121" class="i">+        return this;
+</a><a href="#h1-0-122" id="h1-0-122" class="i">+      }
+</a><a href="#h1-0-123" id="h1-0-123" class="i">+
+</a><a href="#h1-0-124" id="h1-0-124" class="i">+      // Loop through the listed events and contexts, splicing them out of the
+</a><a href="#h1-0-125" id="h1-0-125" class="i">+      // linked list of callbacks if appropriate.
+</a><a href="#h1-0-126" id="h1-0-126" class="i">+      events = events ? events.split(eventSplitter) : _.keys(calls);
+</a><a href="#h1-0-127" id="h1-0-127" class="i">+      while (event = events.shift()) {
+</a><a href="#h1-0-128" id="h1-0-128" class="i">+        node = calls[event];
+</a><a href="#h1-0-129" id="h1-0-129" class="i">+        delete calls[event];
+</a><a href="#h1-0-130" id="h1-0-130" class="i">+        if (!node || !(callback || context)) continue;
+</a><a href="#h1-0-131" id="h1-0-131" class="i">+        // Create a new list, omitting the indicated callbacks.
+</a><a href="#h1-0-132" id="h1-0-132" class="i">+        tail = node.tail;
+</a><a href="#h1-0-133" id="h1-0-133" class="i">+        while ((node = node.next) !== tail) {
+</a><a href="#h1-0-134" id="h1-0-134" class="i">+          cb = node.callback;
+</a><a href="#h1-0-135" id="h1-0-135" class="i">+          ctx = node.context;
+</a><a href="#h1-0-136" id="h1-0-136" class="i">+          if ((callback &amp;&amp; cb !== callback) || (context &amp;&amp; ctx !== context)) {
+</a><a href="#h1-0-137" id="h1-0-137" class="i">+            this.on(event, cb, ctx);
+</a><a href="#h1-0-138" id="h1-0-138" class="i">+          }
+</a><a href="#h1-0-139" id="h1-0-139" class="i">+        }
+</a><a href="#h1-0-140" id="h1-0-140" class="i">+      }
+</a><a href="#h1-0-141" id="h1-0-141" class="i">+
+</a><a href="#h1-0-142" id="h1-0-142" class="i">+      return this;
+</a><a href="#h1-0-143" id="h1-0-143" class="i">+    },
+</a><a href="#h1-0-144" id="h1-0-144" class="i">+
+</a><a href="#h1-0-145" id="h1-0-145" class="i">+    // Trigger one or many events, firing all bound callbacks. Callbacks are
+</a><a href="#h1-0-146" id="h1-0-146" class="i">+    // passed the same arguments as `trigger` is, apart from the event name
+</a><a href="#h1-0-147" id="h1-0-147" class="i">+    // (unless you&#39;re listening on `&quot;all&quot;`, which will cause your callback to
+</a><a href="#h1-0-148" id="h1-0-148" class="i">+    // receive the true name of the event as the first argument).
+</a><a href="#h1-0-149" id="h1-0-149" class="i">+    trigger: function(events) {
+</a><a href="#h1-0-150" id="h1-0-150" class="i">+      var event, node, calls, tail, args, all, rest;
+</a><a href="#h1-0-151" id="h1-0-151" class="i">+      if (!(calls = this._callbacks)) return this;
+</a><a href="#h1-0-152" id="h1-0-152" class="i">+      all = calls.all;
+</a><a href="#h1-0-153" id="h1-0-153" class="i">+      events = events.split(eventSplitter);
+</a><a href="#h1-0-154" id="h1-0-154" class="i">+      rest = slice.call(arguments, 1);
+</a><a href="#h1-0-155" id="h1-0-155" class="i">+
+</a><a href="#h1-0-156" id="h1-0-156" class="i">+      // For each event, walk through the linked list of callbacks twice,
+</a><a href="#h1-0-157" id="h1-0-157" class="i">+      // first to trigger the event, then to trigger any `&quot;all&quot;` callbacks.
+</a><a href="#h1-0-158" id="h1-0-158" class="i">+      while (event = events.shift()) {
+</a><a href="#h1-0-159" id="h1-0-159" class="i">+        if (node = calls[event]) {
+</a><a href="#h1-0-160" id="h1-0-160" class="i">+          tail = node.tail;
+</a><a href="#h1-0-161" id="h1-0-161" class="i">+          while ((node = node.next) !== tail) {
+</a><a href="#h1-0-162" id="h1-0-162" class="i">+            node.callback.apply(node.context || this, rest);
+</a><a href="#h1-0-163" id="h1-0-163" class="i">+          }
+</a><a href="#h1-0-164" id="h1-0-164" class="i">+        }
+</a><a href="#h1-0-165" id="h1-0-165" class="i">+        if (node = all) {
+</a><a href="#h1-0-166" id="h1-0-166" class="i">+          tail = node.tail;
+</a><a href="#h1-0-167" id="h1-0-167" class="i">+          args = [event].concat(rest);
+</a><a href="#h1-0-168" id="h1-0-168" class="i">+          while ((node = node.next) !== tail) {
+</a><a href="#h1-0-169" id="h1-0-169" class="i">+            node.callback.apply(node.context || this, args);
+</a><a href="#h1-0-170" id="h1-0-170" class="i">+          }
+</a><a href="#h1-0-171" id="h1-0-171" class="i">+        }
+</a><a href="#h1-0-172" id="h1-0-172" class="i">+      }
+</a><a href="#h1-0-173" id="h1-0-173" class="i">+
+</a><a href="#h1-0-174" id="h1-0-174" class="i">+      return this;
+</a><a href="#h1-0-175" id="h1-0-175" class="i">+    }
+</a><a href="#h1-0-176" id="h1-0-176" class="i">+
+</a><a href="#h1-0-177" id="h1-0-177" class="i">+  };
+</a><a href="#h1-0-178" id="h1-0-178" class="i">+
+</a><a href="#h1-0-179" id="h1-0-179" class="i">+  // Aliases for backwards compatibility.
+</a><a href="#h1-0-180" id="h1-0-180" class="i">+  Events.bind   = Events.on;
+</a><a href="#h1-0-181" id="h1-0-181" class="i">+  Events.unbind = Events.off;
+</a><a href="#h1-0-182" id="h1-0-182" class="i">+
+</a><a href="#h1-0-183" id="h1-0-183" class="i">+  // Backbone.Model
+</a><a href="#h1-0-184" id="h1-0-184" class="i">+  // --------------
+</a><a href="#h1-0-185" id="h1-0-185" class="i">+
+</a><a href="#h1-0-186" id="h1-0-186" class="i">+  // Create a new model, with defined attributes. A client id (`cid`)
+</a><a href="#h1-0-187" id="h1-0-187" class="i">+  // is automatically generated and assigned for you.
+</a><a href="#h1-0-188" id="h1-0-188" class="i">+  var Model = Backbone.Model = function(attributes, options) {
+</a><a href="#h1-0-189" id="h1-0-189" class="i">+    var defaults;
+</a><a href="#h1-0-190" id="h1-0-190" class="i">+    attributes || (attributes = {});
+</a><a href="#h1-0-191" id="h1-0-191" class="i">+    if (options &amp;&amp; options.parse) attributes = this.parse(attributes);
+</a><a href="#h1-0-192" id="h1-0-192" class="i">+    if (defaults = getValue(this, &#39;defaults&#39;)) {
+</a><a href="#h1-0-193" id="h1-0-193" class="i">+      attributes = _.extend({}, defaults, attributes);
+</a><a href="#h1-0-194" id="h1-0-194" class="i">+    }
+</a><a href="#h1-0-195" id="h1-0-195" class="i">+    if (options &amp;&amp; options.collection) this.collection = options.collection;
+</a><a href="#h1-0-196" id="h1-0-196" class="i">+    this.attributes = {};
+</a><a href="#h1-0-197" id="h1-0-197" class="i">+    this._escapedAttributes = {};
+</a><a href="#h1-0-198" id="h1-0-198" class="i">+    this.cid = _.uniqueId(&#39;c&#39;);
+</a><a href="#h1-0-199" id="h1-0-199" class="i">+    this.changed = {};
+</a><a href="#h1-0-200" id="h1-0-200" class="i">+    this._silent = {};
+</a><a href="#h1-0-201" id="h1-0-201" class="i">+    this._pending = {};
+</a><a href="#h1-0-202" id="h1-0-202" class="i">+    this.set(attributes, {silent: true});
+</a><a href="#h1-0-203" id="h1-0-203" class="i">+    // Reset change tracking.
+</a><a href="#h1-0-204" id="h1-0-204" class="i">+    this.changed = {};
+</a><a href="#h1-0-205" id="h1-0-205" class="i">+    this._silent = {};
+</a><a href="#h1-0-206" id="h1-0-206" class="i">+    this._pending = {};
+</a><a href="#h1-0-207" id="h1-0-207" class="i">+    this._previousAttributes = _.clone(this.attributes);
+</a><a href="#h1-0-208" id="h1-0-208" class="i">+    this.initialize.apply(this, arguments);
+</a><a href="#h1-0-209" id="h1-0-209" class="i">+  };
+</a><a href="#h1-0-210" id="h1-0-210" class="i">+
+</a><a href="#h1-0-211" id="h1-0-211" class="i">+  // Attach all inheritable methods to the Model prototype.
+</a><a href="#h1-0-212" id="h1-0-212" class="i">+  _.extend(Model.prototype, Events, {
+</a><a href="#h1-0-213" id="h1-0-213" class="i">+
+</a><a href="#h1-0-214" id="h1-0-214" class="i">+    // A hash of attributes whose current and previous value differ.
+</a><a href="#h1-0-215" id="h1-0-215" class="i">+    changed: null,
+</a><a href="#h1-0-216" id="h1-0-216" class="i">+
+</a><a href="#h1-0-217" id="h1-0-217" class="i">+    // A hash of attributes that have silently changed since the last time
+</a><a href="#h1-0-218" id="h1-0-218" class="i">+    // `change` was called.  Will become pending attributes on the next call.
+</a><a href="#h1-0-219" id="h1-0-219" class="i">+    _silent: null,
+</a><a href="#h1-0-220" id="h1-0-220" class="i">+
+</a><a href="#h1-0-221" id="h1-0-221" class="i">+    // A hash of attributes that have changed since the last `&#39;change&#39;` event
+</a><a href="#h1-0-222" id="h1-0-222" class="i">+    // began.
+</a><a href="#h1-0-223" id="h1-0-223" class="i">+    _pending: null,
+</a><a href="#h1-0-224" id="h1-0-224" class="i">+
+</a><a href="#h1-0-225" id="h1-0-225" class="i">+    // The default name for the JSON `id` attribute is `&quot;id&quot;`. MongoDB and
+</a><a href="#h1-0-226" id="h1-0-226" class="i">+    // CouchDB users may want to set this to `&quot;_id&quot;`.
+</a><a href="#h1-0-227" id="h1-0-227" class="i">+    idAttribute: &#39;id&#39;,
+</a><a href="#h1-0-228" id="h1-0-228" class="i">+
+</a><a href="#h1-0-229" id="h1-0-229" class="i">+    // Initialize is an empty function by default. Override it with your own
+</a><a href="#h1-0-230" id="h1-0-230" class="i">+    // initialization logic.
+</a><a href="#h1-0-231" id="h1-0-231" class="i">+    initialize: function(){},
+</a><a href="#h1-0-232" id="h1-0-232" class="i">+
+</a><a href="#h1-0-233" id="h1-0-233" class="i">+    // Return a copy of the model&#39;s `attributes` object.
+</a><a href="#h1-0-234" id="h1-0-234" class="i">+    toJSON: function(options) {
+</a><a href="#h1-0-235" id="h1-0-235" class="i">+      return _.clone(this.attributes);
+</a><a href="#h1-0-236" id="h1-0-236" class="i">+    },
+</a><a href="#h1-0-237" id="h1-0-237" class="i">+
+</a><a href="#h1-0-238" id="h1-0-238" class="i">+    // Get the value of an attribute.
+</a><a href="#h1-0-239" id="h1-0-239" class="i">+    get: function(attr) {
+</a><a href="#h1-0-240" id="h1-0-240" class="i">+      return this.attributes[attr];
+</a><a href="#h1-0-241" id="h1-0-241" class="i">+    },
+</a><a href="#h1-0-242" id="h1-0-242" class="i">+
+</a><a href="#h1-0-243" id="h1-0-243" class="i">+    // Get the HTML-escaped value of an attribute.
+</a><a href="#h1-0-244" id="h1-0-244" class="i">+    escape: function(attr) {
+</a><a href="#h1-0-245" id="h1-0-245" class="i">+      var html;
+</a><a href="#h1-0-246" id="h1-0-246" class="i">+      if (html = this._escapedAttributes[attr]) return html;
+</a><a href="#h1-0-247" id="h1-0-247" class="i">+      var val = this.get(attr);
+</a><a href="#h1-0-248" id="h1-0-248" class="i">+      return this._escapedAttributes[attr] = _.escape(val == null ? &#39;&#39; : &#39;&#39; + val);
+</a><a href="#h1-0-249" id="h1-0-249" class="i">+    },
+</a><a href="#h1-0-250" id="h1-0-250" class="i">+
+</a><a href="#h1-0-251" id="h1-0-251" class="i">+    // Returns `true` if the attribute contains a value that is not null
+</a><a href="#h1-0-252" id="h1-0-252" class="i">+    // or undefined.
+</a><a href="#h1-0-253" id="h1-0-253" class="i">+    has: function(attr) {
+</a><a href="#h1-0-254" id="h1-0-254" class="i">+      return this.get(attr) != null;
+</a><a href="#h1-0-255" id="h1-0-255" class="i">+    },
+</a><a href="#h1-0-256" id="h1-0-256" class="i">+
+</a><a href="#h1-0-257" id="h1-0-257" class="i">+    // Set a hash of model attributes on the object, firing `&quot;change&quot;` unless
+</a><a href="#h1-0-258" id="h1-0-258" class="i">+    // you choose to silence it.
+</a><a href="#h1-0-259" id="h1-0-259" class="i">+    set: function(key, value, options) {
+</a><a href="#h1-0-260" id="h1-0-260" class="i">+      var attrs, attr, val;
+</a><a href="#h1-0-261" id="h1-0-261" class="i">+
+</a><a href="#h1-0-262" id="h1-0-262" class="i">+      // Handle both `&quot;key&quot;, value` and `{key: value}` -style arguments.
+</a><a href="#h1-0-263" id="h1-0-263" class="i">+      if (_.isObject(key) || key == null) {
+</a><a href="#h1-0-264" id="h1-0-264" class="i">+        attrs = key;
+</a><a href="#h1-0-265" id="h1-0-265" class="i">+        options = value;
+</a><a href="#h1-0-266" id="h1-0-266" class="i">+      } else {
+</a><a href="#h1-0-267" id="h1-0-267" class="i">+        attrs = {};
+</a><a href="#h1-0-268" id="h1-0-268" class="i">+        attrs[key] = value;
+</a><a href="#h1-0-269" id="h1-0-269" class="i">+      }
+</a><a href="#h1-0-270" id="h1-0-270" class="i">+
+</a><a href="#h1-0-271" id="h1-0-271" class="i">+      // Extract attributes and options.
+</a><a href="#h1-0-272" id="h1-0-272" class="i">+      options || (options = {});
+</a><a href="#h1-0-273" id="h1-0-273" class="i">+      if (!attrs) return this;
+</a><a href="#h1-0-274" id="h1-0-274" class="i">+      if (attrs instanceof Model) attrs = attrs.attributes;
+</a><a href="#h1-0-275" id="h1-0-275" class="i">+      if (options.unset) for (attr in attrs) attrs[attr] = void 0;
+</a><a href="#h1-0-276" id="h1-0-276" class="i">+
+</a><a href="#h1-0-277" id="h1-0-277" class="i">+      // Run validation.
+</a><a href="#h1-0-278" id="h1-0-278" class="i">+      if (!this._validate(attrs, options)) return false;
+</a><a href="#h1-0-279" id="h1-0-279" class="i">+
+</a><a href="#h1-0-280" id="h1-0-280" class="i">+      // Check for changes of `id`.
+</a><a href="#h1-0-281" id="h1-0-281" class="i">+      if (this.idAttribute in attrs) this.id = attrs[this.idAttribute];
+</a><a href="#h1-0-282" id="h1-0-282" class="i">+
+</a><a href="#h1-0-283" id="h1-0-283" class="i">+      var changes = options.changes = {};
+</a><a href="#h1-0-284" id="h1-0-284" class="i">+      var now = this.attributes;
+</a><a href="#h1-0-285" id="h1-0-285" class="i">+      var escaped = this._escapedAttributes;
+</a><a href="#h1-0-286" id="h1-0-286" class="i">+      var prev = this._previousAttributes || {};
+</a><a href="#h1-0-287" id="h1-0-287" class="i">+
+</a><a href="#h1-0-288" id="h1-0-288" class="i">+      // For each `set` attribute...
+</a><a href="#h1-0-289" id="h1-0-289" class="i">+      for (attr in attrs) {
+</a><a href="#h1-0-290" id="h1-0-290" class="i">+        val = attrs[attr];
+</a><a href="#h1-0-291" id="h1-0-291" class="i">+
+</a><a href="#h1-0-292" id="h1-0-292" class="i">+        // If the new and current value differ, record the change.
+</a><a href="#h1-0-293" id="h1-0-293" class="i">+        if (!_.isEqual(now[attr], val) || (options.unset &amp;&amp; _.has(now, attr))) {
+</a><a href="#h1-0-294" id="h1-0-294" class="i">+          delete escaped[attr];
+</a><a href="#h1-0-295" id="h1-0-295" class="i">+          (options.silent ? this._silent : changes)[attr] = true;
+</a><a href="#h1-0-296" id="h1-0-296" class="i">+        }
+</a><a href="#h1-0-297" id="h1-0-297" class="i">+
+</a><a href="#h1-0-298" id="h1-0-298" class="i">+        // Update or delete the current value.
+</a><a href="#h1-0-299" id="h1-0-299" class="i">+        options.unset ? delete now[attr] : now[attr] = val;
+</a><a href="#h1-0-300" id="h1-0-300" class="i">+
+</a><a href="#h1-0-301" id="h1-0-301" class="i">+        // If the new and previous value differ, record the change.  If not,
+</a><a href="#h1-0-302" id="h1-0-302" class="i">+        // then remove changes for this attribute.
+</a><a href="#h1-0-303" id="h1-0-303" class="i">+        if (!_.isEqual(prev[attr], val) || (_.has(now, attr) != _.has(prev, attr))) {
+</a><a href="#h1-0-304" id="h1-0-304" class="i">+          this.changed[attr] = val;
+</a><a href="#h1-0-305" id="h1-0-305" class="i">+          if (!options.silent) this._pending[attr] = true;
+</a><a href="#h1-0-306" id="h1-0-306" class="i">+        } else {
+</a><a href="#h1-0-307" id="h1-0-307" class="i">+          delete this.changed[attr];
+</a><a href="#h1-0-308" id="h1-0-308" class="i">+          delete this._pending[attr];
+</a><a href="#h1-0-309" id="h1-0-309" class="i">+        }
+</a><a href="#h1-0-310" id="h1-0-310" class="i">+      }
+</a><a href="#h1-0-311" id="h1-0-311" class="i">+
+</a><a href="#h1-0-312" id="h1-0-312" class="i">+      // Fire the `&quot;change&quot;` events.
+</a><a href="#h1-0-313" id="h1-0-313" class="i">+      if (!options.silent) this.change(options);
+</a><a href="#h1-0-314" id="h1-0-314" class="i">+      return this;
+</a><a href="#h1-0-315" id="h1-0-315" class="i">+    },
+</a><a href="#h1-0-316" id="h1-0-316" class="i">+
+</a><a href="#h1-0-317" id="h1-0-317" class="i">+    // Remove an attribute from the model, firing `&quot;change&quot;` unless you choose
+</a><a href="#h1-0-318" id="h1-0-318" class="i">+    // to silence it. `unset` is a noop if the attribute doesn&#39;t exist.
+</a><a href="#h1-0-319" id="h1-0-319" class="i">+    unset: function(attr, options) {
+</a><a href="#h1-0-320" id="h1-0-320" class="i">+      (options || (options = {})).unset = true;
+</a><a href="#h1-0-321" id="h1-0-321" class="i">+      return this.set(attr, null, options);
+</a><a href="#h1-0-322" id="h1-0-322" class="i">+    },
+</a><a href="#h1-0-323" id="h1-0-323" class="i">+
+</a><a href="#h1-0-324" id="h1-0-324" class="i">+    // Clear all attributes on the model, firing `&quot;change&quot;` unless you choose
+</a><a href="#h1-0-325" id="h1-0-325" class="i">+    // to silence it.
+</a><a href="#h1-0-326" id="h1-0-326" class="i">+    clear: function(options) {
+</a><a href="#h1-0-327" id="h1-0-327" class="i">+      (options || (options = {})).unset = true;
+</a><a href="#h1-0-328" id="h1-0-328" class="i">+      return this.set(_.clone(this.attributes), options);
+</a><a href="#h1-0-329" id="h1-0-329" class="i">+    },
+</a><a href="#h1-0-330" id="h1-0-330" class="i">+
+</a><a href="#h1-0-331" id="h1-0-331" class="i">+    // Fetch the model from the server. If the server&#39;s representation of the
+</a><a href="#h1-0-332" id="h1-0-332" class="i">+    // model differs from its current attributes, they will be overriden,
+</a><a href="#h1-0-333" id="h1-0-333" class="i">+    // triggering a `&quot;change&quot;` event.
+</a><a href="#h1-0-334" id="h1-0-334" class="i">+    fetch: function(options) {
+</a><a href="#h1-0-335" id="h1-0-335" class="i">+      options = options ? _.clone(options) : {};
+</a><a href="#h1-0-336" id="h1-0-336" class="i">+      var model = this;
+</a><a href="#h1-0-337" id="h1-0-337" class="i">+      var success = options.success;
+</a><a href="#h1-0-338" id="h1-0-338" class="i">+      options.success = function(resp, status, xhr) {
+</a><a href="#h1-0-339" id="h1-0-339" class="i">+        if (!model.set(model.parse(resp, xhr), options)) return false;
+</a><a href="#h1-0-340" id="h1-0-340" class="i">+        if (success) success(model, resp);
+</a><a href="#h1-0-341" id="h1-0-341" class="i">+      };
+</a><a href="#h1-0-342" id="h1-0-342" class="i">+      options.error = Backbone.wrapError(options.error, model, options);
+</a><a href="#h1-0-343" id="h1-0-343" class="i">+      return (this.sync || Backbone.sync).call(this, &#39;read&#39;, this, options);
+</a><a href="#h1-0-344" id="h1-0-344" class="i">+    },
+</a><a href="#h1-0-345" id="h1-0-345" class="i">+
+</a><a href="#h1-0-346" id="h1-0-346" class="i">+    // Set a hash of model attributes, and sync the model to the server.
+</a><a href="#h1-0-347" id="h1-0-347" class="i">+    // If the server returns an attributes hash that differs, the model&#39;s
+</a><a href="#h1-0-348" id="h1-0-348" class="i">+    // state will be `set` again.
+</a><a href="#h1-0-349" id="h1-0-349" class="i">+    save: function(key, value, options) {
+</a><a href="#h1-0-350" id="h1-0-350" class="i">+      var attrs, current;
+</a><a href="#h1-0-351" id="h1-0-351" class="i">+
+</a><a href="#h1-0-352" id="h1-0-352" class="i">+      // Handle both `(&quot;key&quot;, value)` and `({key: value})` -style calls.
+</a><a href="#h1-0-353" id="h1-0-353" class="i">+      if (_.isObject(key) || key == null) {
+</a><a href="#h1-0-354" id="h1-0-354" class="i">+        attrs = key;
+</a><a href="#h1-0-355" id="h1-0-355" class="i">+        options = value;
+</a><a href="#h1-0-356" id="h1-0-356" class="i">+      } else {
+</a><a href="#h1-0-357" id="h1-0-357" class="i">+        attrs = {};
+</a><a href="#h1-0-358" id="h1-0-358" class="i">+        attrs[key] = value;
+</a><a href="#h1-0-359" id="h1-0-359" class="i">+      }
+</a><a href="#h1-0-360" id="h1-0-360" class="i">+      options = options ? _.clone(options) : {};
+</a><a href="#h1-0-361" id="h1-0-361" class="i">+
+</a><a href="#h1-0-362" id="h1-0-362" class="i">+      // If we&#39;re &quot;wait&quot;-ing to set changed attributes, validate early.
+</a><a href="#h1-0-363" id="h1-0-363" class="i">+      if (options.wait) {
+</a><a href="#h1-0-364" id="h1-0-364" class="i">+        if (!this._validate(attrs, options)) return false;
+</a><a href="#h1-0-365" id="h1-0-365" class="i">+        current = _.clone(this.attributes);
+</a><a href="#h1-0-366" id="h1-0-366" class="i">+      }
+</a><a href="#h1-0-367" id="h1-0-367" class="i">+
+</a><a href="#h1-0-368" id="h1-0-368" class="i">+      // Regular saves `set` attributes before persisting to the server.
+</a><a href="#h1-0-369" id="h1-0-369" class="i">+      var silentOptions = _.extend({}, options, {silent: true});
+</a><a href="#h1-0-370" id="h1-0-370" class="i">+      if (attrs &amp;&amp; !this.set(attrs, options.wait ? silentOptions : options)) {
+</a><a href="#h1-0-371" id="h1-0-371" class="i">+        return false;
+</a><a href="#h1-0-372" id="h1-0-372" class="i">+      }
+</a><a href="#h1-0-373" id="h1-0-373" class="i">+
+</a><a href="#h1-0-374" id="h1-0-374" class="i">+      // After a successful server-side save, the client is (optionally)
+</a><a href="#h1-0-375" id="h1-0-375" class="i">+      // updated with the server-side state.
+</a><a href="#h1-0-376" id="h1-0-376" class="i">+      var model = this;
+</a><a href="#h1-0-377" id="h1-0-377" class="i">+      var success = options.success;
+</a><a href="#h1-0-378" id="h1-0-378" class="i">+      options.success = function(resp, status, xhr) {
+</a><a href="#h1-0-379" id="h1-0-379" class="i">+        var serverAttrs = model.parse(resp, xhr);
+</a><a href="#h1-0-380" id="h1-0-380" class="i">+        if (options.wait) {
+</a><a href="#h1-0-381" id="h1-0-381" class="i">+          delete options.wait;
+</a><a href="#h1-0-382" id="h1-0-382" class="i">+          serverAttrs = _.extend(attrs || {}, serverAttrs);
+</a><a href="#h1-0-383" id="h1-0-383" class="i">+        }
+</a><a href="#h1-0-384" id="h1-0-384" class="i">+        if (!model.set(serverAttrs, options)) return false;
+</a><a href="#h1-0-385" id="h1-0-385" class="i">+        if (success) {
+</a><a href="#h1-0-386" id="h1-0-386" class="i">+          success(model, resp);
+</a><a href="#h1-0-387" id="h1-0-387" class="i">+        } else {
+</a><a href="#h1-0-388" id="h1-0-388" class="i">+          model.trigger(&#39;sync&#39;, model, resp, options);
+</a><a href="#h1-0-389" id="h1-0-389" class="i">+        }
+</a><a href="#h1-0-390" id="h1-0-390" class="i">+      };
+</a><a href="#h1-0-391" id="h1-0-391" class="i">+
+</a><a href="#h1-0-392" id="h1-0-392" class="i">+      // Finish configuring and sending the Ajax request.
+</a><a href="#h1-0-393" id="h1-0-393" class="i">+      options.error = Backbone.wrapError(options.error, model, options);
+</a><a href="#h1-0-394" id="h1-0-394" class="i">+      var method = this.isNew() ? &#39;create&#39; : &#39;update&#39;;
+</a><a href="#h1-0-395" id="h1-0-395" class="i">+      var xhr = (this.sync || Backbone.sync).call(this, method, this, options);
+</a><a href="#h1-0-396" id="h1-0-396" class="i">+      if (options.wait) this.set(current, silentOptions);
+</a><a href="#h1-0-397" id="h1-0-397" class="i">+      return xhr;
+</a><a href="#h1-0-398" id="h1-0-398" class="i">+    },
+</a><a href="#h1-0-399" id="h1-0-399" class="i">+
+</a><a href="#h1-0-400" id="h1-0-400" class="i">+    // Destroy this model on the server if it was already persisted.
+</a><a href="#h1-0-401" id="h1-0-401" class="i">+    // Optimistically removes the model from its collection, if it has one.
+</a><a href="#h1-0-402" id="h1-0-402" class="i">+    // If `wait: true` is passed, waits for the server to respond before removal.
+</a><a href="#h1-0-403" id="h1-0-403" class="i">+    destroy: function(options) {
+</a><a href="#h1-0-404" id="h1-0-404" class="i">+      options = options ? _.clone(options) : {};
+</a><a href="#h1-0-405" id="h1-0-405" class="i">+      var model = this;
+</a><a href="#h1-0-406" id="h1-0-406" class="i">+      var success = options.success;
+</a><a href="#h1-0-407" id="h1-0-407" class="i">+
+</a><a href="#h1-0-408" id="h1-0-408" class="i">+      var triggerDestroy = function() {
+</a><a href="#h1-0-409" id="h1-0-409" class="i">+        model.trigger(&#39;destroy&#39;, model, model.collection, options);
+</a><a href="#h1-0-410" id="h1-0-410" class="i">+      };
+</a><a href="#h1-0-411" id="h1-0-411" class="i">+
+</a><a href="#h1-0-412" id="h1-0-412" class="i">+      if (this.isNew()) {
+</a><a href="#h1-0-413" id="h1-0-413" class="i">+        triggerDestroy();
+</a><a href="#h1-0-414" id="h1-0-414" class="i">+        return false;
+</a><a href="#h1-0-415" id="h1-0-415" class="i">+      }
+</a><a href="#h1-0-416" id="h1-0-416" class="i">+
+</a><a href="#h1-0-417" id="h1-0-417" class="i">+      options.success = function(resp) {
+</a><a href="#h1-0-418" id="h1-0-418" class="i">+        if (options.wait) triggerDestroy();
+</a><a href="#h1-0-419" id="h1-0-419" class="i">+        if (success) {
+</a><a href="#h1-0-420" id="h1-0-420" class="i">+          success(model, resp);
+</a><a href="#h1-0-421" id="h1-0-421" class="i">+        } else {
+</a><a href="#h1-0-422" id="h1-0-422" class="i">+          model.trigger(&#39;sync&#39;, model, resp, options);
+</a><a href="#h1-0-423" id="h1-0-423" class="i">+        }
+</a><a href="#h1-0-424" id="h1-0-424" class="i">+      };
+</a><a href="#h1-0-425" id="h1-0-425" class="i">+
+</a><a href="#h1-0-426" id="h1-0-426" class="i">+      options.error = Backbone.wrapError(options.error, model, options);
+</a><a href="#h1-0-427" id="h1-0-427" class="i">+      var xhr = (this.sync || Backbone.sync).call(this, &#39;delete&#39;, this, options);
+</a><a href="#h1-0-428" id="h1-0-428" class="i">+      if (!options.wait) triggerDestroy();
+</a><a href="#h1-0-429" id="h1-0-429" class="i">+      return xhr;
+</a><a href="#h1-0-430" id="h1-0-430" class="i">+    },
+</a><a href="#h1-0-431" id="h1-0-431" class="i">+
+</a><a href="#h1-0-432" id="h1-0-432" class="i">+    // Default URL for the model&#39;s representation on the server -- if you&#39;re
+</a><a href="#h1-0-433" id="h1-0-433" class="i">+    // using Backbone&#39;s restful methods, override this to change the endpoint
+</a><a href="#h1-0-434" id="h1-0-434" class="i">+    // that will be called.
+</a><a href="#h1-0-435" id="h1-0-435" class="i">+    url: function() {
+</a><a href="#h1-0-436" id="h1-0-436" class="i">+      var base = getValue(this, &#39;urlRoot&#39;) || getValue(this.collection, &#39;url&#39;) || urlError();
+</a><a href="#h1-0-437" id="h1-0-437" class="i">+      if (this.isNew()) return base;
+</a><a href="#h1-0-438" id="h1-0-438" class="i">+      return base + (base.charAt(base.length - 1) == &#39;/&#39; ? &#39;&#39; : &#39;/&#39;) + encodeURIComponent(this.id);
+</a><a href="#h1-0-439" id="h1-0-439" class="i">+    },
+</a><a href="#h1-0-440" id="h1-0-440" class="i">+
+</a><a href="#h1-0-441" id="h1-0-441" class="i">+    // **parse** converts a response into the hash of attributes to be `set` on
+</a><a href="#h1-0-442" id="h1-0-442" class="i">+    // the model. The default implementation is just to pass the response along.
+</a><a href="#h1-0-443" id="h1-0-443" class="i">+    parse: function(resp, xhr) {
+</a><a href="#h1-0-444" id="h1-0-444" class="i">+      return resp;
+</a><a href="#h1-0-445" id="h1-0-445" class="i">+    },
+</a><a href="#h1-0-446" id="h1-0-446" class="i">+
+</a><a href="#h1-0-447" id="h1-0-447" class="i">+    // Create a new model with identical attributes to this one.
+</a><a href="#h1-0-448" id="h1-0-448" class="i">+    clone: function() {
+</a><a href="#h1-0-449" id="h1-0-449" class="i">+      return new this.constructor(this.attributes);
+</a><a href="#h1-0-450" id="h1-0-450" class="i">+    },
+</a><a href="#h1-0-451" id="h1-0-451" class="i">+
+</a><a href="#h1-0-452" id="h1-0-452" class="i">+    // A model is new if it has never been saved to the server, and lacks an id.
+</a><a href="#h1-0-453" id="h1-0-453" class="i">+    isNew: function() {
+</a><a href="#h1-0-454" id="h1-0-454" class="i">+      return this.id == null;
+</a><a href="#h1-0-455" id="h1-0-455" class="i">+    },
+</a><a href="#h1-0-456" id="h1-0-456" class="i">+
+</a><a href="#h1-0-457" id="h1-0-457" class="i">+    // Call this method to manually fire a `&quot;change&quot;` event for this model and
+</a><a href="#h1-0-458" id="h1-0-458" class="i">+    // a `&quot;change:attribute&quot;` event for each changed attribute.
+</a><a href="#h1-0-459" id="h1-0-459" class="i">+    // Calling this will cause all objects observing the model to update.
+</a><a href="#h1-0-460" id="h1-0-460" class="i">+    change: function(options) {
+</a><a href="#h1-0-461" id="h1-0-461" class="i">+      options || (options = {});
+</a><a href="#h1-0-462" id="h1-0-462" class="i">+      var changing = this._changing;
+</a><a href="#h1-0-463" id="h1-0-463" class="i">+      this._changing = true;
+</a><a href="#h1-0-464" id="h1-0-464" class="i">+
+</a><a href="#h1-0-465" id="h1-0-465" class="i">+      // Silent changes become pending changes.
+</a><a href="#h1-0-466" id="h1-0-466" class="i">+      for (var attr in this._silent) this._pending[attr] = true;
+</a><a href="#h1-0-467" id="h1-0-467" class="i">+
+</a><a href="#h1-0-468" id="h1-0-468" class="i">+      // Silent changes are triggered.
+</a><a href="#h1-0-469" id="h1-0-469" class="i">+      var changes = _.extend({}, options.changes, this._silent);
+</a><a href="#h1-0-470" id="h1-0-470" class="i">+      this._silent = {};
+</a><a href="#h1-0-471" id="h1-0-471" class="i">+      for (var attr in changes) {
+</a><a href="#h1-0-472" id="h1-0-472" class="i">+        this.trigger(&#39;change:&#39; + attr, this, this.get(attr), options);
+</a><a href="#h1-0-473" id="h1-0-473" class="i">+      }
+</a><a href="#h1-0-474" id="h1-0-474" class="i">+      if (changing) return this;
+</a><a href="#h1-0-475" id="h1-0-475" class="i">+
+</a><a href="#h1-0-476" id="h1-0-476" class="i">+      // Continue firing `&quot;change&quot;` events while there are pending changes.
+</a><a href="#h1-0-477" id="h1-0-477" class="i">+      while (!_.isEmpty(this._pending)) {
+</a><a href="#h1-0-478" id="h1-0-478" class="i">+        this._pending = {};
+</a><a href="#h1-0-479" id="h1-0-479" class="i">+        this.trigger(&#39;change&#39;, this, options);
+</a><a href="#h1-0-480" id="h1-0-480" class="i">+        // Pending and silent changes still remain.
+</a><a href="#h1-0-481" id="h1-0-481" class="i">+        for (var attr in this.changed) {
+</a><a href="#h1-0-482" id="h1-0-482" class="i">+          if (this._pending[attr] || this._silent[attr]) continue;
+</a><a href="#h1-0-483" id="h1-0-483" class="i">+          delete this.changed[attr];
+</a><a href="#h1-0-484" id="h1-0-484" class="i">+        }
+</a><a href="#h1-0-485" id="h1-0-485" class="i">+        this._previousAttributes = _.clone(this.attributes);
+</a><a href="#h1-0-486" id="h1-0-486" class="i">+      }
+</a><a href="#h1-0-487" id="h1-0-487" class="i">+
+</a><a href="#h1-0-488" id="h1-0-488" class="i">+      this._changing = false;
+</a><a href="#h1-0-489" id="h1-0-489" class="i">+      return this;
+</a><a href="#h1-0-490" id="h1-0-490" class="i">+    },
+</a><a href="#h1-0-491" id="h1-0-491" class="i">+
+</a><a href="#h1-0-492" id="h1-0-492" class="i">+    // Determine if the model has changed since the last `&quot;change&quot;` event.
+</a><a href="#h1-0-493" id="h1-0-493" class="i">+    // If you specify an attribute name, determine if that attribute has changed.
+</a><a href="#h1-0-494" id="h1-0-494" class="i">+    hasChanged: function(attr) {
+</a><a href="#h1-0-495" id="h1-0-495" class="i">+      if (!arguments.length) return !_.isEmpty(this.changed);
+</a><a href="#h1-0-496" id="h1-0-496" class="i">+      return _.has(this.changed, attr);
+</a><a href="#h1-0-497" id="h1-0-497" class="i">+    },
+</a><a href="#h1-0-498" id="h1-0-498" class="i">+
+</a><a href="#h1-0-499" id="h1-0-499" class="i">+    // Return an object containing all the attributes that have changed, or
+</a><a href="#h1-0-500" id="h1-0-500" class="i">+    // false if there are no changed attributes. Useful for determining what
+</a><a href="#h1-0-501" id="h1-0-501" class="i">+    // parts of a view need to be updated and/or what attributes need to be
+</a><a href="#h1-0-502" id="h1-0-502" class="i">+    // persisted to the server. Unset attributes will be set to undefined.
+</a><a href="#h1-0-503" id="h1-0-503" class="i">+    // You can also pass an attributes object to diff against the model,
+</a><a href="#h1-0-504" id="h1-0-504" class="i">+    // determining if there *would be* a change.
+</a><a href="#h1-0-505" id="h1-0-505" class="i">+    changedAttributes: function(diff) {
+</a><a href="#h1-0-506" id="h1-0-506" class="i">+      if (!diff) return this.hasChanged() ? _.clone(this.changed) : false;
+</a><a href="#h1-0-507" id="h1-0-507" class="i">+      var val, changed = false, old = this._previousAttributes;
+</a><a href="#h1-0-508" id="h1-0-508" class="i">+      for (var attr in diff) {
+</a><a href="#h1-0-509" id="h1-0-509" class="i">+        if (_.isEqual(old[attr], (val = diff[attr]))) continue;
+</a><a href="#h1-0-510" id="h1-0-510" class="i">+        (changed || (changed = {}))[attr] = val;
+</a><a href="#h1-0-511" id="h1-0-511" class="i">+      }
+</a><a href="#h1-0-512" id="h1-0-512" class="i">+      return changed;
+</a><a href="#h1-0-513" id="h1-0-513" class="i">+    },
+</a><a href="#h1-0-514" id="h1-0-514" class="i">+
+</a><a href="#h1-0-515" id="h1-0-515" class="i">+    // Get the previous value of an attribute, recorded at the time the last
+</a><a href="#h1-0-516" id="h1-0-516" class="i">+    // `&quot;change&quot;` event was fired.
+</a><a href="#h1-0-517" id="h1-0-517" class="i">+    previous: function(attr) {
+</a><a href="#h1-0-518" id="h1-0-518" class="i">+      if (!arguments.length || !this._previousAttributes) return null;
+</a><a href="#h1-0-519" id="h1-0-519" class="i">+      return this._previousAttributes[attr];
+</a><a href="#h1-0-520" id="h1-0-520" class="i">+    },
+</a><a href="#h1-0-521" id="h1-0-521" class="i">+
+</a><a href="#h1-0-522" id="h1-0-522" class="i">+    // Get all of the attributes of the model at the time of the previous
+</a><a href="#h1-0-523" id="h1-0-523" class="i">+    // `&quot;change&quot;` event.
+</a><a href="#h1-0-524" id="h1-0-524" class="i">+    previousAttributes: function() {
+</a><a href="#h1-0-525" id="h1-0-525" class="i">+      return _.clone(this._previousAttributes);
+</a><a href="#h1-0-526" id="h1-0-526" class="i">+    },
+</a><a href="#h1-0-527" id="h1-0-527" class="i">+
+</a><a href="#h1-0-528" id="h1-0-528" class="i">+    // Check if the model is currently in a valid state. It&#39;s only possible to
+</a><a href="#h1-0-529" id="h1-0-529" class="i">+    // get into an *invalid* state if you&#39;re using silent changes.
+</a><a href="#h1-0-530" id="h1-0-530" class="i">+    isValid: function() {
+</a><a href="#h1-0-531" id="h1-0-531" class="i">+      return !this.validate(this.attributes);
+</a><a href="#h1-0-532" id="h1-0-532" class="i">+    },
+</a><a href="#h1-0-533" id="h1-0-533" class="i">+
+</a><a href="#h1-0-534" id="h1-0-534" class="i">+    // Run validation against the next complete set of model attributes,
+</a><a href="#h1-0-535" id="h1-0-535" class="i">+    // returning `true` if all is well. If a specific `error` callback has
+</a><a href="#h1-0-536" id="h1-0-536" class="i">+    // been passed, call that instead of firing the general `&quot;error&quot;` event.
+</a><a href="#h1-0-537" id="h1-0-537" class="i">+    _validate: function(attrs, options) {
+</a><a href="#h1-0-538" id="h1-0-538" class="i">+      if (options.silent || !this.validate) return true;
+</a><a href="#h1-0-539" id="h1-0-539" class="i">+      attrs = _.extend({}, this.attributes, attrs);
+</a><a href="#h1-0-540" id="h1-0-540" class="i">+      var error = this.validate(attrs, options);
+</a><a href="#h1-0-541" id="h1-0-541" class="i">+      if (!error) return true;
+</a><a href="#h1-0-542" id="h1-0-542" class="i">+      if (options &amp;&amp; options.error) {
+</a><a href="#h1-0-543" id="h1-0-543" class="i">+        options.error(this, error, options);
+</a><a href="#h1-0-544" id="h1-0-544" class="i">+      } else {
+</a><a href="#h1-0-545" id="h1-0-545" class="i">+        this.trigger(&#39;error&#39;, this, error, options);
+</a><a href="#h1-0-546" id="h1-0-546" class="i">+      }
+</a><a href="#h1-0-547" id="h1-0-547" class="i">+      return false;
+</a><a href="#h1-0-548" id="h1-0-548" class="i">+    }
+</a><a href="#h1-0-549" id="h1-0-549" class="i">+
+</a><a href="#h1-0-550" id="h1-0-550" class="i">+  });
+</a><a href="#h1-0-551" id="h1-0-551" class="i">+
+</a><a href="#h1-0-552" id="h1-0-552" class="i">+  // Backbone.Collection
+</a><a href="#h1-0-553" id="h1-0-553" class="i">+  // -------------------
+</a><a href="#h1-0-554" id="h1-0-554" class="i">+
+</a><a href="#h1-0-555" id="h1-0-555" class="i">+  // Provides a standard collection class for our sets of models, ordered
+</a><a href="#h1-0-556" id="h1-0-556" class="i">+  // or unordered. If a `comparator` is specified, the Collection will maintain
+</a><a href="#h1-0-557" id="h1-0-557" class="i">+  // its models in sort order, as they&#39;re added and removed.
+</a><a href="#h1-0-558" id="h1-0-558" class="i">+  var Collection = Backbone.Collection = function(models, options) {
+</a><a href="#h1-0-559" id="h1-0-559" class="i">+    options || (options = {});
+</a><a href="#h1-0-560" id="h1-0-560" class="i">+    if (options.model) this.model = options.model;
+</a><a href="#h1-0-561" id="h1-0-561" class="i">+    if (options.comparator) this.comparator = options.comparator;
+</a><a href="#h1-0-562" id="h1-0-562" class="i">+    this._reset();
+</a><a href="#h1-0-563" id="h1-0-563" class="i">+    this.initialize.apply(this, arguments);
+</a><a href="#h1-0-564" id="h1-0-564" class="i">+    if (models) this.reset(models, {silent: true, parse: options.parse});
+</a><a href="#h1-0-565" id="h1-0-565" class="i">+  };
+</a><a href="#h1-0-566" id="h1-0-566" class="i">+
+</a><a href="#h1-0-567" id="h1-0-567" class="i">+  // Define the Collection&#39;s inheritable methods.
+</a><a href="#h1-0-568" id="h1-0-568" class="i">+  _.extend(Collection.prototype, Events, {
+</a><a href="#h1-0-569" id="h1-0-569" class="i">+
+</a><a href="#h1-0-570" id="h1-0-570" class="i">+    // The default model for a collection is just a **Backbone.Model**.
+</a><a href="#h1-0-571" id="h1-0-571" class="i">+    // This should be overridden in most cases.
+</a><a href="#h1-0-572" id="h1-0-572" class="i">+    model: Model,
+</a><a href="#h1-0-573" id="h1-0-573" class="i">+
+</a><a href="#h1-0-574" id="h1-0-574" class="i">+    // Initialize is an empty function by default. Override it with your own
+</a><a href="#h1-0-575" id="h1-0-575" class="i">+    // initialization logic.
+</a><a href="#h1-0-576" id="h1-0-576" class="i">+    initialize: function(){},
+</a><a href="#h1-0-577" id="h1-0-577" class="i">+
+</a><a href="#h1-0-578" id="h1-0-578" class="i">+    // The JSON representation of a Collection is an array of the
+</a><a href="#h1-0-579" id="h1-0-579" class="i">+    // models&#39; attributes.
+</a><a href="#h1-0-580" id="h1-0-580" class="i">+    toJSON: function(options) {
+</a><a href="#h1-0-581" id="h1-0-581" class="i">+      return this.map(function(model){ return model.toJSON(options); });
+</a><a href="#h1-0-582" id="h1-0-582" class="i">+    },
+</a><a href="#h1-0-583" id="h1-0-583" class="i">+
+</a><a href="#h1-0-584" id="h1-0-584" class="i">+    // Add a model, or list of models to the set. Pass **silent** to avoid
+</a><a href="#h1-0-585" id="h1-0-585" class="i">+    // firing the `add` event for every new model.
+</a><a href="#h1-0-586" id="h1-0-586" class="i">+    add: function(models, options) {
+</a><a href="#h1-0-587" id="h1-0-587" class="i">+      var i, index, length, model, cid, id, cids = {}, ids = {}, dups = [];
+</a><a href="#h1-0-588" id="h1-0-588" class="i">+      options || (options = {});
+</a><a href="#h1-0-589" id="h1-0-589" class="i">+      models = _.isArray(models) ? models.slice() : [models];
+</a><a href="#h1-0-590" id="h1-0-590" class="i">+
+</a><a href="#h1-0-591" id="h1-0-591" class="i">+      // Begin by turning bare objects into model references, and preventing
+</a><a href="#h1-0-592" id="h1-0-592" class="i">+      // invalid models or duplicate models from being added.
+</a><a href="#h1-0-593" id="h1-0-593" class="i">+      for (i = 0, length = models.length; i &lt; length; i++) {
+</a><a href="#h1-0-594" id="h1-0-594" class="i">+        if (!(model = models[i] = this._prepareModel(models[i], options))) {
+</a><a href="#h1-0-595" id="h1-0-595" class="i">+          throw new Error(&quot;Can&#39;t add an invalid model to a collection&quot;);
+</a><a href="#h1-0-596" id="h1-0-596" class="i">+        }
+</a><a href="#h1-0-597" id="h1-0-597" class="i">+        cid = model.cid;
+</a><a href="#h1-0-598" id="h1-0-598" class="i">+        id = model.id;
+</a><a href="#h1-0-599" id="h1-0-599" class="i">+        if (cids[cid] || this._byCid[cid] || ((id != null) &amp;&amp; (ids[id] || this._byId[id]))) {
+</a><a href="#h1-0-600" id="h1-0-600" class="i">+          dups.push(i);
+</a><a href="#h1-0-601" id="h1-0-601" class="i">+          continue;
+</a><a href="#h1-0-602" id="h1-0-602" class="i">+        }
+</a><a href="#h1-0-603" id="h1-0-603" class="i">+        cids[cid] = ids[id] = model;
+</a><a href="#h1-0-604" id="h1-0-604" class="i">+      }
+</a><a href="#h1-0-605" id="h1-0-605" class="i">+
+</a><a href="#h1-0-606" id="h1-0-606" class="i">+      // Remove duplicates.
+</a><a href="#h1-0-607" id="h1-0-607" class="i">+      i = dups.length;
+</a><a href="#h1-0-608" id="h1-0-608" class="i">+      while (i--) {
+</a><a href="#h1-0-609" id="h1-0-609" class="i">+        models.splice(dups[i], 1);
+</a><a href="#h1-0-610" id="h1-0-610" class="i">+      }
+</a><a href="#h1-0-611" id="h1-0-611" class="i">+
+</a><a href="#h1-0-612" id="h1-0-612" class="i">+      // Listen to added models&#39; events, and index models for lookup by
+</a><a href="#h1-0-613" id="h1-0-613" class="i">+      // `id` and by `cid`.
+</a><a href="#h1-0-614" id="h1-0-614" class="i">+      for (i = 0, length = models.length; i &lt; length; i++) {
+</a><a href="#h1-0-615" id="h1-0-615" class="i">+        (model = models[i]).on(&#39;all&#39;, this._onModelEvent, this);
+</a><a href="#h1-0-616" id="h1-0-616" class="i">+        this._byCid[model.cid] = model;
+</a><a href="#h1-0-617" id="h1-0-617" class="i">+        if (model.id != null) this._byId[model.id] = model;
+</a><a href="#h1-0-618" id="h1-0-618" class="i">+      }
+</a><a href="#h1-0-619" id="h1-0-619" class="i">+
+</a><a href="#h1-0-620" id="h1-0-620" class="i">+      // Insert models into the collection, re-sorting if needed, and triggering
+</a><a href="#h1-0-621" id="h1-0-621" class="i">+      // `add` events unless silenced.
+</a><a href="#h1-0-622" id="h1-0-622" class="i">+      this.length += length;
+</a><a href="#h1-0-623" id="h1-0-623" class="i">+      index = options.at != null ? options.at : this.models.length;
+</a><a href="#h1-0-624" id="h1-0-624" class="i">+      splice.apply(this.models, [index, 0].concat(models));
+</a><a href="#h1-0-625" id="h1-0-625" class="i">+      if (this.comparator) this.sort({silent: true});
+</a><a href="#h1-0-626" id="h1-0-626" class="i">+      if (options.silent) return this;
+</a><a href="#h1-0-627" id="h1-0-627" class="i">+      for (i = 0, length = this.models.length; i &lt; length; i++) {
+</a><a href="#h1-0-628" id="h1-0-628" class="i">+        if (!cids[(model = this.models[i]).cid]) continue;
+</a><a href="#h1-0-629" id="h1-0-629" class="i">+        options.index = i;
+</a><a href="#h1-0-630" id="h1-0-630" class="i">+        model.trigger(&#39;add&#39;, model, this, options);
+</a><a href="#h1-0-631" id="h1-0-631" class="i">+      }
+</a><a href="#h1-0-632" id="h1-0-632" class="i">+      return this;
+</a><a href="#h1-0-633" id="h1-0-633" class="i">+    },
+</a><a href="#h1-0-634" id="h1-0-634" class="i">+
+</a><a href="#h1-0-635" id="h1-0-635" class="i">+    // Remove a model, or a list of models from the set. Pass silent to avoid
+</a><a href="#h1-0-636" id="h1-0-636" class="i">+    // firing the `remove` event for every model removed.
+</a><a href="#h1-0-637" id="h1-0-637" class="i">+    remove: function(models, options) {
+</a><a href="#h1-0-638" id="h1-0-638" class="i">+      var i, l, index, model;
+</a><a href="#h1-0-639" id="h1-0-639" class="i">+      options || (options = {});
+</a><a href="#h1-0-640" id="h1-0-640" class="i">+      models = _.isArray(models) ? models.slice() : [models];
+</a><a href="#h1-0-641" id="h1-0-641" class="i">+      for (i = 0, l = models.length; i &lt; l; i++) {
+</a><a href="#h1-0-642" id="h1-0-642" class="i">+        model = this.getByCid(models[i]) || this.get(models[i]);
+</a><a href="#h1-0-643" id="h1-0-643" class="i">+        if (!model) continue;
+</a><a href="#h1-0-644" id="h1-0-644" class="i">+        delete this._byId[model.id];
+</a><a href="#h1-0-645" id="h1-0-645" class="i">+        delete this._byCid[model.cid];
+</a><a href="#h1-0-646" id="h1-0-646" class="i">+        index = this.indexOf(model);
+</a><a href="#h1-0-647" id="h1-0-647" class="i">+        this.models.splice(index, 1);
+</a><a href="#h1-0-648" id="h1-0-648" class="i">+        this.length--;
+</a><a href="#h1-0-649" id="h1-0-649" class="i">+        if (!options.silent) {
+</a><a href="#h1-0-650" id="h1-0-650" class="i">+          options.index = index;
+</a><a href="#h1-0-651" id="h1-0-651" class="i">+          model.trigger(&#39;remove&#39;, model, this, options);
+</a><a href="#h1-0-652" id="h1-0-652" class="i">+        }
+</a><a href="#h1-0-653" id="h1-0-653" class="i">+        this._removeReference(model);
+</a><a href="#h1-0-654" id="h1-0-654" class="i">+      }
+</a><a href="#h1-0-655" id="h1-0-655" class="i">+      return this;
+</a><a href="#h1-0-656" id="h1-0-656" class="i">+    },
+</a><a href="#h1-0-657" id="h1-0-657" class="i">+
+</a><a href="#h1-0-658" id="h1-0-658" class="i">+    // Add a model to the end of the collection.
+</a><a href="#h1-0-659" id="h1-0-659" class="i">+    push: function(model, options) {
+</a><a href="#h1-0-660" id="h1-0-660" class="i">+      model = this._prepareModel(model, options);
+</a><a href="#h1-0-661" id="h1-0-661" class="i">+      this.add(model, options);
+</a><a href="#h1-0-662" id="h1-0-662" class="i">+      return model;
+</a><a href="#h1-0-663" id="h1-0-663" class="i">+    },
+</a><a href="#h1-0-664" id="h1-0-664" class="i">+
+</a><a href="#h1-0-665" id="h1-0-665" class="i">+    // Remove a model from the end of the collection.
+</a><a href="#h1-0-666" id="h1-0-666" class="i">+    pop: function(options) {
+</a><a href="#h1-0-667" id="h1-0-667" class="i">+      var model = this.at(this.length - 1);
+</a><a href="#h1-0-668" id="h1-0-668" class="i">+      this.remove(model, options);
+</a><a href="#h1-0-669" id="h1-0-669" class="i">+      return model;
+</a><a href="#h1-0-670" id="h1-0-670" class="i">+    },
+</a><a href="#h1-0-671" id="h1-0-671" class="i">+
+</a><a href="#h1-0-672" id="h1-0-672" class="i">+    // Add a model to the beginning of the collection.
+</a><a href="#h1-0-673" id="h1-0-673" class="i">+    unshift: function(model, options) {
+</a><a href="#h1-0-674" id="h1-0-674" class="i">+      model = this._prepareModel(model, options);
+</a><a href="#h1-0-675" id="h1-0-675" class="i">+      this.add(model, _.extend({at: 0}, options));
+</a><a href="#h1-0-676" id="h1-0-676" class="i">+      return model;
+</a><a href="#h1-0-677" id="h1-0-677" class="i">+    },
+</a><a href="#h1-0-678" id="h1-0-678" class="i">+
+</a><a href="#h1-0-679" id="h1-0-679" class="i">+    // Remove a model from the beginning of the collection.
+</a><a href="#h1-0-680" id="h1-0-680" class="i">+    shift: function(options) {
+</a><a href="#h1-0-681" id="h1-0-681" class="i">+      var model = this.at(0);
+</a><a href="#h1-0-682" id="h1-0-682" class="i">+      this.remove(model, options);
+</a><a href="#h1-0-683" id="h1-0-683" class="i">+      return model;
+</a><a href="#h1-0-684" id="h1-0-684" class="i">+    },
+</a><a href="#h1-0-685" id="h1-0-685" class="i">+
+</a><a href="#h1-0-686" id="h1-0-686" class="i">+    // Get a model from the set by id.
+</a><a href="#h1-0-687" id="h1-0-687" class="i">+    get: function(id) {
+</a><a href="#h1-0-688" id="h1-0-688" class="i">+      if (id == null) return void 0;
+</a><a href="#h1-0-689" id="h1-0-689" class="i">+      return this._byId[id.id != null ? id.id : id];
+</a><a href="#h1-0-690" id="h1-0-690" class="i">+    },
+</a><a href="#h1-0-691" id="h1-0-691" class="i">+
+</a><a href="#h1-0-692" id="h1-0-692" class="i">+    // Get a model from the set by client id.
+</a><a href="#h1-0-693" id="h1-0-693" class="i">+    getByCid: function(cid) {
+</a><a href="#h1-0-694" id="h1-0-694" class="i">+      return cid &amp;&amp; this._byCid[cid.cid || cid];
+</a><a href="#h1-0-695" id="h1-0-695" class="i">+    },
+</a><a href="#h1-0-696" id="h1-0-696" class="i">+
+</a><a href="#h1-0-697" id="h1-0-697" class="i">+    // Get the model at the given index.
+</a><a href="#h1-0-698" id="h1-0-698" class="i">+    at: function(index) {
+</a><a href="#h1-0-699" id="h1-0-699" class="i">+      return this.models[index];
+</a><a href="#h1-0-700" id="h1-0-700" class="i">+    },
+</a><a href="#h1-0-701" id="h1-0-701" class="i">+
+</a><a href="#h1-0-702" id="h1-0-702" class="i">+    // Return models with matching attributes. Useful for simple cases of `filter`.
+</a><a href="#h1-0-703" id="h1-0-703" class="i">+    where: function(attrs) {
+</a><a href="#h1-0-704" id="h1-0-704" class="i">+      if (_.isEmpty(attrs)) return [];
+</a><a href="#h1-0-705" id="h1-0-705" class="i">+      return this.filter(function(model) {
+</a><a href="#h1-0-706" id="h1-0-706" class="i">+        for (var key in attrs) {
+</a><a href="#h1-0-707" id="h1-0-707" class="i">+          if (attrs[key] !== model.get(key)) return false;
+</a><a href="#h1-0-708" id="h1-0-708" class="i">+        }
+</a><a href="#h1-0-709" id="h1-0-709" class="i">+        return true;
+</a><a href="#h1-0-710" id="h1-0-710" class="i">+      });
+</a><a href="#h1-0-711" id="h1-0-711" class="i">+    },
+</a><a href="#h1-0-712" id="h1-0-712" class="i">+
+</a><a href="#h1-0-713" id="h1-0-713" class="i">+    // Force the collection to re-sort itself. You don&#39;t need to call this under
+</a><a href="#h1-0-714" id="h1-0-714" class="i">+    // normal circumstances, as the set will maintain sort order as each item
+</a><a href="#h1-0-715" id="h1-0-715" class="i">+    // is added.
+</a><a href="#h1-0-716" id="h1-0-716" class="i">+    sort: function(options) {
+</a><a href="#h1-0-717" id="h1-0-717" class="i">+      options || (options = {});
+</a><a href="#h1-0-718" id="h1-0-718" class="i">+      if (!this.comparator) throw new Error(&#39;Cannot sort a set without a comparator&#39;);
+</a><a href="#h1-0-719" id="h1-0-719" class="i">+      var boundComparator = _.bind(this.comparator, this);
+</a><a href="#h1-0-720" id="h1-0-720" class="i">+      if (this.comparator.length == 1) {
+</a><a href="#h1-0-721" id="h1-0-721" class="i">+        this.models = this.sortBy(boundComparator);
+</a><a href="#h1-0-722" id="h1-0-722" class="i">+      } else {
+</a><a href="#h1-0-723" id="h1-0-723" class="i">+        this.models.sort(boundComparator);
+</a><a href="#h1-0-724" id="h1-0-724" class="i">+      }
+</a><a href="#h1-0-725" id="h1-0-725" class="i">+      if (!options.silent) this.trigger(&#39;reset&#39;, this, options);
+</a><a href="#h1-0-726" id="h1-0-726" class="i">+      return this;
+</a><a href="#h1-0-727" id="h1-0-727" class="i">+    },
+</a><a href="#h1-0-728" id="h1-0-728" class="i">+
+</a><a href="#h1-0-729" id="h1-0-729" class="i">+    // Pluck an attribute from each model in the collection.
+</a><a href="#h1-0-730" id="h1-0-730" class="i">+    pluck: function(attr) {
+</a><a href="#h1-0-731" id="h1-0-731" class="i">+      return _.map(this.models, function(model){ return model.get(attr); });
+</a><a href="#h1-0-732" id="h1-0-732" class="i">+    },
+</a><a href="#h1-0-733" id="h1-0-733" class="i">+
+</a><a href="#h1-0-734" id="h1-0-734" class="i">+    // When you have more items than you want to add or remove individually,
+</a><a href="#h1-0-735" id="h1-0-735" class="i">+    // you can reset the entire set with a new list of models, without firing
+</a><a href="#h1-0-736" id="h1-0-736" class="i">+    // any `add` or `remove` events. Fires `reset` when finished.
+</a><a href="#h1-0-737" id="h1-0-737" class="i">+    reset: function(models, options) {
+</a><a href="#h1-0-738" id="h1-0-738" class="i">+      models  || (models = []);
+</a><a href="#h1-0-739" id="h1-0-739" class="i">+      options || (options = {});
+</a><a href="#h1-0-740" id="h1-0-740" class="i">+      for (var i = 0, l = this.models.length; i &lt; l; i++) {
+</a><a href="#h1-0-741" id="h1-0-741" class="i">+        this._removeReference(this.models[i]);
+</a><a href="#h1-0-742" id="h1-0-742" class="i">+      }
+</a><a href="#h1-0-743" id="h1-0-743" class="i">+      this._reset();
+</a><a href="#h1-0-744" id="h1-0-744" class="i">+      this.add(models, _.extend({silent: true}, options));
+</a><a href="#h1-0-745" id="h1-0-745" class="i">+      if (!options.silent) this.trigger(&#39;reset&#39;, this, options);
+</a><a href="#h1-0-746" id="h1-0-746" class="i">+      return this;
+</a><a href="#h1-0-747" id="h1-0-747" class="i">+    },
+</a><a href="#h1-0-748" id="h1-0-748" class="i">+
+</a><a href="#h1-0-749" id="h1-0-749" class="i">+    // Fetch the default set of models for this collection, resetting the
+</a><a href="#h1-0-750" id="h1-0-750" class="i">+    // collection when they arrive. If `add: true` is passed, appends the
+</a><a href="#h1-0-751" id="h1-0-751" class="i">+    // models to the collection instead of resetting.
+</a><a href="#h1-0-752" id="h1-0-752" class="i">+    fetch: function(options) {
+</a><a href="#h1-0-753" id="h1-0-753" class="i">+      options = options ? _.clone(options) : {};
+</a><a href="#h1-0-754" id="h1-0-754" class="i">+      if (options.parse === undefined) options.parse = true;
+</a><a href="#h1-0-755" id="h1-0-755" class="i">+      var collection = this;
+</a><a href="#h1-0-756" id="h1-0-756" class="i">+      var success = options.success;
+</a><a href="#h1-0-757" id="h1-0-757" class="i">+      options.success = function(resp, status, xhr) {
+</a><a href="#h1-0-758" id="h1-0-758" class="i">+        collection[options.add ? &#39;add&#39; : &#39;reset&#39;](collection.parse(resp, xhr), options);
+</a><a href="#h1-0-759" id="h1-0-759" class="i">+        if (success) success(collection, resp);
+</a><a href="#h1-0-760" id="h1-0-760" class="i">+      };
+</a><a href="#h1-0-761" id="h1-0-761" class="i">+      options.error = Backbone.wrapError(options.error, collection, options);
+</a><a href="#h1-0-762" id="h1-0-762" class="i">+      return (this.sync || Backbone.sync).call(this, &#39;read&#39;, this, options);
+</a><a href="#h1-0-763" id="h1-0-763" class="i">+    },
+</a><a href="#h1-0-764" id="h1-0-764" class="i">+
+</a><a href="#h1-0-765" id="h1-0-765" class="i">+    // Create a new instance of a model in this collection. Add the model to the
+</a><a href="#h1-0-766" id="h1-0-766" class="i">+    // collection immediately, unless `wait: true` is passed, in which case we
+</a><a href="#h1-0-767" id="h1-0-767" class="i">+    // wait for the server to agree.
+</a><a href="#h1-0-768" id="h1-0-768" class="i">+    create: function(model, options) {
+</a><a href="#h1-0-769" id="h1-0-769" class="i">+      var coll = this;
+</a><a href="#h1-0-770" id="h1-0-770" class="i">+      options = options ? _.clone(options) : {};
+</a><a href="#h1-0-771" id="h1-0-771" class="i">+      model = this._prepareModel(model, options);
+</a><a href="#h1-0-772" id="h1-0-772" class="i">+      if (!model) return false;
+</a><a href="#h1-0-773" id="h1-0-773" class="i">+      if (!options.wait) coll.add(model, options);
+</a><a href="#h1-0-774" id="h1-0-774" class="i">+      var success = options.success;
+</a><a href="#h1-0-775" id="h1-0-775" class="i">+      options.success = function(nextModel, resp, xhr) {
+</a><a href="#h1-0-776" id="h1-0-776" class="i">+        if (options.wait) coll.add(nextModel, options);
+</a><a href="#h1-0-777" id="h1-0-777" class="i">+        if (success) {
+</a><a href="#h1-0-778" id="h1-0-778" class="i">+          success(nextModel, resp);
+</a><a href="#h1-0-779" id="h1-0-779" class="i">+        } else {
+</a><a href="#h1-0-780" id="h1-0-780" class="i">+          nextModel.trigger(&#39;sync&#39;, model, resp, options);
+</a><a href="#h1-0-781" id="h1-0-781" class="i">+        }
+</a><a href="#h1-0-782" id="h1-0-782" class="i">+      };
+</a><a href="#h1-0-783" id="h1-0-783" class="i">+      model.save(null, options);
+</a><a href="#h1-0-784" id="h1-0-784" class="i">+      return model;
+</a><a href="#h1-0-785" id="h1-0-785" class="i">+    },
+</a><a href="#h1-0-786" id="h1-0-786" class="i">+
+</a><a href="#h1-0-787" id="h1-0-787" class="i">+    // **parse** converts a response into a list of models to be added to the
+</a><a href="#h1-0-788" id="h1-0-788" class="i">+    // collection. The default implementation is just to pass it through.
+</a><a href="#h1-0-789" id="h1-0-789" class="i">+    parse: function(resp, xhr) {
+</a><a href="#h1-0-790" id="h1-0-790" class="i">+      return resp;
+</a><a href="#h1-0-791" id="h1-0-791" class="i">+    },
+</a><a href="#h1-0-792" id="h1-0-792" class="i">+
+</a><a href="#h1-0-793" id="h1-0-793" class="i">+    // Proxy to _&#39;s chain. Can&#39;t be proxied the same way the rest of the
+</a><a href="#h1-0-794" id="h1-0-794" class="i">+    // underscore methods are proxied because it relies on the underscore
+</a><a href="#h1-0-795" id="h1-0-795" class="i">+    // constructor.
+</a><a href="#h1-0-796" id="h1-0-796" class="i">+    chain: function () {
+</a><a href="#h1-0-797" id="h1-0-797" class="i">+      return _(this.models).chain();
+</a><a href="#h1-0-798" id="h1-0-798" class="i">+    },
+</a><a href="#h1-0-799" id="h1-0-799" class="i">+
+</a><a href="#h1-0-800" id="h1-0-800" class="i">+    // Reset all internal state. Called when the collection is reset.
+</a><a href="#h1-0-801" id="h1-0-801" class="i">+    _reset: function(options) {
+</a><a href="#h1-0-802" id="h1-0-802" class="i">+      this.length = 0;
+</a><a href="#h1-0-803" id="h1-0-803" class="i">+      this.models = [];
+</a><a href="#h1-0-804" id="h1-0-804" class="i">+      this._byId  = {};
+</a><a href="#h1-0-805" id="h1-0-805" class="i">+      this._byCid = {};
+</a><a href="#h1-0-806" id="h1-0-806" class="i">+    },
+</a><a href="#h1-0-807" id="h1-0-807" class="i">+
+</a><a href="#h1-0-808" id="h1-0-808" class="i">+    // Prepare a model or hash of attributes to be added to this collection.
+</a><a href="#h1-0-809" id="h1-0-809" class="i">+    _prepareModel: function(model, options) {
+</a><a href="#h1-0-810" id="h1-0-810" class="i">+      options || (options = {});
+</a><a href="#h1-0-811" id="h1-0-811" class="i">+      if (!(model instanceof Model)) {
+</a><a href="#h1-0-812" id="h1-0-812" class="i">+        var attrs = model;
+</a><a href="#h1-0-813" id="h1-0-813" class="i">+        options.collection = this;
+</a><a href="#h1-0-814" id="h1-0-814" class="i">+        model = new this.model(attrs, options);
+</a><a href="#h1-0-815" id="h1-0-815" class="i">+        if (!model._validate(model.attributes, options)) model = false;
+</a><a href="#h1-0-816" id="h1-0-816" class="i">+      } else if (!model.collection) {
+</a><a href="#h1-0-817" id="h1-0-817" class="i">+        model.collection = this;
+</a><a href="#h1-0-818" id="h1-0-818" class="i">+      }
+</a><a href="#h1-0-819" id="h1-0-819" class="i">+      return model;
+</a><a href="#h1-0-820" id="h1-0-820" class="i">+    },
+</a><a href="#h1-0-821" id="h1-0-821" class="i">+
+</a><a href="#h1-0-822" id="h1-0-822" class="i">+    // Internal method to remove a model&#39;s ties to a collection.
+</a><a href="#h1-0-823" id="h1-0-823" class="i">+    _removeReference: function(model) {
+</a><a href="#h1-0-824" id="h1-0-824" class="i">+      if (this == model.collection) {
+</a><a href="#h1-0-825" id="h1-0-825" class="i">+        delete model.collection;
+</a><a href="#h1-0-826" id="h1-0-826" class="i">+      }
+</a><a href="#h1-0-827" id="h1-0-827" class="i">+      model.off(&#39;all&#39;, this._onModelEvent, this);
+</a><a href="#h1-0-828" id="h1-0-828" class="i">+    },
+</a><a href="#h1-0-829" id="h1-0-829" class="i">+
+</a><a href="#h1-0-830" id="h1-0-830" class="i">+    // Internal method called every time a model in the set fires an event.
+</a><a href="#h1-0-831" id="h1-0-831" class="i">+    // Sets need to update their indexes when models change ids. All other
+</a><a href="#h1-0-832" id="h1-0-832" class="i">+    // events simply proxy through. &quot;add&quot; and &quot;remove&quot; events that originate
+</a><a href="#h1-0-833" id="h1-0-833" class="i">+    // in other collections are ignored.
+</a><a href="#h1-0-834" id="h1-0-834" class="i">+    _onModelEvent: function(event, model, collection, options) {
+</a><a href="#h1-0-835" id="h1-0-835" class="i">+      if ((event == &#39;add&#39; || event == &#39;remove&#39;) &amp;&amp; collection != this) return;
+</a><a href="#h1-0-836" id="h1-0-836" class="i">+      if (event == &#39;destroy&#39;) {
+</a><a href="#h1-0-837" id="h1-0-837" class="i">+        this.remove(model, options);
+</a><a href="#h1-0-838" id="h1-0-838" class="i">+      }
+</a><a href="#h1-0-839" id="h1-0-839" class="i">+      if (model &amp;&amp; event === &#39;change:&#39; + model.idAttribute) {
+</a><a href="#h1-0-840" id="h1-0-840" class="i">+        delete this._byId[model.previous(model.idAttribute)];
+</a><a href="#h1-0-841" id="h1-0-841" class="i">+        this._byId[model.id] = model;
+</a><a href="#h1-0-842" id="h1-0-842" class="i">+      }
+</a><a href="#h1-0-843" id="h1-0-843" class="i">+      this.trigger.apply(this, arguments);
+</a><a href="#h1-0-844" id="h1-0-844" class="i">+    }
+</a><a href="#h1-0-845" id="h1-0-845" class="i">+
+</a><a href="#h1-0-846" id="h1-0-846" class="i">+  });
+</a><a href="#h1-0-847" id="h1-0-847" class="i">+
+</a><a href="#h1-0-848" id="h1-0-848" class="i">+  // Underscore methods that we want to implement on the Collection.
+</a><a href="#h1-0-849" id="h1-0-849" class="i">+  var methods = [&#39;forEach&#39;, &#39;each&#39;, &#39;map&#39;, &#39;reduce&#39;, &#39;reduceRight&#39;, &#39;find&#39;,
+</a><a href="#h1-0-850" id="h1-0-850" class="i">+    &#39;detect&#39;, &#39;filter&#39;, &#39;select&#39;, &#39;reject&#39;, &#39;every&#39;, &#39;all&#39;, &#39;some&#39;, &#39;any&#39;,
+</a><a href="#h1-0-851" id="h1-0-851" class="i">+    &#39;include&#39;, &#39;contains&#39;, &#39;invoke&#39;, &#39;max&#39;, &#39;min&#39;, &#39;sortBy&#39;, &#39;sortedIndex&#39;,
+</a><a href="#h1-0-852" id="h1-0-852" class="i">+    &#39;toArray&#39;, &#39;size&#39;, &#39;first&#39;, &#39;initial&#39;, &#39;rest&#39;, &#39;last&#39;, &#39;without&#39;, &#39;indexOf&#39;,
+</a><a href="#h1-0-853" id="h1-0-853" class="i">+    &#39;shuffle&#39;, &#39;lastIndexOf&#39;, &#39;isEmpty&#39;, &#39;groupBy&#39;];
+</a><a href="#h1-0-854" id="h1-0-854" class="i">+
+</a><a href="#h1-0-855" id="h1-0-855" class="i">+  // Mix in each Underscore method as a proxy to `Collection#models`.
+</a><a href="#h1-0-856" id="h1-0-856" class="i">+  _.each(methods, function(method) {
+</a><a href="#h1-0-857" id="h1-0-857" class="i">+    Collection.prototype[method] = function() {
+</a><a href="#h1-0-858" id="h1-0-858" class="i">+      return _[method].apply(_, [this.models].concat(_.toArray(arguments)));
+</a><a href="#h1-0-859" id="h1-0-859" class="i">+    };
+</a><a href="#h1-0-860" id="h1-0-860" class="i">+  });
+</a><a href="#h1-0-861" id="h1-0-861" class="i">+
+</a><a href="#h1-0-862" id="h1-0-862" class="i">+  // Backbone.Router
+</a><a href="#h1-0-863" id="h1-0-863" class="i">+  // -------------------
+</a><a href="#h1-0-864" id="h1-0-864" class="i">+
+</a><a href="#h1-0-865" id="h1-0-865" class="i">+  // Routers map faux-URLs to actions, and fire events when routes are
+</a><a href="#h1-0-866" id="h1-0-866" class="i">+  // matched. Creating a new one sets its `routes` hash, if not set statically.
+</a><a href="#h1-0-867" id="h1-0-867" class="i">+  var Router = Backbone.Router = function(options) {
+</a><a href="#h1-0-868" id="h1-0-868" class="i">+    options || (options = {});
+</a><a href="#h1-0-869" id="h1-0-869" class="i">+    if (options.routes) this.routes = options.routes;
+</a><a href="#h1-0-870" id="h1-0-870" class="i">+    this._bindRoutes();
+</a><a href="#h1-0-871" id="h1-0-871" class="i">+    this.initialize.apply(this, arguments);
+</a><a href="#h1-0-872" id="h1-0-872" class="i">+  };
+</a><a href="#h1-0-873" id="h1-0-873" class="i">+
+</a><a href="#h1-0-874" id="h1-0-874" class="i">+  // Cached regular expressions for matching named param parts and splatted
+</a><a href="#h1-0-875" id="h1-0-875" class="i">+  // parts of route strings.
+</a><a href="#h1-0-876" id="h1-0-876" class="i">+  var namedParam    = /:\w+/g;
+</a><a href="#h1-0-877" id="h1-0-877" class="i">+  var splatParam    = /\*\w+/g;
+</a><a href="#h1-0-878" id="h1-0-878" class="i">+  var escapeRegExp  = /[-[\]{}()+?.,\\^$|#\s]/g;
+</a><a href="#h1-0-879" id="h1-0-879" class="i">+
+</a><a href="#h1-0-880" id="h1-0-880" class="i">+  // Set up all inheritable **Backbone.Router** properties and methods.
+</a><a href="#h1-0-881" id="h1-0-881" class="i">+  _.extend(Router.prototype, Events, {
+</a><a href="#h1-0-882" id="h1-0-882" class="i">+
+</a><a href="#h1-0-883" id="h1-0-883" class="i">+    // Initialize is an empty function by default. Override it with your own
+</a><a href="#h1-0-884" id="h1-0-884" class="i">+    // initialization logic.
+</a><a href="#h1-0-885" id="h1-0-885" class="i">+    initialize: function(){},
+</a><a href="#h1-0-886" id="h1-0-886" class="i">+
+</a><a href="#h1-0-887" id="h1-0-887" class="i">+    // Manually bind a single named route to a callback. For example:
+</a><a href="#h1-0-888" id="h1-0-888" class="i">+    //
+</a><a href="#h1-0-889" id="h1-0-889" class="i">+    //     this.route(&#39;search/:query/p:num&#39;, &#39;search&#39;, function(query, num) {
+</a><a href="#h1-0-890" id="h1-0-890" class="i">+    //       ...
+</a><a href="#h1-0-891" id="h1-0-891" class="i">+    //     });
+</a><a href="#h1-0-892" id="h1-0-892" class="i">+    //
+</a><a href="#h1-0-893" id="h1-0-893" class="i">+    route: function(route, name, callback) {
+</a><a href="#h1-0-894" id="h1-0-894" class="i">+      Backbone.history || (Backbone.history = new History);
+</a><a href="#h1-0-895" id="h1-0-895" class="i">+      if (!_.isRegExp(route)) route = this._routeToRegExp(route);
+</a><a href="#h1-0-896" id="h1-0-896" class="i">+      if (!callback) callback = this[name];
+</a><a href="#h1-0-897" id="h1-0-897" class="i">+      Backbone.history.route(route, _.bind(function(fragment) {
+</a><a href="#h1-0-898" id="h1-0-898" class="i">+        var args = this._extractParameters(route, fragment);
+</a><a href="#h1-0-899" id="h1-0-899" class="i">+        callback &amp;&amp; callback.apply(this, args);
+</a><a href="#h1-0-900" id="h1-0-900" class="i">+        this.trigger.apply(this, [&#39;route:&#39; + name].concat(args));
+</a><a href="#h1-0-901" id="h1-0-901" class="i">+        Backbone.history.trigger(&#39;route&#39;, this, name, args);
+</a><a href="#h1-0-902" id="h1-0-902" class="i">+      }, this));
+</a><a href="#h1-0-903" id="h1-0-903" class="i">+      return this;
+</a><a href="#h1-0-904" id="h1-0-904" class="i">+    },
+</a><a href="#h1-0-905" id="h1-0-905" class="i">+
+</a><a href="#h1-0-906" id="h1-0-906" class="i">+    // Simple proxy to `Backbone.history` to save a fragment into the history.
+</a><a href="#h1-0-907" id="h1-0-907" class="i">+    navigate: function(fragment, options) {
+</a><a href="#h1-0-908" id="h1-0-908" class="i">+      Backbone.history.navigate(fragment, options);
+</a><a href="#h1-0-909" id="h1-0-909" class="i">+    },
+</a><a href="#h1-0-910" id="h1-0-910" class="i">+
+</a><a href="#h1-0-911" id="h1-0-911" class="i">+    // Bind all defined routes to `Backbone.history`. We have to reverse the
+</a><a href="#h1-0-912" id="h1-0-912" class="i">+    // order of the routes here to support behavior where the most general
+</a><a href="#h1-0-913" id="h1-0-913" class="i">+    // routes can be defined at the bottom of the route map.
+</a><a href="#h1-0-914" id="h1-0-914" class="i">+    _bindRoutes: function() {
+</a><a href="#h1-0-915" id="h1-0-915" class="i">+      if (!this.routes) return;
+</a><a href="#h1-0-916" id="h1-0-916" class="i">+      var routes = [];
+</a><a href="#h1-0-917" id="h1-0-917" class="i">+      for (var route in this.routes) {
+</a><a href="#h1-0-918" id="h1-0-918" class="i">+        routes.unshift([route, this.routes[route]]);
+</a><a href="#h1-0-919" id="h1-0-919" class="i">+      }
+</a><a href="#h1-0-920" id="h1-0-920" class="i">+      for (var i = 0, l = routes.length; i &lt; l; i++) {
+</a><a href="#h1-0-921" id="h1-0-921" class="i">+        this.route(routes[i][0], routes[i][1], this[routes[i][1]]);
+</a><a href="#h1-0-922" id="h1-0-922" class="i">+      }
+</a><a href="#h1-0-923" id="h1-0-923" class="i">+    },
+</a><a href="#h1-0-924" id="h1-0-924" class="i">+
+</a><a href="#h1-0-925" id="h1-0-925" class="i">+    // Convert a route string into a regular expression, suitable for matching
+</a><a href="#h1-0-926" id="h1-0-926" class="i">+    // against the current location hash.
+</a><a href="#h1-0-927" id="h1-0-927" class="i">+    _routeToRegExp: function(route) {
+</a><a href="#h1-0-928" id="h1-0-928" class="i">+      route = route.replace(escapeRegExp, &#39;\\$&amp;&#39;)
+</a><a href="#h1-0-929" id="h1-0-929" class="i">+                   .replace(namedParam, &#39;([^\/]+)&#39;)
+</a><a href="#h1-0-930" id="h1-0-930" class="i">+                   .replace(splatParam, &#39;(.*?)&#39;);
+</a><a href="#h1-0-931" id="h1-0-931" class="i">+      return new RegExp(&#39;^&#39; + route + &#39;$&#39;);
+</a><a href="#h1-0-932" id="h1-0-932" class="i">+    },
+</a><a href="#h1-0-933" id="h1-0-933" class="i">+
+</a><a href="#h1-0-934" id="h1-0-934" class="i">+    // Given a route, and a URL fragment that it matches, return the array of
+</a><a href="#h1-0-935" id="h1-0-935" class="i">+    // extracted parameters.
+</a><a href="#h1-0-936" id="h1-0-936" class="i">+    _extractParameters: function(route, fragment) {
+</a><a href="#h1-0-937" id="h1-0-937" class="i">+      return route.exec(fragment).slice(1);
+</a><a href="#h1-0-938" id="h1-0-938" class="i">+    }
+</a><a href="#h1-0-939" id="h1-0-939" class="i">+
+</a><a href="#h1-0-940" id="h1-0-940" class="i">+  });
+</a><a href="#h1-0-941" id="h1-0-941" class="i">+
+</a><a href="#h1-0-942" id="h1-0-942" class="i">+  // Backbone.History
+</a><a href="#h1-0-943" id="h1-0-943" class="i">+  // ----------------
+</a><a href="#h1-0-944" id="h1-0-944" class="i">+
+</a><a href="#h1-0-945" id="h1-0-945" class="i">+  // Handles cross-browser history management, based on URL fragments. If the
+</a><a href="#h1-0-946" id="h1-0-946" class="i">+  // browser does not support `onhashchange`, falls back to polling.
+</a><a href="#h1-0-947" id="h1-0-947" class="i">+  var History = Backbone.History = function() {
+</a><a href="#h1-0-948" id="h1-0-948" class="i">+    this.handlers = [];
+</a><a href="#h1-0-949" id="h1-0-949" class="i">+    _.bindAll(this, &#39;checkUrl&#39;);
+</a><a href="#h1-0-950" id="h1-0-950" class="i">+  };
+</a><a href="#h1-0-951" id="h1-0-951" class="i">+
+</a><a href="#h1-0-952" id="h1-0-952" class="i">+  // Cached regex for cleaning leading hashes and slashes .
+</a><a href="#h1-0-953" id="h1-0-953" class="i">+  var routeStripper = /^[#\/]/;
+</a><a href="#h1-0-954" id="h1-0-954" class="i">+
+</a><a href="#h1-0-955" id="h1-0-955" class="i">+  // Cached regex for detecting MSIE.
+</a><a href="#h1-0-956" id="h1-0-956" class="i">+  var isExplorer = /msie [\w.]+/;
+</a><a href="#h1-0-957" id="h1-0-957" class="i">+
+</a><a href="#h1-0-958" id="h1-0-958" class="i">+  // Has the history handling already been started?
+</a><a href="#h1-0-959" id="h1-0-959" class="i">+  History.started = false;
+</a><a href="#h1-0-960" id="h1-0-960" class="i">+
+</a><a href="#h1-0-961" id="h1-0-961" class="i">+  // Set up all inheritable **Backbone.History** properties and methods.
+</a><a href="#h1-0-962" id="h1-0-962" class="i">+  _.extend(History.prototype, Events, {
+</a><a href="#h1-0-963" id="h1-0-963" class="i">+
+</a><a href="#h1-0-964" id="h1-0-964" class="i">+    // The default interval to poll for hash changes, if necessary, is
+</a><a href="#h1-0-965" id="h1-0-965" class="i">+    // twenty times a second.
+</a><a href="#h1-0-966" id="h1-0-966" class="i">+    interval: 50,
+</a><a href="#h1-0-967" id="h1-0-967" class="i">+
+</a><a href="#h1-0-968" id="h1-0-968" class="i">+    // Gets the true hash value. Cannot use location.hash directly due to bug
+</a><a href="#h1-0-969" id="h1-0-969" class="i">+    // in Firefox where location.hash will always be decoded.
+</a><a href="#h1-0-970" id="h1-0-970" class="i">+    getHash: function(windowOverride) {
+</a><a href="#h1-0-971" id="h1-0-971" class="i">+      var loc = windowOverride ? windowOverride.location : window.location;
+</a><a href="#h1-0-972" id="h1-0-972" class="i">+      var match = loc.href.match(/#(.*)$/);
+</a><a href="#h1-0-973" id="h1-0-973" class="i">+      return match ? match[1] : &#39;&#39;;
+</a><a href="#h1-0-974" id="h1-0-974" class="i">+    },
+</a><a href="#h1-0-975" id="h1-0-975" class="i">+
+</a><a href="#h1-0-976" id="h1-0-976" class="i">+    // Get the cross-browser normalized URL fragment, either from the URL,
+</a><a href="#h1-0-977" id="h1-0-977" class="i">+    // the hash, or the override.
+</a><a href="#h1-0-978" id="h1-0-978" class="i">+    getFragment: function(fragment, forcePushState) {
+</a><a href="#h1-0-979" id="h1-0-979" class="i">+      if (fragment == null) {
+</a><a href="#h1-0-980" id="h1-0-980" class="i">+        if (this._hasPushState || forcePushState) {
+</a><a href="#h1-0-981" id="h1-0-981" class="i">+          fragment = window.location.pathname;
+</a><a href="#h1-0-982" id="h1-0-982" class="i">+          var search = window.location.search;
+</a><a href="#h1-0-983" id="h1-0-983" class="i">+          if (search) fragment += search;
+</a><a href="#h1-0-984" id="h1-0-984" class="i">+        } else {
+</a><a href="#h1-0-985" id="h1-0-985" class="i">+          fragment = this.getHash();
+</a><a href="#h1-0-986" id="h1-0-986" class="i">+        }
+</a><a href="#h1-0-987" id="h1-0-987" class="i">+      }
+</a><a href="#h1-0-988" id="h1-0-988" class="i">+      if (!fragment.indexOf(this.options.root)) fragment = fragment.substr(this.options.root.length);
+</a><a href="#h1-0-989" id="h1-0-989" class="i">+      return fragment.replace(routeStripper, &#39;&#39;);
+</a><a href="#h1-0-990" id="h1-0-990" class="i">+    },
+</a><a href="#h1-0-991" id="h1-0-991" class="i">+
+</a><a href="#h1-0-992" id="h1-0-992" class="i">+    // Start the hash change handling, returning `true` if the current URL matches
+</a><a href="#h1-0-993" id="h1-0-993" class="i">+    // an existing route, and `false` otherwise.
+</a><a href="#h1-0-994" id="h1-0-994" class="i">+    start: function(options) {
+</a><a href="#h1-0-995" id="h1-0-995" class="i">+      if (History.started) throw new Error(&quot;Backbone.history has already been started&quot;);
+</a><a href="#h1-0-996" id="h1-0-996" class="i">+      History.started = true;
+</a><a href="#h1-0-997" id="h1-0-997" class="i">+
+</a><a href="#h1-0-998" id="h1-0-998" class="i">+      // Figure out the initial configuration. Do we need an iframe?
+</a><a href="#h1-0-999" id="h1-0-999" class="i">+      // Is pushState desired ... is it available?
+</a><a href="#h1-0-1000" id="h1-0-1000" class="i">+      this.options          = _.extend({}, {root: &#39;/&#39;}, this.options, options);
+</a><a href="#h1-0-1001" id="h1-0-1001" class="i">+      this._wantsHashChange = this.options.hashChange !== false;
+</a><a href="#h1-0-1002" id="h1-0-1002" class="i">+      this._wantsPushState  = !!this.options.pushState;
+</a><a href="#h1-0-1003" id="h1-0-1003" class="i">+      this._hasPushState    = !!(this.options.pushState &amp;&amp; window.history &amp;&amp; window.history.pushState);
+</a><a href="#h1-0-1004" id="h1-0-1004" class="i">+      var fragment          = this.getFragment();
+</a><a href="#h1-0-1005" id="h1-0-1005" class="i">+      var docMode           = document.documentMode;
+</a><a href="#h1-0-1006" id="h1-0-1006" class="i">+      var oldIE             = (isExplorer.exec(navigator.userAgent.toLowerCase()) &amp;&amp; (!docMode || docMode &lt;= 7));
+</a><a href="#h1-0-1007" id="h1-0-1007" class="i">+
+</a><a href="#h1-0-1008" id="h1-0-1008" class="i">+      if (oldIE) {
+</a><a href="#h1-0-1009" id="h1-0-1009" class="i">+        this.iframe = $(&#39;&lt;iframe src=&quot;javascript:0&quot; tabindex=&quot;-1&quot; /&gt;&#39;).hide().appendTo(&#39;body&#39;)[0].contentWindow;
+</a><a href="#h1-0-1010" id="h1-0-1010" class="i">+        this.navigate(fragment);
+</a><a href="#h1-0-1011" id="h1-0-1011" class="i">+      }
+</a><a href="#h1-0-1012" id="h1-0-1012" class="i">+
+</a><a href="#h1-0-1013" id="h1-0-1013" class="i">+      // Depending on whether we&#39;re using pushState or hashes, and whether
+</a><a href="#h1-0-1014" id="h1-0-1014" class="i">+      // &#39;onhashchange&#39; is supported, determine how we check the URL state.
+</a><a href="#h1-0-1015" id="h1-0-1015" class="i">+      if (this._hasPushState) {
+</a><a href="#h1-0-1016" id="h1-0-1016" class="i">+        $(window).bind(&#39;popstate&#39;, this.checkUrl);
+</a><a href="#h1-0-1017" id="h1-0-1017" class="i">+      } else if (this._wantsHashChange &amp;&amp; (&#39;onhashchange&#39; in window) &amp;&amp; !oldIE) {
+</a><a href="#h1-0-1018" id="h1-0-1018" class="i">+        $(window).bind(&#39;hashchange&#39;, this.checkUrl);
+</a><a href="#h1-0-1019" id="h1-0-1019" class="i">+      } else if (this._wantsHashChange) {
+</a><a href="#h1-0-1020" id="h1-0-1020" class="i">+        this._checkUrlInterval = setInterval(this.checkUrl, this.interval);
+</a><a href="#h1-0-1021" id="h1-0-1021" class="i">+      }
+</a><a href="#h1-0-1022" id="h1-0-1022" class="i">+
+</a><a href="#h1-0-1023" id="h1-0-1023" class="i">+      // Determine if we need to change the base url, for a pushState link
+</a><a href="#h1-0-1024" id="h1-0-1024" class="i">+      // opened by a non-pushState browser.
+</a><a href="#h1-0-1025" id="h1-0-1025" class="i">+      this.fragment = fragment;
+</a><a href="#h1-0-1026" id="h1-0-1026" class="i">+      var loc = window.location;
+</a><a href="#h1-0-1027" id="h1-0-1027" class="i">+      var atRoot  = loc.pathname == this.options.root;
+</a><a href="#h1-0-1028" id="h1-0-1028" class="i">+
+</a><a href="#h1-0-1029" id="h1-0-1029" class="i">+      // If we&#39;ve started off with a route from a `pushState`-enabled browser,
+</a><a href="#h1-0-1030" id="h1-0-1030" class="i">+      // but we&#39;re currently in a browser that doesn&#39;t support it...
+</a><a href="#h1-0-1031" id="h1-0-1031" class="i">+      if (this._wantsHashChange &amp;&amp; this._wantsPushState &amp;&amp; !this._hasPushState &amp;&amp; !atRoot) {
+</a><a href="#h1-0-1032" id="h1-0-1032" class="i">+        this.fragment = this.getFragment(null, true);
+</a><a href="#h1-0-1033" id="h1-0-1033" class="i">+        window.location.replace(this.options.root + &#39;#&#39; + this.fragment);
+</a><a href="#h1-0-1034" id="h1-0-1034" class="i">+        // Return immediately as browser will do redirect to new url
+</a><a href="#h1-0-1035" id="h1-0-1035" class="i">+        return true;
+</a><a href="#h1-0-1036" id="h1-0-1036" class="i">+
+</a><a href="#h1-0-1037" id="h1-0-1037" class="i">+      // Or if we&#39;ve started out with a hash-based route, but we&#39;re currently
+</a><a href="#h1-0-1038" id="h1-0-1038" class="i">+      // in a browser where it could be `pushState`-based instead...
+</a><a href="#h1-0-1039" id="h1-0-1039" class="i">+      } else if (this._wantsPushState &amp;&amp; this._hasPushState &amp;&amp; atRoot &amp;&amp; loc.hash) {
+</a><a href="#h1-0-1040" id="h1-0-1040" class="i">+        this.fragment = this.getHash().replace(routeStripper, &#39;&#39;);
+</a><a href="#h1-0-1041" id="h1-0-1041" class="i">+        window.history.replaceState({}, document.title, loc.protocol + &#39;//&#39; + loc.host + this.options.root + this.fragment);
+</a><a href="#h1-0-1042" id="h1-0-1042" class="i">+      }
+</a><a href="#h1-0-1043" id="h1-0-1043" class="i">+
+</a><a href="#h1-0-1044" id="h1-0-1044" class="i">+      if (!this.options.silent) {
+</a><a href="#h1-0-1045" id="h1-0-1045" class="i">+        return this.loadUrl();
+</a><a href="#h1-0-1046" id="h1-0-1046" class="i">+      }
+</a><a href="#h1-0-1047" id="h1-0-1047" class="i">+    },
+</a><a href="#h1-0-1048" id="h1-0-1048" class="i">+
+</a><a href="#h1-0-1049" id="h1-0-1049" class="i">+    // Disable Backbone.history, perhaps temporarily. Not useful in a real app,
+</a><a href="#h1-0-1050" id="h1-0-1050" class="i">+    // but possibly useful for unit testing Routers.
+</a><a href="#h1-0-1051" id="h1-0-1051" class="i">+    stop: function() {
+</a><a href="#h1-0-1052" id="h1-0-1052" class="i">+      $(window).unbind(&#39;popstate&#39;, this.checkUrl).unbind(&#39;hashchange&#39;, this.checkUrl);
+</a><a href="#h1-0-1053" id="h1-0-1053" class="i">+      clearInterval(this._checkUrlInterval);
+</a><a href="#h1-0-1054" id="h1-0-1054" class="i">+      History.started = false;
+</a><a href="#h1-0-1055" id="h1-0-1055" class="i">+    },
+</a><a href="#h1-0-1056" id="h1-0-1056" class="i">+
+</a><a href="#h1-0-1057" id="h1-0-1057" class="i">+    // Add a route to be tested when the fragment changes. Routes added later
+</a><a href="#h1-0-1058" id="h1-0-1058" class="i">+    // may override previous routes.
+</a><a href="#h1-0-1059" id="h1-0-1059" class="i">+    route: function(route, callback) {
+</a><a href="#h1-0-1060" id="h1-0-1060" class="i">+      this.handlers.unshift({route: route, callback: callback});
+</a><a href="#h1-0-1061" id="h1-0-1061" class="i">+    },
+</a><a href="#h1-0-1062" id="h1-0-1062" class="i">+
+</a><a href="#h1-0-1063" id="h1-0-1063" class="i">+    // Checks the current URL to see if it has changed, and if it has,
+</a><a href="#h1-0-1064" id="h1-0-1064" class="i">+    // calls `loadUrl`, normalizing across the hidden iframe.
+</a><a href="#h1-0-1065" id="h1-0-1065" class="i">+    checkUrl: function(e) {
+</a><a href="#h1-0-1066" id="h1-0-1066" class="i">+      var current = this.getFragment();
+</a><a href="#h1-0-1067" id="h1-0-1067" class="i">+      if (current == this.fragment &amp;&amp; this.iframe) current = this.getFragment(this.getHash(this.iframe));
+</a><a href="#h1-0-1068" id="h1-0-1068" class="i">+      if (current == this.fragment) return false;
+</a><a href="#h1-0-1069" id="h1-0-1069" class="i">+      if (this.iframe) this.navigate(current);
+</a><a href="#h1-0-1070" id="h1-0-1070" class="i">+      this.loadUrl() || this.loadUrl(this.getHash());
+</a><a href="#h1-0-1071" id="h1-0-1071" class="i">+    },
+</a><a href="#h1-0-1072" id="h1-0-1072" class="i">+
+</a><a href="#h1-0-1073" id="h1-0-1073" class="i">+    // Attempt to load the current URL fragment. If a route succeeds with a
+</a><a href="#h1-0-1074" id="h1-0-1074" class="i">+    // match, returns `true`. If no defined routes matches the fragment,
+</a><a href="#h1-0-1075" id="h1-0-1075" class="i">+    // returns `false`.
+</a><a href="#h1-0-1076" id="h1-0-1076" class="i">+    loadUrl: function(fragmentOverride) {
+</a><a href="#h1-0-1077" id="h1-0-1077" class="i">+      var fragment = this.fragment = this.getFragment(fragmentOverride);
+</a><a href="#h1-0-1078" id="h1-0-1078" class="i">+      var matched = _.any(this.handlers, function(handler) {
+</a><a href="#h1-0-1079" id="h1-0-1079" class="i">+        if (handler.route.test(fragment)) {
+</a><a href="#h1-0-1080" id="h1-0-1080" class="i">+          handler.callback(fragment);
+</a><a href="#h1-0-1081" id="h1-0-1081" class="i">+          return true;
+</a><a href="#h1-0-1082" id="h1-0-1082" class="i">+        }
+</a><a href="#h1-0-1083" id="h1-0-1083" class="i">+      });
+</a><a href="#h1-0-1084" id="h1-0-1084" class="i">+      return matched;
+</a><a href="#h1-0-1085" id="h1-0-1085" class="i">+    },
+</a><a href="#h1-0-1086" id="h1-0-1086" class="i">+
+</a><a href="#h1-0-1087" id="h1-0-1087" class="i">+    // Save a fragment into the hash history, or replace the URL state if the
+</a><a href="#h1-0-1088" id="h1-0-1088" class="i">+    // &#39;replace&#39; option is passed. You are responsible for properly URL-encoding
+</a><a href="#h1-0-1089" id="h1-0-1089" class="i">+    // the fragment in advance.
+</a><a href="#h1-0-1090" id="h1-0-1090" class="i">+    //
+</a><a href="#h1-0-1091" id="h1-0-1091" class="i">+    // The options object can contain `trigger: true` if you wish to have the
+</a><a href="#h1-0-1092" id="h1-0-1092" class="i">+    // route callback be fired (not usually desirable), or `replace: true`, if
+</a><a href="#h1-0-1093" id="h1-0-1093" class="i">+    // you wish to modify the current URL without adding an entry to the history.
+</a><a href="#h1-0-1094" id="h1-0-1094" class="i">+    navigate: function(fragment, options) {
+</a><a href="#h1-0-1095" id="h1-0-1095" class="i">+      if (!History.started) return false;
+</a><a href="#h1-0-1096" id="h1-0-1096" class="i">+      if (!options || options === true) options = {trigger: options};
+</a><a href="#h1-0-1097" id="h1-0-1097" class="i">+      var frag = (fragment || &#39;&#39;).replace(routeStripper, &#39;&#39;);
+</a><a href="#h1-0-1098" id="h1-0-1098" class="i">+      if (this.fragment == frag) return;
+</a><a href="#h1-0-1099" id="h1-0-1099" class="i">+
+</a><a href="#h1-0-1100" id="h1-0-1100" class="i">+      // If pushState is available, we use it to set the fragment as a real URL.
+</a><a href="#h1-0-1101" id="h1-0-1101" class="i">+      if (this._hasPushState) {
+</a><a href="#h1-0-1102" id="h1-0-1102" class="i">+        if (frag.indexOf(this.options.root) != 0) frag = this.options.root + frag;
+</a><a href="#h1-0-1103" id="h1-0-1103" class="i">+        this.fragment = frag;
+</a><a href="#h1-0-1104" id="h1-0-1104" class="i">+        window.history[options.replace ? &#39;replaceState&#39; : &#39;pushState&#39;]({}, document.title, frag);
+</a><a href="#h1-0-1105" id="h1-0-1105" class="i">+
+</a><a href="#h1-0-1106" id="h1-0-1106" class="i">+      // If hash changes haven&#39;t been explicitly disabled, update the hash
+</a><a href="#h1-0-1107" id="h1-0-1107" class="i">+      // fragment to store history.
+</a><a href="#h1-0-1108" id="h1-0-1108" class="i">+      } else if (this._wantsHashChange) {
+</a><a href="#h1-0-1109" id="h1-0-1109" class="i">+        this.fragment = frag;
+</a><a href="#h1-0-1110" id="h1-0-1110" class="i">+        this._updateHash(window.location, frag, options.replace);
+</a><a href="#h1-0-1111" id="h1-0-1111" class="i">+        if (this.iframe &amp;&amp; (frag != this.getFragment(this.getHash(this.iframe)))) {
+</a><a href="#h1-0-1112" id="h1-0-1112" class="i">+          // Opening and closing the iframe tricks IE7 and earlier to push a history entry on hash-tag change.
+</a><a href="#h1-0-1113" id="h1-0-1113" class="i">+          // When replace is true, we don&#39;t want this.
+</a><a href="#h1-0-1114" id="h1-0-1114" class="i">+          if(!options.replace) this.iframe.document.open().close();
+</a><a href="#h1-0-1115" id="h1-0-1115" class="i">+          this._updateHash(this.iframe.location, frag, options.replace);
+</a><a href="#h1-0-1116" id="h1-0-1116" class="i">+        }
+</a><a href="#h1-0-1117" id="h1-0-1117" class="i">+
+</a><a href="#h1-0-1118" id="h1-0-1118" class="i">+      // If you&#39;ve told us that you explicitly don&#39;t want fallback hashchange-
+</a><a href="#h1-0-1119" id="h1-0-1119" class="i">+      // based history, then `navigate` becomes a page refresh.
+</a><a href="#h1-0-1120" id="h1-0-1120" class="i">+      } else {
+</a><a href="#h1-0-1121" id="h1-0-1121" class="i">+        window.location.assign(this.options.root + fragment);
+</a><a href="#h1-0-1122" id="h1-0-1122" class="i">+      }
+</a><a href="#h1-0-1123" id="h1-0-1123" class="i">+      if (options.trigger) this.loadUrl(fragment);
+</a><a href="#h1-0-1124" id="h1-0-1124" class="i">+    },
+</a><a href="#h1-0-1125" id="h1-0-1125" class="i">+
+</a><a href="#h1-0-1126" id="h1-0-1126" class="i">+    // Update the hash location, either replacing the current entry, or adding
+</a><a href="#h1-0-1127" id="h1-0-1127" class="i">+    // a new one to the browser history.
+</a><a href="#h1-0-1128" id="h1-0-1128" class="i">+    _updateHash: function(location, fragment, replace) {
+</a><a href="#h1-0-1129" id="h1-0-1129" class="i">+      if (replace) {
+</a><a href="#h1-0-1130" id="h1-0-1130" class="i">+        location.replace(location.toString().replace(/(javascript:|#).*$/, &#39;&#39;) + &#39;#&#39; + fragment);
+</a><a href="#h1-0-1131" id="h1-0-1131" class="i">+      } else {
+</a><a href="#h1-0-1132" id="h1-0-1132" class="i">+        location.hash = fragment;
+</a><a href="#h1-0-1133" id="h1-0-1133" class="i">+      }
+</a><a href="#h1-0-1134" id="h1-0-1134" class="i">+    }
+</a><a href="#h1-0-1135" id="h1-0-1135" class="i">+  });
+</a><a href="#h1-0-1136" id="h1-0-1136" class="i">+
+</a><a href="#h1-0-1137" id="h1-0-1137" class="i">+  // Backbone.View
+</a><a href="#h1-0-1138" id="h1-0-1138" class="i">+  // -------------
+</a><a href="#h1-0-1139" id="h1-0-1139" class="i">+
+</a><a href="#h1-0-1140" id="h1-0-1140" class="i">+  // Creating a Backbone.View creates its initial element outside of the DOM,
+</a><a href="#h1-0-1141" id="h1-0-1141" class="i">+  // if an existing element is not provided...
+</a><a href="#h1-0-1142" id="h1-0-1142" class="i">+  var View = Backbone.View = function(options) {
+</a><a href="#h1-0-1143" id="h1-0-1143" class="i">+    this.cid = _.uniqueId(&#39;view&#39;);
+</a><a href="#h1-0-1144" id="h1-0-1144" class="i">+    this._configure(options || {});
+</a><a href="#h1-0-1145" id="h1-0-1145" class="i">+    this._ensureElement();
+</a><a href="#h1-0-1146" id="h1-0-1146" class="i">+    this.initialize.apply(this, arguments);
+</a><a href="#h1-0-1147" id="h1-0-1147" class="i">+    this.delegateEvents();
+</a><a href="#h1-0-1148" id="h1-0-1148" class="i">+  };
+</a><a href="#h1-0-1149" id="h1-0-1149" class="i">+
+</a><a href="#h1-0-1150" id="h1-0-1150" class="i">+  // Cached regex to split keys for `delegate`.
+</a><a href="#h1-0-1151" id="h1-0-1151" class="i">+  var delegateEventSplitter = /^(\S+)\s*(.*)$/;
+</a><a href="#h1-0-1152" id="h1-0-1152" class="i">+
+</a><a href="#h1-0-1153" id="h1-0-1153" class="i">+  // List of view options to be merged as properties.
+</a><a href="#h1-0-1154" id="h1-0-1154" class="i">+  var viewOptions = [&#39;model&#39;, &#39;collection&#39;, &#39;el&#39;, &#39;id&#39;, &#39;attributes&#39;, &#39;className&#39;, &#39;tagName&#39;];
+</a><a href="#h1-0-1155" id="h1-0-1155" class="i">+
+</a><a href="#h1-0-1156" id="h1-0-1156" class="i">+  // Set up all inheritable **Backbone.View** properties and methods.
+</a><a href="#h1-0-1157" id="h1-0-1157" class="i">+  _.extend(View.prototype, Events, {
+</a><a href="#h1-0-1158" id="h1-0-1158" class="i">+
+</a><a href="#h1-0-1159" id="h1-0-1159" class="i">+    // The default `tagName` of a View&#39;s element is `&quot;div&quot;`.
+</a><a href="#h1-0-1160" id="h1-0-1160" class="i">+    tagName: &#39;div&#39;,
+</a><a href="#h1-0-1161" id="h1-0-1161" class="i">+
+</a><a href="#h1-0-1162" id="h1-0-1162" class="i">+    // jQuery delegate for element lookup, scoped to DOM elements within the
+</a><a href="#h1-0-1163" id="h1-0-1163" class="i">+    // current view. This should be prefered to global lookups where possible.
+</a><a href="#h1-0-1164" id="h1-0-1164" class="i">+    $: function(selector) {
+</a><a href="#h1-0-1165" id="h1-0-1165" class="i">+      return this.$el.find(selector);
+</a><a href="#h1-0-1166" id="h1-0-1166" class="i">+    },
+</a><a href="#h1-0-1167" id="h1-0-1167" class="i">+
+</a><a href="#h1-0-1168" id="h1-0-1168" class="i">+    // Initialize is an empty function by default. Override it with your own
+</a><a href="#h1-0-1169" id="h1-0-1169" class="i">+    // initialization logic.
+</a><a href="#h1-0-1170" id="h1-0-1170" class="i">+    initialize: function(){},
+</a><a href="#h1-0-1171" id="h1-0-1171" class="i">+
+</a><a href="#h1-0-1172" id="h1-0-1172" class="i">+    // **render** is the core function that your view should override, in order
+</a><a href="#h1-0-1173" id="h1-0-1173" class="i">+    // to populate its element (`this.el`), with the appropriate HTML. The
+</a><a href="#h1-0-1174" id="h1-0-1174" class="i">+    // convention is for **render** to always return `this`.
+</a><a href="#h1-0-1175" id="h1-0-1175" class="i">+    render: function() {
+</a><a href="#h1-0-1176" id="h1-0-1176" class="i">+      return this;
+</a><a href="#h1-0-1177" id="h1-0-1177" class="i">+    },
+</a><a href="#h1-0-1178" id="h1-0-1178" class="i">+
+</a><a href="#h1-0-1179" id="h1-0-1179" class="i">+    // Remove this view from the DOM. Note that the view isn&#39;t present in the
+</a><a href="#h1-0-1180" id="h1-0-1180" class="i">+    // DOM by default, so calling this method may be a no-op.
+</a><a href="#h1-0-1181" id="h1-0-1181" class="i">+    remove: function() {
+</a><a href="#h1-0-1182" id="h1-0-1182" class="i">+      this.$el.remove();
+</a><a href="#h1-0-1183" id="h1-0-1183" class="i">+      return this;
+</a><a href="#h1-0-1184" id="h1-0-1184" class="i">+    },
+</a><a href="#h1-0-1185" id="h1-0-1185" class="i">+
+</a><a href="#h1-0-1186" id="h1-0-1186" class="i">+    // For small amounts of DOM Elements, where a full-blown template isn&#39;t
+</a><a href="#h1-0-1187" id="h1-0-1187" class="i">+    // needed, use **make** to manufacture elements, one at a time.
+</a><a href="#h1-0-1188" id="h1-0-1188" class="i">+    //
+</a><a href="#h1-0-1189" id="h1-0-1189" class="i">+    //     var el = this.make(&#39;li&#39;, {&#39;class&#39;: &#39;row&#39;}, this.model.escape(&#39;title&#39;));
+</a><a href="#h1-0-1190" id="h1-0-1190" class="i">+    //
+</a><a href="#h1-0-1191" id="h1-0-1191" class="i">+    make: function(tagName, attributes, content) {
+</a><a href="#h1-0-1192" id="h1-0-1192" class="i">+      var el = document.createElement(tagName);
+</a><a href="#h1-0-1193" id="h1-0-1193" class="i">+      if (attributes) $(el).attr(attributes);
+</a><a href="#h1-0-1194" id="h1-0-1194" class="i">+      if (content) $(el).html(content);
+</a><a href="#h1-0-1195" id="h1-0-1195" class="i">+      return el;
+</a><a href="#h1-0-1196" id="h1-0-1196" class="i">+    },
+</a><a href="#h1-0-1197" id="h1-0-1197" class="i">+
+</a><a href="#h1-0-1198" id="h1-0-1198" class="i">+    // Change the view&#39;s element (`this.el` property), including event
+</a><a href="#h1-0-1199" id="h1-0-1199" class="i">+    // re-delegation.
+</a><a href="#h1-0-1200" id="h1-0-1200" class="i">+    setElement: function(element, delegate) {
+</a><a href="#h1-0-1201" id="h1-0-1201" class="i">+      if (this.$el) this.undelegateEvents();
+</a><a href="#h1-0-1202" id="h1-0-1202" class="i">+      this.$el = (element instanceof $) ? element : $(element);
+</a><a href="#h1-0-1203" id="h1-0-1203" class="i">+      this.el = this.$el[0];
+</a><a href="#h1-0-1204" id="h1-0-1204" class="i">+      if (delegate !== false) this.delegateEvents();
+</a><a href="#h1-0-1205" id="h1-0-1205" class="i">+      return this;
+</a><a href="#h1-0-1206" id="h1-0-1206" class="i">+    },
+</a><a href="#h1-0-1207" id="h1-0-1207" class="i">+
+</a><a href="#h1-0-1208" id="h1-0-1208" class="i">+    // Set callbacks, where `this.events` is a hash of
+</a><a href="#h1-0-1209" id="h1-0-1209" class="i">+    //
+</a><a href="#h1-0-1210" id="h1-0-1210" class="i">+    // *{&quot;event selector&quot;: &quot;callback&quot;}*
+</a><a href="#h1-0-1211" id="h1-0-1211" class="i">+    //
+</a><a href="#h1-0-1212" id="h1-0-1212" class="i">+    //     {
+</a><a href="#h1-0-1213" id="h1-0-1213" class="i">+    //       &#39;mousedown .title&#39;:  &#39;edit&#39;,
+</a><a href="#h1-0-1214" id="h1-0-1214" class="i">+    //       &#39;click .button&#39;:     &#39;save&#39;
+</a><a href="#h1-0-1215" id="h1-0-1215" class="i">+    //       &#39;click .open&#39;:       function(e) { ... }
+</a><a href="#h1-0-1216" id="h1-0-1216" class="i">+    //     }
+</a><a href="#h1-0-1217" id="h1-0-1217" class="i">+    //
+</a><a href="#h1-0-1218" id="h1-0-1218" class="i">+    // pairs. Callbacks will be bound to the view, with `this` set properly.
+</a><a href="#h1-0-1219" id="h1-0-1219" class="i">+    // Uses event delegation for efficiency.
+</a><a href="#h1-0-1220" id="h1-0-1220" class="i">+    // Omitting the selector binds the event to `this.el`.
+</a><a href="#h1-0-1221" id="h1-0-1221" class="i">+    // This only works for delegate-able events: not `focus`, `blur`, and
+</a><a href="#h1-0-1222" id="h1-0-1222" class="i">+    // not `change`, `submit`, and `reset` in Internet Explorer.
+</a><a href="#h1-0-1223" id="h1-0-1223" class="i">+    delegateEvents: function(events) {
+</a><a href="#h1-0-1224" id="h1-0-1224" class="i">+      if (!(events || (events = getValue(this, &#39;events&#39;)))) return;
+</a><a href="#h1-0-1225" id="h1-0-1225" class="i">+      this.undelegateEvents();
+</a><a href="#h1-0-1226" id="h1-0-1226" class="i">+      for (var key in events) {
+</a><a href="#h1-0-1227" id="h1-0-1227" class="i">+        var method = events[key];
+</a><a href="#h1-0-1228" id="h1-0-1228" class="i">+        if (!_.isFunction(method)) method = this[events[key]];
+</a><a href="#h1-0-1229" id="h1-0-1229" class="i">+        if (!method) throw new Error(&#39;Method &quot;&#39; + events[key] + &#39;&quot; does not exist&#39;);
+</a><a href="#h1-0-1230" id="h1-0-1230" class="i">+        var match = key.match(delegateEventSplitter);
+</a><a href="#h1-0-1231" id="h1-0-1231" class="i">+        var eventName = match[1], selector = match[2];
+</a><a href="#h1-0-1232" id="h1-0-1232" class="i">+        method = _.bind(method, this);
+</a><a href="#h1-0-1233" id="h1-0-1233" class="i">+        eventName += &#39;.delegateEvents&#39; + this.cid;
+</a><a href="#h1-0-1234" id="h1-0-1234" class="i">+        if (selector === &#39;&#39;) {
+</a><a href="#h1-0-1235" id="h1-0-1235" class="i">+          this.$el.bind(eventName, method);
+</a><a href="#h1-0-1236" id="h1-0-1236" class="i">+        } else {
+</a><a href="#h1-0-1237" id="h1-0-1237" class="i">+          this.$el.delegate(selector, eventName, method);
+</a><a href="#h1-0-1238" id="h1-0-1238" class="i">+        }
+</a><a href="#h1-0-1239" id="h1-0-1239" class="i">+      }
+</a><a href="#h1-0-1240" id="h1-0-1240" class="i">+    },
+</a><a href="#h1-0-1241" id="h1-0-1241" class="i">+
+</a><a href="#h1-0-1242" id="h1-0-1242" class="i">+    // Clears all callbacks previously bound to the view with `delegateEvents`.
+</a><a href="#h1-0-1243" id="h1-0-1243" class="i">+    // You usually don&#39;t need to use this, but may wish to if you have multiple
+</a><a href="#h1-0-1244" id="h1-0-1244" class="i">+    // Backbone views attached to the same DOM element.
+</a><a href="#h1-0-1245" id="h1-0-1245" class="i">+    undelegateEvents: function() {
+</a><a href="#h1-0-1246" id="h1-0-1246" class="i">+      this.$el.unbind(&#39;.delegateEvents&#39; + this.cid);
+</a><a href="#h1-0-1247" id="h1-0-1247" class="i">+    },
+</a><a href="#h1-0-1248" id="h1-0-1248" class="i">+
+</a><a href="#h1-0-1249" id="h1-0-1249" class="i">+    // Performs the initial configuration of a View with a set of options.
+</a><a href="#h1-0-1250" id="h1-0-1250" class="i">+    // Keys with special meaning *(model, collection, id, className)*, are
+</a><a href="#h1-0-1251" id="h1-0-1251" class="i">+    // attached directly to the view.
+</a><a href="#h1-0-1252" id="h1-0-1252" class="i">+    _configure: function(options) {
+</a><a href="#h1-0-1253" id="h1-0-1253" class="i">+      if (this.options) options = _.extend({}, this.options, options);
+</a><a href="#h1-0-1254" id="h1-0-1254" class="i">+      for (var i = 0, l = viewOptions.length; i &lt; l; i++) {
+</a><a href="#h1-0-1255" id="h1-0-1255" class="i">+        var attr = viewOptions[i];
+</a><a href="#h1-0-1256" id="h1-0-1256" class="i">+        if (options[attr]) this[attr] = options[attr];
+</a><a href="#h1-0-1257" id="h1-0-1257" class="i">+      }
+</a><a href="#h1-0-1258" id="h1-0-1258" class="i">+      this.options = options;
+</a><a href="#h1-0-1259" id="h1-0-1259" class="i">+    },
+</a><a href="#h1-0-1260" id="h1-0-1260" class="i">+
+</a><a href="#h1-0-1261" id="h1-0-1261" class="i">+    // Ensure that the View has a DOM element to render into.
+</a><a href="#h1-0-1262" id="h1-0-1262" class="i">+    // If `this.el` is a string, pass it through `$()`, take the first
+</a><a href="#h1-0-1263" id="h1-0-1263" class="i">+    // matching element, and re-assign it to `el`. Otherwise, create
+</a><a href="#h1-0-1264" id="h1-0-1264" class="i">+    // an element from the `id`, `className` and `tagName` properties.
+</a><a href="#h1-0-1265" id="h1-0-1265" class="i">+    _ensureElement: function() {
+</a><a href="#h1-0-1266" id="h1-0-1266" class="i">+      if (!this.el) {
+</a><a href="#h1-0-1267" id="h1-0-1267" class="i">+        var attrs = getValue(this, &#39;attributes&#39;) || {};
+</a><a href="#h1-0-1268" id="h1-0-1268" class="i">+        if (this.id) attrs.id = this.id;
+</a><a href="#h1-0-1269" id="h1-0-1269" class="i">+        if (this.className) attrs[&#39;class&#39;] = this.className;
+</a><a href="#h1-0-1270" id="h1-0-1270" class="i">+        this.setElement(this.make(this.tagName, attrs), false);
+</a><a href="#h1-0-1271" id="h1-0-1271" class="i">+      } else {
+</a><a href="#h1-0-1272" id="h1-0-1272" class="i">+        this.setElement(this.el, false);
+</a><a href="#h1-0-1273" id="h1-0-1273" class="i">+      }
+</a><a href="#h1-0-1274" id="h1-0-1274" class="i">+    }
+</a><a href="#h1-0-1275" id="h1-0-1275" class="i">+
+</a><a href="#h1-0-1276" id="h1-0-1276" class="i">+  });
+</a><a href="#h1-0-1277" id="h1-0-1277" class="i">+
+</a><a href="#h1-0-1278" id="h1-0-1278" class="i">+  // The self-propagating extend function that Backbone classes use.
+</a><a href="#h1-0-1279" id="h1-0-1279" class="i">+  var extend = function (protoProps, classProps) {
+</a><a href="#h1-0-1280" id="h1-0-1280" class="i">+    var child = inherits(this, protoProps, classProps);
+</a><a href="#h1-0-1281" id="h1-0-1281" class="i">+    child.extend = this.extend;
+</a><a href="#h1-0-1282" id="h1-0-1282" class="i">+    return child;
+</a><a href="#h1-0-1283" id="h1-0-1283" class="i">+  };
+</a><a href="#h1-0-1284" id="h1-0-1284" class="i">+
+</a><a href="#h1-0-1285" id="h1-0-1285" class="i">+  // Set up inheritance for the model, collection, and view.
+</a><a href="#h1-0-1286" id="h1-0-1286" class="i">+  Model.extend = Collection.extend = Router.extend = View.extend = extend;
+</a><a href="#h1-0-1287" id="h1-0-1287" class="i">+
+</a><a href="#h1-0-1288" id="h1-0-1288" class="i">+  // Backbone.sync
+</a><a href="#h1-0-1289" id="h1-0-1289" class="i">+  // -------------
+</a><a href="#h1-0-1290" id="h1-0-1290" class="i">+
+</a><a href="#h1-0-1291" id="h1-0-1291" class="i">+  // Map from CRUD to HTTP for our default `Backbone.sync` implementation.
+</a><a href="#h1-0-1292" id="h1-0-1292" class="i">+  var methodMap = {
+</a><a href="#h1-0-1293" id="h1-0-1293" class="i">+    &#39;create&#39;: &#39;POST&#39;,
+</a><a href="#h1-0-1294" id="h1-0-1294" class="i">+    &#39;update&#39;: &#39;PUT&#39;,
+</a><a href="#h1-0-1295" id="h1-0-1295" class="i">+    &#39;delete&#39;: &#39;DELETE&#39;,
+</a><a href="#h1-0-1296" id="h1-0-1296" class="i">+    &#39;read&#39;:   &#39;GET&#39;
+</a><a href="#h1-0-1297" id="h1-0-1297" class="i">+  };
+</a><a href="#h1-0-1298" id="h1-0-1298" class="i">+
+</a><a href="#h1-0-1299" id="h1-0-1299" class="i">+  // Override this function to change the manner in which Backbone persists
+</a><a href="#h1-0-1300" id="h1-0-1300" class="i">+  // models to the server. You will be passed the type of request, and the
+</a><a href="#h1-0-1301" id="h1-0-1301" class="i">+  // model in question. By default, makes a RESTful Ajax request
+</a><a href="#h1-0-1302" id="h1-0-1302" class="i">+  // to the model&#39;s `url()`. Some possible customizations could be:
+</a><a href="#h1-0-1303" id="h1-0-1303" class="i">+  //
+</a><a href="#h1-0-1304" id="h1-0-1304" class="i">+  // * Use `setTimeout` to batch rapid-fire updates into a single request.
+</a><a href="#h1-0-1305" id="h1-0-1305" class="i">+  // * Send up the models as XML instead of JSON.
+</a><a href="#h1-0-1306" id="h1-0-1306" class="i">+  // * Persist models via WebSockets instead of Ajax.
+</a><a href="#h1-0-1307" id="h1-0-1307" class="i">+  //
+</a><a href="#h1-0-1308" id="h1-0-1308" class="i">+  // Turn on `Backbone.emulateHTTP` in order to send `PUT` and `DELETE` requests
+</a><a href="#h1-0-1309" id="h1-0-1309" class="i">+  // as `POST`, with a `_method` parameter containing the true HTTP method,
+</a><a href="#h1-0-1310" id="h1-0-1310" class="i">+  // as well as all requests with the body as `application/x-www-form-urlencoded`
+</a><a href="#h1-0-1311" id="h1-0-1311" class="i">+  // instead of `application/json` with the model in a param named `model`.
+</a><a href="#h1-0-1312" id="h1-0-1312" class="i">+  // Useful when interfacing with server-side languages like **PHP** that make
+</a><a href="#h1-0-1313" id="h1-0-1313" class="i">+  // it difficult to read the body of `PUT` requests.
+</a><a href="#h1-0-1314" id="h1-0-1314" class="i">+  Backbone.sync = function(method, model, options) {
+</a><a href="#h1-0-1315" id="h1-0-1315" class="i">+    var type = methodMap[method];
+</a><a href="#h1-0-1316" id="h1-0-1316" class="i">+
+</a><a href="#h1-0-1317" id="h1-0-1317" class="i">+    // Default options, unless specified.
+</a><a href="#h1-0-1318" id="h1-0-1318" class="i">+    options || (options = {});
+</a><a href="#h1-0-1319" id="h1-0-1319" class="i">+
+</a><a href="#h1-0-1320" id="h1-0-1320" class="i">+    // Default JSON-request options.
+</a><a href="#h1-0-1321" id="h1-0-1321" class="i">+    var params = {type: type, dataType: &#39;json&#39;};
+</a><a href="#h1-0-1322" id="h1-0-1322" class="i">+
+</a><a href="#h1-0-1323" id="h1-0-1323" class="i">+    // Ensure that we have a URL.
+</a><a href="#h1-0-1324" id="h1-0-1324" class="i">+    if (!options.url) {
+</a><a href="#h1-0-1325" id="h1-0-1325" class="i">+      params.url = getValue(model, &#39;url&#39;) || urlError();
+</a><a href="#h1-0-1326" id="h1-0-1326" class="i">+    }
+</a><a href="#h1-0-1327" id="h1-0-1327" class="i">+
+</a><a href="#h1-0-1328" id="h1-0-1328" class="i">+    // Ensure that we have the appropriate request data.
+</a><a href="#h1-0-1329" id="h1-0-1329" class="i">+    if (!options.data &amp;&amp; model &amp;&amp; (method == &#39;create&#39; || method == &#39;update&#39;)) {
+</a><a href="#h1-0-1330" id="h1-0-1330" class="i">+      params.contentType = &#39;application/json&#39;;
+</a><a href="#h1-0-1331" id="h1-0-1331" class="i">+      params.data = JSON.stringify(model.toJSON());
+</a><a href="#h1-0-1332" id="h1-0-1332" class="i">+    }
+</a><a href="#h1-0-1333" id="h1-0-1333" class="i">+
+</a><a href="#h1-0-1334" id="h1-0-1334" class="i">+    // For older servers, emulate JSON by encoding the request into an HTML-form.
+</a><a href="#h1-0-1335" id="h1-0-1335" class="i">+    if (Backbone.emulateJSON) {
+</a><a href="#h1-0-1336" id="h1-0-1336" class="i">+      params.contentType = &#39;application/x-www-form-urlencoded&#39;;
+</a><a href="#h1-0-1337" id="h1-0-1337" class="i">+      params.data = params.data ? {model: params.data} : {};
+</a><a href="#h1-0-1338" id="h1-0-1338" class="i">+    }
+</a><a href="#h1-0-1339" id="h1-0-1339" class="i">+
+</a><a href="#h1-0-1340" id="h1-0-1340" class="i">+    // For older servers, emulate HTTP by mimicking the HTTP method with `_method`
+</a><a href="#h1-0-1341" id="h1-0-1341" class="i">+    // And an `X-HTTP-Method-Override` header.
+</a><a href="#h1-0-1342" id="h1-0-1342" class="i">+    if (Backbone.emulateHTTP) {
+</a><a href="#h1-0-1343" id="h1-0-1343" class="i">+      if (type === &#39;PUT&#39; || type === &#39;DELETE&#39;) {
+</a><a href="#h1-0-1344" id="h1-0-1344" class="i">+        if (Backbone.emulateJSON) params.data._method = type;
+</a><a href="#h1-0-1345" id="h1-0-1345" class="i">+        params.type = &#39;POST&#39;;
+</a><a href="#h1-0-1346" id="h1-0-1346" class="i">+        params.beforeSend = function(xhr) {
+</a><a href="#h1-0-1347" id="h1-0-1347" class="i">+          xhr.setRequestHeader(&#39;X-HTTP-Method-Override&#39;, type);
+</a><a href="#h1-0-1348" id="h1-0-1348" class="i">+        };
+</a><a href="#h1-0-1349" id="h1-0-1349" class="i">+      }
+</a><a href="#h1-0-1350" id="h1-0-1350" class="i">+    }
+</a><a href="#h1-0-1351" id="h1-0-1351" class="i">+
+</a><a href="#h1-0-1352" id="h1-0-1352" class="i">+    // Don&#39;t process data on a non-GET request.
+</a><a href="#h1-0-1353" id="h1-0-1353" class="i">+    if (params.type !== &#39;GET&#39; &amp;&amp; !Backbone.emulateJSON) {
+</a><a href="#h1-0-1354" id="h1-0-1354" class="i">+      params.processData = false;
+</a><a href="#h1-0-1355" id="h1-0-1355" class="i">+    }
+</a><a href="#h1-0-1356" id="h1-0-1356" class="i">+
+</a><a href="#h1-0-1357" id="h1-0-1357" class="i">+    // Make the request, allowing the user to override any Ajax options.
+</a><a href="#h1-0-1358" id="h1-0-1358" class="i">+    return $.ajax(_.extend(params, options));
+</a><a href="#h1-0-1359" id="h1-0-1359" class="i">+  };
+</a><a href="#h1-0-1360" id="h1-0-1360" class="i">+
+</a><a href="#h1-0-1361" id="h1-0-1361" class="i">+  // Wrap an optional error callback with a fallback error event.
+</a><a href="#h1-0-1362" id="h1-0-1362" class="i">+  Backbone.wrapError = function(onError, originalModel, options) {
+</a><a href="#h1-0-1363" id="h1-0-1363" class="i">+    return function(model, resp) {
+</a><a href="#h1-0-1364" id="h1-0-1364" class="i">+      resp = model === originalModel ? resp : model;
+</a><a href="#h1-0-1365" id="h1-0-1365" class="i">+      if (onError) {
+</a><a href="#h1-0-1366" id="h1-0-1366" class="i">+        onError(originalModel, resp, options);
+</a><a href="#h1-0-1367" id="h1-0-1367" class="i">+      } else {
+</a><a href="#h1-0-1368" id="h1-0-1368" class="i">+        originalModel.trigger(&#39;error&#39;, originalModel, resp, options);
+</a><a href="#h1-0-1369" id="h1-0-1369" class="i">+      }
+</a><a href="#h1-0-1370" id="h1-0-1370" class="i">+    };
+</a><a href="#h1-0-1371" id="h1-0-1371" class="i">+  };
+</a><a href="#h1-0-1372" id="h1-0-1372" class="i">+
+</a><a href="#h1-0-1373" id="h1-0-1373" class="i">+  // Helpers
+</a><a href="#h1-0-1374" id="h1-0-1374" class="i">+  // -------
+</a><a href="#h1-0-1375" id="h1-0-1375" class="i">+
+</a><a href="#h1-0-1376" id="h1-0-1376" class="i">+  // Shared empty constructor function to aid in prototype-chain creation.
+</a><a href="#h1-0-1377" id="h1-0-1377" class="i">+  var ctor = function(){};
+</a><a href="#h1-0-1378" id="h1-0-1378" class="i">+
+</a><a href="#h1-0-1379" id="h1-0-1379" class="i">+  // Helper function to correctly set up the prototype chain, for subclasses.
+</a><a href="#h1-0-1380" id="h1-0-1380" class="i">+  // Similar to `goog.inherits`, but uses a hash of prototype properties and
+</a><a href="#h1-0-1381" id="h1-0-1381" class="i">+  // class properties to be extended.
+</a><a href="#h1-0-1382" id="h1-0-1382" class="i">+  var inherits = function(parent, protoProps, staticProps) {
+</a><a href="#h1-0-1383" id="h1-0-1383" class="i">+    var child;
+</a><a href="#h1-0-1384" id="h1-0-1384" class="i">+
+</a><a href="#h1-0-1385" id="h1-0-1385" class="i">+    // The constructor function for the new subclass is either defined by you
+</a><a href="#h1-0-1386" id="h1-0-1386" class="i">+    // (the &quot;constructor&quot; property in your `extend` definition), or defaulted
+</a><a href="#h1-0-1387" id="h1-0-1387" class="i">+    // by us to simply call the parent&#39;s constructor.
+</a><a href="#h1-0-1388" id="h1-0-1388" class="i">+    if (protoProps &amp;&amp; protoProps.hasOwnProperty(&#39;constructor&#39;)) {
+</a><a href="#h1-0-1389" id="h1-0-1389" class="i">+      child = protoProps.constructor;
+</a><a href="#h1-0-1390" id="h1-0-1390" class="i">+    } else {
+</a><a href="#h1-0-1391" id="h1-0-1391" class="i">+      child = function(){ parent.apply(this, arguments); };
+</a><a href="#h1-0-1392" id="h1-0-1392" class="i">+    }
+</a><a href="#h1-0-1393" id="h1-0-1393" class="i">+
+</a><a href="#h1-0-1394" id="h1-0-1394" class="i">+    // Inherit class (static) properties from parent.
+</a><a href="#h1-0-1395" id="h1-0-1395" class="i">+    _.extend(child, parent);
+</a><a href="#h1-0-1396" id="h1-0-1396" class="i">+
+</a><a href="#h1-0-1397" id="h1-0-1397" class="i">+    // Set the prototype chain to inherit from `parent`, without calling
+</a><a href="#h1-0-1398" id="h1-0-1398" class="i">+    // `parent`&#39;s constructor function.
+</a><a href="#h1-0-1399" id="h1-0-1399" class="i">+    ctor.prototype = parent.prototype;
+</a><a href="#h1-0-1400" id="h1-0-1400" class="i">+    child.prototype = new ctor();
+</a><a href="#h1-0-1401" id="h1-0-1401" class="i">+
+</a><a href="#h1-0-1402" id="h1-0-1402" class="i">+    // Add prototype properties (instance properties) to the subclass,
+</a><a href="#h1-0-1403" id="h1-0-1403" class="i">+    // if supplied.
+</a><a href="#h1-0-1404" id="h1-0-1404" class="i">+    if (protoProps) _.extend(child.prototype, protoProps);
+</a><a href="#h1-0-1405" id="h1-0-1405" class="i">+
+</a><a href="#h1-0-1406" id="h1-0-1406" class="i">+    // Add static properties to the constructor function, if supplied.
+</a><a href="#h1-0-1407" id="h1-0-1407" class="i">+    if (staticProps) _.extend(child, staticProps);
+</a><a href="#h1-0-1408" id="h1-0-1408" class="i">+
+</a><a href="#h1-0-1409" id="h1-0-1409" class="i">+    // Correctly set child&#39;s `prototype.constructor`.
+</a><a href="#h1-0-1410" id="h1-0-1410" class="i">+    child.prototype.constructor = child;
+</a><a href="#h1-0-1411" id="h1-0-1411" class="i">+
+</a><a href="#h1-0-1412" id="h1-0-1412" class="i">+    // Set a convenience property in case the parent&#39;s prototype is needed later.
+</a><a href="#h1-0-1413" id="h1-0-1413" class="i">+    child.__super__ = parent.prototype;
+</a><a href="#h1-0-1414" id="h1-0-1414" class="i">+
+</a><a href="#h1-0-1415" id="h1-0-1415" class="i">+    return child;
+</a><a href="#h1-0-1416" id="h1-0-1416" class="i">+  };
+</a><a href="#h1-0-1417" id="h1-0-1417" class="i">+
+</a><a href="#h1-0-1418" id="h1-0-1418" class="i">+  // Helper function to get a value from a Backbone object as a property
+</a><a href="#h1-0-1419" id="h1-0-1419" class="i">+  // or as a function.
+</a><a href="#h1-0-1420" id="h1-0-1420" class="i">+  var getValue = function(object, prop) {
+</a><a href="#h1-0-1421" id="h1-0-1421" class="i">+    if (!(object &amp;&amp; object[prop])) return null;
+</a><a href="#h1-0-1422" id="h1-0-1422" class="i">+    return _.isFunction(object[prop]) ? object[prop]() : object[prop];
+</a><a href="#h1-0-1423" id="h1-0-1423" class="i">+  };
+</a><a href="#h1-0-1424" id="h1-0-1424" class="i">+
+</a><a href="#h1-0-1425" id="h1-0-1425" class="i">+  // Throw an error when a URL is needed, and none is supplied.
+</a><a href="#h1-0-1426" id="h1-0-1426" class="i">+  var urlError = function() {
+</a><a href="#h1-0-1427" id="h1-0-1427" class="i">+    throw new Error(&#39;A &quot;url&quot; property or function must be specified&#39;);
+</a><a href="#h1-0-1428" id="h1-0-1428" class="i">+  };
+</a><a href="#h1-0-1429" id="h1-0-1429" class="i">+
+</a><a href="#h1-0-1430" id="h1-0-1430" class="i">+}).call(this);
+</a><b>diff --git a/<a id="h2" href="../file/web/templates/layout.html">web/templates/layout.html</a> b/<a href="../file/web/templates/layout.html">web/templates/layout.html</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -8,6 +8,7 @@
+</a>     &lt;script language=&quot;javascript&quot; type=&quot;text/javascript&quot; src=&quot;feedback.js&quot;&gt;&lt;/script&gt;
+     {{#if js}}
+     &lt;script language=&quot;javascript&quot; type=&quot;text/javascript&quot; src=&quot;js/underscore.js&quot;&gt;&lt;/script&gt;
+<a href="#h2-0-3" id="h2-0-3" class="i">+    &lt;script language=&quot;javascript&quot; type=&quot;text/javascript&quot; src=&quot;js/backbone.js&quot;&gt;&lt;/script&gt;
+</a>     &lt;script language=&quot;javascript&quot; type=&quot;text/javascript&quot; src=&quot;/socket.io/socket.io.js&quot;&gt;&lt;/script&gt;
+     &lt;script language=&quot;javascript&quot; type=&quot;text/javascript&quot; src=&quot;js/html.js&quot;&gt;&lt;/script&gt;
+     &lt;script language=&quot;javascript&quot; type=&quot;text/javascript&quot; src=&quot;codesearch.js&quot;&gt;&lt;/script&gt;
+</pre>
+</div>
+</body>
+</html>

@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Implement `-file:` and `-repo:`. - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/91ffad4129fb3414aa42754d247105ec3b07d6df">91ffad4129fb3414aa42754d247105ec3b07d6df</a>
+<b>parent</b> <a href="../commit/5c183ab5588aabe4a4f58f548ebb587480246d0b">5c183ab5588aabe4a4f58f548ebb587480246d0b</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Sat, 11 Apr 2015 19:23:53 -0700
+
+Implement `-file:` and `-repo:`.
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">client/types.go</a></td><td> | </td><td class="num">4</td><td><span class="i">++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">server/query.go</a></td><td> | </td><td class="num">4</td><td><span class="i">+++</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">server/query_test.go</a></td><td> | </td><td class="num">17</td><td><span class="i">+++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">src/codesearch.cc</a></td><td> | </td><td class="num">15</td><td><span class="i">++++++++++++</span><span class="d">---</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h4">src/codesearch.h</a></td><td> | </td><td class="num">4</td><td><span class="i">++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h5">src/tools/transport.cc</a></td><td> | </td><td class="num">28</td><td><span class="i">++++++++++++++++++++++</span><span class="d">------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h6">test/codesearch_test.cc</a></td><td> | </td><td class="num">46</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">-</span></td></tr>
+</table></pre><pre>7 files changed, 107 insertions(+), 11 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/client/types.go">client/types.go</a> b/<a href="../file/client/types.go">client/types.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -5,6 +5,10 @@ type Query struct {
+</a> 	File     string `json:&quot;file&quot;`
+ 	Repo     string `json:&quot;repo&quot;`
+ 	FoldCase bool   `json:&quot;fold_case&quot;`
+<a href="#h0-0-3" id="h0-0-3" class="i">+	Not      struct {
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+		File string `json:&quot;file&quot;`
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+		Repo string `json:&quot;repo&quot;`
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+	} `json:&quot;not&quot;`
+</a> }
+ 
+ func (q *Query) Opcode() string {
+<b>diff --git a/<a id="h1" href="../file/server/query.go">server/query.go</a> b/<a href="../file/server/query.go">server/query.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -9,7 +9,7 @@ import (
+</a> 	&quot;github.com/livegrep/livegrep/client&quot;
+ )
+ 
+<a href="#h1-0-3" id="h1-0-3" class="d">-var pieceRE = regexp.MustCompile(`\(|(?:^(\w+):|\\.)| `)
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+var pieceRE = regexp.MustCompile(`\(|(?:^([a-zA-Z0-9-]+):|\\.)| `)
+</a> 
+ func ParseQuery(query string) client.Query {
+ 	ops := make(map[string]string)
+<a href="#h1-1" id="h1-1" class="h">@@ -76,6 +76,8 @@ func ParseQuery(query string) client.Query {
+</a> 	var out client.Query
+ 	out.File = ops[&quot;file&quot;]
+ 	out.Repo = ops[&quot;repo&quot;]
+<a href="#h1-1-3" id="h1-1-3" class="i">+	out.Not.File = ops[&quot;-file&quot;]
+</a><a href="#h1-1-4" id="h1-1-4" class="i">+	out.Not.Repo = ops[&quot;-repo&quot;]
+</a> 	out.Line = strings.TrimSpace(ops[&quot;&quot;] + ops[&quot;case&quot;])
+ 	if _, ok := ops[&quot;case&quot;]; ok {
+ 		out.FoldCase = false
+<b>diff --git a/<a id="h2" href="../file/server/query_test.go">server/query_test.go</a> b/<a href="../file/server/query_test.go">server/query_test.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -8,6 +8,15 @@ import (
+</a> )
+ 
+ func TestParseQuery(t *testing.T) {
+<a href="#h2-0-3" id="h2-0-3" class="i">+	Not := func(file, repo string) struct {
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+		File string `json:&quot;file&quot;`
+</a><a href="#h2-0-5" id="h2-0-5" class="i">+		Repo string `json:&quot;repo&quot;`
+</a><a href="#h2-0-6" id="h2-0-6" class="i">+	} {
+</a><a href="#h2-0-7" id="h2-0-7" class="i">+		return struct {
+</a><a href="#h2-0-8" id="h2-0-8" class="i">+			File string `json:&quot;file&quot;`
+</a><a href="#h2-0-9" id="h2-0-9" class="i">+			Repo string `json:&quot;repo&quot;`
+</a><a href="#h2-0-10" id="h2-0-10" class="i">+		}{file, repo}
+</a><a href="#h2-0-11" id="h2-0-11" class="i">+	}
+</a> 	cases := []struct {
+ 		in  string
+ 		out client.Query
+<a href="#h2-1" id="h2-1" class="h">@@ -80,6 +89,14 @@ func TestParseQuery(t *testing.T) {
+</a> 			`(file:)`,
+ 			client.Query{Line: &quot;(file:)&quot;, FoldCase: true},
+ 		},
+<a href="#h2-1-3" id="h2-1-3" class="i">+		{
+</a><a href="#h2-1-4" id="h2-1-4" class="i">+			`-file:Godep re`,
+</a><a href="#h2-1-5" id="h2-1-5" class="i">+			client.Query{Line: &quot;re&quot;, Not: Not(&quot;Godep&quot;, &quot;&quot;), FoldCase: true},
+</a><a href="#h2-1-6" id="h2-1-6" class="i">+		},
+</a><a href="#h2-1-7" id="h2-1-7" class="i">+		{
+</a><a href="#h2-1-8" id="h2-1-8" class="i">+			`-file:. -repo:Godep re`,
+</a><a href="#h2-1-9" id="h2-1-9" class="i">+			client.Query{Line: &quot;re&quot;, Not: Not(&quot;.&quot;, &quot;Godep&quot;), FoldCase: true},
+</a><a href="#h2-1-10" id="h2-1-10" class="i">+		},
+</a> 	}
+ 
+ 	for _, tc := range cases {
+<b>diff --git a/<a id="h3" href="../file/src/codesearch.cc">src/codesearch.cc</a> b/<a href="../file/src/codesearch.cc">src/codesearch.cc</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -178,9 +178,6 @@ protected:
+</a>     void search_lines(uint32_t *left, int count, const chunk *chunk);
+ 
+     bool accept(const indexed_file *file) {
+<a href="#h3-0-3" id="h3-0-3" class="d">-        if (!query_-&gt;file_pat &amp;&amp; !query_-&gt;tree_pat)
+</a><a href="#h3-0-4" id="h3-0-4" class="d">-            return true;
+</a><a href="#h3-0-5" id="h3-0-5" class="d">-
+</a>         if (query_-&gt;file_pat &amp;&amp;
+             !query_-&gt;file_pat-&gt;Match(file-&gt;path, 0, file-&gt;path.size(),
+                                      RE2::UNANCHORED, 0, 0))
+<a href="#h3-1" id="h3-1" class="h">@@ -192,6 +189,18 @@ protected:
+</a>                                      RE2::UNANCHORED, 0, 0))
+             return false;
+ 
+<a href="#h3-1-3" id="h3-1-3" class="i">+        if (query_-&gt;negate.file_pat &amp;&amp;
+</a><a href="#h3-1-4" id="h3-1-4" class="i">+            query_-&gt;negate.file_pat-&gt;Match(file-&gt;path, 0,
+</a><a href="#h3-1-5" id="h3-1-5" class="i">+                                           file-&gt;path.size(),
+</a><a href="#h3-1-6" id="h3-1-6" class="i">+                                           RE2::UNANCHORED, 0, 0))
+</a><a href="#h3-1-7" id="h3-1-7" class="i">+            return false;
+</a><a href="#h3-1-8" id="h3-1-8" class="i">+
+</a><a href="#h3-1-9" id="h3-1-9" class="i">+        if (query_-&gt;negate.tree_pat &amp;&amp;
+</a><a href="#h3-1-10" id="h3-1-10" class="i">+            query_-&gt;negate.tree_pat-&gt;Match(file-&gt;tree-&gt;name, 0,
+</a><a href="#h3-1-11" id="h3-1-11" class="i">+                                           file-&gt;tree-&gt;name.size(),
+</a><a href="#h3-1-12" id="h3-1-12" class="i">+                                           RE2::UNANCHORED, 0, 0))
+</a><a href="#h3-1-13" id="h3-1-13" class="i">+            return false;
+</a><a href="#h3-1-14" id="h3-1-14" class="i">+
+</a>         return true;
+     }
+ 
+<b>diff --git a/<a id="h4" href="../file/src/codesearch.h">src/codesearch.h</a> b/<a href="../file/src/codesearch.h">src/codesearch.h</a></b>
+<a href="#h4-0" id="h4-0" class="h">@@ -132,6 +132,10 @@ struct query {
+</a>     std::unique_ptr&lt;RE2&gt; line_pat;
+     std::unique_ptr&lt;RE2&gt; file_pat;
+     std::unique_ptr&lt;RE2&gt; tree_pat;
+<a href="#h4-0-3" id="h4-0-3" class="i">+    struct {
+</a><a href="#h4-0-4" id="h4-0-4" class="i">+        std::unique_ptr&lt;RE2&gt; file_pat;
+</a><a href="#h4-0-5" id="h4-0-5" class="i">+        std::unique_ptr&lt;RE2&gt; tree_pat;
+</a><a href="#h4-0-6" id="h4-0-6" class="i">+    } negate;
+</a> };
+ 
+ class code_searcher {
+<b>diff --git a/<a id="h5" href="../file/src/tools/transport.cc">src/tools/transport.cc</a> b/<a href="../file/src/tools/transport.cc">src/tools/transport.cc</a></b>
+<a href="#h5-0" id="h5-0" class="h">@@ -167,6 +167,8 @@ json_parse_error parse_regex(json_object *js, const char *key,
+</a>     err = parse_object(js, key, &amp;str);
+     if (!err.ok())
+         return err;
+<a href="#h5-0-3" id="h5-0-3" class="i">+    if (str.size() == 0)
+</a><a href="#h5-0-4" id="h5-0-4" class="i">+        return json_parse_error();
+</a>     unique_ptr&lt;RE2&gt; re(new RE2(str, opts));
+     if (!re-&gt;ok()) {
+         return json_parse_error(re-&gt;error()).wrap(key);
+<a href="#h5-1" id="h5-1" class="h">@@ -176,15 +178,23 @@ json_parse_error parse_regex(json_object *js, const char *key,
+</a> }
+ 
+ json_parse_error parse_object(json_object *js, query *q) {
+<a href="#h5-1-3" id="h5-1-3" class="d">-    if (json_object_get_type(js) != json_type_object)
+</a><a href="#h5-1-4" id="h5-1-4" class="d">-        return json_parse_error(&quot;expected a JSON object&quot;);
+</a><a href="#h5-1-5" id="h5-1-5" class="d">-    json_object *b = json_object_object_get(js, &quot;body&quot;);
+</a><a href="#h5-1-6" id="h5-1-6" class="d">-    if (b == NULL || json_object_get_type(b) != json_type_object)
+</a><a href="#h5-1-7" id="h5-1-7" class="d">-        return json_parse_error(&quot;expected a JSON object&quot;).wrap(&quot;body&quot;);
+</a><a href="#h5-1-8" id="h5-1-8" class="i">+    json_object *b = NULL, *negate = NULL;
+</a><a href="#h5-1-9" id="h5-1-9" class="i">+    json_parse_error err;
+</a><a href="#h5-1-10" id="h5-1-10" class="i">+
+</a><a href="#h5-1-11" id="h5-1-11" class="i">+    err = parse_object(js, &quot;body&quot;, &amp;b);
+</a><a href="#h5-1-12" id="h5-1-12" class="i">+    if (!err.ok())
+</a><a href="#h5-1-13" id="h5-1-13" class="i">+        return err;
+</a><a href="#h5-1-14" id="h5-1-14" class="i">+    if (!b)
+</a><a href="#h5-1-15" id="h5-1-15" class="i">+        return json_parse_error(&quot;expected a body&quot;);
+</a><a href="#h5-1-16" id="h5-1-16" class="i">+
+</a><a href="#h5-1-17" id="h5-1-17" class="i">+    err = parse_object(b, &quot;not&quot;, &amp;negate);
+</a><a href="#h5-1-18" id="h5-1-18" class="i">+    if (!err.ok())
+</a><a href="#h5-1-19" id="h5-1-19" class="i">+        return err.wrap(&quot;body&quot;);
+</a><a href="#h5-1-20" id="h5-1-20" class="i">+
+</a>     RE2::Options opts;
+     default_re2_options(opts);
+     bool fold_case = false;
+<a href="#h5-1-24" id="h5-1-24" class="d">-    json_parse_error err = parse_object(b, &quot;fold_case&quot;, &amp;fold_case);
+</a><a href="#h5-1-25" id="h5-1-25" class="i">+    err = parse_object(b, &quot;fold_case&quot;, &amp;fold_case);
+</a>     if (!err.ok())
+         return err.wrap(&quot;body&quot;);
+     opts.set_case_sensitive(!fold_case);
+<a href="#h5-2" id="h5-2" class="h">@@ -197,6 +207,12 @@ json_parse_error parse_object(json_object *js, query *q) {
+</a>         err = parse_regex(b, &quot;file&quot;, opts, &amp;q-&gt;file_pat);
+     if (err.ok())
+         err = parse_regex(b, &quot;repo&quot;, opts, &amp;q-&gt;tree_pat);
+<a href="#h5-2-3" id="h5-2-3" class="i">+
+</a><a href="#h5-2-4" id="h5-2-4" class="i">+    if (err.ok() &amp;&amp; negate)
+</a><a href="#h5-2-5" id="h5-2-5" class="i">+        err = parse_regex(negate, &quot;file&quot;, opts, &amp;q-&gt;negate.file_pat);
+</a><a href="#h5-2-6" id="h5-2-6" class="i">+    if (err.ok() &amp;&amp; negate)
+</a><a href="#h5-2-7" id="h5-2-7" class="i">+        err = parse_regex(negate, &quot;repo&quot;, opts, &amp;q-&gt;negate.tree_pat);
+</a><a href="#h5-2-8" id="h5-2-8" class="i">+
+</a>     return err;
+ }
+ 
+<b>diff --git a/<a id="h6" href="../file/test/codesearch_test.cc">test/codesearch_test.cc</a> b/<a href="../file/test/codesearch_test.cc">test/codesearch_test.cc</a></b>
+<a href="#h6-0" id="h6-0" class="h">@@ -63,7 +63,10 @@ TEST_F(codesearch_test, NoTrailingNewLine) {
+</a> 
+ struct accumulate_matches {
+     vector&lt;match_result&gt; *results_;
+<a href="#h6-0-3" id="h6-0-3" class="d">-    accumulate_matches(vector&lt;match_result&gt; *results) : results_(results) {}
+</a><a href="#h6-0-4" id="h6-0-4" class="i">+    accumulate_matches(vector&lt;match_result&gt; *results) : results_(results) {
+</a><a href="#h6-0-5" id="h6-0-5" class="i">+        results_-&gt;clear();
+</a><a href="#h6-0-6" id="h6-0-6" class="i">+    }
+</a><a href="#h6-0-7" id="h6-0-7" class="i">+
+</a>     void operator()(const match_result *m) {
+         results_-&gt;push_back(*m);
+     }
+<a href="#h6-1" id="h6-1" class="h">@@ -114,3 +117,44 @@ TEST_F(codesearch_test, LongLines) {
+</a>     ASSERT_EQ(1, results.size());
+     EXPECT_EQ(4, results[0].lno);
+ }
+<a href="#h6-1-3" id="h6-1-3" class="i">+
+</a><a href="#h6-1-4" id="h6-1-4" class="i">+
+</a><a href="#h6-1-5" id="h6-1-5" class="i">+TEST_F(codesearch_test, RestrictFiles) {
+</a><a href="#h6-1-6" id="h6-1-6" class="i">+    // tree_ is &quot;REPO&quot;
+</a><a href="#h6-1-7" id="h6-1-7" class="i">+    cs_.index_file(tree_, &quot;/file1&quot;, &quot;contents&quot;);
+</a><a href="#h6-1-8" id="h6-1-8" class="i">+    cs_.index_file(tree_, &quot;/file2&quot;, &quot;contents&quot;);
+</a><a href="#h6-1-9" id="h6-1-9" class="i">+    // other is &quot;OTHER&quot;
+</a><a href="#h6-1-10" id="h6-1-10" class="i">+    const indexed_tree *other = cs_.open_tree(&quot;OTHER&quot;, 0, &quot;REV0&quot;);
+</a><a href="#h6-1-11" id="h6-1-11" class="i">+    cs_.index_file(other, &quot;/file1&quot;, &quot;contents&quot;);
+</a><a href="#h6-1-12" id="h6-1-12" class="i">+    cs_.index_file(other, &quot;/file2&quot;, &quot;contents&quot;);
+</a><a href="#h6-1-13" id="h6-1-13" class="i">+    cs_.finalize();
+</a><a href="#h6-1-14" id="h6-1-14" class="i">+
+</a><a href="#h6-1-15" id="h6-1-15" class="i">+    code_searcher::search_thread search(&amp;cs_);
+</a><a href="#h6-1-16" id="h6-1-16" class="i">+    match_stats stats;
+</a><a href="#h6-1-17" id="h6-1-17" class="i">+    query q;
+</a><a href="#h6-1-18" id="h6-1-18" class="i">+    vector&lt;match_result&gt; results;
+</a><a href="#h6-1-19" id="h6-1-19" class="i">+    RE2::Options opts;
+</a><a href="#h6-1-20" id="h6-1-20" class="i">+    default_re2_options(opts);
+</a><a href="#h6-1-21" id="h6-1-21" class="i">+
+</a><a href="#h6-1-22" id="h6-1-22" class="i">+    q.line_pat.reset(new RE2(&quot;contents&quot;, opts));
+</a><a href="#h6-1-23" id="h6-1-23" class="i">+    q.file_pat.reset(new RE2(&quot;file1&quot;, opts));
+</a><a href="#h6-1-24" id="h6-1-24" class="i">+
+</a><a href="#h6-1-25" id="h6-1-25" class="i">+    search.match(q, accumulate_matches(&amp;results), &amp;stats);
+</a><a href="#h6-1-26" id="h6-1-26" class="i">+    ASSERT_EQ(2, results.size());
+</a><a href="#h6-1-27" id="h6-1-27" class="i">+    EXPECT_EQ(&quot;/file1&quot;, results[0].file-&gt;path);
+</a><a href="#h6-1-28" id="h6-1-28" class="i">+    EXPECT_EQ(&quot;/file1&quot;, results[1].file-&gt;path);
+</a><a href="#h6-1-29" id="h6-1-29" class="i">+
+</a><a href="#h6-1-30" id="h6-1-30" class="i">+    q.file_pat.reset();
+</a><a href="#h6-1-31" id="h6-1-31" class="i">+    q.tree_pat.reset(new RE2(&quot;REPO&quot;, opts));
+</a><a href="#h6-1-32" id="h6-1-32" class="i">+    search.match(q, accumulate_matches(&amp;results), &amp;stats);
+</a><a href="#h6-1-33" id="h6-1-33" class="i">+    ASSERT_EQ(2, results.size());
+</a><a href="#h6-1-34" id="h6-1-34" class="i">+    EXPECT_EQ(&quot;REPO&quot;, results[0].file-&gt;tree-&gt;name);
+</a><a href="#h6-1-35" id="h6-1-35" class="i">+    EXPECT_EQ(&quot;REPO&quot;, results[1].file-&gt;tree-&gt;name);
+</a><a href="#h6-1-36" id="h6-1-36" class="i">+
+</a><a href="#h6-1-37" id="h6-1-37" class="i">+    q.tree_pat.reset();
+</a><a href="#h6-1-38" id="h6-1-38" class="i">+    q.negate.file_pat.reset(new RE2(&quot;file1&quot;, opts));
+</a><a href="#h6-1-39" id="h6-1-39" class="i">+    search.match(q, accumulate_matches(&amp;results), &amp;stats);
+</a><a href="#h6-1-40" id="h6-1-40" class="i">+    ASSERT_EQ(2, results.size());
+</a><a href="#h6-1-41" id="h6-1-41" class="i">+    EXPECT_EQ(&quot;/file2&quot;, results[0].file-&gt;path);
+</a><a href="#h6-1-42" id="h6-1-42" class="i">+    EXPECT_EQ(&quot;/file2&quot;, results[1].file-&gt;path);
+</a><a href="#h6-1-43" id="h6-1-43" class="i">+}
+</a></pre>
+</div>
+</body>
+</html>

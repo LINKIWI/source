@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Refactor kChunkSize into a member of chunk_allocator. - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/026f39a03301f781c4a59c164d824a7312199c4d">026f39a03301f781c4a59c164d824a7312199c4d</a>
+<b>parent</b> <a href="../commit/8e8ff690d08699395a607e4548f343408b87a8e2">8e8ff690d08699395a607e4548f343408b87a8e2</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Sat, 23 Jun 2012 16:24:16 -0700
+
+Refactor kChunkSize into a member of chunk_allocator.
+
+We can still set it as before, but now already-constructed objects
+track it internally, and can pick it up from an index file.
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">chunk.cc</a></td><td> | </td><td class="num">15</td><td><span class="i"></span><span class="d">---------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">chunk.h</a></td><td> | </td><td class="num">1</td><td><span class="i"></span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">chunk_allocator.cc</a></td><td> | </td><td class="num">29</td><td><span class="i">++++++++++++++++++++++++</span><span class="d">-----</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">chunk_allocator.h</a></td><td> | </td><td class="num">6</td><td><span class="i">++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h4">codesearch.cc</a></td><td> | </td><td class="num">8</td><td><span class="i">++++++</span><span class="d">--</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h5">dump_load.cc</a></td><td> | </td><td class="num">64</td><td><span class="i">+++++++++++++++++++++++++++++++++++++</span><span class="d">---------------------------</span></td></tr>
+</table></pre><pre>6 files changed, 73 insertions(+), 50 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/chunk.cc">chunk.cc</a> b/<a href="../file/chunk.cc">chunk.cc</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -10,21 +10,6 @@ using re2::StringPiece;
+</a> 
+ DECLARE_bool(index);
+ 
+<a href="#h0-0-3" id="h0-0-3" class="d">-DEFINE_int32(chunk_power, 24, &quot;Size of search chunks, as a power of two&quot;);
+</a><a href="#h0-0-4" id="h0-0-4" class="d">-
+</a><a href="#h0-0-5" id="h0-0-5" class="d">-static bool validate_chunk_power(const char* flagname, int32_t value) {
+</a><a href="#h0-0-6" id="h0-0-6" class="d">-    if (value &gt; 10 &amp;&amp; value &lt; 30) {
+</a><a href="#h0-0-7" id="h0-0-7" class="d">-        kChunkSize = (1 &lt;&lt; value);
+</a><a href="#h0-0-8" id="h0-0-8" class="d">-        return true;
+</a><a href="#h0-0-9" id="h0-0-9" class="d">-    }
+</a><a href="#h0-0-10" id="h0-0-10" class="d">-    return false;
+</a><a href="#h0-0-11" id="h0-0-11" class="d">-}
+</a><a href="#h0-0-12" id="h0-0-12" class="d">-
+</a><a href="#h0-0-13" id="h0-0-13" class="d">-static const bool dummy = google::RegisterFlagValidator(&amp;FLAGS_chunk_power,
+</a><a href="#h0-0-14" id="h0-0-14" class="d">-                                                        validate_chunk_power);
+</a><a href="#h0-0-15" id="h0-0-15" class="d">-
+</a><a href="#h0-0-16" id="h0-0-16" class="d">-size_t kChunkSize = (1 &lt;&lt; 24);
+</a><a href="#h0-0-17" id="h0-0-17" class="d">-
+</a> class radix_sorter {
+ public:
+     radix_sorter(chunk *chunk) : chunk_(chunk) {
+<b>diff --git a/<a id="h1" href="../file/chunk.h">chunk.h</a> b/<a href="../file/chunk.h">chunk.h</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -36,7 +36,6 @@ struct chunk_file {
+</a>     }
+ };
+ 
+<a href="#h1-0-3" id="h1-0-3" class="d">-extern size_t kChunkSize;
+</a> const size_t kMaxGap       = 1 &lt;&lt; 10;
+ 
+ struct chunk_file_node {
+<b>diff --git a/<a id="h2" href="../file/chunk_allocator.cc">chunk_allocator.cc</a> b/<a href="../file/chunk_allocator.cc">chunk_allocator.cc</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -7,6 +7,19 @@
+</a> 
+ DECLARE_int32(threads);
+ DECLARE_bool(index);
+<a href="#h2-0-3" id="h2-0-3" class="i">+DEFINE_int32(chunk_power, 24, &quot;Size of search chunks, as a power of two&quot;);
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+size_t kChunkSize = (1 &lt;&lt; 24);
+</a><a href="#h2-0-5" id="h2-0-5" class="i">+
+</a><a href="#h2-0-6" id="h2-0-6" class="i">+static bool validate_chunk_power(const char* flagname, int32_t value) {
+</a><a href="#h2-0-7" id="h2-0-7" class="i">+    if (value &gt; 10 &amp;&amp; value &lt; 30) {
+</a><a href="#h2-0-8" id="h2-0-8" class="i">+        kChunkSize = (1 &lt;&lt; value);
+</a><a href="#h2-0-9" id="h2-0-9" class="i">+        return true;
+</a><a href="#h2-0-10" id="h2-0-10" class="i">+    }
+</a><a href="#h2-0-11" id="h2-0-11" class="i">+    return false;
+</a><a href="#h2-0-12" id="h2-0-12" class="i">+}
+</a><a href="#h2-0-13" id="h2-0-13" class="i">+
+</a><a href="#h2-0-14" id="h2-0-14" class="i">+static const bool dummy = google::RegisterFlagValidator(&amp;FLAGS_chunk_power,
+</a><a href="#h2-0-15" id="h2-0-15" class="i">+                                                        validate_chunk_power);
+</a> 
+ bool chunk_allocator::finalizer::operator()(chunk *chunk) {
+     if (!chunk)
+<a href="#h2-1" id="h2-1" class="h">@@ -16,21 +29,27 @@ bool chunk_allocator::finalizer::operator()(chunk *chunk) {
+</a> }
+ 
+ chunk_allocator::chunk_allocator()  :
+<a href="#h2-1-3" id="h2-1-3" class="d">-    current_(0), finalizer_(), finalize_pool_(0) {
+</a><a href="#h2-1-4" id="h2-1-4" class="i">+    chunk_size_(kChunkSize), current_(0), finalizer_(), finalize_pool_(0) {
+</a>     //    new_chunk();
+ }
+ 
+ chunk_allocator::~chunk_allocator() {
+ }
+ 
+<a href="#h2-1-11" id="h2-1-11" class="i">+void chunk_allocator::set_chunk_size(size_t size) {
+</a><a href="#h2-1-12" id="h2-1-12" class="i">+    assert(current_ == 0);
+</a><a href="#h2-1-13" id="h2-1-13" class="i">+    assert(!chunks_.size());
+</a><a href="#h2-1-14" id="h2-1-14" class="i">+    chunk_size_ = size;
+</a><a href="#h2-1-15" id="h2-1-15" class="i">+}
+</a><a href="#h2-1-16" id="h2-1-16" class="i">+
+</a> void chunk_allocator::cleanup() {
+     for (auto c = begin(); c != end(); ++ c)
+         free_chunk(*c);
+ }
+ 
+ unsigned char *chunk_allocator::alloc(size_t len) {
+<a href="#h2-1-23" id="h2-1-23" class="d">-    assert(len &lt; kChunkSize);
+</a><a href="#h2-1-24" id="h2-1-24" class="d">-    if (current_ == 0 || (current_-&gt;size + len) &gt; kChunkSize)
+</a><a href="#h2-1-25" id="h2-1-25" class="i">+    assert(len &lt; chunk_size_);
+</a><a href="#h2-1-26" id="h2-1-26" class="i">+    if (current_ == 0 || (current_-&gt;size + len) &gt; chunk_size_)
+</a>         new_chunk();
+     unsigned char *out = current_-&gt;data + current_-&gt;size;
+     current_-&gt;size += len;
+<a href="#h2-2" id="h2-2" class="h">@@ -84,8 +103,8 @@ chunk *chunk_allocator::chunk_from_string(const unsigned char *p) {
+</a> class mem_allocator : public chunk_allocator {
+ public:
+     virtual chunk *alloc_chunk() {
+<a href="#h2-2-3" id="h2-2-3" class="d">-        unsigned char *buf = new unsigned char[kChunkSize];
+</a><a href="#h2-2-4" id="h2-2-4" class="d">-        uint32_t *idx = FLAGS_index ? new uint32_t[kChunkSize] : 0;
+</a><a href="#h2-2-5" id="h2-2-5" class="i">+        unsigned char *buf = new unsigned char[chunk_size_];
+</a><a href="#h2-2-6" id="h2-2-6" class="i">+        uint32_t *idx = FLAGS_index ? new uint32_t[chunk_size_] : 0;
+</a>         return new chunk(buf, idx);
+     }
+ 
+<b>diff --git a/<a id="h3" href="../file/chunk_allocator.h">chunk_allocator.h</a> b/<a href="../file/chunk_allocator.h">chunk_allocator.h</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -13,6 +13,11 @@ public:
+</a>     virtual ~chunk_allocator();
+     void cleanup();
+ 
+<a href="#h3-0-3" id="h3-0-3" class="i">+    void set_chunk_size(size_t size);
+</a><a href="#h3-0-4" id="h3-0-4" class="i">+    size_t chunk_size() {
+</a><a href="#h3-0-5" id="h3-0-5" class="i">+        return chunk_size_;
+</a><a href="#h3-0-6" id="h3-0-6" class="i">+    }
+</a><a href="#h3-0-7" id="h3-0-7" class="i">+
+</a>     unsigned char *alloc(size_t len);
+ 
+     vector&lt;chunk*&gt;::iterator begin () {
+<a href="#h3-1" id="h3-1" class="h">@@ -50,6 +55,7 @@ protected:
+</a>     void finish_chunk();
+     void new_chunk();
+ 
+<a href="#h3-1-3" id="h3-1-3" class="i">+    size_t chunk_size_;
+</a>     vector&lt;chunk*&gt; chunks_;
+     chunk *current_;
+     finalizer finalizer_;
+<b>diff --git a/<a id="h4" href="../file/codesearch.cc">codesearch.cc</a> b/<a href="../file/codesearch.cc">codesearch.cc</a></b>
+<a href="#h4-0" id="h4-0" class="h">@@ -478,11 +478,16 @@ void code_searcher::update_stats(const char *ref, const string&amp; path, git_blob *
+</a>     file_map_[*oid] = sf;
+ 
+     while ((f = static_cast&lt;const char*&gt;(memchr(p, &#39;\n&#39;, end - p))) != 0) {
+<a href="#h4-0-3" id="h4-0-3" class="i">+        stats_.lines++;
+</a>         string_hash::iterator it = lines_.find(StringPiece(p, f - p));
+         if (it == lines_.end()) {
+             stats_.dedup_bytes += (f - p) + 1;
+             stats_.dedup_lines ++;
+ 
+<a href="#h4-0-9" id="h4-0-9" class="i">+            if (f - p + 1 &gt;= alloc_-&gt;chunk_size()) {
+</a><a href="#h4-0-10" id="h4-0-10" class="i">+                p = f + 1;
+</a><a href="#h4-0-11" id="h4-0-11" class="i">+                continue;
+</a><a href="#h4-0-12" id="h4-0-12" class="i">+            }
+</a>             // Include the trailing &#39;\n&#39; in the chunk buffer
+             unsigned char *alloc = alloc_-&gt;alloc(f - p + 1);
+             memcpy(alloc, p, f - p + 1);
+<a href="#h4-1" id="h4-1" class="h">@@ -506,7 +511,6 @@ void code_searcher::update_stats(const char *ref, const string&amp; path, git_blob *
+</a>             sf-&gt;content.push_back(StringPiece(line.data(), line.size()));
+         }
+         p = f + 1;
+<a href="#h4-1-3" id="h4-1-3" class="d">-        stats_.lines++;
+</a>     }
+ 
+     for (auto it = alloc_-&gt;begin();
+<a href="#h4-2" id="h4-2" class="h">@@ -556,7 +560,7 @@ void searcher::filtered_search(const chunk *chunk)
+</a> {
+     static per_thread&lt;vector&lt;uint32_t&gt; &gt; indexes;
+     if (!indexes.get()) {
+<a href="#h4-2-3" id="h4-2-3" class="d">-        indexes.put(new vector&lt;uint32_t&gt;(kChunkSize / kMinFilterRatio));
+</a><a href="#h4-2-4" id="h4-2-4" class="i">+        indexes.put(new vector&lt;uint32_t&gt;(cc_-&gt;alloc_-&gt;chunk_size() / kMinFilterRatio));
+</a>     }
+     int count = 0;
+     {
+<b>diff --git a/<a id="h5" href="../file/dump_load.cc">dump_load.cc</a> b/<a href="../file/dump_load.cc">dump_load.cc</a></b>
+<a href="#h5-0" id="h5-0" class="h">@@ -3,6 +3,8 @@
+</a> #include &quot;chunk_allocator.h&quot;
+ 
+ #include &lt;map&gt;
+<a href="#h5-0-3" id="h5-0-3" class="i">+#include &lt;string&gt;
+</a><a href="#h5-0-4" id="h5-0-4" class="i">+#include &lt;memory&gt;
+</a> 
+ #include &lt;sys/fcntl.h&gt;
+ #include &lt;sys/mman.h&gt;
+<a href="#h5-1" id="h5-1" class="h">@@ -46,7 +48,7 @@ public:
+</a>         if (dump) {
+             hdr_.magic      = kIndexMagic;
+             hdr_.version    = kIndexVersion;
+<a href="#h5-1-3" id="h5-1-3" class="d">-            hdr_.chunk_size = kChunkSize;
+</a><a href="#h5-1-4" id="h5-1-4" class="i">+            hdr_.chunk_size = cs-&gt;alloc_-&gt;chunk_size();
+</a>         } else {
+             load(&amp;hdr_);
+         }
+<a href="#h5-2" id="h5-2" class="h">@@ -128,64 +130,71 @@ protected:
+</a> class dump_allocator : public chunk_allocator {
+ public:
+     dump_allocator(code_searcher *cs, const char *path)
+<a href="#h5-2-3" id="h5-2-3" class="d">-        : index_(cs, path, true){
+</a><a href="#h5-2-4" id="h5-2-4" class="d">-        index_.dump(&amp;index_.hdr_);
+</a><a href="#h5-2-5" id="h5-2-5" class="d">-        index_.alignp(kPageSize);
+</a><a href="#h5-2-6" id="h5-2-6" class="d">-        index_.hdr_.chunks_off = index_.stream_.tellp();
+</a><a href="#h5-2-7" id="h5-2-7" class="i">+        : cs_(cs), path_(path), index_() {
+</a>     }
+ 
+     virtual chunk *alloc_chunk() {
+         void *buf;
+ 
+<a href="#h5-2-13" id="h5-2-13" class="d">-        size_t off = index_.stream_.tellp();
+</a><a href="#h5-2-14" id="h5-2-14" class="d">-        assert(ftruncate(index_.fd_, off + 5*kChunkSize) == 0);
+</a><a href="#h5-2-15" id="h5-2-15" class="d">-        buf = mmap(NULL, 5*kChunkSize, PROT_READ|PROT_WRITE, MAP_SHARED,
+</a><a href="#h5-2-16" id="h5-2-16" class="d">-                   index_.fd_, off);
+</a><a href="#h5-2-17" id="h5-2-17" class="i">+        if (!index_.get()) {
+</a><a href="#h5-2-18" id="h5-2-18" class="i">+            index_.reset(new codesearch_index(cs_, path_.c_str(), true));
+</a><a href="#h5-2-19" id="h5-2-19" class="i">+            index_-&gt;dump(&amp;index_-&gt;hdr_);
+</a><a href="#h5-2-20" id="h5-2-20" class="i">+            index_-&gt;alignp(kPageSize);
+</a><a href="#h5-2-21" id="h5-2-21" class="i">+            index_-&gt;hdr_.chunks_off = index_-&gt;stream_.tellp();
+</a><a href="#h5-2-22" id="h5-2-22" class="i">+        }
+</a><a href="#h5-2-23" id="h5-2-23" class="i">+
+</a><a href="#h5-2-24" id="h5-2-24" class="i">+        size_t off = index_-&gt;stream_.tellp();
+</a><a href="#h5-2-25" id="h5-2-25" class="i">+        assert(ftruncate(index_-&gt;fd_, off + 5*chunk_size_) == 0);
+</a><a href="#h5-2-26" id="h5-2-26" class="i">+        buf = mmap(NULL, 5*chunk_size_, PROT_READ|PROT_WRITE, MAP_SHARED,
+</a><a href="#h5-2-27" id="h5-2-27" class="i">+                   index_-&gt;fd_, off);
+</a>         assert(buf != MAP_FAILED);
+<a href="#h5-2-29" id="h5-2-29" class="d">-        index_.stream_.seekp(5*kChunkSize, ios::cur);
+</a><a href="#h5-2-30" id="h5-2-30" class="i">+        index_-&gt;stream_.seekp(5*chunk_size_, ios::cur);
+</a> 
+         return new chunk(static_cast&lt;unsigned char*&gt;(buf),
+                          reinterpret_cast&lt;uint32_t*&gt;
+<a href="#h5-2-34" id="h5-2-34" class="d">-                         (static_cast&lt;unsigned char*&gt;(buf) + kChunkSize));
+</a><a href="#h5-2-35" id="h5-2-35" class="i">+                         (static_cast&lt;unsigned char*&gt;(buf) + chunk_size_));
+</a>     }
+ 
+     virtual void finalize() {
+         chunk_allocator::finalize();
+<a href="#h5-2-40" id="h5-2-40" class="d">-        index_.dump_metadata();
+</a><a href="#h5-2-41" id="h5-2-41" class="d">-        index_.stream_.seekp(0);
+</a><a href="#h5-2-42" id="h5-2-42" class="d">-        index_.dump(&amp;index_.hdr_);
+</a><a href="#h5-2-43" id="h5-2-43" class="d">-        index_.stream_.close();
+</a><a href="#h5-2-44" id="h5-2-44" class="i">+        index_-&gt;dump_metadata();
+</a><a href="#h5-2-45" id="h5-2-45" class="i">+        index_-&gt;stream_.seekp(0);
+</a><a href="#h5-2-46" id="h5-2-46" class="i">+        index_-&gt;dump(&amp;index_-&gt;hdr_);
+</a><a href="#h5-2-47" id="h5-2-47" class="i">+        index_-&gt;stream_.close();
+</a>     }
+ 
+     virtual void free_chunk(chunk *chunk) {
+<a href="#h5-2-51" id="h5-2-51" class="d">-        munmap(chunk-&gt;data, 5*kChunkSize);
+</a><a href="#h5-2-52" id="h5-2-52" class="i">+        munmap(chunk-&gt;data, 5*chunk_size_);
+</a>         delete chunk;
+     }
+ protected:
+<a href="#h5-2-56" id="h5-2-56" class="d">-    codesearch_index index_;
+</a><a href="#h5-2-57" id="h5-2-57" class="i">+    code_searcher *cs_;
+</a><a href="#h5-2-58" id="h5-2-58" class="i">+    std::string path_;
+</a><a href="#h5-2-59" id="h5-2-59" class="i">+    unique_ptr&lt;codesearch_index&gt; index_;
+</a> };
+ 
+ class load_allocator : public chunk_allocator {
+ public:
+     load_allocator(codesearch_index *index)
+<a href="#h5-2-65" id="h5-2-65" class="d">-        : index_(index){
+</a><a href="#h5-2-66" id="h5-2-66" class="i">+        : index_(index) {
+</a>         off_ = index_-&gt;hdr_.chunks_off;
+<a href="#h5-2-68" id="h5-2-68" class="i">+        set_chunk_size(index_-&gt;hdr_.chunk_size);
+</a>     }
+ 
+     virtual chunk *alloc_chunk() {
+         void *buf;
+<a href="#h5-2-73" id="h5-2-73" class="d">-        buf = mmap(NULL, 5*kChunkSize, PROT_READ, MAP_SHARED,
+</a><a href="#h5-2-74" id="h5-2-74" class="i">+        buf = mmap(NULL, 5*chunk_size_, PROT_READ, MAP_SHARED,
+</a>                    index_-&gt;fd_, off_);
+         assert(buf != MAP_FAILED);
+<a href="#h5-2-77" id="h5-2-77" class="d">-        off_ += 5*kChunkSize;
+</a><a href="#h5-2-78" id="h5-2-78" class="i">+        off_ += 5*chunk_size_;
+</a> 
+         return new chunk(static_cast&lt;unsigned char*&gt;(buf),
+                          reinterpret_cast&lt;uint32_t*&gt;
+<a href="#h5-2-82" id="h5-2-82" class="d">-                         (static_cast&lt;unsigned char*&gt;(buf) + kChunkSize));
+</a><a href="#h5-2-83" id="h5-2-83" class="i">+                         (static_cast&lt;unsigned char*&gt;(buf) + chunk_size_));
+</a>     }
+ 
+     virtual void free_chunk(chunk *chunk) {
+<a href="#h5-2-87" id="h5-2-87" class="d">-        munmap(chunk-&gt;data, 5*kChunkSize);
+</a><a href="#h5-2-88" id="h5-2-88" class="i">+        munmap(chunk-&gt;data, 5*chunk_size_);
+</a>         delete chunk;
+     }
+ protected:
+<a href="#h5-3" id="h5-3" class="h">@@ -228,11 +237,11 @@ void codesearch_index::dump_chunk(chunk *chunk) {
+</a> void codesearch_index::dump_chunk_data(chunk *chunk) {
+     alignp(kPageSize);
+     size_t off = stream_.tellp();
+<a href="#h5-3-3" id="h5-3-3" class="d">-    assert(ftruncate(fd_, off + 5 * kChunkSize) == 0);
+</a><a href="#h5-3-4" id="h5-3-4" class="d">-    stream_.write(reinterpret_cast&lt;char*&gt;(chunk-&gt;data), kChunkSize);
+</a><a href="#h5-3-5" id="h5-3-5" class="i">+    assert(ftruncate(fd_, off + 5 * hdr_.chunk_size) == 0);
+</a><a href="#h5-3-6" id="h5-3-6" class="i">+    stream_.write(reinterpret_cast&lt;char*&gt;(chunk-&gt;data), hdr_.chunk_size);
+</a>     stream_.write(reinterpret_cast&lt;char*&gt;(chunk-&gt;suffixes),
+                   sizeof(uint32_t) * chunk-&gt;size);
+<a href="#h5-3-9" id="h5-3-9" class="d">-    stream_.seekp(off + 5 * kChunkSize);
+</a><a href="#h5-3-10" id="h5-3-10" class="i">+    stream_.seekp(off + 5 * hdr_.chunk_size);
+</a> }
+ 
+ 
+<a href="#h5-4" id="h5-4" class="h">@@ -313,7 +322,7 @@ search_file *codesearch_index::load_file() {
+</a> void codesearch_index::load_chunk(chunk *chunk) {
+     chunk_header hdr;
+     load(&amp;hdr);
+<a href="#h5-4-3" id="h5-4-3" class="d">-    assert(hdr.size &lt;= kChunkSize);
+</a><a href="#h5-4-4" id="h5-4-4" class="i">+    assert(hdr.size &lt;= hdr_.chunk_size);
+</a>     chunk-&gt;size = hdr.size;
+ 
+     /*
+<a href="#h5-5" id="h5-5" class="h">@@ -352,10 +361,11 @@ void codesearch_index::load() {
+</a> 
+     assert(hdr_.magic == kIndexMagic);
+     assert(hdr_.version == kIndexVersion);
+<a href="#h5-5-3" id="h5-5-3" class="d">-    assert(hdr_.chunk_size == kChunkSize);
+</a>     assert(hdr_.metadata_off);
+     assert(hdr_.chunks_off);
+ 
+<a href="#h5-5-7" id="h5-5-7" class="i">+    cs_-&gt;alloc_-&gt;set_chunk_size(hdr_.chunk_size);
+</a><a href="#h5-5-8" id="h5-5-8" class="i">+
+</a>     stream_.seekg(hdr_.metadata_off);
+     metadata_header meta;
+     load(&amp;meta);
+</pre>
+</div>
+</body>
+</html>

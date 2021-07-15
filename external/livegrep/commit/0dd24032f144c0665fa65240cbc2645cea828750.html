@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>basic crosscheck against `git grep` - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/0dd24032f144c0665fa65240cbc2645cea828750">0dd24032f144c0665fa65240cbc2645cea828750</a>
+<b>parent</b> <a href="../commit/de4135f0ce294eb4643c2cfca04bfd8bdf334f82">de4135f0ce294eb4643c2cfca04bfd8bdf334f82</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Mon,  1 Dec 2014 22:56:29 -0500
+
+basic crosscheck against `git grep`
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">client/test/integration_test.go</a></td><td> | </td><td class="num">88</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">-</span></td></tr>
+</table></pre><pre>1 file changed, 87 insertions(+), 1 deletion(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/client/test/integration_test.go">client/test/integration_test.go</a> b/<a href="../file/client/test/integration_test.go">client/test/integration_test.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -1,10 +1,16 @@
+</a> package test
+ 
+ import (
+<a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;bufio&quot;
+</a> 	&quot;encoding/json&quot;
+ 	&quot;flag&quot;
+<a href="#h0-0-6" id="h0-0-6" class="i">+	&quot;fmt&quot;
+</a> 	&quot;io/ioutil&quot;
+ 	&quot;os&quot;
+<a href="#h0-0-9" id="h0-0-9" class="i">+	&quot;os/exec&quot;
+</a><a href="#h0-0-10" id="h0-0-10" class="i">+	&quot;regexp&quot;
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+	&quot;sort&quot;
+</a><a href="#h0-0-12" id="h0-0-12" class="i">+	&quot;strconv&quot;
+</a> 	&quot;testing&quot;
+ 
+ 	&quot;github.com/livegrep/livegrep/client&quot;
+<a href="#h0-1" id="h0-1" class="h">@@ -57,7 +63,11 @@ func (i *IntegrationSuite) SetUpSuite(c *check.C) {
+</a> 		c.Fatalf(&quot;Encode: %s&quot;, err)
+ 	}
+ 
+<a href="#h0-1-3" id="h0-1-3" class="d">-	i.client, err = NewClient(&quot;--dump_index&quot;, i.index.Name(), i.config.Name())
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+	i.client, err = NewClient(
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+		&quot;--dump_index&quot;, i.index.Name(),
+</a><a href="#h0-1-6" id="h0-1-6" class="i">+		&quot;--max_matches&quot;, &quot;100000&quot;,
+</a><a href="#h0-1-7" id="h0-1-7" class="i">+		&quot;--timeout&quot;, &quot;100000&quot;,
+</a><a href="#h0-1-8" id="h0-1-8" class="i">+		i.config.Name())
+</a> 	if err != nil {
+ 		c.Fatalf(&quot;NewClient: %s&quot;, err)
+ 	}
+<a href="#h0-2" id="h0-2" class="h">@@ -88,3 +98,79 @@ func (i *IntegrationSuite) TestBasic(c *check.C) {
+</a> 	c.Check(stats, check.Not(check.IsNil))
+ 	c.Check(err, check.IsNil)
+ }
+<a href="#h0-2-3" id="h0-2-3" class="i">+
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+type Match struct {
+</a><a href="#h0-2-5" id="h0-2-5" class="i">+	Path string
+</a><a href="#h0-2-6" id="h0-2-6" class="i">+	Line int
+</a><a href="#h0-2-7" id="h0-2-7" class="i">+}
+</a><a href="#h0-2-8" id="h0-2-8" class="i">+
+</a><a href="#h0-2-9" id="h0-2-9" class="i">+type SortMatches []Match
+</a><a href="#h0-2-10" id="h0-2-10" class="i">+
+</a><a href="#h0-2-11" id="h0-2-11" class="i">+func (s SortMatches) Less(i, j int) bool {
+</a><a href="#h0-2-12" id="h0-2-12" class="i">+	l, r := s[i], s[j]
+</a><a href="#h0-2-13" id="h0-2-13" class="i">+	if l.Path != r.Path {
+</a><a href="#h0-2-14" id="h0-2-14" class="i">+		return l.Path &lt; r.Path
+</a><a href="#h0-2-15" id="h0-2-15" class="i">+	}
+</a><a href="#h0-2-16" id="h0-2-16" class="i">+	return l.Line &lt; r.Line
+</a><a href="#h0-2-17" id="h0-2-17" class="i">+}
+</a><a href="#h0-2-18" id="h0-2-18" class="i">+func (s SortMatches) Len() int {
+</a><a href="#h0-2-19" id="h0-2-19" class="i">+	return len(s)
+</a><a href="#h0-2-20" id="h0-2-20" class="i">+}
+</a><a href="#h0-2-21" id="h0-2-21" class="i">+
+</a><a href="#h0-2-22" id="h0-2-22" class="i">+func (s SortMatches) Swap(i, j int) {
+</a><a href="#h0-2-23" id="h0-2-23" class="i">+	s[i], s[j] = s[j], s[i]
+</a><a href="#h0-2-24" id="h0-2-24" class="i">+}
+</a><a href="#h0-2-25" id="h0-2-25" class="i">+
+</a><a href="#h0-2-26" id="h0-2-26" class="i">+var grepRE = regexp.MustCompile(`^HEAD:([^:]+):(\d+):`)
+</a><a href="#h0-2-27" id="h0-2-27" class="i">+
+</a><a href="#h0-2-28" id="h0-2-28" class="i">+func gitGrep(path, regex string) ([]Match, error) {
+</a><a href="#h0-2-29" id="h0-2-29" class="i">+	cmd := exec.Command(&quot;git&quot;, &quot;grep&quot;, &quot;-n&quot;, &quot;-E&quot;, &quot;-e&quot;, regex, &quot;HEAD&quot;)
+</a><a href="#h0-2-30" id="h0-2-30" class="i">+	cmd.Dir = path
+</a><a href="#h0-2-31" id="h0-2-31" class="i">+	out, err := cmd.StdoutPipe()
+</a><a href="#h0-2-32" id="h0-2-32" class="i">+	if err != nil {
+</a><a href="#h0-2-33" id="h0-2-33" class="i">+		return nil, err
+</a><a href="#h0-2-34" id="h0-2-34" class="i">+	}
+</a><a href="#h0-2-35" id="h0-2-35" class="i">+
+</a><a href="#h0-2-36" id="h0-2-36" class="i">+	var matches []Match
+</a><a href="#h0-2-37" id="h0-2-37" class="i">+
+</a><a href="#h0-2-38" id="h0-2-38" class="i">+	cmd.Start()
+</a><a href="#h0-2-39" id="h0-2-39" class="i">+	scan := bufio.NewScanner(out)
+</a><a href="#h0-2-40" id="h0-2-40" class="i">+	for scan.Scan() {
+</a><a href="#h0-2-41" id="h0-2-41" class="i">+		line := scan.Bytes()
+</a><a href="#h0-2-42" id="h0-2-42" class="i">+		m := grepRE.FindSubmatch(line)
+</a><a href="#h0-2-43" id="h0-2-43" class="i">+		if m == nil {
+</a><a href="#h0-2-44" id="h0-2-44" class="i">+			return nil, fmt.Errorf(&quot;unparsable: `%s&#39;&quot;, line)
+</a><a href="#h0-2-45" id="h0-2-45" class="i">+		}
+</a><a href="#h0-2-46" id="h0-2-46" class="i">+		lno, _ := strconv.Atoi(string(m[2]))
+</a><a href="#h0-2-47" id="h0-2-47" class="i">+		matches = append(matches, Match{string(m[1]), lno})
+</a><a href="#h0-2-48" id="h0-2-48" class="i">+	}
+</a><a href="#h0-2-49" id="h0-2-49" class="i">+	cmd.Wait()
+</a><a href="#h0-2-50" id="h0-2-50" class="i">+
+</a><a href="#h0-2-51" id="h0-2-51" class="i">+	return matches, nil
+</a><a href="#h0-2-52" id="h0-2-52" class="i">+}
+</a><a href="#h0-2-53" id="h0-2-53" class="i">+
+</a><a href="#h0-2-54" id="h0-2-54" class="i">+func (i *IntegrationSuite) crosscheck(c *check.C, regex string) {
+</a><a href="#h0-2-55" id="h0-2-55" class="i">+	gitMatches, err := gitGrep(*repo, regex)
+</a><a href="#h0-2-56" id="h0-2-56" class="i">+	if err != nil {
+</a><a href="#h0-2-57" id="h0-2-57" class="i">+		c.Fatalf(&quot;git grep: %s&quot;, err)
+</a><a href="#h0-2-58" id="h0-2-58" class="i">+	}
+</a><a href="#h0-2-59" id="h0-2-59" class="i">+
+</a><a href="#h0-2-60" id="h0-2-60" class="i">+	var livegrepMatches []Match
+</a><a href="#h0-2-61" id="h0-2-61" class="i">+	search, err := i.client.Query(&amp;client.Query{Line: regex})
+</a><a href="#h0-2-62" id="h0-2-62" class="i">+	if err != nil {
+</a><a href="#h0-2-63" id="h0-2-63" class="i">+		c.Fatalf(&quot;Query: %s&quot;, err)
+</a><a href="#h0-2-64" id="h0-2-64" class="i">+	}
+</a><a href="#h0-2-65" id="h0-2-65" class="i">+	for m := range search.Results() {
+</a><a href="#h0-2-66" id="h0-2-66" class="i">+		livegrepMatches = append(livegrepMatches, Match{m.Path, m.LineNumber})
+</a><a href="#h0-2-67" id="h0-2-67" class="i">+	}
+</a><a href="#h0-2-68" id="h0-2-68" class="i">+	search.Close()
+</a><a href="#h0-2-69" id="h0-2-69" class="i">+
+</a><a href="#h0-2-70" id="h0-2-70" class="i">+	sort.Sort(SortMatches(gitMatches))
+</a><a href="#h0-2-71" id="h0-2-71" class="i">+	sort.Sort(SortMatches(livegrepMatches))
+</a><a href="#h0-2-72" id="h0-2-72" class="i">+
+</a><a href="#h0-2-73" id="h0-2-73" class="i">+	c.Check(livegrepMatches, check.DeepEquals, gitMatches)
+</a><a href="#h0-2-74" id="h0-2-74" class="i">+}
+</a><a href="#h0-2-75" id="h0-2-75" class="i">+
+</a><a href="#h0-2-76" id="h0-2-76" class="i">+func (i *IntegrationSuite) TestCrosscheck(c *check.C) {
+</a><a href="#h0-2-77" id="h0-2-77" class="i">+	i.crosscheck(c, `hello`)
+</a><a href="#h0-2-78" id="h0-2-78" class="i">+}
+</a></pre>
+</div>
+</body>
+</html>

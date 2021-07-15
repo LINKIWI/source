@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Add the capability to limit matches by filename. - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/d6c82bf4b9773a32180b55a804d1a389910a56a8">d6c82bf4b9773a32180b55a804d1a389910a56a8</a>
+<b>parent</b> <a href="../commit/dae062e81d4dac42c360e1e75ff06de9d1ed1c85">dae062e81d4dac42c360e1e75ff06de9d1ed1c85</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Tue, 31 Jan 2012 19:24:35 -0500
+
+Add the capability to limit matches by filename.
+
+For now, just accept a command-line argument.
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">codesearch.cc</a></td><td> | </td><td class="num">128</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">-----------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">codesearch.h</a></td><td> | </td><td class="num">7</td><td><span class="i">++++</span><span class="d">---</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">main.cc</a></td><td> | </td><td class="num">4</td><td><span class="i">+++</span><span class="d">-</span></td></tr>
+</table></pre><pre>3 files changed, 117 insertions(+), 22 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/codesearch.cc">codesearch.cc</a> b/<a href="../file/codesearch.cc">codesearch.cc</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -33,7 +33,11 @@ const int    kMaxMatches   = 50;
+</a> const int    kContextLines = 3;
+ 
+ #ifdef PROFILE_CODESEARCH
+<a href="#h0-0-3" id="h0-0-3" class="d">-#define log_profile(format, ...) fprintf(stderr, format, __VA_ARGS__)
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+DEFINE_bool(debug_search, false, &quot;Produce debugging output about the search process&quot;);
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+#define log_profile(format, ...) do {                   \
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+        if (FLAGS_debug_search)                         \
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+            fprintf(stderr, format, ## __VA_ARGS__);    \
+</a><a href="#h0-0-8" id="h0-0-8" class="i">+    } while(0)
+</a> #else
+ #define log_profile(...)
+ #endif
+<a href="#h0-1" id="h0-1" class="h">@@ -59,19 +63,21 @@ size_t hashstr::operator()(const StringPiece&amp; str) const {
+</a> const StringPiece empty_string(NULL, 0);
+ 
+ class code_searcher;
+<a href="#h0-1-3" id="h0-1-3" class="i">+struct match_finger;
+</a> 
+ class searcher {
+ public:
+<a href="#h0-1-7" id="h0-1-7" class="d">-    searcher(const code_searcher *cc, thread_queue&lt;match_result*&gt;&amp; queue, RE2&amp; pat) :
+</a><a href="#h0-1-8" id="h0-1-8" class="d">-        cc_(cc), pat_(pat), queue_(queue),
+</a><a href="#h0-1-9" id="h0-1-9" class="i">+    searcher(const code_searcher *cc, thread_queue&lt;match_result*&gt;&amp; queue,
+</a><a href="#h0-1-10" id="h0-1-10" class="i">+             RE2&amp; pat, RE2 *file_pat) :
+</a><a href="#h0-1-11" id="h0-1-11" class="i">+        cc_(cc), pat_(pat), file_pat_(file_pat), queue_(queue),
+</a>         matches_(0), re2_time_(false), git_time_(false),
+         index_time_(false), sort_time_(false), analyze_time_(false),
+<a href="#h0-1-14" id="h0-1-14" class="d">-        exit_reason_(kExitNone)
+</a><a href="#h0-1-15" id="h0-1-15" class="i">+        exit_reason_(kExitNone), files_(new uint8_t[cc-&gt;files_.size()])
+</a>     {
+<a href="#h0-1-17" id="h0-1-17" class="i">+        memset(files_, 0xff, cc-&gt;files_.size());
+</a>         {
+             run_timer run(analyze_time_);
+             index_ = indexRE(pat);
+<a href="#h0-1-21" id="h0-1-21" class="d">-            log_profile(&quot;Index: %s\n&quot;, index_-&gt;ToString().c_str());
+</a>         }
+ 
+         if (FLAGS_timeout &lt;= 0) {
+<a href="#h0-2" id="h0-2" class="h">@@ -83,6 +89,8 @@ public:
+</a>     }
+ 
+     ~searcher() {
+<a href="#h0-2-3" id="h0-2-3" class="i">+        delete files_;
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+
+</a>         log_profile(&quot;re2 time: %d.%06ds\n&quot;,
+                     int(re2_time_.elapsed().tv_sec),
+                     int(re2_time_.elapsed().tv_usec));
+<a href="#h0-3" id="h0-3" class="h">@@ -115,12 +123,28 @@ public:
+</a>     }
+ 
+ protected:
+<a href="#h0-3-3" id="h0-3-3" class="i">+    void next_range(match_finger *finger, int&amp; minpos, int&amp; maxpos, int end);
+</a>     void full_search(const chunk *chunk);
+<a href="#h0-3-5" id="h0-3-5" class="d">-    void full_search(const chunk *chunk, size_t minpos, size_t maxpos);
+</a><a href="#h0-3-6" id="h0-3-6" class="i">+    void full_search(match_finger *finger, const chunk *chunk,
+</a><a href="#h0-3-7" id="h0-3-7" class="i">+                     size_t minpos, size_t maxpos);
+</a> 
+     void filtered_search(const chunk *chunk);
+     void search_lines(uint32_t *left, int count, const chunk *chunk);
+ 
+<a href="#h0-3-12" id="h0-3-12" class="i">+    bool accept(search_file *sf) {
+</a><a href="#h0-3-13" id="h0-3-13" class="i">+        if (!file_pat_)
+</a><a href="#h0-3-14" id="h0-3-14" class="i">+            return true;
+</a><a href="#h0-3-15" id="h0-3-15" class="i">+
+</a><a href="#h0-3-16" id="h0-3-16" class="i">+        assert(cc_-&gt;files_[sf-&gt;no] == sf);
+</a><a href="#h0-3-17" id="h0-3-17" class="i">+
+</a><a href="#h0-3-18" id="h0-3-18" class="i">+        if (files_[sf-&gt;no] == 0xff) {
+</a><a href="#h0-3-19" id="h0-3-19" class="i">+            files_[sf-&gt;no] = file_pat_-&gt;Match(sf-&gt;path, 0, sf-&gt;path.size(),
+</a><a href="#h0-3-20" id="h0-3-20" class="i">+                                              RE2::UNANCHORED, 0, 0);
+</a><a href="#h0-3-21" id="h0-3-21" class="i">+        }
+</a><a href="#h0-3-22" id="h0-3-22" class="i">+
+</a><a href="#h0-3-23" id="h0-3-23" class="i">+        return files_[sf-&gt;no];
+</a><a href="#h0-3-24" id="h0-3-24" class="i">+    }
+</a><a href="#h0-3-25" id="h0-3-25" class="i">+
+</a>     void find_match (const chunk *chunk,
+                      const StringPiece&amp; match,
+                      const StringPiece&amp; line) {
+<a href="#h0-4" id="h0-4" class="h">@@ -128,22 +152,21 @@ protected:
+</a>         timer tm;
+         int off = (unsigned char*)line.data() - chunk-&gt;data;
+         int searched = 0;
+<a href="#h0-4-3" id="h0-4-3" class="d">-        bool found = false;
+</a><a href="#h0-4-4" id="h0-4-4" class="i">+
+</a>         for(vector&lt;chunk_file&gt;::const_iterator it = chunk-&gt;files.begin();
+             it != chunk-&gt;files.end(); it++) {
+<a href="#h0-4-7" id="h0-4-7" class="d">-            if (off &gt;= it-&gt;left &amp;&amp; off &lt;= it-&gt;right) {
+</a><a href="#h0-4-8" id="h0-4-8" class="i">+            if (off &gt;= it-&gt;left &amp;&amp; off &lt;= it-&gt;right &amp;&amp; accept(it-&gt;file)) {
+</a>                 searched++;
+                 if (exit_early())
+                     break;
+                 match_result *m = try_match(line, match, it-&gt;file);
+                 if (m) {
+<a href="#h0-4-14" id="h0-4-14" class="d">-                    found = true;
+</a>                     queue_.push(m);
+                     ++matches_;
+                 }
+             }
+         }
+<a href="#h0-4-20" id="h0-4-20" class="d">-        assert(found || exit_reason_);
+</a><a href="#h0-4-21" id="h0-4-21" class="i">+
+</a>         tm.pause();
+         log_profile(&quot;Searched %d files in %d.%06ds\n&quot;,
+                     searched,
+<a href="#h0-5" id="h0-5" class="h">@@ -215,6 +238,7 @@ protected:
+</a> 
+     const code_searcher *cc_;
+     RE2&amp; pat_;
+<a href="#h0-5-3" id="h0-5-3" class="i">+    RE2 *file_pat_;
+</a>     thread_queue&lt;match_result*&gt;&amp; queue_;
+     atomic_int matches_;
+     intrusive_ptr&lt;IndexKey&gt; index_;
+<a href="#h0-6" id="h0-6" class="h">@@ -225,6 +249,7 @@ protected:
+</a>     timer analyze_time_;
+     timeval limit_;
+     exit_reason exit_reason_;
+<a href="#h0-6-3" id="h0-6-3" class="i">+    uint8_t *files_;
+</a> 
+     friend class code_searcher::search_thread;
+ };
+<a href="#h0-7" id="h0-7" class="h">@@ -463,6 +488,14 @@ void searcher::filtered_search(const chunk *chunk)
+</a>     delete[] indexes;
+ }
+ 
+<a href="#h0-7-3" id="h0-7-3" class="i">+
+</a><a href="#h0-7-4" id="h0-7-4" class="i">+struct match_finger {
+</a><a href="#h0-7-5" id="h0-7-5" class="i">+    const chunk *chunk_;
+</a><a href="#h0-7-6" id="h0-7-6" class="i">+    vector&lt;chunk_file&gt;::const_iterator it_;
+</a><a href="#h0-7-7" id="h0-7-7" class="i">+    match_finger(const chunk *chunk) :
+</a><a href="#h0-7-8" id="h0-7-8" class="i">+        chunk_(chunk), it_(chunk-&gt;files.begin()) {};
+</a><a href="#h0-7-9" id="h0-7-9" class="i">+};
+</a><a href="#h0-7-10" id="h0-7-10" class="i">+
+</a> const size_t kMinSkip = 250;
+ const int kMinFilterRatio = 50;
+ 
+<a href="#h0-8" id="h0-8" class="h">@@ -484,6 +517,7 @@ void searcher::search_lines(uint32_t *indexes, int count,
+</a>         lsd_radix_sort(indexes, indexes + count);
+     }
+ 
+<a href="#h0-8-3" id="h0-8-3" class="i">+    match_finger finger(chunk);
+</a> 
+     StringPiece search((char*)chunk-&gt;data, chunk-&gt;size);
+     uint32_t max = indexes[0];
+<a href="#h0-9" id="h0-9" class="h">@@ -498,7 +532,7 @@ void searcher::search_lines(uint32_t *indexes, int count,
+</a>         }
+ 
+         int end = line_end(chunk, max);
+<a href="#h0-9-3" id="h0-9-3" class="d">-        full_search(chunk, min, end);
+</a><a href="#h0-9-4" id="h0-9-4" class="i">+        full_search(&amp;finger, chunk, min, end);
+</a> 
+         if (i != count) {
+             max = indexes[i];
+<a href="#h0-10" id="h0-10" class="h">@@ -509,19 +543,77 @@ void searcher::search_lines(uint32_t *indexes, int count,
+</a> 
+ void searcher::full_search(const chunk *chunk)
+ {
+<a href="#h0-10-3" id="h0-10-3" class="d">-    full_search(chunk, 0, chunk-&gt;size - 1);
+</a><a href="#h0-10-4" id="h0-10-4" class="i">+    match_finger finger(chunk);
+</a><a href="#h0-10-5" id="h0-10-5" class="i">+    full_search(&amp;finger, chunk, 0, chunk-&gt;size - 1);
+</a> }
+ 
+<a href="#h0-10-8" id="h0-10-8" class="d">-void searcher::full_search(const chunk *chunk, size_t minpos, size_t maxpos)
+</a><a href="#h0-10-9" id="h0-10-9" class="i">+void searcher::next_range(match_finger *finger,
+</a><a href="#h0-10-10" id="h0-10-10" class="i">+                          int&amp; pos, int&amp; endpos, int maxpos)
+</a><a href="#h0-10-11" id="h0-10-11" class="i">+{
+</a><a href="#h0-10-12" id="h0-10-12" class="i">+    if (!file_pat_ || !FLAGS_index)
+</a><a href="#h0-10-13" id="h0-10-13" class="i">+        return;
+</a><a href="#h0-10-14" id="h0-10-14" class="i">+
+</a><a href="#h0-10-15" id="h0-10-15" class="i">+    log_profile(&quot;next_range(%d, %d, %d)\n&quot;, pos, endpos, maxpos);
+</a><a href="#h0-10-16" id="h0-10-16" class="i">+
+</a><a href="#h0-10-17" id="h0-10-17" class="i">+    vector&lt;chunk_file&gt;::const_iterator&amp; it = finger-&gt;it_;
+</a><a href="#h0-10-18" id="h0-10-18" class="i">+    const vector&lt;chunk_file&gt;::const_iterator&amp; end = finger-&gt;chunk_-&gt;files.end();
+</a><a href="#h0-10-19" id="h0-10-19" class="i">+
+</a><a href="#h0-10-20" id="h0-10-20" class="i">+    /* Find the first matching range that intersects [pos, maxpos) */
+</a><a href="#h0-10-21" id="h0-10-21" class="i">+    while (it != end &amp;&amp;
+</a><a href="#h0-10-22" id="h0-10-22" class="i">+           (it-&gt;right &lt; pos || !accept(it-&gt;file)) &amp;&amp;
+</a><a href="#h0-10-23" id="h0-10-23" class="i">+           it-&gt;left &lt; maxpos)
+</a><a href="#h0-10-24" id="h0-10-24" class="i">+        ++it;
+</a><a href="#h0-10-25" id="h0-10-25" class="i">+
+</a><a href="#h0-10-26" id="h0-10-26" class="i">+    if (it == end || it-&gt;left &gt;= maxpos) {
+</a><a href="#h0-10-27" id="h0-10-27" class="i">+        pos = endpos = maxpos;
+</a><a href="#h0-10-28" id="h0-10-28" class="i">+        return;
+</a><a href="#h0-10-29" id="h0-10-29" class="i">+    }
+</a><a href="#h0-10-30" id="h0-10-30" class="i">+
+</a><a href="#h0-10-31" id="h0-10-31" class="i">+    pos = max(pos, it-&gt;left);
+</a><a href="#h0-10-32" id="h0-10-32" class="i">+
+</a><a href="#h0-10-33" id="h0-10-33" class="i">+    /*
+</a><a href="#h0-10-34" id="h0-10-34" class="i">+     * Now scan until we either prove that [pos, maxpos) is all in
+</a><a href="#h0-10-35" id="h0-10-35" class="i">+     * range, or until we pass maxpos.
+</a><a href="#h0-10-36" id="h0-10-36" class="i">+     */
+</a><a href="#h0-10-37" id="h0-10-37" class="i">+    do {
+</a><a href="#h0-10-38" id="h0-10-38" class="i">+        if (it-&gt;right &gt; endpos &amp;&amp; accept(it-&gt;file)) {
+</a><a href="#h0-10-39" id="h0-10-39" class="i">+            endpos = max(endpos, it-&gt;right);
+</a><a href="#h0-10-40" id="h0-10-40" class="i">+            if (endpos &gt;= maxpos)
+</a><a href="#h0-10-41" id="h0-10-41" class="i">+                /*
+</a><a href="#h0-10-42" id="h0-10-42" class="i">+                 * We&#39;ve accepted the entire range. No point in going on.
+</a><a href="#h0-10-43" id="h0-10-43" class="i">+                 */
+</a><a href="#h0-10-44" id="h0-10-44" class="i">+                break;
+</a><a href="#h0-10-45" id="h0-10-45" class="i">+        }
+</a><a href="#h0-10-46" id="h0-10-46" class="i">+        ++it;
+</a><a href="#h0-10-47" id="h0-10-47" class="i">+    } while (it != end &amp;&amp; it-&gt;left &lt; maxpos);
+</a><a href="#h0-10-48" id="h0-10-48" class="i">+
+</a><a href="#h0-10-49" id="h0-10-49" class="i">+    endpos = min(endpos, maxpos);
+</a><a href="#h0-10-50" id="h0-10-50" class="i">+}
+</a><a href="#h0-10-51" id="h0-10-51" class="i">+
+</a><a href="#h0-10-52" id="h0-10-52" class="i">+void searcher::full_search(match_finger *finger,
+</a><a href="#h0-10-53" id="h0-10-53" class="i">+                           const chunk *chunk, size_t minpos, size_t maxpos)
+</a> {
+     StringPiece str((char*)chunk-&gt;data, chunk-&gt;size);
+     StringPiece match;
+<a href="#h0-10-57" id="h0-10-57" class="d">-    int pos = minpos, new_pos;
+</a><a href="#h0-10-58" id="h0-10-58" class="i">+    int pos = minpos, new_pos, end = minpos;
+</a>     while (pos &lt; maxpos &amp;&amp; !exit_early()) {
+<a href="#h0-10-60" id="h0-10-60" class="i">+        if (pos &gt;= end) {
+</a><a href="#h0-10-61" id="h0-10-61" class="i">+            end = maxpos;
+</a><a href="#h0-10-62" id="h0-10-62" class="i">+            next_range(finger, pos, end, maxpos);
+</a><a href="#h0-10-63" id="h0-10-63" class="i">+            assert(pos &lt;= end);
+</a><a href="#h0-10-64" id="h0-10-64" class="i">+        }
+</a><a href="#h0-10-65" id="h0-10-65" class="i">+        if (pos &gt;= maxpos)
+</a><a href="#h0-10-66" id="h0-10-66" class="i">+            break;
+</a><a href="#h0-10-67" id="h0-10-67" class="i">+
+</a><a href="#h0-10-68" id="h0-10-68" class="i">+        log_profile(&quot;[%p] range:%d-%d/%d-%d\n&quot;,
+</a><a href="#h0-10-69" id="h0-10-69" class="i">+                    (void*)(chunk), pos, end, int(minpos), int(maxpos));
+</a><a href="#h0-10-70" id="h0-10-70" class="i">+
+</a>         {
+             run_timer run(re2_time_);
+<a href="#h0-10-73" id="h0-10-73" class="d">-            if (!pat_.Match(str, pos, maxpos, RE2::UNANCHORED, &amp;match, 1))
+</a><a href="#h0-10-74" id="h0-10-74" class="d">-                break;
+</a><a href="#h0-10-75" id="h0-10-75" class="i">+            if (!pat_.Match(str, pos, end, RE2::UNANCHORED, &amp;match, 1)) {
+</a><a href="#h0-10-76" id="h0-10-76" class="i">+                pos = end + 1;
+</a><a href="#h0-10-77" id="h0-10-77" class="i">+                continue;
+</a><a href="#h0-10-78" id="h0-10-78" class="i">+            }
+</a>         }
+         assert(memchr(match.data(), &#39;\n&#39;, match.size()) == NULL);
+         StringPiece line = find_line(str, match);
+<a href="#h0-11" id="h0-11" class="h">@@ -596,7 +688,7 @@ code_searcher::search_thread::search_thread(code_searcher *cs)
+</a>     : cs_(cs), pool_(FLAGS_threads, &amp;search_one) {
+ }
+ 
+<a href="#h0-11-3" id="h0-11-3" class="d">-void code_searcher::search_thread::match_internal(RE2&amp; pat,
+</a><a href="#h0-11-4" id="h0-11-4" class="i">+void code_searcher::search_thread::match_internal(RE2&amp; pat, RE2 *file_pat,
+</a>                                                  const code_searcher::search_thread::base_cb&amp; cb,
+                                                  match_stats *stats) {
+     list&lt;chunk*&gt;::iterator it;
+<a href="#h0-12" id="h0-12" class="h">@@ -607,7 +699,7 @@ void code_searcher::search_thread::match_internal(RE2&amp; pat,
+</a>     assert(cs_-&gt;finalized_);
+ 
+     thread_queue&lt;match_result*&gt; results;
+<a href="#h0-12-3" id="h0-12-3" class="d">-    searcher search(cs_, results, pat);
+</a><a href="#h0-12-4" id="h0-12-4" class="i">+    searcher search(cs_, results, pat, file_pat);
+</a> 
+     memset(stats, 0, sizeof *stats);
+     stats-&gt;why = kExitNone;
+<b>diff --git a/<a id="h1" href="../file/codesearch.h">codesearch.h</a> b/<a href="../file/codesearch.h">codesearch.h</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -117,14 +117,15 @@ public:
+</a>             T cb_;
+         };
+ 
+<a href="#h1-0-3" id="h1-0-3" class="d">-        void match_internal(RE2&amp; pat, const base_cb&amp; cb, match_stats *stats);
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+        void match_internal(RE2&amp; pat, RE2 *file_pat, const base_cb&amp; cb, match_stats *stats);
+</a>     public:
+         search_thread(code_searcher *cs);
+         ~search_thread();
+ 
+<a href="#h1-0-9" id="h1-0-9" class="i">+        /* file_pat may be NULL */
+</a>         template &lt;class T&gt;
+<a href="#h1-0-11" id="h1-0-11" class="d">-        void match(RE2&amp; pat, T cb, match_stats *stats) {
+</a><a href="#h1-0-12" id="h1-0-12" class="d">-            match_internal(pat, match_cb&lt;T&gt;(cb), stats);
+</a><a href="#h1-0-13" id="h1-0-13" class="i">+        void match(RE2&amp; pat, RE2 *file_pat, T cb, match_stats *stats) {
+</a><a href="#h1-0-14" id="h1-0-14" class="i">+            match_internal(pat, file_pat, match_cb&lt;T&gt;(cb), stats);
+</a>         }
+     protected:
+         const code_searcher *cs_;
+<b>diff --git a/<a id="h2" href="../file/main.cc">main.cc</a> b/<a href="../file/main.cc">main.cc</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -23,6 +23,7 @@ DEFINE_string(load_index, &quot;&quot;, &quot;Load the index from a file instead of walking the
+</a> DEFINE_string(git_dir, &quot;.git&quot;, &quot;The git directory to read from&quot;);
+ DEFINE_bool(quiet, false, &quot;Do the search, but don&#39;t print results.&quot;);
+ DEFINE_string(listen, &quot;&quot;, &quot;Listen on a UNIX socket for connections&quot;);
+<a href="#h2-0-3" id="h2-0-3" class="i">+DEFINE_string(file, &quot;&quot;, &quot;Only match files matching the provided regex&quot;);
+</a> 
+ using namespace std;
+ using namespace re2;
+<a href="#h2-1" id="h2-1" class="h">@@ -161,6 +162,7 @@ void interact(code_searcher *cs, FILE *in, FILE *out) {
+</a>         if (feof(in) || ferror(in))
+             break;
+         RE2 re(line, opts);
+<a href="#h2-1-3" id="h2-1-3" class="i">+        RE2 file(FLAGS_file, opts);
+</a>         if (!re.ok()) {
+             print_error(out, re.error());
+             continue;
+<a href="#h2-2" id="h2-2" class="h">@@ -182,7 +184,7 @@ void interact(code_searcher *cs, FILE *in, FILE *out) {
+</a>             if (!FLAGS_json)
+                 fprintf(out, &quot;ProgramSize: %d\n&quot;, re.ProgramSize());
+ 
+<a href="#h2-2-3" id="h2-2-3" class="d">-            search.match(re, print_match(out), &amp;stats);
+</a><a href="#h2-2-4" id="h2-2-4" class="i">+            search.match(re, FLAGS_file.size() ? &amp;file : 0, print_match(out), &amp;stats);
+</a>             elapsed = tm.elapsed();
+             if (FLAGS_json)
+                 print_stats(out, stats);
+</pre>
+</div>
+</body>
+</html>

@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>livegrep-github-reindex: chain to livegrep-fetch-reindex - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/73213f227138fb2664a2b964ef8313e5b67bb6a7">73213f227138fb2664a2b964ef8313e5b67bb6a7</a>
+<b>parent</b> <a href="../commit/8c639ff5f1b7e3916ed1c480eeab6bc50c4f8c73">8c639ff5f1b7e3916ed1c480eeab6bc50c4f8c73</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Mon, 24 Aug 2020 11:36:31 -0700
+
+livegrep-github-reindex: chain to livegrep-fetch-reindex
+
+This lets us drop to a single copy of the cloning code. In order to
+make this work, we add a new clone_options field to the config proto
+in order to side-channel the information we need.
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">cmd/livegrep-fetch-reindex/main.go</a></td><td> | </td><td class="num">91</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">-----</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">cmd/livegrep-github-reindex/main.go</a></td><td> | </td><td class="num">219</td><td><span class="i">++++++++++++++++++</span><span class="d">-------------------------------------------------------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">src/proto/config.proto</a></td><td> | </td><td class="num">17</td><td><span class="i">++++++++++++</span><span class="d">-----</span></td></tr>
+</table></pre><pre>3 files changed, 146 insertions(+), 181 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/cmd/livegrep-fetch-reindex/main.go">cmd/livegrep-fetch-reindex/main.go</a> b/<a href="../file/cmd/livegrep-fetch-reindex/main.go">cmd/livegrep-fetch-reindex/main.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -19,7 +19,7 @@ import (
+</a> )
+ 
+ var (
+<a href="#h0-0-3" id="h0-0-3" class="d">-	flagCodesearch    = flag.String(&quot;codesearch&quot;, path.Join(path.Dir(os.Args[0]), &quot;codesearch&quot;), &quot;Path to the `codesearch` binary&quot;)
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+	flagCodesearch    = flag.String(&quot;codesearch&quot;, &quot;&quot;, &quot;Path to the `codesearch` binary&quot;)
+</a> 	flagIndexPath     = flag.String(&quot;out&quot;, &quot;livegrep.idx&quot;, &quot;Path to write the index&quot;)
+ 	flagRevparse      = flag.Bool(&quot;revparse&quot;, true, &quot;whether to `git rev-parse` the provided revision in generated links&quot;)
+ 	flagSkipMissing   = flag.Bool(&quot;skip-missing&quot;, false, &quot;skip repositories where the specified revision is missing&quot;)
+<a href="#h0-1" id="h0-1" class="h">@@ -63,7 +63,7 @@ func main() {
+</a> 	}
+ 	args = append(args, flag.Arg(0))
+ 
+<a href="#h0-1-3" id="h0-1-3" class="d">-	cmd := exec.Command(*flagCodesearch, args...)
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+	cmd := exec.Command(findCodesearch(*flagCodesearch), args...)
+</a> 	cmd.Stdout = os.Stdout
+ 	cmd.Stderr = os.Stderr
+ 	if err := cmd.Run(); err != nil {
+<a href="#h0-2" id="h0-2" class="h">@@ -81,6 +81,22 @@ func main() {
+</a> 	}
+ }
+ 
+<a href="#h0-2-3" id="h0-2-3" class="i">+func findCodesearch(given string) string {
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+	if given != &quot;&quot; {
+</a><a href="#h0-2-5" id="h0-2-5" class="i">+		return given
+</a><a href="#h0-2-6" id="h0-2-6" class="i">+	}
+</a><a href="#h0-2-7" id="h0-2-7" class="i">+	search := []string{
+</a><a href="#h0-2-8" id="h0-2-8" class="i">+		path.Join(path.Dir(os.Args[0]), &quot;codesearch&quot;),
+</a><a href="#h0-2-9" id="h0-2-9" class="i">+		&quot;bazel-bin/src/tools/codesearch&quot;,
+</a><a href="#h0-2-10" id="h0-2-10" class="i">+	}
+</a><a href="#h0-2-11" id="h0-2-11" class="i">+	for _, try := range search {
+</a><a href="#h0-2-12" id="h0-2-12" class="i">+		if st, err := os.Stat(try); err == nil &amp;&amp; (st.Mode()&amp;os.ModeDir) == 0 {
+</a><a href="#h0-2-13" id="h0-2-13" class="i">+			return try
+</a><a href="#h0-2-14" id="h0-2-14" class="i">+		}
+</a><a href="#h0-2-15" id="h0-2-15" class="i">+	}
+</a><a href="#h0-2-16" id="h0-2-16" class="i">+	return &quot;codesearch&quot;
+</a><a href="#h0-2-17" id="h0-2-17" class="i">+}
+</a><a href="#h0-2-18" id="h0-2-18" class="i">+
+</a> func checkoutRepos(repos *[]*config.RepoSpec) error {
+ 	repoc := make(chan *config.RepoSpec)
+ 	errc := make(chan error, Workers)
+<a href="#h0-3" id="h0-3" class="h">@@ -133,12 +149,63 @@ func checkoutWorker(c &lt;-chan *config.RepoSpec,
+</a> 	}
+ }
+ 
+<a href="#h0-3-3" id="h0-3-3" class="d">-func retryCommand(program string, args []string) error {
+</a><a href="#h0-3-4" id="h0-3-4" class="i">+const credentialHelperScript = (`#!/bin/sh
+</a><a href="#h0-3-5" id="h0-3-5" class="i">+if test &quot;$1&quot; = &quot;get&quot;; then
+</a><a href="#h0-3-6" id="h0-3-6" class="i">+  pass=` + &quot;`cat &lt;&amp;3`&quot; + `
+</a><a href="#h0-3-7" id="h0-3-7" class="i">+  if test -n &quot;$LIVEGREP_GITHUB_USERNAME&quot;; then
+</a><a href="#h0-3-8" id="h0-3-8" class="i">+    echo &quot;username=$LIVEGREP_GITHUB_USERNAME&quot;
+</a><a href="#h0-3-9" id="h0-3-9" class="i">+  fi
+</a><a href="#h0-3-10" id="h0-3-10" class="i">+  if test -n &quot;$pass&quot;; then
+</a><a href="#h0-3-11" id="h0-3-11" class="i">+    echo &quot;password=$pass&quot;
+</a><a href="#h0-3-12" id="h0-3-12" class="i">+  fi
+</a><a href="#h0-3-13" id="h0-3-13" class="i">+fi
+</a><a href="#h0-3-14" id="h0-3-14" class="i">+`)
+</a><a href="#h0-3-15" id="h0-3-15" class="i">+
+</a><a href="#h0-3-16" id="h0-3-16" class="i">+func callGit(program string, args []string, username string, password string) error {
+</a> 	var err error
+<a href="#h0-3-18" id="h0-3-18" class="i">+
+</a><a href="#h0-3-19" id="h0-3-19" class="i">+	if username != &quot;&quot; || password != &quot;&quot; {
+</a><a href="#h0-3-20" id="h0-3-20" class="i">+		// If we&#39;re given credentials, pass them to git via a
+</a><a href="#h0-3-21" id="h0-3-21" class="i">+		// credential helper
+</a><a href="#h0-3-22" id="h0-3-22" class="i">+		//
+</a><a href="#h0-3-23" id="h0-3-23" class="i">+		// In order to avoid the key hitting the
+</a><a href="#h0-3-24" id="h0-3-24" class="i">+		// filesystem, we pass the actual key via a
+</a><a href="#h0-3-25" id="h0-3-25" class="i">+		// pipe on fd `3`, and we set the askpass
+</a><a href="#h0-3-26" id="h0-3-26" class="i">+		// script to a tiny sh script that just reads
+</a><a href="#h0-3-27" id="h0-3-27" class="i">+		// from that pipe.
+</a><a href="#h0-3-28" id="h0-3-28" class="i">+		f, err := ioutil.TempFile(&quot;&quot;, &quot;livegrep-credential-helper&quot;)
+</a><a href="#h0-3-29" id="h0-3-29" class="i">+		if err != nil {
+</a><a href="#h0-3-30" id="h0-3-30" class="i">+			return err
+</a><a href="#h0-3-31" id="h0-3-31" class="i">+		}
+</a><a href="#h0-3-32" id="h0-3-32" class="i">+		f.WriteString(credentialHelperScript)
+</a><a href="#h0-3-33" id="h0-3-33" class="i">+		f.Close()
+</a><a href="#h0-3-34" id="h0-3-34" class="i">+		defer os.Remove(f.Name())
+</a><a href="#h0-3-35" id="h0-3-35" class="i">+
+</a><a href="#h0-3-36" id="h0-3-36" class="i">+		os.Chmod(f.Name(), 0700)
+</a><a href="#h0-3-37" id="h0-3-37" class="i">+		args = append([]string{&quot;-c&quot;, fmt.Sprintf(&quot;credential.helper=%s&quot;, f.Name())}, args...)
+</a><a href="#h0-3-38" id="h0-3-38" class="i">+	}
+</a><a href="#h0-3-39" id="h0-3-39" class="i">+
+</a> 	for i := 0; i &lt; 3; i++ {
+ 		cmd := exec.Command(&quot;git&quot;, args...)
+ 		cmd.Stdout = os.Stdout
+ 		cmd.Stderr = os.Stderr
+<a href="#h0-3-44" id="h0-3-44" class="i">+		if password != &quot;&quot; {
+</a><a href="#h0-3-45" id="h0-3-45" class="i">+			r, w, err := os.Pipe()
+</a><a href="#h0-3-46" id="h0-3-46" class="i">+			if err != nil {
+</a><a href="#h0-3-47" id="h0-3-47" class="i">+				return err
+</a><a href="#h0-3-48" id="h0-3-48" class="i">+			}
+</a><a href="#h0-3-49" id="h0-3-49" class="i">+
+</a><a href="#h0-3-50" id="h0-3-50" class="i">+			cmd.ExtraFiles = []*os.File{r}
+</a><a href="#h0-3-51" id="h0-3-51" class="i">+
+</a><a href="#h0-3-52" id="h0-3-52" class="i">+			go func() {
+</a><a href="#h0-3-53" id="h0-3-53" class="i">+				defer w.Close()
+</a><a href="#h0-3-54" id="h0-3-54" class="i">+				w.WriteString(password)
+</a><a href="#h0-3-55" id="h0-3-55" class="i">+			}()
+</a><a href="#h0-3-56" id="h0-3-56" class="i">+			defer r.Close()
+</a><a href="#h0-3-57" id="h0-3-57" class="i">+		}
+</a><a href="#h0-3-58" id="h0-3-58" class="i">+		if username != &quot;&quot; {
+</a><a href="#h0-3-59" id="h0-3-59" class="i">+			cmd.Env = append(os.Environ(), fmt.Sprintf(&quot;LIVEGREP_GITHUB_USERNAME=%s&quot;, username))
+</a><a href="#h0-3-60" id="h0-3-60" class="i">+		}
+</a> 		if err = cmd.Run(); err == nil {
+ 			return nil
+ 		}
+<a href="#h0-4" id="h0-4" class="h">@@ -160,6 +227,11 @@ func checkoutOne(r *config.RepoSpec) error {
+</a> 			return err
+ 		}
+ 	}
+<a href="#h0-4-3" id="h0-4-3" class="i">+	var username, password string
+</a><a href="#h0-4-4" id="h0-4-4" class="i">+	if r.CloneOptions != nil {
+</a><a href="#h0-4-5" id="h0-4-5" class="i">+		username = r.CloneOptions.Username
+</a><a href="#h0-4-6" id="h0-4-6" class="i">+		password = os.Getenv(r.CloneOptions.PasswordEnv)
+</a><a href="#h0-4-7" id="h0-4-7" class="i">+	}
+</a> 	if strings.Trim(string(out), &quot; \n&quot;) != &quot;true&quot; {
+ 		if err := os.RemoveAll(r.Path); err != nil {
+ 			return err
+<a href="#h0-5" id="h0-5" class="h">@@ -167,14 +239,23 @@ func checkoutOne(r *config.RepoSpec) error {
+</a> 		if err := os.MkdirAll(r.Path, 0755); err != nil {
+ 			return err
+ 		}
+<a href="#h0-5-3" id="h0-5-3" class="d">-		return retryCommand(&quot;git&quot;, []string{&quot;clone&quot;, &quot;--mirror&quot;, remote, r.Path})
+</a><a href="#h0-5-4" id="h0-5-4" class="i">+		args := []string{&quot;clone&quot;, &quot;--mirror&quot;}
+</a><a href="#h0-5-5" id="h0-5-5" class="i">+		if r.CloneOptions != nil &amp;&amp; r.CloneOptions.Depth != 0 {
+</a><a href="#h0-5-6" id="h0-5-6" class="i">+			args = append(args, fmt.Sprintf(&quot;--depth=%d&quot;, r.CloneOptions.Depth))
+</a><a href="#h0-5-7" id="h0-5-7" class="i">+		}
+</a><a href="#h0-5-8" id="h0-5-8" class="i">+		args = append(args, remote, r.Path)
+</a><a href="#h0-5-9" id="h0-5-9" class="i">+		return callGit(&quot;git&quot;, args, username, password)
+</a> 	}
+ 
+ 	if err := exec.Command(&quot;git&quot;, &quot;-C&quot;, r.Path, &quot;remote&quot;, &quot;set-url&quot;, &quot;origin&quot;, remote).Run(); err != nil {
+ 		return err
+ 	}
+ 
+<a href="#h0-5-16" id="h0-5-16" class="d">-	return retryCommand(&quot;git&quot;, []string{&quot;-C&quot;, r.Path, &quot;fetch&quot;, &quot;-p&quot;})
+</a><a href="#h0-5-17" id="h0-5-17" class="i">+	args := []string{&quot;--git-dir&quot;, r.Path, &quot;fetch&quot;, &quot;-p&quot;}
+</a><a href="#h0-5-18" id="h0-5-18" class="i">+	if r.CloneOptions != nil &amp;&amp; r.CloneOptions.Depth != 0 {
+</a><a href="#h0-5-19" id="h0-5-19" class="i">+		args = append(args, fmt.Sprintf(&quot;--depth=%d&quot;, r.CloneOptions.Depth))
+</a><a href="#h0-5-20" id="h0-5-20" class="i">+	}
+</a><a href="#h0-5-21" id="h0-5-21" class="i">+	return callGit(&quot;git&quot;, args, username, password)
+</a> }
+ 
+ func reloadBackend(addr string) error {
+<b>diff --git a/<a id="h1" href="../file/cmd/livegrep-github-reindex/main.go">cmd/livegrep-github-reindex/main.go</a> b/<a href="../file/cmd/livegrep-github-reindex/main.go">cmd/livegrep-github-reindex/main.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -25,7 +25,8 @@ import (
+</a> const BLDeprecatedMessage = &quot;This flag has been deprecated and will be removed in a future release. Please switch to the &#39;-ignorelist&#39; option.&quot;
+ 
+ var (
+<a href="#h1-0-3" id="h1-0-3" class="d">-	flagCodesearch   = flag.String(&quot;codesearch&quot;, path.Join(path.Dir(os.Args[0]), &quot;codesearch&quot;), &quot;Path to the `codesearch` binary&quot;)
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+	flagCodesearch   = flag.String(&quot;codesearch&quot;, &quot;&quot;, &quot;Path to the `codesearch` binary&quot;)
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+	flagFetchReindex = flag.String(&quot;fetch-reindex&quot;, &quot;&quot;, &quot;Path to the `livegrep-fetch-reindex` binary&quot;)
+</a> 	flagApiBaseUrl   = flag.String(&quot;api-base-url&quot;, &quot;https://api.github.com/&quot;, &quot;Github API base url&quot;)
+ 	flagGithubKey    = flag.String(&quot;github-key&quot;, os.Getenv(&quot;GITHUB_KEY&quot;), &quot;Github API key&quot;)
+ 	flagRepoDir      = flag.String(&quot;dir&quot;, &quot;repos&quot;, &quot;Directory to store repos&quot;)
+<a href="#h1-1" id="h1-1" class="h">@@ -41,7 +42,7 @@ var (
+</a> 	flagForks        = flag.Bool(&quot;forks&quot;, true, &quot;whether to index repositories that are github forks, and not original repos&quot;)
+ 	flagArchived     = flag.Bool(&quot;archived&quot;, false, &quot;whether to index repositories that are archived on github&quot;)
+ 	flagHTTP         = flag.Bool(&quot;http&quot;, false, &quot;clone repositories over HTTPS instead of SSH&quot;)
+<a href="#h1-1-3" id="h1-1-3" class="d">-	flagHTTPUsername = flag.String(&quot;http-user&quot;, &quot;&quot;, &quot;Override the username to use when cloning over https&quot;)
+</a><a href="#h1-1-4" id="h1-1-4" class="i">+	flagHTTPUsername = flag.String(&quot;http-user&quot;, &quot;git&quot;, &quot;Override the username to use when cloning over https&quot;)
+</a> 	flagInstallation = flag.Bool(&quot;installation-token&quot;, false, &quot;Treat the API key as a Github Application Installation Key when cloning&quot;)
+ 	flagDepth        = flag.Int(&quot;depth&quot;, 0, &quot;clone repository with specify --depth=N depth.&quot;)
+ 	flagSkipMissing  = flag.Bool(&quot;skip-missing&quot;, false, &quot;skip repositories where the specified revision is missing&quot;)
+<a href="#h1-2" id="h1-2" class="h">@@ -126,10 +127,6 @@ func main() {
+</a> 
+ 	sort.Sort(ReposByName(repos))
+ 
+<a href="#h1-2-3" id="h1-2-3" class="d">-	if err := checkoutRepos(repos, *flagRepoDir, *flagDepth, *flagHTTP); err != nil {
+</a><a href="#h1-2-4" id="h1-2-4" class="d">-		log.Fatalln(err.Error())
+</a><a href="#h1-2-5" id="h1-2-5" class="d">-	}
+</a><a href="#h1-2-6" id="h1-2-6" class="d">-
+</a> 	config, err := buildConfig(*flagName, *flagRepoDir, repos, *flagRevision)
+ 	if err != nil {
+ 		log.Fatalln(err.Error())
+<a href="#h1-3" id="h1-3" class="h">@@ -140,29 +137,47 @@ func main() {
+</a> 	}
+ 
+ 	index := flagIndexPath.Get().(string)
+<a href="#h1-3-3" id="h1-3-3" class="d">-	tmp := index + &quot;.tmp&quot;
+</a> 
+ 	args := []string{
+<a href="#h1-3-6" id="h1-3-6" class="d">-		&quot;--debug=ui&quot;,
+</a><a href="#h1-3-7" id="h1-3-7" class="d">-		&quot;--dump_index&quot;,
+</a><a href="#h1-3-8" id="h1-3-8" class="d">-		tmp,
+</a><a href="#h1-3-9" id="h1-3-9" class="d">-		&quot;--index_only&quot;,
+</a><a href="#h1-3-10" id="h1-3-10" class="i">+		&quot;--out&quot;, index,
+</a><a href="#h1-3-11" id="h1-3-11" class="i">+		&quot;--codesearch&quot;, *flagCodesearch,
+</a> 	}
+ 	if *flagRevparse {
+ 		args = append(args, &quot;--revparse&quot;)
+ 	}
+<a href="#h1-3-16" id="h1-3-16" class="i">+	if *flagSkipMissing {
+</a><a href="#h1-3-17" id="h1-3-17" class="i">+		args = append(args, &quot;--skip-missing&quot;)
+</a><a href="#h1-3-18" id="h1-3-18" class="i">+	}
+</a> 	args = append(args, configPath)
+ 
+<a href="#h1-3-21" id="h1-3-21" class="d">-	cmd := exec.Command(*flagCodesearch, args...)
+</a><a href="#h1-3-22" id="h1-3-22" class="i">+	if *flagFetchReindex == &quot;&quot; {
+</a><a href="#h1-3-23" id="h1-3-23" class="i">+		fr := findBinary(&quot;livegrep-fetch-reindex&quot;)
+</a><a href="#h1-3-24" id="h1-3-24" class="i">+		flagFetchReindex = &amp;fr
+</a><a href="#h1-3-25" id="h1-3-25" class="i">+	}
+</a><a href="#h1-3-26" id="h1-3-26" class="i">+
+</a><a href="#h1-3-27" id="h1-3-27" class="i">+	log.Printf(&quot;Running: %s %v\n&quot;, *flagFetchReindex, args)
+</a><a href="#h1-3-28" id="h1-3-28" class="i">+	cmd := exec.Command(*flagFetchReindex, args...)
+</a> 	cmd.Stdout = os.Stdout
+ 	cmd.Stderr = os.Stderr
+<a href="#h1-3-31" id="h1-3-31" class="i">+	if *flagGithubKey != &quot;&quot; {
+</a><a href="#h1-3-32" id="h1-3-32" class="i">+		cmd.Env = append(os.Environ(), fmt.Sprintf(&quot;GITHUB_KEY=%s&quot;, *flagGithubKey))
+</a><a href="#h1-3-33" id="h1-3-33" class="i">+	}
+</a> 	if err := cmd.Run(); err != nil {
+<a href="#h1-3-35" id="h1-3-35" class="d">-		log.Fatalln(err)
+</a><a href="#h1-3-36" id="h1-3-36" class="i">+		log.Fatalln(&quot;livegrep-fetch-reindex: &quot;, err)
+</a> 	}
+<a href="#h1-3-38" id="h1-3-38" class="i">+}
+</a> 
+<a href="#h1-3-40" id="h1-3-40" class="d">-	if err := os.Rename(tmp, index); err != nil {
+</a><a href="#h1-3-41" id="h1-3-41" class="d">-		log.Fatalln(&quot;rename:&quot;, err.Error())
+</a><a href="#h1-3-42" id="h1-3-42" class="i">+func findBinary(name string) string {
+</a><a href="#h1-3-43" id="h1-3-43" class="i">+	paths := []string{
+</a><a href="#h1-3-44" id="h1-3-44" class="i">+		path.Join(path.Dir(os.Args[0]), name),
+</a><a href="#h1-3-45" id="h1-3-45" class="i">+		strings.Replace(os.Args[0], path.Base(os.Args[0]), name, -1),
+</a><a href="#h1-3-46" id="h1-3-46" class="i">+	}
+</a><a href="#h1-3-47" id="h1-3-47" class="i">+	for _, try := range paths {
+</a><a href="#h1-3-48" id="h1-3-48" class="i">+		if st, err := os.Stat(try); err == nil &amp;&amp; (st.Mode()&amp;os.ModeDir) == 0 {
+</a><a href="#h1-3-49" id="h1-3-49" class="i">+			return try
+</a><a href="#h1-3-50" id="h1-3-50" class="i">+		}
+</a> 	}
+<a href="#h1-3-52" id="h1-3-52" class="i">+	return name
+</a> }
+ 
+ type ReposByName []*github.Repository
+<a href="#h1-4" id="h1-4" class="h">@@ -347,162 +362,6 @@ func getUserRepos(client *github.Client, user string) ([]*github.Repository, err
+</a> 	return buf, nil
+ }
+ 
+<a href="#h1-4-3" id="h1-4-3" class="d">-func checkoutRepos(repos []*github.Repository, dir string, depth int, http bool) error {
+</a><a href="#h1-4-4" id="h1-4-4" class="d">-	repoc := make(chan *github.Repository)
+</a><a href="#h1-4-5" id="h1-4-5" class="d">-	errc := make(chan error, Workers)
+</a><a href="#h1-4-6" id="h1-4-6" class="d">-	stop := make(chan struct{})
+</a><a href="#h1-4-7" id="h1-4-7" class="d">-	wg := sync.WaitGroup{}
+</a><a href="#h1-4-8" id="h1-4-8" class="d">-	wg.Add(Workers)
+</a><a href="#h1-4-9" id="h1-4-9" class="d">-	for i := 0; i &lt; Workers; i++ {
+</a><a href="#h1-4-10" id="h1-4-10" class="d">-		go func() {
+</a><a href="#h1-4-11" id="h1-4-11" class="d">-			defer wg.Done()
+</a><a href="#h1-4-12" id="h1-4-12" class="d">-			checkoutWorker(dir, depth, http, repoc, stop, errc)
+</a><a href="#h1-4-13" id="h1-4-13" class="d">-		}()
+</a><a href="#h1-4-14" id="h1-4-14" class="d">-	}
+</a><a href="#h1-4-15" id="h1-4-15" class="d">-
+</a><a href="#h1-4-16" id="h1-4-16" class="d">-	var err error
+</a><a href="#h1-4-17" id="h1-4-17" class="d">-Repos:
+</a><a href="#h1-4-18" id="h1-4-18" class="d">-	for i := range repos {
+</a><a href="#h1-4-19" id="h1-4-19" class="d">-		select {
+</a><a href="#h1-4-20" id="h1-4-20" class="d">-		case repoc &lt;- repos[i]:
+</a><a href="#h1-4-21" id="h1-4-21" class="d">-		case err = &lt;-errc:
+</a><a href="#h1-4-22" id="h1-4-22" class="d">-			close(stop)
+</a><a href="#h1-4-23" id="h1-4-23" class="d">-			break Repos
+</a><a href="#h1-4-24" id="h1-4-24" class="d">-		}
+</a><a href="#h1-4-25" id="h1-4-25" class="d">-	}
+</a><a href="#h1-4-26" id="h1-4-26" class="d">-
+</a><a href="#h1-4-27" id="h1-4-27" class="d">-	close(repoc)
+</a><a href="#h1-4-28" id="h1-4-28" class="d">-	wg.Wait()
+</a><a href="#h1-4-29" id="h1-4-29" class="d">-	select {
+</a><a href="#h1-4-30" id="h1-4-30" class="d">-	case err = &lt;-errc:
+</a><a href="#h1-4-31" id="h1-4-31" class="d">-	default:
+</a><a href="#h1-4-32" id="h1-4-32" class="d">-	}
+</a><a href="#h1-4-33" id="h1-4-33" class="d">-
+</a><a href="#h1-4-34" id="h1-4-34" class="d">-	return err
+</a><a href="#h1-4-35" id="h1-4-35" class="d">-}
+</a><a href="#h1-4-36" id="h1-4-36" class="d">-
+</a><a href="#h1-4-37" id="h1-4-37" class="d">-func checkoutWorker(dir string,
+</a><a href="#h1-4-38" id="h1-4-38" class="d">-	depth int,
+</a><a href="#h1-4-39" id="h1-4-39" class="d">-	http bool,
+</a><a href="#h1-4-40" id="h1-4-40" class="d">-	c &lt;-chan *github.Repository,
+</a><a href="#h1-4-41" id="h1-4-41" class="d">-	stop &lt;-chan struct{}, errc chan error) {
+</a><a href="#h1-4-42" id="h1-4-42" class="d">-	for {
+</a><a href="#h1-4-43" id="h1-4-43" class="d">-		select {
+</a><a href="#h1-4-44" id="h1-4-44" class="d">-		case r, ok := &lt;-c:
+</a><a href="#h1-4-45" id="h1-4-45" class="d">-			if !ok {
+</a><a href="#h1-4-46" id="h1-4-46" class="d">-				return
+</a><a href="#h1-4-47" id="h1-4-47" class="d">-			}
+</a><a href="#h1-4-48" id="h1-4-48" class="d">-			err := checkoutOne(dir, depth, http, r)
+</a><a href="#h1-4-49" id="h1-4-49" class="d">-			if err != nil {
+</a><a href="#h1-4-50" id="h1-4-50" class="d">-				errc &lt;- err
+</a><a href="#h1-4-51" id="h1-4-51" class="d">-			}
+</a><a href="#h1-4-52" id="h1-4-52" class="d">-		case &lt;-stop:
+</a><a href="#h1-4-53" id="h1-4-53" class="d">-			return
+</a><a href="#h1-4-54" id="h1-4-54" class="d">-		}
+</a><a href="#h1-4-55" id="h1-4-55" class="d">-	}
+</a><a href="#h1-4-56" id="h1-4-56" class="d">-}
+</a><a href="#h1-4-57" id="h1-4-57" class="d">-
+</a><a href="#h1-4-58" id="h1-4-58" class="d">-const credentialHelperScript = (`#!/bin/sh
+</a><a href="#h1-4-59" id="h1-4-59" class="d">-if test &quot;$1&quot; = &quot;get&quot;; then
+</a><a href="#h1-4-60" id="h1-4-60" class="d">-  pass=` + &quot;`cat &lt;&amp;3`&quot; + `
+</a><a href="#h1-4-61" id="h1-4-61" class="d">-  if test -n &quot;$LIVEGREP_GITHUB_USERNAME&quot;; then
+</a><a href="#h1-4-62" id="h1-4-62" class="d">-    echo &quot;username=$LIVEGREP_GITHUB_USERNAME&quot;
+</a><a href="#h1-4-63" id="h1-4-63" class="d">-    echo &quot;password=$pass&quot;
+</a><a href="#h1-4-64" id="h1-4-64" class="d">-  else
+</a><a href="#h1-4-65" id="h1-4-65" class="d">-    echo &quot;username=$pass&quot;
+</a><a href="#h1-4-66" id="h1-4-66" class="d">-  fi
+</a><a href="#h1-4-67" id="h1-4-67" class="d">-fi
+</a><a href="#h1-4-68" id="h1-4-68" class="d">-`)
+</a><a href="#h1-4-69" id="h1-4-69" class="d">-
+</a><a href="#h1-4-70" id="h1-4-70" class="d">-func callGit(program string, args []string, key string) error {
+</a><a href="#h1-4-71" id="h1-4-71" class="d">-	var err error
+</a><a href="#h1-4-72" id="h1-4-72" class="d">-
+</a><a href="#h1-4-73" id="h1-4-73" class="d">-	if key != &quot;&quot; {
+</a><a href="#h1-4-74" id="h1-4-74" class="d">-		// If we&#39;re given an oauth key, pass it to git
+</a><a href="#h1-4-75" id="h1-4-75" class="d">-		// via a credential helper
+</a><a href="#h1-4-76" id="h1-4-76" class="d">-		//
+</a><a href="#h1-4-77" id="h1-4-77" class="d">-		// In order to avoid the key hitting the
+</a><a href="#h1-4-78" id="h1-4-78" class="d">-		// filesystem, we pass the actual key via a
+</a><a href="#h1-4-79" id="h1-4-79" class="d">-		// pipe on fd `3`, and we set the askpass
+</a><a href="#h1-4-80" id="h1-4-80" class="d">-		// script to a tiny sh script that just reads
+</a><a href="#h1-4-81" id="h1-4-81" class="d">-		// from that pipe.
+</a><a href="#h1-4-82" id="h1-4-82" class="d">-		f, err := ioutil.TempFile(&quot;&quot;, &quot;livegrep-credential-helper&quot;)
+</a><a href="#h1-4-83" id="h1-4-83" class="d">-		if err != nil {
+</a><a href="#h1-4-84" id="h1-4-84" class="d">-			return err
+</a><a href="#h1-4-85" id="h1-4-85" class="d">-		}
+</a><a href="#h1-4-86" id="h1-4-86" class="d">-		f.WriteString(credentialHelperScript)
+</a><a href="#h1-4-87" id="h1-4-87" class="d">-		f.Close()
+</a><a href="#h1-4-88" id="h1-4-88" class="d">-		defer os.Remove(f.Name())
+</a><a href="#h1-4-89" id="h1-4-89" class="d">-
+</a><a href="#h1-4-90" id="h1-4-90" class="d">-		os.Chmod(f.Name(), 0700)
+</a><a href="#h1-4-91" id="h1-4-91" class="d">-		args = append([]string{&quot;-c&quot;, fmt.Sprintf(&quot;credential.helper=%s&quot;, f.Name())}, args...)
+</a><a href="#h1-4-92" id="h1-4-92" class="d">-	}
+</a><a href="#h1-4-93" id="h1-4-93" class="d">-
+</a><a href="#h1-4-94" id="h1-4-94" class="d">-	for i := 0; i &lt; 3; i++ {
+</a><a href="#h1-4-95" id="h1-4-95" class="d">-		cmd := exec.Command(&quot;git&quot;, args...)
+</a><a href="#h1-4-96" id="h1-4-96" class="d">-		cmd.Stdout = os.Stdout
+</a><a href="#h1-4-97" id="h1-4-97" class="d">-		cmd.Stderr = os.Stderr
+</a><a href="#h1-4-98" id="h1-4-98" class="d">-		if key != &quot;&quot; {
+</a><a href="#h1-4-99" id="h1-4-99" class="d">-			r, w, err := os.Pipe()
+</a><a href="#h1-4-100" id="h1-4-100" class="d">-			if err != nil {
+</a><a href="#h1-4-101" id="h1-4-101" class="d">-				return err
+</a><a href="#h1-4-102" id="h1-4-102" class="d">-			}
+</a><a href="#h1-4-103" id="h1-4-103" class="d">-
+</a><a href="#h1-4-104" id="h1-4-104" class="d">-			cmd.ExtraFiles = []*os.File{r}
+</a><a href="#h1-4-105" id="h1-4-105" class="d">-
+</a><a href="#h1-4-106" id="h1-4-106" class="d">-			go func() {
+</a><a href="#h1-4-107" id="h1-4-107" class="d">-				defer w.Close()
+</a><a href="#h1-4-108" id="h1-4-108" class="d">-				w.WriteString(key)
+</a><a href="#h1-4-109" id="h1-4-109" class="d">-			}()
+</a><a href="#h1-4-110" id="h1-4-110" class="d">-			defer r.Close()
+</a><a href="#h1-4-111" id="h1-4-111" class="d">-		}
+</a><a href="#h1-4-112" id="h1-4-112" class="d">-		if *flagHTTPUsername != &quot;&quot; {
+</a><a href="#h1-4-113" id="h1-4-113" class="d">-			cmd.Env = append(os.Environ(), fmt.Sprintf(&quot;LIVEGREP_GITHUB_USERNAME=%s&quot;, *flagHTTPUsername))
+</a><a href="#h1-4-114" id="h1-4-114" class="d">-		}
+</a><a href="#h1-4-115" id="h1-4-115" class="d">-		if err = cmd.Run(); err == nil {
+</a><a href="#h1-4-116" id="h1-4-116" class="d">-			return nil
+</a><a href="#h1-4-117" id="h1-4-117" class="d">-		}
+</a><a href="#h1-4-118" id="h1-4-118" class="d">-	}
+</a><a href="#h1-4-119" id="h1-4-119" class="d">-	return fmt.Errorf(&quot;%s %v: %s&quot;, program, args, err.Error())
+</a><a href="#h1-4-120" id="h1-4-120" class="d">-}
+</a><a href="#h1-4-121" id="h1-4-121" class="d">-
+</a><a href="#h1-4-122" id="h1-4-122" class="d">-func checkoutOne(dir string, depth int, http bool, r *github.Repository) error {
+</a><a href="#h1-4-123" id="h1-4-123" class="d">-	log.Println(&quot;Updating&quot;, *r.FullName)
+</a><a href="#h1-4-124" id="h1-4-124" class="d">-	checkout := path.Join(dir, *r.FullName)
+</a><a href="#h1-4-125" id="h1-4-125" class="d">-	out, err := exec.Command(&quot;git&quot;, &quot;--git-dir&quot;, checkout, &quot;rev-parse&quot;, &quot;--is-bare-repository&quot;).Output()
+</a><a href="#h1-4-126" id="h1-4-126" class="d">-	if err != nil {
+</a><a href="#h1-4-127" id="h1-4-127" class="d">-		if _, ok := err.(*exec.ExitError); !ok {
+</a><a href="#h1-4-128" id="h1-4-128" class="d">-			return err
+</a><a href="#h1-4-129" id="h1-4-129" class="d">-		}
+</a><a href="#h1-4-130" id="h1-4-130" class="d">-	}
+</a><a href="#h1-4-131" id="h1-4-131" class="d">-	if strings.Trim(string(out), &quot; \n&quot;) != &quot;true&quot; {
+</a><a href="#h1-4-132" id="h1-4-132" class="d">-		if err := os.RemoveAll(checkout); err != nil {
+</a><a href="#h1-4-133" id="h1-4-133" class="d">-			return err
+</a><a href="#h1-4-134" id="h1-4-134" class="d">-		}
+</a><a href="#h1-4-135" id="h1-4-135" class="d">-		if err := os.MkdirAll(checkout, 0755); err != nil {
+</a><a href="#h1-4-136" id="h1-4-136" class="d">-			return err
+</a><a href="#h1-4-137" id="h1-4-137" class="d">-		}
+</a><a href="#h1-4-138" id="h1-4-138" class="d">-		var remote string
+</a><a href="#h1-4-139" id="h1-4-139" class="d">-		if http {
+</a><a href="#h1-4-140" id="h1-4-140" class="d">-			remote = *r.CloneURL
+</a><a href="#h1-4-141" id="h1-4-141" class="d">-		} else {
+</a><a href="#h1-4-142" id="h1-4-142" class="d">-			remote = *r.SSHURL
+</a><a href="#h1-4-143" id="h1-4-143" class="d">-		}
+</a><a href="#h1-4-144" id="h1-4-144" class="d">-		args := []string{&quot;clone&quot;, &quot;--mirror&quot;}
+</a><a href="#h1-4-145" id="h1-4-145" class="d">-		if depth != 0 {
+</a><a href="#h1-4-146" id="h1-4-146" class="d">-			args = append(args, fmt.Sprintf(&quot;--depth=%d&quot;, depth))
+</a><a href="#h1-4-147" id="h1-4-147" class="d">-		}
+</a><a href="#h1-4-148" id="h1-4-148" class="d">-		args = append(args, remote, checkout)
+</a><a href="#h1-4-149" id="h1-4-149" class="d">-		return callGit(&quot;git&quot;, args, *flagGithubKey)
+</a><a href="#h1-4-150" id="h1-4-150" class="d">-	}
+</a><a href="#h1-4-151" id="h1-4-151" class="d">-
+</a><a href="#h1-4-152" id="h1-4-152" class="d">-	args := []string{&quot;--git-dir&quot;, checkout, &quot;fetch&quot;, &quot;-p&quot;}
+</a><a href="#h1-4-153" id="h1-4-153" class="d">-	if depth != 0 {
+</a><a href="#h1-4-154" id="h1-4-154" class="d">-		args = append(args, fmt.Sprintf(&quot;--depth=%d&quot;, depth))
+</a><a href="#h1-4-155" id="h1-4-155" class="d">-	}
+</a><a href="#h1-4-156" id="h1-4-156" class="d">-	return callGit(&quot;git&quot;, args, *flagGithubKey)
+</a><a href="#h1-4-157" id="h1-4-157" class="d">-}
+</a><a href="#h1-4-158" id="h1-4-158" class="d">-
+</a> func writeConfig(config []byte, file string) error {
+ 	dir := path.Dir(file)
+ 	if err := os.MkdirAll(dir, 0755); err != nil {
+<a href="#h1-5" id="h1-5" class="h">@@ -535,12 +394,30 @@ func buildConfig(name string,
+</a> 				continue
+ 			}
+ 		}
+<a href="#h1-5-3" id="h1-5-3" class="i">+		var remote string
+</a><a href="#h1-5-4" id="h1-5-4" class="i">+		if *flagHTTP {
+</a><a href="#h1-5-5" id="h1-5-5" class="i">+			remote = *r.CloneURL
+</a><a href="#h1-5-6" id="h1-5-6" class="i">+		} else {
+</a><a href="#h1-5-7" id="h1-5-7" class="i">+			remote = *r.SSHURL
+</a><a href="#h1-5-8" id="h1-5-8" class="i">+		}
+</a><a href="#h1-5-9" id="h1-5-9" class="i">+
+</a><a href="#h1-5-10" id="h1-5-10" class="i">+		var password_env string
+</a><a href="#h1-5-11" id="h1-5-11" class="i">+		if *flagGithubKey != &quot;&quot; {
+</a><a href="#h1-5-12" id="h1-5-12" class="i">+			password_env = &quot;GITHUB_KEY&quot;
+</a><a href="#h1-5-13" id="h1-5-13" class="i">+		}
+</a><a href="#h1-5-14" id="h1-5-14" class="i">+
+</a> 		cfg.Repos = append(cfg.Repos, &amp;config.RepoSpec{
+ 			Path:      path.Join(dir, *r.FullName),
+ 			Name:      *r.FullName,
+ 			Revisions: []string{revision},
+ 			Metadata: &amp;config.Metadata{
+ 				Github: *r.HTMLURL,
+<a href="#h1-5-21" id="h1-5-21" class="i">+				Remote: remote,
+</a><a href="#h1-5-22" id="h1-5-22" class="i">+			},
+</a><a href="#h1-5-23" id="h1-5-23" class="i">+			CloneOptions: &amp;config.CloneOptions{
+</a><a href="#h1-5-24" id="h1-5-24" class="i">+				Depth:       int32(*flagDepth),
+</a><a href="#h1-5-25" id="h1-5-25" class="i">+				Username:    *flagHTTPUsername,
+</a><a href="#h1-5-26" id="h1-5-26" class="i">+				PasswordEnv: password_env,
+</a> 			},
+ 		})
+ 	}
+<b>diff --git a/<a id="h2" href="../file/src/proto/config.proto">src/proto/config.proto</a> b/<a href="../file/src/proto/config.proto">src/proto/config.proto</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -13,6 +13,12 @@ message Metadata {
+</a>     repeated string labels = 4 [json_name = &quot;labels&quot;];
+ }
+ 
+<a href="#h2-0-3" id="h2-0-3" class="i">+message CloneOptions {
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+    int32 depth = 1            [json_name = &quot;depth&quot;];
+</a><a href="#h2-0-5" id="h2-0-5" class="i">+    string username = 2        [json_name = &quot;username&quot;];
+</a><a href="#h2-0-6" id="h2-0-6" class="i">+    string password_env = 3    [json_name = &quot;password_env&quot;];
+</a><a href="#h2-0-7" id="h2-0-7" class="i">+}
+</a><a href="#h2-0-8" id="h2-0-8" class="i">+
+</a> message PathSpec {
+     string path = 1             [json_name = &quot;path&quot;];
+     string name = 2             [json_name = &quot;name&quot;];
+<a href="#h2-1" id="h2-1" class="h">@@ -21,9 +27,10 @@ message PathSpec {
+</a> }
+ 
+ message RepoSpec {
+<a href="#h2-1-3" id="h2-1-3" class="d">-    string path = 1               [json_name = &quot;path&quot;];
+</a><a href="#h2-1-4" id="h2-1-4" class="d">-    string name = 2               [json_name = &quot;name&quot;];
+</a><a href="#h2-1-5" id="h2-1-5" class="d">-    repeated string revisions = 3 [json_name = &quot;revisions&quot;];
+</a><a href="#h2-1-6" id="h2-1-6" class="d">-    Metadata metadata = 4         [json_name = &quot;metadata&quot;];
+</a><a href="#h2-1-7" id="h2-1-7" class="d">-    bool walk_submodules = 5      [json_name = &quot;walk_submodules&quot;];
+</a><a href="#h2-1-8" id="h2-1-8" class="i">+    string path = 1                [json_name = &quot;path&quot;];
+</a><a href="#h2-1-9" id="h2-1-9" class="i">+    string name = 2                [json_name = &quot;name&quot;];
+</a><a href="#h2-1-10" id="h2-1-10" class="i">+    repeated string revisions = 3  [json_name = &quot;revisions&quot;];
+</a><a href="#h2-1-11" id="h2-1-11" class="i">+    Metadata metadata = 4          [json_name = &quot;metadata&quot;];
+</a><a href="#h2-1-12" id="h2-1-12" class="i">+    bool walk_submodules = 5       [json_name = &quot;walk_submodules&quot;];
+</a><a href="#h2-1-13" id="h2-1-13" class="i">+    CloneOptions clone_options = 6 [json_name = &quot;clone_options&quot;];
+</a> }
+</pre>
+</div>
+</body>
+</html>

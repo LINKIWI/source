@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Stop treating NULL IndexKey pointers as valid. - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/f5c7060b491b2f20da46f0c10d30443b7ab3bf5b">f5c7060b491b2f20da46f0c10d30443b7ab3bf5b</a>
+<b>parent</b> <a href="../commit/f1d5de7e0404de5bdeeaeaccdeee2623768b8e90">f1d5de7e0404de5bdeeaeaccdeee2623768b8e90</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Fri, 30 Dec 2011 11:38:01 -0500
+
+Stop treating NULL IndexKey pointers as valid.
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">indexer.cc</a></td><td> | </td><td class="num">65</td><td><span class="i">+++++++++++++++++++++++++++++++++</span><span class="d">--------------------------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">indexer.h</a></td><td> | </td><td class="num">4</td><td><span class="i">+</span><span class="d">---</span></td></tr>
+</table></pre><pre>2 files changed, 34 insertions(+), 35 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/indexer.cc">indexer.cc</a> b/<a href="../file/indexer.cc">indexer.cc</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -34,6 +34,10 @@ const int kMaxWidth       = 32;
+</a> const int kMaxRecursion   = 10;
+ const int kMaxNodes       = (1 &lt;&lt; 24);
+ 
+<a href="#h0-0-3" id="h0-0-3" class="i">+namespace {
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+    static IndexKey::Stats null_stats;
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+};
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+
+</a> IndexKey::Stats::Stats ()
+     : selectivity_(1.0), depth_(0), nodes_(1), tail_paths_(1) {
+ }
+<a href="#h0-1" id="h0-1" class="h">@@ -45,9 +49,11 @@ IndexKey::Stats IndexKey::Stats::insert(const value_type&amp; val) const {
+</a>         out.tail_paths_  = 0;
+     }
+ 
+<a href="#h0-1-3" id="h0-1-3" class="d">-    out.selectivity_ += (val.first.second - val.first.first + 1)/128. * val.second-&gt;selectivity();
+</a><a href="#h0-1-4" id="h0-1-4" class="d">-    out.depth_ = max(depth_, val.second-&gt;depth() + 1);
+</a><a href="#h0-1-5" id="h0-1-5" class="d">-    out.nodes_ += (val.first.second - val.first.first + 1) * val.second-&gt;nodes();
+</a><a href="#h0-1-6" id="h0-1-6" class="i">+    const Stats&amp; rstats = val.second ? val.second-&gt;stats() : null_stats;
+</a><a href="#h0-1-7" id="h0-1-7" class="i">+
+</a><a href="#h0-1-8" id="h0-1-8" class="i">+    out.selectivity_ += (val.first.second - val.first.first + 1)/128. * rstats.selectivity_;
+</a><a href="#h0-1-9" id="h0-1-9" class="i">+    out.depth_ = max(depth_, rstats.depth_ + 1);
+</a><a href="#h0-1-10" id="h0-1-10" class="i">+    out.nodes_ += (val.first.second - val.first.first + 1) * rstats.nodes_;
+</a>     if (!val.second)
+         out.tail_paths_ += (val.first.second - val.first.first + 1);
+ 
+<a href="#h0-2" id="h0-2" class="h">@@ -64,8 +70,6 @@ IndexKey::Stats IndexKey::Stats::concat(const IndexKey::Stats&amp; rhs) const {
+</a>     return out;
+ }
+ 
+<a href="#h0-2-3" id="h0-2-3" class="d">-IndexKey::Stats IndexKey::null_stats_;
+</a><a href="#h0-2-4" id="h0-2-4" class="d">-
+</a> void IndexKey::insert(const value_type&amp; val) {
+     stats_ = stats_.insert(val);
+ 
+<a href="#h0-3" id="h0-3" class="h">@@ -78,9 +82,6 @@ void IndexKey::insert(const value_type&amp; val) {
+</a> }
+ 
+ double IndexKey::selectivity() {
+<a href="#h0-3-3" id="h0-3-3" class="d">-    if (this == 0)
+</a><a href="#h0-3-4" id="h0-3-4" class="d">-        return 1.0;
+</a><a href="#h0-3-5" id="h0-3-5" class="d">-
+</a>     if (empty())
+         assert(stats_.selectivity_ == 1.0);
+ 
+<a href="#h0-4" id="h0-4" class="h">@@ -94,23 +95,14 @@ unsigned IndexKey::weight() {
+</a> }
+ 
+ long IndexKey::nodes() {
+<a href="#h0-4-3" id="h0-4-3" class="d">-    if (this == 0)
+</a><a href="#h0-4-4" id="h0-4-4" class="d">-        return 1;
+</a>     return stats_.nodes_;
+ }
+ 
+ int IndexKey::depth() {
+<a href="#h0-4-9" id="h0-4-9" class="d">-    if (this == 0)
+</a><a href="#h0-4-10" id="h0-4-10" class="d">-        return 0;
+</a>     return stats_.depth_;
+ }
+ 
+ void IndexKey::collect_tails(list&lt;IndexKey::iterator&gt;&amp; tails) {
+<a href="#h0-4-15" id="h0-4-15" class="d">-    if (this == 0)
+</a><a href="#h0-4-16" id="h0-4-16" class="d">-        return;
+</a><a href="#h0-4-17" id="h0-4-17" class="d">-
+</a><a href="#h0-4-18" id="h0-4-18" class="d">-    // assert(empty() || !tails_.empty());
+</a><a href="#h0-4-19" id="h0-4-19" class="d">-
+</a>     tails.splice(tails.end(), tails_);
+ }
+ 
+<a href="#h0-5" id="h0-5" class="h">@@ -150,16 +142,22 @@ static string strprintf(const char *fmt, ...) {
+</a>     return string(buf);
+ }
+ 
+<a href="#h0-5-3" id="h0-5-3" class="i">+static string StrChar(uchar c) {
+</a><a href="#h0-5-4" id="h0-5-4" class="i">+    if (c &gt; &#39; &#39; &amp;&amp; c &lt;= &#39;~&#39;)
+</a><a href="#h0-5-5" id="h0-5-5" class="i">+        return strprintf(&quot;%c&quot;, c);
+</a><a href="#h0-5-6" id="h0-5-6" class="i">+    return strprintf(&quot;\\x%02x&quot;, c);
+</a><a href="#h0-5-7" id="h0-5-7" class="i">+}
+</a><a href="#h0-5-8" id="h0-5-8" class="i">+
+</a> static string ToString(IndexKey *k, int indent = 0) {
+     string out;
+     if (k == 0)
+         return strprintf(&quot;%*.s[]\n&quot;, indent, &quot;&quot;);
+ 
+     for (IndexKey::iterator it = k-&gt;begin(); it != k-&gt;end(); ++it) {
+<a href="#h0-5-15" id="h0-5-15" class="d">-        out += strprintf(&quot;%*.s[%c-%c] -&gt; \n&quot;,
+</a><a href="#h0-5-16" id="h0-5-16" class="i">+        out += strprintf(&quot;%*.s[%s-%s] -&gt; \n&quot;,
+</a>                          indent, &quot;&quot;,
+<a href="#h0-5-18" id="h0-5-18" class="d">-                         it-&gt;first.first,
+</a><a href="#h0-5-19" id="h0-5-19" class="d">-                         it-&gt;first.second);
+</a><a href="#h0-5-20" id="h0-5-20" class="i">+                         StrChar(it-&gt;first.first).c_str(),
+</a><a href="#h0-5-21" id="h0-5-21" class="i">+                         StrChar(it-&gt;first.second).c_str());
+</a>         out += ToString(it-&gt;second.get(), indent + 1);
+     }
+     return out;
+<a href="#h0-6" id="h0-6" class="h">@@ -167,8 +165,6 @@ static string ToString(IndexKey *k, int indent = 0) {
+</a> 
+ string IndexKey::ToString() {
+     string out = ::ToString(this, 0);
+<a href="#h0-6-3" id="h0-6-3" class="d">-    if (this == 0)
+</a><a href="#h0-6-4" id="h0-6-4" class="d">-        return out;
+</a> 
+     out += &quot;|&quot;;
+     if (anchor &amp; kAnchorLeft)
+<a href="#h0-7" id="h0-7" class="h">@@ -212,7 +208,7 @@ namespace {
+</a>     }
+ 
+     shared_ptr&lt;IndexKey&gt; Any() {
+<a href="#h0-7-3" id="h0-7-3" class="d">-        return shared_ptr&lt;IndexKey&gt;(0);
+</a><a href="#h0-7-4" id="h0-7-4" class="i">+        return shared_ptr&lt;IndexKey&gt;(new IndexKey());
+</a>     }
+ 
+     shared_ptr&lt;IndexKey&gt; Empty() {
+<a href="#h0-8" id="h0-8" class="h">@@ -282,8 +278,7 @@ namespace {
+</a>     }
+ 
+     bool ShouldConcat(shared_ptr&lt;IndexKey&gt; lhs, shared_ptr&lt;IndexKey&gt; rhs) {
+<a href="#h0-8-3" id="h0-8-3" class="d">-        if (!lhs || !rhs)
+</a><a href="#h0-8-4" id="h0-8-4" class="d">-            return false;
+</a><a href="#h0-8-5" id="h0-8-5" class="i">+        assert(lhs &amp;&amp; rhs);
+</a>         if (!(lhs-&gt;anchor &amp; kAnchorRight) ||
+             !(rhs-&gt;anchor &amp; kAnchorLeft))
+             return false;
+<a href="#h0-9" id="h0-9" class="h">@@ -300,9 +295,9 @@ namespace {
+</a>         shared_ptr&lt;IndexKey&gt; out = lhs;
+ 
+         debug(2, &quot;Concat([%s](%ld), [%s](%ld)) = &quot;,
+<a href="#h0-9-3" id="h0-9-3" class="d">-              lhs-&gt;ToString().c_str(),
+</a><a href="#h0-9-4" id="h0-9-4" class="i">+              lhs ? lhs-&gt;ToString().c_str() : &quot;&quot;,
+</a>               lhs-&gt;nodes(),
+<a href="#h0-9-6" id="h0-9-6" class="d">-              rhs-&gt;ToString().c_str(),
+</a><a href="#h0-9-7" id="h0-9-7" class="i">+              rhs ? rhs-&gt;ToString().c_str() : &quot;&quot;,
+</a>               rhs-&gt;nodes());
+ 
+         if (ShouldConcat(lhs, rhs)) {
+<a href="#h0-10" id="h0-10" class="h">@@ -445,7 +440,7 @@ namespace {
+</a>                                            shared_ptr&lt;IndexKey&gt; rhs) {
+         if (lhs == rhs)
+             return lhs;
+<a href="#h0-10-3" id="h0-10-3" class="d">-        if (lhs == 0 || rhs == 0 ||
+</a><a href="#h0-10-4" id="h0-10-4" class="i">+        if (lhs-&gt;empty() || rhs-&gt;empty() ||
+</a>             lhs-&gt;size() + rhs-&gt;size() &gt;= kMaxWidth)
+             return Any();
+ 
+<a href="#h0-11" id="h0-11" class="h">@@ -589,11 +584,17 @@ IndexWalker::PostVisit(Regexp* re, shared_ptr&lt;IndexKey&gt; parent_arg,
+</a>         assert(false);
+     }
+ 
+<a href="#h0-11-3" id="h0-11-3" class="d">-    debug(1, &quot;* INDEX %s ==&gt; [weight %d, nodes %ld, depth %d]\n&quot;,
+</a><a href="#h0-11-4" id="h0-11-4" class="d">-          re-&gt;ToString().c_str(),
+</a><a href="#h0-11-5" id="h0-11-5" class="d">-          key-&gt;weight(), key-&gt;nodes(), key-&gt;depth());
+</a><a href="#h0-11-6" id="h0-11-6" class="i">+    assert(key);
+</a><a href="#h0-11-7" id="h0-11-7" class="i">+
+</a><a href="#h0-11-8" id="h0-11-8" class="i">+    debug(1, &quot;* INDEX %s ==&gt; &quot;, re-&gt;ToString().c_str());
+</a><a href="#h0-11-9" id="h0-11-9" class="i">+    if (key)
+</a><a href="#h0-11-10" id="h0-11-10" class="i">+        debug(1, &quot;[weight %d, nodes %ld, depth %d]\n&quot;,
+</a><a href="#h0-11-11" id="h0-11-11" class="i">+              key-&gt;weight(), key-&gt;nodes(), key-&gt;depth());
+</a><a href="#h0-11-12" id="h0-11-12" class="i">+    else
+</a><a href="#h0-11-13" id="h0-11-13" class="i">+        debug(1, &quot;nul\n&quot;);
+</a><a href="#h0-11-14" id="h0-11-14" class="i">+
+</a>     debug(2, &quot;           ==&gt; [%s]\n&quot;,
+<a href="#h0-11-16" id="h0-11-16" class="d">-          key-&gt;ToString().c_str());
+</a><a href="#h0-11-17" id="h0-11-17" class="i">+          key ? key-&gt;ToString().c_str() : &quot;nul&quot;);
+</a> 
+     if (FLAGS_debug_index &amp;&amp; key)
+         key-&gt;check_rep();
+<b>diff --git a/<a id="h1" href="../file/indexer.h">indexer.h</a> b/<a href="../file/indexer.h">indexer.h</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -72,7 +72,7 @@ public:
+</a>     };
+ 
+     const Stats&amp; stats() {
+<a href="#h1-0-3" id="h1-0-3" class="d">-        return this ? stats_ : null_stats_;
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+        return stats_;
+</a>     }
+ 
+     /*
+<a href="#h1-1" id="h1-1" class="h">@@ -113,8 +113,6 @@ protected:
+</a> 
+     void collect_tails(list&lt;IndexKey::iterator&gt;&amp; tails);
+ 
+<a href="#h1-1-3" id="h1-1-3" class="d">-    static Stats null_stats_;
+</a><a href="#h1-1-4" id="h1-1-4" class="d">-
+</a> private:
+     IndexKey(const IndexKey&amp;);
+     void operator=(const IndexKey&amp;);
+</pre>
+</div>
+</body>
+</html>

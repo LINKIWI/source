@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Move the responsibility for printing results into main.cc. - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/f53f5c8182ca512ea3beb1a7180b8f44f6caac57">f53f5c8182ca512ea3beb1a7180b8f44f6caac57</a>
+<b>parent</b> <a href="../commit/54579faedc6530f7c7c814fd5666e01684441d49">54579faedc6530f7c7c814fd5666e01684441d49</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Sun,  8 Jan 2012 16:47:07 -0500
+
+Move the responsibility for printing results into main.cc.
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">codesearch.cc</a></td><td> | </td><td class="num">62</td><td><span class="i">+++++</span><span class="d">---------------------------------------------------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">codesearch.h</a></td><td> | </td><td class="num">35</td><td><span class="i">+++++++++++++++++++++++++++++</span><span class="d">------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">main.cc</a></td><td> | </td><td class="num">46</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">--</span></td></tr>
+</table></pre><pre>3 files changed, 78 insertions(+), 65 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/codesearch.cc">codesearch.cc</a> b/<a href="../file/codesearch.cc">codesearch.cc</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -10,8 +10,6 @@
+</a> 
+ #include &lt;re2/re2.h&gt;
+ 
+<a href="#h0-0-3" id="h0-0-3" class="d">-#include &lt;json/json.h&gt;
+</a><a href="#h0-0-4" id="h0-0-4" class="d">-
+</a> #include &lt;gflags/gflags.h&gt;
+ 
+ #include &quot;timer.h&quot;
+<a href="#h0-1" id="h0-1" class="h">@@ -41,19 +39,9 @@ const int    kContextLines = 3;
+</a> 
+ DEFINE_bool(index, true, &quot;Create a suffix-array index to speed searches.&quot;);
+ DEFINE_bool(search, true, &quot;Actually do the search.&quot;);
+<a href="#h0-1-3" id="h0-1-3" class="d">-DEFINE_bool(quiet, false, &quot;Do the search, but don&#39;t print results.&quot;);
+</a> DEFINE_int32(timeout, 1, &quot;The number of seconds a single search may run for.&quot;);
+ DECLARE_int32(threads);
+ 
+<a href="#h0-1-7" id="h0-1-7" class="d">-struct match_result {
+</a><a href="#h0-1-8" id="h0-1-8" class="d">-    search_file *file;
+</a><a href="#h0-1-9" id="h0-1-9" class="d">-    int lno;
+</a><a href="#h0-1-10" id="h0-1-10" class="d">-    vector&lt;string&gt; context_before;
+</a><a href="#h0-1-11" id="h0-1-11" class="d">-    vector&lt;string&gt; context_after;
+</a><a href="#h0-1-12" id="h0-1-12" class="d">-    StringPiece line;
+</a><a href="#h0-1-13" id="h0-1-13" class="d">-    int matchleft, matchright;
+</a><a href="#h0-1-14" id="h0-1-14" class="d">-};
+</a><a href="#h0-1-15" id="h0-1-15" class="d">-
+</a> bool eqstr::operator()(const StringPiece&amp; lhs, const StringPiece&amp; rhs) const {
+     if (lhs.data() == NULL &amp;&amp; rhs.data() == NULL)
+         return true;
+<a href="#h0-2" id="h0-2" class="h">@@ -241,8 +229,7 @@ protected:
+</a> };
+ 
+ code_searcher::code_searcher()
+<a href="#h0-2-3" id="h0-2-3" class="d">-    : stats_(), output_json_(false),
+</a><a href="#h0-2-4" id="h0-2-4" class="d">-      finalized_(false)
+</a><a href="#h0-2-5" id="h0-2-5" class="i">+    : stats_(), finalized_(false)
+</a> {
+ #ifdef USE_DENSE_HASH_SET
+     lines_.set_empty_key(empty_string);
+<a href="#h0-3" id="h0-3" class="h">@@ -607,7 +594,9 @@ code_searcher::search_thread::search_thread(code_searcher *cs)
+</a>     : cs_(cs), pool_(FLAGS_threads, &amp;search_one) {
+ }
+ 
+<a href="#h0-3-3" id="h0-3-3" class="d">-int code_searcher::search_thread::match(RE2&amp; pat, match_stats *stats, exit_reason *why) {
+</a><a href="#h0-3-4" id="h0-3-4" class="i">+int code_searcher::search_thread::match_internal(RE2&amp; pat,
+</a><a href="#h0-3-5" id="h0-3-5" class="i">+                                                 const code_searcher::search_thread::base_cb&amp; cb,
+</a><a href="#h0-3-6" id="h0-3-6" class="i">+                                                 match_stats *stats, exit_reason *why) {
+</a>     list&lt;chunk*&gt;::iterator it;
+     match_result *m;
+     int matches = 0;
+<a href="#h0-4" id="h0-4" class="h">@@ -634,7 +623,7 @@ int code_searcher::search_thread::match(RE2&amp; pat, match_stats *stats, exit_reaso
+</a>             continue;
+         }
+         matches++;
+<a href="#h0-4-3" id="h0-4-3" class="d">-        print_match(m);
+</a><a href="#h0-4-4" id="h0-4-4" class="i">+        cb(m);
+</a>         delete m;
+     }
+ 
+<a href="#h0-5" id="h0-5" class="h">@@ -644,47 +633,6 @@ int code_searcher::search_thread::match(RE2&amp; pat, match_stats *stats, exit_reaso
+</a> }
+ 
+ 
+<a href="#h0-5-3" id="h0-5-3" class="d">-void code_searcher::search_thread::print_match(const match_result *m) {
+</a><a href="#h0-5-4" id="h0-5-4" class="d">-    if (FLAGS_quiet)
+</a><a href="#h0-5-5" id="h0-5-5" class="d">-        return;
+</a><a href="#h0-5-6" id="h0-5-6" class="d">-    else if (cs_-&gt;output_json_)
+</a><a href="#h0-5-7" id="h0-5-7" class="d">-        print_match_json(m);
+</a><a href="#h0-5-8" id="h0-5-8" class="d">-    else
+</a><a href="#h0-5-9" id="h0-5-9" class="d">-        printf(&quot;%s:%s:%d:%d-%d: %.*s\n&quot;,
+</a><a href="#h0-5-10" id="h0-5-10" class="d">-               m-&gt;file-&gt;ref,
+</a><a href="#h0-5-11" id="h0-5-11" class="d">-               m-&gt;file-&gt;path.c_str(),
+</a><a href="#h0-5-12" id="h0-5-12" class="d">-               m-&gt;lno,
+</a><a href="#h0-5-13" id="h0-5-13" class="d">-               m-&gt;matchleft, m-&gt;matchright,
+</a><a href="#h0-5-14" id="h0-5-14" class="d">-               m-&gt;line.size(), m-&gt;line.data());
+</a><a href="#h0-5-15" id="h0-5-15" class="d">-}
+</a><a href="#h0-5-16" id="h0-5-16" class="d">-
+</a><a href="#h0-5-17" id="h0-5-17" class="d">-static json_object *to_json(vector&lt;string&gt; vec) {
+</a><a href="#h0-5-18" id="h0-5-18" class="d">-    json_object *out = json_object_new_array();
+</a><a href="#h0-5-19" id="h0-5-19" class="d">-    for (vector&lt;string&gt;::iterator it = vec.begin(); it != vec.end(); it++)
+</a><a href="#h0-5-20" id="h0-5-20" class="d">-        json_object_array_add(out, json_object_new_string(it-&gt;c_str()));
+</a><a href="#h0-5-21" id="h0-5-21" class="d">-    return out;
+</a><a href="#h0-5-22" id="h0-5-22" class="d">-}
+</a><a href="#h0-5-23" id="h0-5-23" class="d">-
+</a><a href="#h0-5-24" id="h0-5-24" class="d">-void code_searcher::search_thread::print_match_json(const match_result *m) {
+</a><a href="#h0-5-25" id="h0-5-25" class="d">-    json_object *obj = json_object_new_object();
+</a><a href="#h0-5-26" id="h0-5-26" class="d">-    json_object_object_add(obj, &quot;ref&quot;,  json_object_new_string(m-&gt;file-&gt;ref));
+</a><a href="#h0-5-27" id="h0-5-27" class="d">-    json_object_object_add(obj, &quot;file&quot;, json_object_new_string(m-&gt;file-&gt;path.c_str()));
+</a><a href="#h0-5-28" id="h0-5-28" class="d">-    json_object_object_add(obj, &quot;lno&quot;,  json_object_new_int(m-&gt;lno));
+</a><a href="#h0-5-29" id="h0-5-29" class="d">-    json_object *bounds = json_object_new_array();
+</a><a href="#h0-5-30" id="h0-5-30" class="d">-    json_object_array_add(bounds, json_object_new_int(m-&gt;matchleft));
+</a><a href="#h0-5-31" id="h0-5-31" class="d">-    json_object_array_add(bounds, json_object_new_int(m-&gt;matchright));
+</a><a href="#h0-5-32" id="h0-5-32" class="d">-    json_object_object_add(obj, &quot;bounds&quot;, bounds);
+</a><a href="#h0-5-33" id="h0-5-33" class="d">-    json_object_object_add(obj, &quot;line&quot;,
+</a><a href="#h0-5-34" id="h0-5-34" class="d">-                           json_object_new_string_len(m-&gt;line.data(),
+</a><a href="#h0-5-35" id="h0-5-35" class="d">-                                                      m-&gt;line.size()));
+</a><a href="#h0-5-36" id="h0-5-36" class="d">-    json_object_object_add(obj, &quot;context_before&quot;,
+</a><a href="#h0-5-37" id="h0-5-37" class="d">-                           to_json(m-&gt;context_before));
+</a><a href="#h0-5-38" id="h0-5-38" class="d">-    json_object_object_add(obj, &quot;context_after&quot;,
+</a><a href="#h0-5-39" id="h0-5-39" class="d">-                           to_json(m-&gt;context_after));
+</a><a href="#h0-5-40" id="h0-5-40" class="d">-    printf(&quot;%s\n&quot;, json_object_to_json_string(obj));
+</a><a href="#h0-5-41" id="h0-5-41" class="d">-    json_object_put(obj);
+</a><a href="#h0-5-42" id="h0-5-42" class="d">-}
+</a><a href="#h0-5-43" id="h0-5-43" class="d">-
+</a> code_searcher::search_thread::~search_thread() {
+     for (int i = 0; i &lt; FLAGS_threads; i++)
+         pool_.queue(pair&lt;searcher*, chunk*&gt;(0, 0));
+<b>diff --git a/<a id="h1" href="../file/codesearch.h">codesearch.h</a> b/<a href="../file/codesearch.h">codesearch.h</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -79,6 +79,15 @@ struct search_file {
+</a>     int no;
+ };
+ 
+<a href="#h1-0-3" id="h1-0-3" class="i">+struct match_result {
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+    search_file *file;
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+    int lno;
+</a><a href="#h1-0-6" id="h1-0-6" class="i">+    vector&lt;string&gt; context_before;
+</a><a href="#h1-0-7" id="h1-0-7" class="i">+    vector&lt;string&gt; context_after;
+</a><a href="#h1-0-8" id="h1-0-8" class="i">+    StringPiece line;
+</a><a href="#h1-0-9" id="h1-0-9" class="i">+    int matchleft, matchright;
+</a><a href="#h1-0-10" id="h1-0-10" class="i">+};
+</a><a href="#h1-0-11" id="h1-0-11" class="i">+
+</a> class code_searcher {
+ public:
+     code_searcher();
+<a href="#h1-1" id="h1-1" class="h">@@ -88,18 +97,33 @@ public:
+</a>     void dump_index(const string&amp; path);
+     void load_index(const string&amp; path);
+ 
+<a href="#h1-1-3" id="h1-1-3" class="d">-    void set_output_json(bool j) { output_json_ = j; }
+</a>     void finalize();
+ 
+     class search_thread {
+<a href="#h1-1-7" id="h1-1-7" class="i">+    protected:
+</a><a href="#h1-1-8" id="h1-1-8" class="i">+        struct base_cb {
+</a><a href="#h1-1-9" id="h1-1-9" class="i">+            virtual void operator()(const struct match_result *m) const = 0;
+</a><a href="#h1-1-10" id="h1-1-10" class="i">+        };
+</a><a href="#h1-1-11" id="h1-1-11" class="i">+        template &lt;class T&gt;
+</a><a href="#h1-1-12" id="h1-1-12" class="i">+        struct match_cb : public base_cb {
+</a><a href="#h1-1-13" id="h1-1-13" class="i">+            match_cb(T cb) : cb_(cb) {}
+</a><a href="#h1-1-14" id="h1-1-14" class="i">+            virtual void operator()(const struct match_result *m) const {
+</a><a href="#h1-1-15" id="h1-1-15" class="i">+                cb_(m);
+</a><a href="#h1-1-16" id="h1-1-16" class="i">+            }
+</a><a href="#h1-1-17" id="h1-1-17" class="i">+        private:
+</a><a href="#h1-1-18" id="h1-1-18" class="i">+            T cb_;
+</a><a href="#h1-1-19" id="h1-1-19" class="i">+        };
+</a><a href="#h1-1-20" id="h1-1-20" class="i">+
+</a><a href="#h1-1-21" id="h1-1-21" class="i">+        int match_internal(RE2&amp; pat, const base_cb&amp; cb, match_stats *stats, exit_reason *why);
+</a>     public:
+         search_thread(code_searcher *cs);
+         ~search_thread();
+<a href="#h1-1-25" id="h1-1-25" class="d">-        int match(RE2&amp; pat, match_stats *stats, exit_reason *why);
+</a><a href="#h1-1-26" id="h1-1-26" class="d">-    protected:
+</a><a href="#h1-1-27" id="h1-1-27" class="d">-        void print_match(const match_result *m);
+</a><a href="#h1-1-28" id="h1-1-28" class="d">-        void print_match_json(const match_result *m);
+</a> 
+<a href="#h1-1-30" id="h1-1-30" class="i">+        template &lt;class T&gt;
+</a><a href="#h1-1-31" id="h1-1-31" class="i">+        int match(RE2&amp; pat, T cb, match_stats *stats, exit_reason *why) {
+</a><a href="#h1-1-32" id="h1-1-32" class="i">+            return match_internal(pat, match_cb&lt;T&gt;(cb), stats, why);
+</a><a href="#h1-1-33" id="h1-1-33" class="i">+        }
+</a><a href="#h1-1-34" id="h1-1-34" class="i">+    protected:
+</a>         const code_searcher *cs_;
+         thread_pool&lt;pair&lt;searcher*, chunk*&gt;,
+                     bool(*)(const pair&lt;searcher*, chunk*&gt;&amp;)&gt; pool_;
+<a href="#h1-2" id="h1-2" class="h">@@ -128,7 +152,6 @@ protected:
+</a>         unsigned long lines, dedup_lines;
+     } stats_;
+     chunk_allocator *alloc_;
+<a href="#h1-2-3" id="h1-2-3" class="d">-    bool output_json_;
+</a>     bool finalized_;
+     std::vector&lt;const char*&gt;  refs_;
+     std::vector&lt;search_file*&gt; files_;
+<b>diff --git a/<a id="h2" href="../file/main.cc">main.cc</a> b/<a href="../file/main.cc">main.cc</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -18,6 +18,7 @@ DEFINE_int32(threads, 4, &quot;Number of threads to use.&quot;);
+</a> DEFINE_string(dump_index, &quot;&quot;, &quot;Dump the produced index to a specified file&quot;);
+ DEFINE_string(load_index, &quot;&quot;, &quot;Load the index from a file instead of walking the repository&quot;);
+ DEFINE_string(git_dir, &quot;.git&quot;, &quot;The git directory to read from&quot;);
+<a href="#h2-0-3" id="h2-0-3" class="i">+DEFINE_bool(quiet, false, &quot;Do the search, but don&#39;t print results.&quot;);
+</a> 
+ using namespace std;
+ using namespace re2;
+<a href="#h2-1" id="h2-1" class="h">@@ -26,6 +27,48 @@ long timeval_ms (struct timeval tv) {
+</a>     return tv.tv_sec * 1000 + tv.tv_usec / 1000;
+ }
+ 
+<a href="#h2-1-3" id="h2-1-3" class="i">+void print_match_json(const match_result *m);
+</a><a href="#h2-1-4" id="h2-1-4" class="i">+void print_match(const match_result *m) {
+</a><a href="#h2-1-5" id="h2-1-5" class="i">+    if (FLAGS_quiet)
+</a><a href="#h2-1-6" id="h2-1-6" class="i">+        return;
+</a><a href="#h2-1-7" id="h2-1-7" class="i">+    else if (FLAGS_json)
+</a><a href="#h2-1-8" id="h2-1-8" class="i">+        print_match_json(m);
+</a><a href="#h2-1-9" id="h2-1-9" class="i">+    else
+</a><a href="#h2-1-10" id="h2-1-10" class="i">+        printf(&quot;%s:%s:%d:%d-%d: %.*s\n&quot;,
+</a><a href="#h2-1-11" id="h2-1-11" class="i">+               m-&gt;file-&gt;ref,
+</a><a href="#h2-1-12" id="h2-1-12" class="i">+               m-&gt;file-&gt;path.c_str(),
+</a><a href="#h2-1-13" id="h2-1-13" class="i">+               m-&gt;lno,
+</a><a href="#h2-1-14" id="h2-1-14" class="i">+               m-&gt;matchleft, m-&gt;matchright,
+</a><a href="#h2-1-15" id="h2-1-15" class="i">+               m-&gt;line.size(), m-&gt;line.data());
+</a><a href="#h2-1-16" id="h2-1-16" class="i">+}
+</a><a href="#h2-1-17" id="h2-1-17" class="i">+
+</a><a href="#h2-1-18" id="h2-1-18" class="i">+static json_object *to_json(vector&lt;string&gt; vec) {
+</a><a href="#h2-1-19" id="h2-1-19" class="i">+    json_object *out = json_object_new_array();
+</a><a href="#h2-1-20" id="h2-1-20" class="i">+    for (vector&lt;string&gt;::iterator it = vec.begin(); it != vec.end(); it++)
+</a><a href="#h2-1-21" id="h2-1-21" class="i">+        json_object_array_add(out, json_object_new_string(it-&gt;c_str()));
+</a><a href="#h2-1-22" id="h2-1-22" class="i">+    return out;
+</a><a href="#h2-1-23" id="h2-1-23" class="i">+}
+</a><a href="#h2-1-24" id="h2-1-24" class="i">+
+</a><a href="#h2-1-25" id="h2-1-25" class="i">+void print_match_json(const match_result *m) {
+</a><a href="#h2-1-26" id="h2-1-26" class="i">+    json_object *obj = json_object_new_object();
+</a><a href="#h2-1-27" id="h2-1-27" class="i">+    json_object_object_add(obj, &quot;ref&quot;,  json_object_new_string(m-&gt;file-&gt;ref));
+</a><a href="#h2-1-28" id="h2-1-28" class="i">+    json_object_object_add(obj, &quot;file&quot;, json_object_new_string(m-&gt;file-&gt;path.c_str()));
+</a><a href="#h2-1-29" id="h2-1-29" class="i">+    json_object_object_add(obj, &quot;lno&quot;,  json_object_new_int(m-&gt;lno));
+</a><a href="#h2-1-30" id="h2-1-30" class="i">+    json_object *bounds = json_object_new_array();
+</a><a href="#h2-1-31" id="h2-1-31" class="i">+    json_object_array_add(bounds, json_object_new_int(m-&gt;matchleft));
+</a><a href="#h2-1-32" id="h2-1-32" class="i">+    json_object_array_add(bounds, json_object_new_int(m-&gt;matchright));
+</a><a href="#h2-1-33" id="h2-1-33" class="i">+    json_object_object_add(obj, &quot;bounds&quot;, bounds);
+</a><a href="#h2-1-34" id="h2-1-34" class="i">+    json_object_object_add(obj, &quot;line&quot;,
+</a><a href="#h2-1-35" id="h2-1-35" class="i">+                           json_object_new_string_len(m-&gt;line.data(),
+</a><a href="#h2-1-36" id="h2-1-36" class="i">+                                                      m-&gt;line.size()));
+</a><a href="#h2-1-37" id="h2-1-37" class="i">+    json_object_object_add(obj, &quot;context_before&quot;,
+</a><a href="#h2-1-38" id="h2-1-38" class="i">+                           to_json(m-&gt;context_before));
+</a><a href="#h2-1-39" id="h2-1-39" class="i">+    json_object_object_add(obj, &quot;context_after&quot;,
+</a><a href="#h2-1-40" id="h2-1-40" class="i">+                           to_json(m-&gt;context_after));
+</a><a href="#h2-1-41" id="h2-1-41" class="i">+    printf(&quot;%s\n&quot;, json_object_to_json_string(obj));
+</a><a href="#h2-1-42" id="h2-1-42" class="i">+    json_object_put(obj);
+</a><a href="#h2-1-43" id="h2-1-43" class="i">+}
+</a><a href="#h2-1-44" id="h2-1-44" class="i">+
+</a> void print_stats(FILE *out, const match_stats &amp;stats, exit_reason why) {
+     json_object *obj = json_object_new_object();
+     json_object_object_add(obj, &quot;re2_time&quot;, json_object_new_int
+<a href="#h2-2" id="h2-2" class="h">@@ -121,7 +164,7 @@ void interact(code_searcher *cs, FILE *in, FILE *out) {
+</a>             if (!FLAGS_json)
+                 fprintf(out, &quot;ProgramSize: %d\n&quot;, re.ProgramSize());
+ 
+<a href="#h2-2-3" id="h2-2-3" class="d">-            search.match(re, &amp;stats, &amp;why);
+</a><a href="#h2-2-4" id="h2-2-4" class="i">+            search.match(re, print_match, &amp;stats, &amp;why);
+</a>             elapsed = tm.elapsed();
+             if (FLAGS_json)
+                 print_stats(out, stats, why);
+<a href="#h2-3" id="h2-3" class="h">@@ -150,7 +193,6 @@ int main(int argc, char **argv) {
+</a>     google::ParseCommandLineFlags(&amp;argc, &amp;argv, true);
+ 
+     code_searcher counter;
+<a href="#h2-3-3" id="h2-3-3" class="d">-    counter.set_output_json(FLAGS_json);
+</a> 
+     if (FLAGS_load_index.size() == 0) {
+         git_repository *repo;
+</pre>
+</div>
+</body>
+</html>

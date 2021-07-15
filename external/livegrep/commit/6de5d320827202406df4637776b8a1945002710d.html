@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Move git indexing out of codesearch.cc. - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/6de5d320827202406df4637776b8a1945002710d">6de5d320827202406df4637776b8a1945002710d</a>
+<b>parent</b> <a href="../commit/c955f310bf908717a54bbf24e41712007224e9c8">c955f310bf908717a54bbf24e41712007224e9c8</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Sat, 29 Dec 2012 14:20:19 -0500
+
+Move git indexing out of codesearch.cc.
+
+The indexer core should be now entirely independent of git/libgit2.
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">src/Makefrag</a></td><td> | </td><td class="num">2</td><td><span class="i">+</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">src/codesearch.cc</a></td><td> | </td><td class="num">108</td><td><span class="i">++++++++++++++</span><span class="d">-----------------------------------------------------------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">src/codesearch.h</a></td><td> | </td><td class="num">25</td><td><span class="i">++++++++++++</span><span class="d">-------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">src/dump_load.cc</a></td><td> | </td><td class="num">29</td><td><span class="i">+++++++++++++++</span><span class="d">--------------</span></td></tr>
+<tr><td class="A">A</td><td><a href="#h4">src/git_indexer.cc</a></td><td> | </td><td class="num">90</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="A">A</td><td><a href="#h5">src/git_indexer.h</a></td><td> | </td><td class="num">29</td><td><span class="i">+++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h6">src/main.cc</a></td><td> | </td><td class="num">13</td><td><span class="i">++++++</span><span class="d">-------</span></td></tr>
+</table></pre><pre>7 files changed, 172 insertions(+), 124 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/src/Makefrag">src/Makefrag</a> b/<a href="../file/src/Makefrag">src/Makefrag</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -1,3 +1,3 @@
+</a> OBJECTS += src/chunk_allocator.o src/chunk.o src/codesearch.o \
+            src/content.o src/dump_load.o src/indexer.o src/main.o \
+<a href="#h0-0-2" id="h0-0-2" class="d">-           src/re_width.o
+</a><a href="#h0-0-3" id="h0-0-3" class="i">+           src/re_width.o src/git_indexer.o
+</a><b>diff --git a/<a id="h1" href="../file/src/codesearch.cc">src/codesearch.cc</a> b/<a href="../file/src/codesearch.cc">src/codesearch.cc</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -13,7 +13,6 @@
+</a> #include &lt;iostream&gt;
+ #include &lt;string&gt;
+ #include &lt;fstream&gt;
+<a href="#h1-0-3" id="h1-0-3" class="d">-#include &lt;sstream&gt;
+</a> #include &lt;limits&gt;
+ 
+ #include &lt;re2/re2.h&gt;
+<a href="#h1-1" id="h1-1" class="h">@@ -31,7 +30,6 @@
+</a> #include &quot;indexer.h&quot;
+ #include &quot;per_thread.h&quot;
+ #include &quot;debug.h&quot;
+<a href="#h1-1-3" id="h1-1-3" class="d">-#include &quot;smart_git.h&quot;
+</a> 
+ #include &quot;utf8.h&quot;
+ 
+<a href="#h1-2" id="h1-2" class="h">@@ -48,10 +46,8 @@ const int kMaxScan        = (1 &lt;&lt; 20);
+</a> DEFINE_bool(index, true, &quot;Create a suffix-array index to speed searches.&quot;);
+ DEFINE_bool(drop_cache, false, &quot;Drop caches before each search&quot;);
+ DEFINE_bool(search, true, &quot;Actually do the search.&quot;);
+<a href="#h1-2-3" id="h1-2-3" class="d">-DEFINE_bool(revparse, false, &quot;Display parsed revisions, rather than as-provided&quot;);
+</a> DEFINE_int32(max_matches, 50, &quot;The maximum number of results to return for a single query.&quot;);
+ DEFINE_int32(timeout, 1, &quot;The number of seconds a single search may run for.&quot;);
+<a href="#h1-2-6" id="h1-2-6" class="d">-DEFINE_string(order_root, &quot;&quot;, &quot;Walk top-level directories in this order.&quot;);
+</a> DECLARE_int32(threads);
+ 
+ bool eqstr::operator()(const StringPiece&amp; lhs, const StringPiece&amp; rhs) const {
+<a href="#h1-3" id="h1-3" class="h">@@ -78,7 +74,6 @@ void sha1_string(sha1_buf *out, StringPiece string) {
+</a>     SHA1_Final(out-&gt;hash, &amp;ctx);
+ }
+ 
+<a href="#h1-3-3" id="h1-3-3" class="d">-
+</a> size_t hash_sha1::operator()(const sha1_buf&amp; hash) const {
+     /*
+      * We could hash the entire oid together, but since the oid is the
+<a href="#h1-4" id="h1-4" class="h">@@ -349,66 +344,6 @@ code_searcher::~code_searcher() {
+</a>     delete alloc_;
+ }
+ 
+<a href="#h1-4-3" id="h1-4-3" class="d">-namespace {
+</a><a href="#h1-4-4" id="h1-4-4" class="d">-    void resolve_ref(git_repository *repo,
+</a><a href="#h1-4-5" id="h1-4-5" class="d">-                     smart_object&lt;git_commit&gt;&amp; out,
+</a><a href="#h1-4-6" id="h1-4-6" class="d">-                     const char *refname) {
+</a><a href="#h1-4-7" id="h1-4-7" class="d">-        git_revparse_single(out, repo, (string(refname) + &quot;^0&quot;).c_str());
+</a><a href="#h1-4-8" id="h1-4-8" class="d">-    }
+</a><a href="#h1-4-9" id="h1-4-9" class="d">-};
+</a><a href="#h1-4-10" id="h1-4-10" class="d">-
+</a><a href="#h1-4-11" id="h1-4-11" class="d">-void code_searcher::walk_ref(git_repository *repo, const char *ref) {
+</a><a href="#h1-4-12" id="h1-4-12" class="d">-    assert(alloc_);
+</a><a href="#h1-4-13" id="h1-4-13" class="d">-    assert(!finalized_);
+</a><a href="#h1-4-14" id="h1-4-14" class="d">-    smart_object&lt;git_commit&gt; commit;
+</a><a href="#h1-4-15" id="h1-4-15" class="d">-    smart_object&lt;git_tree&gt; tree;
+</a><a href="#h1-4-16" id="h1-4-16" class="d">-    resolve_ref(repo, commit, ref);
+</a><a href="#h1-4-17" id="h1-4-17" class="d">-    git_commit_tree(tree, commit);
+</a><a href="#h1-4-18" id="h1-4-18" class="d">-
+</a><a href="#h1-4-19" id="h1-4-19" class="d">-    char oidstr[GIT_OID_HEXSZ+1];
+</a><a href="#h1-4-20" id="h1-4-20" class="d">-    string name = FLAGS_revparse ?
+</a><a href="#h1-4-21" id="h1-4-21" class="d">-        strdup(git_oid_tostr(oidstr, sizeof(oidstr), git_commit_id(commit))) : ref;
+</a><a href="#h1-4-22" id="h1-4-22" class="d">-    refs_.push_back(name);
+</a><a href="#h1-4-23" id="h1-4-23" class="d">-
+</a><a href="#h1-4-24" id="h1-4-24" class="d">-    walk_root(repo, &amp;(refs_.back()), tree);
+</a><a href="#h1-4-25" id="h1-4-25" class="d">-}
+</a><a href="#h1-4-26" id="h1-4-26" class="d">-
+</a><a href="#h1-4-27" id="h1-4-27" class="d">-void code_searcher::walk_root(git_repository *repo, const string *ref, git_tree *tree) {
+</a><a href="#h1-4-28" id="h1-4-28" class="d">-    map&lt;string, const git_tree_entry *&gt; root;
+</a><a href="#h1-4-29" id="h1-4-29" class="d">-    vector&lt;const git_tree_entry *&gt; ordered;
+</a><a href="#h1-4-30" id="h1-4-30" class="d">-    int entries = git_tree_entrycount(tree);
+</a><a href="#h1-4-31" id="h1-4-31" class="d">-    for (int i = 0; i &lt; entries; ++i) {
+</a><a href="#h1-4-32" id="h1-4-32" class="d">-        const git_tree_entry *ent = git_tree_entry_byindex(tree, i);
+</a><a href="#h1-4-33" id="h1-4-33" class="d">-        root[git_tree_entry_name(ent)] = ent;
+</a><a href="#h1-4-34" id="h1-4-34" class="d">-    }
+</a><a href="#h1-4-35" id="h1-4-35" class="d">-
+</a><a href="#h1-4-36" id="h1-4-36" class="d">-    istringstream stream(FLAGS_order_root);
+</a><a href="#h1-4-37" id="h1-4-37" class="d">-    string dir;
+</a><a href="#h1-4-38" id="h1-4-38" class="d">-    while(stream &gt;&gt; dir) {
+</a><a href="#h1-4-39" id="h1-4-39" class="d">-        map&lt;string, const git_tree_entry *&gt;::iterator it = root.find(dir);
+</a><a href="#h1-4-40" id="h1-4-40" class="d">-        if (it == root.end())
+</a><a href="#h1-4-41" id="h1-4-41" class="d">-            continue;
+</a><a href="#h1-4-42" id="h1-4-42" class="d">-        ordered.push_back(it-&gt;second);
+</a><a href="#h1-4-43" id="h1-4-43" class="d">-        root.erase(it);
+</a><a href="#h1-4-44" id="h1-4-44" class="d">-    }
+</a><a href="#h1-4-45" id="h1-4-45" class="d">-    for (map&lt;string, const git_tree_entry *&gt;::iterator it = root.begin();
+</a><a href="#h1-4-46" id="h1-4-46" class="d">-         it != root.end(); ++it)
+</a><a href="#h1-4-47" id="h1-4-47" class="d">-        ordered.push_back(it-&gt;second);
+</a><a href="#h1-4-48" id="h1-4-48" class="d">-    for (vector&lt;const git_tree_entry *&gt;::iterator it = ordered.begin();
+</a><a href="#h1-4-49" id="h1-4-49" class="d">-         it != ordered.end(); ++it) {
+</a><a href="#h1-4-50" id="h1-4-50" class="d">-        smart_object&lt;git_object&gt; obj;
+</a><a href="#h1-4-51" id="h1-4-51" class="d">-        git_tree_entry_to_object(obj, repo, *it);
+</a><a href="#h1-4-52" id="h1-4-52" class="d">-        string path = string(git_tree_entry_name(*it));
+</a><a href="#h1-4-53" id="h1-4-53" class="d">-
+</a><a href="#h1-4-54" id="h1-4-54" class="d">-        if (git_tree_entry_type(*it) == GIT_OBJ_TREE) {
+</a><a href="#h1-4-55" id="h1-4-55" class="d">-            walk_tree(repo, ref, path + &quot;/&quot;, obj);
+</a><a href="#h1-4-56" id="h1-4-56" class="d">-        } else if (git_tree_entry_type(*it) == GIT_OBJ_BLOB) {
+</a><a href="#h1-4-57" id="h1-4-57" class="d">-            const char *data = static_cast&lt;const char*&gt;(git_blob_rawcontent(obj));
+</a><a href="#h1-4-58" id="h1-4-58" class="d">-            index_file(ref, path, StringPiece(data, git_blob_rawsize(obj)));
+</a><a href="#h1-4-59" id="h1-4-59" class="d">-        }
+</a><a href="#h1-4-60" id="h1-4-60" class="d">-    }
+</a><a href="#h1-4-61" id="h1-4-61" class="d">-}
+</a><a href="#h1-4-62" id="h1-4-62" class="d">-
+</a> void code_searcher::dump_stats() {
+     debug(kDebugProfile, &quot;chunk_files: %d&quot;, chunk::chunk_files);
+     printf(&quot;Bytes: %ld (dedup: %ld)\n&quot;, stats_.bytes, stats_.dedup_bytes);
+<a href="#h1-5" id="h1-5" class="h">@@ -422,30 +357,11 @@ void code_searcher::finalize() {
+</a>     alloc_-&gt;finalize();
+ }
+ 
+<a href="#h1-5-3" id="h1-5-3" class="d">-void code_searcher::walk_tree(git_repository *repo,
+</a><a href="#h1-5-4" id="h1-5-4" class="d">-                              const string *ref,
+</a><a href="#h1-5-5" id="h1-5-5" class="d">-                              const string&amp; pfx,
+</a><a href="#h1-5-6" id="h1-5-6" class="d">-                              git_tree *tree) {
+</a><a href="#h1-5-7" id="h1-5-7" class="d">-    string path;
+</a><a href="#h1-5-8" id="h1-5-8" class="d">-    int entries = git_tree_entrycount(tree);
+</a><a href="#h1-5-9" id="h1-5-9" class="d">-    int i;
+</a><a href="#h1-5-10" id="h1-5-10" class="d">-    for (i = 0; i &lt; entries; i++) {
+</a><a href="#h1-5-11" id="h1-5-11" class="d">-        const git_tree_entry *ent = git_tree_entry_byindex(tree, i);
+</a><a href="#h1-5-12" id="h1-5-12" class="d">-        path = pfx + git_tree_entry_name(ent);
+</a><a href="#h1-5-13" id="h1-5-13" class="d">-        smart_object&lt;git_object&gt; obj;
+</a><a href="#h1-5-14" id="h1-5-14" class="d">-        git_tree_entry_to_object(obj, repo, ent);
+</a><a href="#h1-5-15" id="h1-5-15" class="d">-        if (git_tree_entry_type(ent) == GIT_OBJ_TREE) {
+</a><a href="#h1-5-16" id="h1-5-16" class="d">-            walk_tree(repo, ref, path + &quot;/&quot;, obj);
+</a><a href="#h1-5-17" id="h1-5-17" class="d">-        } else if (git_tree_entry_type(ent) == GIT_OBJ_BLOB) {
+</a><a href="#h1-5-18" id="h1-5-18" class="d">-            const char *data = static_cast&lt;const char*&gt;(git_blob_rawcontent(obj));
+</a><a href="#h1-5-19" id="h1-5-19" class="d">-            index_file(ref, path, StringPiece(data, git_blob_rawsize(obj)));
+</a><a href="#h1-5-20" id="h1-5-20" class="d">-        }
+</a><a href="#h1-5-21" id="h1-5-21" class="d">-    }
+</a><a href="#h1-5-22" id="h1-5-22" class="d">-}
+</a><a href="#h1-5-23" id="h1-5-23" class="d">-
+</a><a href="#h1-5-24" id="h1-5-24" class="d">-void code_searcher::index_file(const string *repo_ref,
+</a><a href="#h1-5-25" id="h1-5-25" class="i">+void code_searcher::index_file(const string&amp; tree_name,
+</a>                                const string&amp; path,
+                                StringPiece contents) {
+<a href="#h1-5-28" id="h1-5-28" class="i">+    assert(!finalized_);
+</a><a href="#h1-5-29" id="h1-5-29" class="i">+    assert(alloc_);
+</a>     size_t len = contents.size();
+     const char *p = contents.data();
+     const char *end = p + len;
+<a href="#h1-6" id="h1-6" class="h">@@ -456,6 +372,20 @@ void code_searcher::index_file(const string *repo_ref,
+</a>     if (memchr(p, 0, len) != NULL)
+         return;
+ 
+<a href="#h1-6-3" id="h1-6-3" class="i">+    indexed_tree *tree;
+</a><a href="#h1-6-4" id="h1-6-4" class="i">+    {
+</a><a href="#h1-6-5" id="h1-6-5" class="i">+        auto it = tree_map_.find(tree_name);
+</a><a href="#h1-6-6" id="h1-6-6" class="i">+        if (it == tree_map_.end()) {
+</a><a href="#h1-6-7" id="h1-6-7" class="i">+            tree = new indexed_tree;
+</a><a href="#h1-6-8" id="h1-6-8" class="i">+            tree-&gt;name = tree_name;
+</a><a href="#h1-6-9" id="h1-6-9" class="i">+            tree-&gt;id = trees_.size();
+</a><a href="#h1-6-10" id="h1-6-10" class="i">+            trees_.push_back(tree);
+</a><a href="#h1-6-11" id="h1-6-11" class="i">+            tree_map_[tree_name] = tree;
+</a><a href="#h1-6-12" id="h1-6-12" class="i">+        } else {
+</a><a href="#h1-6-13" id="h1-6-13" class="i">+            tree = it-&gt;second;
+</a><a href="#h1-6-14" id="h1-6-14" class="i">+        }
+</a><a href="#h1-6-15" id="h1-6-15" class="i">+    }
+</a><a href="#h1-6-16" id="h1-6-16" class="i">+
+</a>     stats_.bytes += len;
+     stats_.files++;
+ 
+<a href="#h1-7" id="h1-7" class="h">@@ -465,14 +395,14 @@ void code_searcher::index_file(const string *repo_ref,
+</a>     auto sit = file_map_.find(sha1);
+     if (sit != file_map_.end()) {
+         indexed_file *sf = sit-&gt;second;
+<a href="#h1-7-3" id="h1-7-3" class="d">-        sf-&gt;paths.push_back((indexed_path){repo_ref, path});
+</a><a href="#h1-7-4" id="h1-7-4" class="i">+        sf-&gt;paths.push_back((indexed_path){tree, path});
+</a>         return;
+     }
+ 
+     stats_.dedup_files++;
+ 
+     indexed_file *sf = new indexed_file;
+<a href="#h1-7-11" id="h1-7-11" class="d">-    sf-&gt;paths.push_back((indexed_path){repo_ref, path});
+</a><a href="#h1-7-12" id="h1-7-12" class="i">+    sf-&gt;paths.push_back((indexed_path){tree, path});
+</a>     sf-&gt;hash = sha1;
+     sf-&gt;no  = files_.size();
+     files_.push_back(sf);
+<b>diff --git a/<a id="h2" href="../file/src/codesearch.h">src/codesearch.h</a> b/<a href="../file/src/codesearch.h">src/codesearch.h</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -10,6 +10,7 @@
+</a> #include &lt;string&gt;
+ #include &lt;map&gt;
+ #include &lt;fstream&gt;
+<a href="#h2-0-3" id="h2-0-3" class="i">+#include &lt;boost/intrusive_ptr.hpp&gt;
+</a> 
+ #ifdef USE_DENSE_HASH_SET
+ #include &lt;google/dense_hash_set&gt;
+<a href="#h2-1" id="h2-1" class="h">@@ -37,9 +38,6 @@ using std::vector;
+</a> using std::map;
+ using std::pair;
+ 
+<a href="#h2-1-3" id="h2-1-3" class="d">-class git_repository;
+</a><a href="#h2-1-4" id="h2-1-4" class="d">-class git_tree;
+</a><a href="#h2-1-5" id="h2-1-5" class="d">-
+</a> /*
+  * We special-case data() == NULL to provide an &quot;empty&quot; element for
+  * dense_hash_set.
+<a href="#h2-2" id="h2-2" class="h">@@ -94,8 +92,13 @@ struct match_stats {
+</a> struct chunk;
+ struct chunk_file;
+ 
+<a href="#h2-2-3" id="h2-2-3" class="i">+struct indexed_tree {
+</a><a href="#h2-2-4" id="h2-2-4" class="i">+    string name;
+</a><a href="#h2-2-5" id="h2-2-5" class="i">+    int id;
+</a><a href="#h2-2-6" id="h2-2-6" class="i">+};
+</a><a href="#h2-2-7" id="h2-2-7" class="i">+
+</a> struct indexed_path {
+<a href="#h2-2-9" id="h2-2-9" class="d">-    const string *repo_ref;
+</a><a href="#h2-2-10" id="h2-2-10" class="i">+    indexed_tree *tree;
+</a>     string path;
+ };
+ 
+<a href="#h2-3" id="h2-3" class="h">@@ -124,12 +127,11 @@ class code_searcher {
+</a> public:
+     code_searcher();
+     ~code_searcher();
+<a href="#h2-3-3" id="h2-3-3" class="d">-    void walk_ref(git_repository *repo, const char *ref);
+</a>     void dump_stats();
+     void dump_index(const string&amp; path);
+     void load_index(const string&amp; path);
+ 
+<a href="#h2-3-8" id="h2-3-8" class="d">-    void index_file(const string *repo_ref,
+</a><a href="#h2-3-9" id="h2-3-9" class="i">+    void index_file(const string&amp; tree,
+</a>                     const string&amp; path,
+                     StringPiece contents);
+     void finalize();
+<a href="#h2-4" id="h2-4" class="h">@@ -173,12 +175,7 @@ public:
+</a>     };
+ 
+ protected:
+<a href="#h2-4-3" id="h2-4-3" class="d">-    void walk_root(git_repository *repo, const string *ref, git_tree *tree);
+</a><a href="#h2-4-4" id="h2-4-4" class="d">-    void walk_tree(git_repository *repo, const string *ref,
+</a><a href="#h2-4-5" id="h2-4-5" class="d">-                   const string&amp; pfx, git_tree *tree);
+</a><a href="#h2-4-6" id="h2-4-6" class="d">-
+</a>     string_hash lines_;
+<a href="#h2-4-8" id="h2-4-8" class="d">-    google::sparse_hash_map&lt;sha1_buf, indexed_file*, hash_sha1&gt; file_map_;
+</a>     struct {
+         unsigned long bytes, dedup_bytes;
+         unsigned long lines, dedup_lines;
+<a href="#h2-5" id="h2-5" class="h">@@ -186,8 +183,10 @@ protected:
+</a>     } stats_;
+     chunk_allocator *alloc_;
+     bool finalized_;
+<a href="#h2-5-3" id="h2-5-3" class="d">-    std::vector&lt;string&gt;  refs_;
+</a><a href="#h2-5-4" id="h2-5-4" class="d">-    std::vector&lt;indexed_file*&gt; files_;
+</a><a href="#h2-5-5" id="h2-5-5" class="i">+    vector&lt;indexed_tree*&gt; trees_;
+</a><a href="#h2-5-6" id="h2-5-6" class="i">+    map&lt;string, indexed_tree*&gt; tree_map_;
+</a><a href="#h2-5-7" id="h2-5-7" class="i">+    vector&lt;indexed_file*&gt; files_;
+</a><a href="#h2-5-8" id="h2-5-8" class="i">+    google::sparse_hash_map&lt;sha1_buf, indexed_file*, hash_sha1&gt; file_map_;
+</a> 
+     friend class search_thread;
+     friend class searcher;
+<b>diff --git a/<a id="h3" href="../file/src/dump_load.cc">src/dump_load.cc</a> b/<a href="../file/src/dump_load.cc">src/dump_load.cc</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -25,7 +25,7 @@ struct index_header {
+</a>     uint32_t version;
+     uint32_t chunk_size;
+ 
+<a href="#h3-0-3" id="h3-0-3" class="d">-    uint32_t nrefs;
+</a><a href="#h3-0-4" id="h3-0-4" class="i">+    uint32_t ntrees;
+</a>     uint64_t refs_off;
+ 
+     uint32_t nfiles;
+<a href="#h3-1" id="h3-1" class="h">@@ -268,9 +268,7 @@ void codesearch_index::dump_file(indexed_file *sf) {
+</a>     dump(&amp;sf-&gt;hash);
+     dump_int32(sf-&gt;paths.size());
+     for (auto it = sf-&gt;paths.begin(); it != sf-&gt;paths.end(); ++it) {
+<a href="#h3-1-3" id="h3-1-3" class="d">-        dump_int32(find(cs_-&gt;refs_.begin(), cs_-&gt;refs_.end(),
+</a><a href="#h3-1-4" id="h3-1-4" class="d">-                        *it-&gt;repo_ref) -
+</a><a href="#h3-1-5" id="h3-1-5" class="d">-                   cs_-&gt;refs_.begin());
+</a><a href="#h3-1-6" id="h3-1-6" class="i">+        dump_int32(it-&gt;tree-&gt;id);
+</a>         dump_string(it-&gt;path.c_str());
+     }
+ }
+<a href="#h3-2" id="h3-2" class="h">@@ -312,15 +310,15 @@ void codesearch_index::dump_chunk_data(chunk *chunk) {
+</a> }
+ 
+ void codesearch_index::dump_metadata() {
+<a href="#h3-2-3" id="h3-2-3" class="d">-    hdr_.nrefs   = cs_-&gt;refs_.size();
+</a><a href="#h3-2-4" id="h3-2-4" class="d">-    hdr_.nfiles  = cs_-&gt;files_.size();
+</a><a href="#h3-2-5" id="h3-2-5" class="d">-    hdr_.nchunks = cs_-&gt;alloc_-&gt;size();
+</a><a href="#h3-2-6" id="h3-2-6" class="i">+    hdr_.ntrees   = cs_-&gt;trees_.size();
+</a><a href="#h3-2-7" id="h3-2-7" class="i">+    hdr_.nfiles   = cs_-&gt;files_.size();
+</a><a href="#h3-2-8" id="h3-2-8" class="i">+    hdr_.nchunks  = cs_-&gt;alloc_-&gt;size();
+</a>     hdr_.ncontent = content_.size();
+ 
+     hdr_.refs_off = stream_.tellp();
+<a href="#h3-2-12" id="h3-2-12" class="d">-    for (auto it = cs_-&gt;refs_.begin();
+</a><a href="#h3-2-13" id="h3-2-13" class="d">-         it != cs_-&gt;refs_.end(); ++it)
+</a><a href="#h3-2-14" id="h3-2-14" class="d">-        dump_string(*it);
+</a><a href="#h3-2-15" id="h3-2-15" class="i">+    for (auto it = cs_-&gt;trees_.begin();
+</a><a href="#h3-2-16" id="h3-2-16" class="i">+         it != cs_-&gt;trees_.end(); ++it)
+</a><a href="#h3-2-17" id="h3-2-17" class="i">+        dump_string((*it)-&gt;name);
+</a> 
+     hdr_.files_off = stream_.tellp();
+     for (vector&lt;indexed_file*&gt;::iterator it = cs_-&gt;files_.begin();
+<a href="#h3-3" id="h3-3" class="h">@@ -406,7 +404,7 @@ indexed_file *load_allocator::load_file(code_searcher *cs) {
+</a>     memcpy(&amp;sf-&gt;hash.hash, consume&lt;sha1_buf&gt;(), sizeof(sf-&gt;hash.hash));
+     sf-&gt;paths.resize(load_int32());
+     for (auto it = sf-&gt;paths.begin(); it != sf-&gt;paths.end(); ++it) {
+<a href="#h3-3-3" id="h3-3-3" class="d">-        it-&gt;repo_ref = &amp;cs-&gt;refs_[load_int32()];
+</a><a href="#h3-3-4" id="h3-3-4" class="i">+        it-&gt;tree = cs-&gt;trees_[load_int32()];
+</a>         it-&gt;path = load_string();
+     }
+     sf-&gt;no = cs-&gt;files_.size();
+<a href="#h3-4" id="h3-4" class="h">@@ -437,7 +435,7 @@ void load_allocator::load_chunk(code_searcher *cs) {
+</a> 
+ void load_allocator::load(code_searcher *cs) {
+     assert(!cs-&gt;finalized_);
+<a href="#h3-4-3" id="h3-4-3" class="d">-    assert(!cs-&gt;refs_.size());
+</a><a href="#h3-4-4" id="h3-4-4" class="i">+    assert(!cs-&gt;trees_.size());
+</a> 
+     assert(hdr_-&gt;magic == kIndexMagic);
+     assert(hdr_-&gt;version == kIndexVersion);
+<a href="#h3-5" id="h3-5" class="h">@@ -446,8 +444,11 @@ void load_allocator::load(code_searcher *cs) {
+</a>     set_chunk_size(hdr_-&gt;chunk_size);
+ 
+     p_ = ptr&lt;uint8_t&gt;(hdr_-&gt;refs_off);
+<a href="#h3-5-3" id="h3-5-3" class="d">-    for (int i = 0; i &lt; hdr_-&gt;nrefs; i++) {
+</a><a href="#h3-5-4" id="h3-5-4" class="d">-        cs-&gt;refs_.push_back(load_string());
+</a><a href="#h3-5-5" id="h3-5-5" class="i">+    for (int i = 0; i &lt; hdr_-&gt;ntrees; i++) {
+</a><a href="#h3-5-6" id="h3-5-6" class="i">+        indexed_tree *tree = new indexed_tree;
+</a><a href="#h3-5-7" id="h3-5-7" class="i">+        tree-&gt;name = load_string();
+</a><a href="#h3-5-8" id="h3-5-8" class="i">+        tree-&gt;id = i;
+</a><a href="#h3-5-9" id="h3-5-9" class="i">+        cs-&gt;trees_.push_back(tree);
+</a>     }
+ 
+     p_ = ptr&lt;uint8_t&gt;(hdr_-&gt;files_off);
+<b>diff --git a/<a id="h4" href="../file/src/git_indexer.cc">src/git_indexer.cc</a> b/<a href="../file/src/git_indexer.cc">src/git_indexer.cc</a></b>
+<a href="#h4-0" id="h4-0" class="h">@@ -0,0 +1,90 @@
+</a><a href="#h4-0-0" id="h4-0-0" class="i">+#include &lt;gflags/gflags.h&gt;
+</a><a href="#h4-0-1" id="h4-0-1" class="i">+#include &lt;sstream&gt;
+</a><a href="#h4-0-2" id="h4-0-2" class="i">+
+</a><a href="#h4-0-3" id="h4-0-3" class="i">+#include &quot;codesearch.h&quot;
+</a><a href="#h4-0-4" id="h4-0-4" class="i">+#include &quot;git_indexer.h&quot;
+</a><a href="#h4-0-5" id="h4-0-5" class="i">+#include &quot;smart_git.h&quot;
+</a><a href="#h4-0-6" id="h4-0-6" class="i">+
+</a><a href="#h4-0-7" id="h4-0-7" class="i">+using namespace std;
+</a><a href="#h4-0-8" id="h4-0-8" class="i">+
+</a><a href="#h4-0-9" id="h4-0-9" class="i">+DEFINE_string(order_root, &quot;&quot;, &quot;Walk top-level directories in this order.&quot;);
+</a><a href="#h4-0-10" id="h4-0-10" class="i">+DEFINE_bool(revparse, false, &quot;Display parsed revisions, rather than as-provided&quot;);
+</a><a href="#h4-0-11" id="h4-0-11" class="i">+
+</a><a href="#h4-0-12" id="h4-0-12" class="i">+git_indexer::git_indexer(code_searcher *cs, const string&amp; repopath)
+</a><a href="#h4-0-13" id="h4-0-13" class="i">+    : cs_(cs), repo_(0) {
+</a><a href="#h4-0-14" id="h4-0-14" class="i">+    git_repository_open(&amp;repo_, repopath.c_str());
+</a><a href="#h4-0-15" id="h4-0-15" class="i">+    assert(repo_);
+</a><a href="#h4-0-16" id="h4-0-16" class="i">+}
+</a><a href="#h4-0-17" id="h4-0-17" class="i">+
+</a><a href="#h4-0-18" id="h4-0-18" class="i">+git_indexer::~git_indexer() {
+</a><a href="#h4-0-19" id="h4-0-19" class="i">+    git_repository_free(repo_);
+</a><a href="#h4-0-20" id="h4-0-20" class="i">+}
+</a><a href="#h4-0-21" id="h4-0-21" class="i">+
+</a><a href="#h4-0-22" id="h4-0-22" class="i">+void git_indexer::walk(const string&amp; ref) {
+</a><a href="#h4-0-23" id="h4-0-23" class="i">+    smart_object&lt;git_commit&gt; commit;
+</a><a href="#h4-0-24" id="h4-0-24" class="i">+    smart_object&lt;git_tree&gt; tree;
+</a><a href="#h4-0-25" id="h4-0-25" class="i">+    git_revparse_single(commit, repo_, (ref + &quot;^0&quot;).c_str());
+</a><a href="#h4-0-26" id="h4-0-26" class="i">+    git_commit_tree(tree, commit);
+</a><a href="#h4-0-27" id="h4-0-27" class="i">+
+</a><a href="#h4-0-28" id="h4-0-28" class="i">+    char oidstr[GIT_OID_HEXSZ+1];
+</a><a href="#h4-0-29" id="h4-0-29" class="i">+    string name = FLAGS_revparse ?
+</a><a href="#h4-0-30" id="h4-0-30" class="i">+        strdup(git_oid_tostr(oidstr, sizeof(oidstr), git_commit_id(commit))) : ref;
+</a><a href="#h4-0-31" id="h4-0-31" class="i">+
+</a><a href="#h4-0-32" id="h4-0-32" class="i">+    walk_root(name, tree);
+</a><a href="#h4-0-33" id="h4-0-33" class="i">+}
+</a><a href="#h4-0-34" id="h4-0-34" class="i">+
+</a><a href="#h4-0-35" id="h4-0-35" class="i">+void git_indexer::walk_root(const string&amp; ref, git_tree *tree) {
+</a><a href="#h4-0-36" id="h4-0-36" class="i">+    map&lt;string, const git_tree_entry *&gt; root;
+</a><a href="#h4-0-37" id="h4-0-37" class="i">+    vector&lt;const git_tree_entry *&gt; ordered;
+</a><a href="#h4-0-38" id="h4-0-38" class="i">+    int entries = git_tree_entrycount(tree);
+</a><a href="#h4-0-39" id="h4-0-39" class="i">+    for (int i = 0; i &lt; entries; ++i) {
+</a><a href="#h4-0-40" id="h4-0-40" class="i">+        const git_tree_entry *ent = git_tree_entry_byindex(tree, i);
+</a><a href="#h4-0-41" id="h4-0-41" class="i">+        root[git_tree_entry_name(ent)] = ent;
+</a><a href="#h4-0-42" id="h4-0-42" class="i">+    }
+</a><a href="#h4-0-43" id="h4-0-43" class="i">+
+</a><a href="#h4-0-44" id="h4-0-44" class="i">+    istringstream stream(FLAGS_order_root);
+</a><a href="#h4-0-45" id="h4-0-45" class="i">+    string dir;
+</a><a href="#h4-0-46" id="h4-0-46" class="i">+    while(stream &gt;&gt; dir) {
+</a><a href="#h4-0-47" id="h4-0-47" class="i">+        map&lt;string, const git_tree_entry *&gt;::iterator it = root.find(dir);
+</a><a href="#h4-0-48" id="h4-0-48" class="i">+        if (it == root.end())
+</a><a href="#h4-0-49" id="h4-0-49" class="i">+            continue;
+</a><a href="#h4-0-50" id="h4-0-50" class="i">+        ordered.push_back(it-&gt;second);
+</a><a href="#h4-0-51" id="h4-0-51" class="i">+        root.erase(it);
+</a><a href="#h4-0-52" id="h4-0-52" class="i">+    }
+</a><a href="#h4-0-53" id="h4-0-53" class="i">+    for (map&lt;string, const git_tree_entry *&gt;::iterator it = root.begin();
+</a><a href="#h4-0-54" id="h4-0-54" class="i">+         it != root.end(); ++it)
+</a><a href="#h4-0-55" id="h4-0-55" class="i">+        ordered.push_back(it-&gt;second);
+</a><a href="#h4-0-56" id="h4-0-56" class="i">+    for (vector&lt;const git_tree_entry *&gt;::iterator it = ordered.begin();
+</a><a href="#h4-0-57" id="h4-0-57" class="i">+         it != ordered.end(); ++it) {
+</a><a href="#h4-0-58" id="h4-0-58" class="i">+        smart_object&lt;git_object&gt; obj;
+</a><a href="#h4-0-59" id="h4-0-59" class="i">+        git_tree_entry_to_object(obj, repo_, *it);
+</a><a href="#h4-0-60" id="h4-0-60" class="i">+        string path = string(git_tree_entry_name(*it));
+</a><a href="#h4-0-61" id="h4-0-61" class="i">+
+</a><a href="#h4-0-62" id="h4-0-62" class="i">+        if (git_tree_entry_type(*it) == GIT_OBJ_TREE) {
+</a><a href="#h4-0-63" id="h4-0-63" class="i">+            walk_tree(ref, path + &quot;/&quot;, obj);
+</a><a href="#h4-0-64" id="h4-0-64" class="i">+        } else if (git_tree_entry_type(*it) == GIT_OBJ_BLOB) {
+</a><a href="#h4-0-65" id="h4-0-65" class="i">+            const char *data = static_cast&lt;const char*&gt;(git_blob_rawcontent(obj));
+</a><a href="#h4-0-66" id="h4-0-66" class="i">+            cs_-&gt;index_file(ref, path, StringPiece(data, git_blob_rawsize(obj)));
+</a><a href="#h4-0-67" id="h4-0-67" class="i">+        }
+</a><a href="#h4-0-68" id="h4-0-68" class="i">+    }
+</a><a href="#h4-0-69" id="h4-0-69" class="i">+}
+</a><a href="#h4-0-70" id="h4-0-70" class="i">+
+</a><a href="#h4-0-71" id="h4-0-71" class="i">+void git_indexer::walk_tree(const string&amp; ref,
+</a><a href="#h4-0-72" id="h4-0-72" class="i">+                            const string&amp; pfx,
+</a><a href="#h4-0-73" id="h4-0-73" class="i">+                            git_tree *tree) {
+</a><a href="#h4-0-74" id="h4-0-74" class="i">+    string path;
+</a><a href="#h4-0-75" id="h4-0-75" class="i">+    int entries = git_tree_entrycount(tree);
+</a><a href="#h4-0-76" id="h4-0-76" class="i">+    int i;
+</a><a href="#h4-0-77" id="h4-0-77" class="i">+    for (i = 0; i &lt; entries; i++) {
+</a><a href="#h4-0-78" id="h4-0-78" class="i">+        const git_tree_entry *ent = git_tree_entry_byindex(tree, i);
+</a><a href="#h4-0-79" id="h4-0-79" class="i">+        path = pfx + git_tree_entry_name(ent);
+</a><a href="#h4-0-80" id="h4-0-80" class="i">+        smart_object&lt;git_object&gt; obj;
+</a><a href="#h4-0-81" id="h4-0-81" class="i">+        git_tree_entry_to_object(obj, repo_, ent);
+</a><a href="#h4-0-82" id="h4-0-82" class="i">+        if (git_tree_entry_type(ent) == GIT_OBJ_TREE) {
+</a><a href="#h4-0-83" id="h4-0-83" class="i">+            walk_tree(ref, path + &quot;/&quot;, obj);
+</a><a href="#h4-0-84" id="h4-0-84" class="i">+        } else if (git_tree_entry_type(ent) == GIT_OBJ_BLOB) {
+</a><a href="#h4-0-85" id="h4-0-85" class="i">+            const char *data = static_cast&lt;const char*&gt;(git_blob_rawcontent(obj));
+</a><a href="#h4-0-86" id="h4-0-86" class="i">+            cs_-&gt;index_file(ref, path, StringPiece(data, git_blob_rawsize(obj)));
+</a><a href="#h4-0-87" id="h4-0-87" class="i">+        }
+</a><a href="#h4-0-88" id="h4-0-88" class="i">+    }
+</a><a href="#h4-0-89" id="h4-0-89" class="i">+}
+</a><b>diff --git a/<a id="h5" href="../file/src/git_indexer.h">src/git_indexer.h</a> b/<a href="../file/src/git_indexer.h">src/git_indexer.h</a></b>
+<a href="#h5-0" id="h5-0" class="h">@@ -0,0 +1,29 @@
+</a><a href="#h5-0-0" id="h5-0-0" class="i">+/********************************************************************
+</a><a href="#h5-0-1" id="h5-0-1" class="i">+ * livegrep -- git_indexer.h
+</a><a href="#h5-0-2" id="h5-0-2" class="i">+ * Copyright (c) 2011-2012 Nelson Elhage
+</a><a href="#h5-0-3" id="h5-0-3" class="i">+ * All Rights Reserved
+</a><a href="#h5-0-4" id="h5-0-4" class="i">+ ********************************************************************/
+</a><a href="#h5-0-5" id="h5-0-5" class="i">+#ifndef CODESEARCH_GIT_INDEXER_H
+</a><a href="#h5-0-6" id="h5-0-6" class="i">+#define CODESEARCH_GIT_INDEXER_H
+</a><a href="#h5-0-7" id="h5-0-7" class="i">+
+</a><a href="#h5-0-8" id="h5-0-8" class="i">+#include &lt;string&gt;
+</a><a href="#h5-0-9" id="h5-0-9" class="i">+
+</a><a href="#h5-0-10" id="h5-0-10" class="i">+class code_searcher;
+</a><a href="#h5-0-11" id="h5-0-11" class="i">+class git_repository;
+</a><a href="#h5-0-12" id="h5-0-12" class="i">+class git_tree;
+</a><a href="#h5-0-13" id="h5-0-13" class="i">+
+</a><a href="#h5-0-14" id="h5-0-14" class="i">+class git_indexer {
+</a><a href="#h5-0-15" id="h5-0-15" class="i">+public:
+</a><a href="#h5-0-16" id="h5-0-16" class="i">+    git_indexer(code_searcher *cs, const std::string&amp; repopath);
+</a><a href="#h5-0-17" id="h5-0-17" class="i">+    ~git_indexer();
+</a><a href="#h5-0-18" id="h5-0-18" class="i">+    void walk(const std::string&amp; ref);
+</a><a href="#h5-0-19" id="h5-0-19" class="i">+protected:
+</a><a href="#h5-0-20" id="h5-0-20" class="i">+    void walk_root(const std::string&amp; ref, git_tree *tree);
+</a><a href="#h5-0-21" id="h5-0-21" class="i">+    void walk_tree(const std::string&amp; ref,
+</a><a href="#h5-0-22" id="h5-0-22" class="i">+                   const std::string&amp; pfx, git_tree *tree);
+</a><a href="#h5-0-23" id="h5-0-23" class="i">+
+</a><a href="#h5-0-24" id="h5-0-24" class="i">+    code_searcher *cs_;
+</a><a href="#h5-0-25" id="h5-0-25" class="i">+    git_repository *repo_;
+</a><a href="#h5-0-26" id="h5-0-26" class="i">+};
+</a><a href="#h5-0-27" id="h5-0-27" class="i">+
+</a><a href="#h5-0-28" id="h5-0-28" class="i">+#endif
+</a><b>diff --git a/<a id="h6" href="../file/src/main.cc">src/main.cc</a> b/<a href="../file/src/main.cc">src/main.cc</a></b>
+<a href="#h6-0" id="h6-0" class="h">@@ -4,7 +4,7 @@
+</a>  * All Rights Reserved
+  ********************************************************************/
+ #include &quot;codesearch.h&quot;
+<a href="#h6-0-3" id="h6-0-3" class="d">-#include &quot;smart_git.h&quot;
+</a><a href="#h6-0-4" id="h6-0-4" class="i">+#include &quot;git_indexer.h&quot;
+</a> #include &quot;timer.h&quot;
+ #include &quot;re_width.h&quot;
+ 
+<a href="#h6-1" id="h6-1" class="h">@@ -73,7 +73,7 @@ json_object *to_json(vector&lt;T&gt; vec) {
+</a> 
+ static json_object *to_json(const indexed_path &amp;path) {
+     json_object *out = json_object_new_object();
+<a href="#h6-1-3" id="h6-1-3" class="d">-    json_object_object_add(out, &quot;ref&quot;,  to_json(*path.repo_ref));
+</a><a href="#h6-1-4" id="h6-1-4" class="i">+    json_object_object_add(out, &quot;ref&quot;,  to_json(path.tree-&gt;name));
+</a>     json_object_object_add(out, &quot;path&quot;, to_json(path.path));
+     return out;
+ }
+<a href="#h6-2" id="h6-2" class="h">@@ -87,7 +87,7 @@ struct print_match {
+</a>             for (auto it = ctx-&gt;paths.begin(); it != ctx-&gt;paths.end(); ++it) {
+                 fprintf(out_,
+                         &quot;%s:%s:%d:%d-%d: %.*s\n&quot;,
+<a href="#h6-2-3" id="h6-2-3" class="d">-                        it-&gt;repo_ref-&gt;c_str(),
+</a><a href="#h6-2-4" id="h6-2-4" class="i">+                        it-&gt;tree-&gt;name.c_str(),
+</a>                         it-&gt;path.c_str(),
+                         ctx-&gt;lno,
+                         m-&gt;matchleft, m-&gt;matchright,
+<a href="#h6-3" id="h6-3" class="h">@@ -99,7 +99,7 @@ struct print_match {
+</a>     void print_json(const match_result *m) const {
+         json_object *obj = json_object_new_object();
+         json_object_object_add(obj, &quot;ref&quot;,
+<a href="#h6-3-3" id="h6-3-3" class="d">-                               to_json(*m-&gt;context[0].paths[0].repo_ref));
+</a><a href="#h6-3-4" id="h6-3-4" class="i">+                               to_json(m-&gt;context[0].paths[0].tree-&gt;name));
+</a>         json_object_object_add(obj, &quot;file&quot;,
+                                to_json(m-&gt;context[0].paths[0].path));
+         json_object *contexts = json_object_new_array();
+<a href="#h6-4" id="h6-4" class="h">@@ -320,8 +320,7 @@ void interact(code_searcher *cs, FILE *in, FILE *out) {
+</a> 
+ void initialize_search(code_searcher *search, int argc, char **argv) {
+     if (FLAGS_load_index.size() == 0) {
+<a href="#h6-4-3" id="h6-4-3" class="d">-        git_repository *repo;
+</a><a href="#h6-4-4" id="h6-4-4" class="d">-        git_repository_open(&amp;repo, FLAGS_git_dir.c_str());
+</a><a href="#h6-4-5" id="h6-4-5" class="i">+        git_indexer indexer(search, FLAGS_git_dir);
+</a> 
+         if (FLAGS_dump_index.size())
+             search-&gt;set_alloc(make_dump_allocator(search, FLAGS_dump_index));
+<a href="#h6-5" id="h6-5" class="h">@@ -335,7 +334,7 @@ void initialize_search(code_searcher *search, int argc, char **argv) {
+</a>             if (!FLAGS_json)
+                 printf(&quot;Walking %s...&quot;, argv[i]);
+             fflush(stdout);
+<a href="#h6-5-3" id="h6-5-3" class="d">-            search-&gt;walk_ref(repo, argv[i]);
+</a><a href="#h6-5-4" id="h6-5-4" class="i">+            indexer.walk(argv[i]);
+</a>             elapsed = tm.elapsed();
+             if (!FLAGS_json)
+                 printf(&quot; done.\n&quot;);
+</pre>
+</div>
+</body>
+</html>

@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>cmd: Migrate livegrep-metrics-exporter to Aperture statsd - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/477b7c1974a948ca32c5c85a6d2c729e1eb79973">477b7c1974a948ca32c5c85a6d2c729e1eb79973</a>
+<b>parent</b> <a href="../commit/3cff847c696cf3396f0ca8ee7dec1cfb025a09ce">3cff847c696cf3396f0ca8ee7dec1cfb025a09ce</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Fri, 27 Dec 2019 14:08:36 -0800
+
+cmd: Migrate livegrep-metrics-exporter to Aperture statsd
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">cmd/livegrep-metrics-exporter/BUILD</a></td><td> | </td><td class="num">7</td><td><span class="i">++</span><span class="d">-----</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">cmd/livegrep-metrics-exporter/main.go</a></td><td> | </td><td class="num">10</td><td><span class="i">++++++++</span><span class="d">--</span></td></tr>
+<tr><td class="D">D</td><td><a href="#h2">cmd/livegrep-metrics-exporter/metrics.go</a></td><td> | </td><td class="num">95</td><td><span class="i"></span><span class="d">-------------------------------------------------------------------------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">tools/build_defs/go_externals.bzl</a></td><td> | </td><td class="num">6</td><td><span class="i">+++++</span><span class="d">-</span></td></tr>
+</table></pre><pre>4 files changed, 15 insertions(+), 103 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/cmd/livegrep-metrics-exporter/BUILD">cmd/livegrep-metrics-exporter/BUILD</a> b/<a href="../file/cmd/livegrep-metrics-exporter/BUILD">cmd/livegrep-metrics-exporter/BUILD</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -2,14 +2,11 @@ load(&quot;@io_bazel_rules_go//go:def.bzl&quot;, &quot;go_binary&quot;, &quot;go_library&quot;)
+</a> 
+ go_library(
+     name = &quot;go_default_library&quot;,
+<a href="#h0-0-3" id="h0-0-3" class="d">-    srcs = [
+</a><a href="#h0-0-4" id="h0-0-4" class="d">-        &quot;main.go&quot;,
+</a><a href="#h0-0-5" id="h0-0-5" class="d">-        &quot;metrics.go&quot;,
+</a><a href="#h0-0-6" id="h0-0-6" class="d">-    ],
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+    srcs = [&quot;main.go&quot;],
+</a>     importpath = &quot;github.com/livegrep/livegrep/cmd/livegrep-metrics-exporter&quot;,
+     visibility = [&quot;//visibility:private&quot;],
+     deps = [
+<a href="#h0-0-11" id="h0-0-11" class="d">-        &quot;@com_github_LINKIWI_go_statsd_client//statsd:go_default_library&quot;,
+</a><a href="#h0-0-12" id="h0-0-12" class="i">+        &quot;@info_kevinlin_lib_aperture//:go_default_library&quot;,
+</a>     ],
+ )
+ 
+<b>diff --git a/<a id="h1" href="../file/cmd/livegrep-metrics-exporter/main.go">cmd/livegrep-metrics-exporter/main.go</a> b/<a href="../file/cmd/livegrep-metrics-exporter/main.go">cmd/livegrep-metrics-exporter/main.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -10,6 +10,8 @@ import (
+</a> 	&quot;regexp&quot;
+ 	&quot;strconv&quot;
+ 	&quot;strings&quot;
+<a href="#h1-0-3" id="h1-0-3" class="i">+
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+	&quot;lib.kevinlin.info/aperture&quot;
+</a> )
+ 
+ const (
+<a href="#h1-1" id="h1-1" class="h">@@ -57,7 +59,11 @@ func main() {
+</a> 	log.Println(&quot;starting livegrep statsd metrics exporter&quot;)
+ 
+ 	// Create a statsd client
+<a href="#h1-1-3" id="h1-1-3" class="d">-	statsd, err := NewStatsdClient(*flagStatsdAddr, *flagStatsdSock, *flagStatsdPrefix, make(map[string]string), 1.0)
+</a><a href="#h1-1-4" id="h1-1-4" class="i">+	statsd, err := aperture.NewClient(&amp;aperture.Config{
+</a><a href="#h1-1-5" id="h1-1-5" class="i">+		Address: *flagStatsdAddr,
+</a><a href="#h1-1-6" id="h1-1-6" class="i">+		Socket:  *flagStatsdSock,
+</a><a href="#h1-1-7" id="h1-1-7" class="i">+		Prefix:  *flagStatsdPrefix,
+</a><a href="#h1-1-8" id="h1-1-8" class="i">+	})
+</a> 	if err != nil {
+ 		panic(err)
+ 	}
+<a href="#h1-2" id="h1-2" class="h">@@ -93,6 +99,6 @@ func main() {
+</a> 	// Report all parsed gauge metrics to statsd
+ 	for metric, value := range metrics {
+ 		log.Printf(&quot;reporting gauge metric: metric=%s value=%d&quot;, metric, value)
+<a href="#h1-2-3" id="h1-2-3" class="d">-		statsd.Gauge(metric, int64(value), make(map[string]string))
+</a><a href="#h1-2-4" id="h1-2-4" class="i">+		statsd.Gauge(metric, float64(value), nil)
+</a> 	}
+ }
+<b>diff --git a/<a id="h2" href="../file/cmd/livegrep-metrics-exporter/metrics.go">cmd/livegrep-metrics-exporter/metrics.go</a> b/<a href="../file/cmd/livegrep-metrics-exporter/metrics.go">cmd/livegrep-metrics-exporter/metrics.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -1,95 +0,0 @@
+</a><a href="#h2-0-0" id="h2-0-0" class="d">-package main
+</a><a href="#h2-0-1" id="h2-0-1" class="d">-
+</a><a href="#h2-0-2" id="h2-0-2" class="d">-import (
+</a><a href="#h2-0-3" id="h2-0-3" class="d">-	&quot;fmt&quot;
+</a><a href="#h2-0-4" id="h2-0-4" class="d">-	&quot;net/url&quot;
+</a><a href="#h2-0-5" id="h2-0-5" class="d">-	&quot;strings&quot;
+</a><a href="#h2-0-6" id="h2-0-6" class="d">-	&quot;time&quot;
+</a><a href="#h2-0-7" id="h2-0-7" class="d">-
+</a><a href="#h2-0-8" id="h2-0-8" class="d">-	&quot;github.com/LINKIWI/go-statsd-client/statsd&quot;
+</a><a href="#h2-0-9" id="h2-0-9" class="d">-)
+</a><a href="#h2-0-10" id="h2-0-10" class="d">-
+</a><a href="#h2-0-11" id="h2-0-11" class="d">-// StatsdClient is an abstraction over a UDP statsd emitter.
+</a><a href="#h2-0-12" id="h2-0-12" class="d">-type StatsdClient struct {
+</a><a href="#h2-0-13" id="h2-0-13" class="d">-	backend     statsd.Statter
+</a><a href="#h2-0-14" id="h2-0-14" class="d">-	defaultTags map[string]string
+</a><a href="#h2-0-15" id="h2-0-15" class="d">-	sampleRate  float32
+</a><a href="#h2-0-16" id="h2-0-16" class="d">-}
+</a><a href="#h2-0-17" id="h2-0-17" class="d">-
+</a><a href="#h2-0-18" id="h2-0-18" class="d">-// NewStatsdClient creates a new statsd client pointing the specified listener/server address with
+</a><a href="#h2-0-19" id="h2-0-19" class="d">-// an optional prefix and set of default tags to include with every metric.
+</a><a href="#h2-0-20" id="h2-0-20" class="d">-func NewStatsdClient(addr string, socket string, prefix string, defaultTags map[string]string, sampleRate float32) (*StatsdClient, error) {
+</a><a href="#h2-0-21" id="h2-0-21" class="d">-	client, err := statsd.NewClientWithConfig(&amp;statsd.ClientConfig{
+</a><a href="#h2-0-22" id="h2-0-22" class="d">-		Address: addr,
+</a><a href="#h2-0-23" id="h2-0-23" class="d">-		Socket:  socket,
+</a><a href="#h2-0-24" id="h2-0-24" class="d">-		Prefix:  prefix,
+</a><a href="#h2-0-25" id="h2-0-25" class="d">-	})
+</a><a href="#h2-0-26" id="h2-0-26" class="d">-	if err != nil {
+</a><a href="#h2-0-27" id="h2-0-27" class="d">-		return nil, fmt.Errorf(&quot;statsd: error creating statsd client: err=%v&quot;, err)
+</a><a href="#h2-0-28" id="h2-0-28" class="d">-	}
+</a><a href="#h2-0-29" id="h2-0-29" class="d">-
+</a><a href="#h2-0-30" id="h2-0-30" class="d">-	return &amp;StatsdClient{
+</a><a href="#h2-0-31" id="h2-0-31" class="d">-		backend:     client,
+</a><a href="#h2-0-32" id="h2-0-32" class="d">-		defaultTags: defaultTags,
+</a><a href="#h2-0-33" id="h2-0-33" class="d">-		sampleRate:  sampleRate,
+</a><a href="#h2-0-34" id="h2-0-34" class="d">-	}, nil
+</a><a href="#h2-0-35" id="h2-0-35" class="d">-}
+</a><a href="#h2-0-36" id="h2-0-36" class="d">-
+</a><a href="#h2-0-37" id="h2-0-37" class="d">-// Count emits a count metric with a configurable delta.
+</a><a href="#h2-0-38" id="h2-0-38" class="d">-func (c *StatsdClient) Count(metric string, delta int64, tags map[string]string) error {
+</a><a href="#h2-0-39" id="h2-0-39" class="d">-	return c.backend.Inc(c.formatMetric(metric, tags), delta, c.sampleRate)
+</a><a href="#h2-0-40" id="h2-0-40" class="d">-}
+</a><a href="#h2-0-41" id="h2-0-41" class="d">-
+</a><a href="#h2-0-42" id="h2-0-42" class="d">-// Gauge emits a gauge metric.
+</a><a href="#h2-0-43" id="h2-0-43" class="d">-func (c *StatsdClient) Gauge(metric string, value int64, tags map[string]string) error {
+</a><a href="#h2-0-44" id="h2-0-44" class="d">-	return c.backend.Gauge(c.formatMetric(metric, tags), value, c.sampleRate)
+</a><a href="#h2-0-45" id="h2-0-45" class="d">-}
+</a><a href="#h2-0-46" id="h2-0-46" class="d">-
+</a><a href="#h2-0-47" id="h2-0-47" class="d">-// Timing emits a time duration metric.
+</a><a href="#h2-0-48" id="h2-0-48" class="d">-func (c *StatsdClient) Timing(metric string, duration time.Duration, tags map[string]string) error {
+</a><a href="#h2-0-49" id="h2-0-49" class="d">-	return c.backend.TimingDuration(c.formatMetric(metric, tags), duration, c.sampleRate)
+</a><a href="#h2-0-50" id="h2-0-50" class="d">-}
+</a><a href="#h2-0-51" id="h2-0-51" class="d">-
+</a><a href="#h2-0-52" id="h2-0-52" class="d">-// Size emits a file size metric as the number of bytes.
+</a><a href="#h2-0-53" id="h2-0-53" class="d">-func (c *StatsdClient) Size(metric string, size int64, tags map[string]string) error {
+</a><a href="#h2-0-54" id="h2-0-54" class="d">-	// Size metrics share the same semantics with timing metrics; they are interpreted and
+</a><a href="#h2-0-55" id="h2-0-55" class="d">-	// aggregated in the same way.
+</a><a href="#h2-0-56" id="h2-0-56" class="d">-	return c.backend.Timing(c.formatMetric(metric, tags), size, c.sampleRate)
+</a><a href="#h2-0-57" id="h2-0-57" class="d">-}
+</a><a href="#h2-0-58" id="h2-0-58" class="d">-
+</a><a href="#h2-0-59" id="h2-0-59" class="d">-// formatMetric serializes a metric and a map of tags (in addition to any default tags) into a
+</a><a href="#h2-0-60" id="h2-0-60" class="d">-// single string to ship to the time-series database backend.
+</a><a href="#h2-0-61" id="h2-0-61" class="d">-func (c *StatsdClient) formatMetric(metric string, tags map[string]string) string {
+</a><a href="#h2-0-62" id="h2-0-62" class="d">-	// Some characters, like colons, are incompatible with the statsd protocol.
+</a><a href="#h2-0-63" id="h2-0-63" class="d">-	// This standardizes on URL escaping to encode such characters that may appear in the metric
+</a><a href="#h2-0-64" id="h2-0-64" class="d">-	// name or tag keys/values.
+</a><a href="#h2-0-65" id="h2-0-65" class="d">-	escapedMetric := url.QueryEscape(metric)
+</a><a href="#h2-0-66" id="h2-0-66" class="d">-
+</a><a href="#h2-0-67" id="h2-0-67" class="d">-	if tags == nil {
+</a><a href="#h2-0-68" id="h2-0-68" class="d">-		tags = make(map[string]string)
+</a><a href="#h2-0-69" id="h2-0-69" class="d">-	}
+</a><a href="#h2-0-70" id="h2-0-70" class="d">-
+</a><a href="#h2-0-71" id="h2-0-71" class="d">-	if len(c.defaultTags)+len(tags) == 0 {
+</a><a href="#h2-0-72" id="h2-0-72" class="d">-		return escapedMetric
+</a><a href="#h2-0-73" id="h2-0-73" class="d">-	}
+</a><a href="#h2-0-74" id="h2-0-74" class="d">-
+</a><a href="#h2-0-75" id="h2-0-75" class="d">-	// Merge specified tags with the default tags, if available.
+</a><a href="#h2-0-76" id="h2-0-76" class="d">-	mergedTags := make(map[string]string)
+</a><a href="#h2-0-77" id="h2-0-77" class="d">-	for key, value := range c.defaultTags {
+</a><a href="#h2-0-78" id="h2-0-78" class="d">-		mergedTags[key] = value
+</a><a href="#h2-0-79" id="h2-0-79" class="d">-	}
+</a><a href="#h2-0-80" id="h2-0-80" class="d">-	for key, value := range tags {
+</a><a href="#h2-0-81" id="h2-0-81" class="d">-		mergedTags[key] = value
+</a><a href="#h2-0-82" id="h2-0-82" class="d">-	}
+</a><a href="#h2-0-83" id="h2-0-83" class="d">-
+</a><a href="#h2-0-84" id="h2-0-84" class="d">-	// Tags are delimited InfluxDB-style.
+</a><a href="#h2-0-85" id="h2-0-85" class="d">-	var components []string
+</a><a href="#h2-0-86" id="h2-0-86" class="d">-	for key, value := range mergedTags {
+</a><a href="#h2-0-87" id="h2-0-87" class="d">-		components = append(
+</a><a href="#h2-0-88" id="h2-0-88" class="d">-			components,
+</a><a href="#h2-0-89" id="h2-0-89" class="d">-			fmt.Sprintf(&quot;%s=%s&quot;, url.QueryEscape(key), url.QueryEscape(value)),
+</a><a href="#h2-0-90" id="h2-0-90" class="d">-		)
+</a><a href="#h2-0-91" id="h2-0-91" class="d">-	}
+</a><a href="#h2-0-92" id="h2-0-92" class="d">-
+</a><a href="#h2-0-93" id="h2-0-93" class="d">-	return fmt.Sprintf(&quot;%s,%s&quot;, escapedMetric, strings.Join(components, &quot;,&quot;))
+</a><a href="#h2-0-94" id="h2-0-94" class="d">-}
+</a><b>diff --git a/<a id="h3" href="../file/tools/build_defs/go_externals.bzl">tools/build_defs/go_externals.bzl</a> b/<a href="../file/tools/build_defs/go_externals.bzl">tools/build_defs/go_externals.bzl</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -56,7 +56,6 @@ _externals = [
+</a>     _github(&quot;honeycombio/libhoney-go&quot;, &quot;a8716c5861ae19c1e2baaad52dd59ba64b902bde&quot;),
+     _github(&quot;jbenet/go-context&quot;, &quot;d14ea06fba99483203c19d92cfcd13ebe73135f4&quot;),
+     _github(&quot;kevinburke/ssh_config&quot;, &quot;81db2a75821ed34e682567d48be488a1c3121088&quot;),
+<a href="#h3-0-3" id="h3-0-3" class="d">-    _github(&quot;LINKIWI/go-statsd-client&quot;, &quot;03661d9baa0f5b6918acd3613c8df983d33efd68&quot;),
+</a>     _github(&quot;mitchellh/go-homedir&quot;, &quot;af06845cf3004701891bf4fdb884bfe4920b3727&quot;),
+     _github(&quot;nelhage/go.cli&quot;, &quot;2aeb96ef8025f3646befae8353b90f95e9e79bdc&quot;),
+     _github(&quot;pelletier/go-buffruneio&quot;, &quot;25c428535bd3f55a16f149a9daebd3fa4c5a562b&quot;),
+<a href="#h3-1" id="h3-1" class="h">@@ -75,6 +74,11 @@ _externals = [
+</a>         commit = &quot;f6d0f9ee430895e87ef1ceb5ac8f39725bafceef&quot;,
+         importpath = &quot;google.golang.org/grpc&quot;,
+     ),
+<a href="#h3-1-3" id="h3-1-3" class="i">+    struct(
+</a><a href="#h3-1-4" id="h3-1-4" class="i">+        name = &quot;info_kevinlin_lib_aperture&quot;,
+</a><a href="#h3-1-5" id="h3-1-5" class="i">+        commit = &quot;8de31ba2646d7adbdde67eeffd9469a6870ebc69&quot;,
+</a><a href="#h3-1-6" id="h3-1-6" class="i">+        importpath = &quot;lib.kevinlin.info/aperture&quot;,
+</a><a href="#h3-1-7" id="h3-1-7" class="i">+    ),
+</a> ]
+ 
+ def go_externals():
+</pre>
+</div>
+</body>
+</html>

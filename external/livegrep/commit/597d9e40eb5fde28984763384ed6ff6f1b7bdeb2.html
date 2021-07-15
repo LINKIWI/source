@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Pull out the websocket code entirely. - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/597d9e40eb5fde28984763384ed6ff6f1b7bdeb2">597d9e40eb5fde28984763384ed6ff6f1b7bdeb2</a>
+<b>parent</b> <a href="../commit/37738592d2433f8c10e08897240edf22cc4a695c">37738592d2433f8c10e08897240edf22cc4a695c</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Tue,  2 Dec 2014 10:39:54 -0500
+
+Pull out the websocket code entirely.
+
+There&#39;s really no need for it.
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">server/api.go</a></td><td> | </td><td class="num">23</td><td><span class="i">++++++++++++++++</span><span class="d">-------</span></td></tr>
+<tr><td class="D">D</td><td><a href="#h1">server/search.go</a></td><td> | </td><td class="num">200</td><td><span class="i"></span><span class="d">-------------------------------------------------------------------------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">server/server.go</a></td><td> | </td><td class="num">2</td><td><span class="i"></span><span class="d">--</span></td></tr>
+<tr><td class="D">D</td><td><a href="#h3">web/htdocs/_bench_one.html</a></td><td> | </td><td class="num">22</td><td><span class="i"></span><span class="d">----------------------</span></td></tr>
+<tr><td class="D">D</td><td><a href="#h4">web/htdocs/assets/js/bench-top.js</a></td><td> | </td><td class="num">39</td><td><span class="i"></span><span class="d">---------------------------------------</span></td></tr>
+<tr><td class="D">D</td><td><a href="#h5">web/htdocs/assets/js/bench.js</a></td><td> | </td><td class="num">112</td><td><span class="i"></span><span class="d">-------------------------------------------------------------------------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h6">web/htdocs/assets/js/codesearch.js</a></td><td> | </td><td class="num">91</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">-----------------------------------</span></td></tr>
+<tr><td class="D">D</td><td><a href="#h7">web/htdocs/bench.html</a></td><td> | </td><td class="num">19</td><td><span class="i"></span><span class="d">-------------------</span></td></tr>
+</table></pre><pre>8 files changed, 67 insertions(+), 441 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/server/api.go">server/api.go</a> b/<a href="../file/server/api.go">server/api.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -25,12 +25,23 @@ func writeError(w http.ResponseWriter, status int, code, message string) {
+</a> 	replyJSON(w, status, &amp;api.ReplyError{Err: api.InnerError{Code: code, Message: message}})
+ }
+ 
+<a href="#h0-0-3" id="h0-0-3" class="i">+func writeQueryError(w http.ResponseWriter, err error) {
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+	if qe, ok := err.(client.QueryError); ok {
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+		writeError(w, 400, &quot;query_error&quot;, qe.Err)
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+	} else {
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+		writeError(w, 500, &quot;internal_error&quot;,
+</a><a href="#h0-0-8" id="h0-0-8" class="i">+			fmt.Sprintf(&quot;Talking to backend: %s&quot;, err.Error()))
+</a><a href="#h0-0-9" id="h0-0-9" class="i">+	}
+</a><a href="#h0-0-10" id="h0-0-10" class="i">+	return
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+}
+</a><a href="#h0-0-12" id="h0-0-12" class="i">+
+</a> func parseQuery(r *http.Request) client.Query {
+ 	params := r.URL.Query()
+ 	return client.Query{
+<a href="#h0-0-16" id="h0-0-16" class="d">-		Line: params.Get(&quot;line&quot;),
+</a><a href="#h0-0-17" id="h0-0-17" class="d">-		File: params.Get(&quot;file&quot;),
+</a><a href="#h0-0-18" id="h0-0-18" class="d">-		Repo: params.Get(&quot;repo&quot;),
+</a><a href="#h0-0-19" id="h0-0-19" class="i">+		Line:     params.Get(&quot;line&quot;),
+</a><a href="#h0-0-20" id="h0-0-20" class="i">+		File:     params.Get(&quot;file&quot;),
+</a><a href="#h0-0-21" id="h0-0-21" class="i">+		Repo:     params.Get(&quot;repo&quot;),
+</a><a href="#h0-0-22" id="h0-0-22" class="i">+		FoldCase: params.Get(&quot;fold_case&quot;) != &quot;&quot;,
+</a> 	}
+ }
+ 
+<a href="#h0-1" id="h0-1" class="h">@@ -61,8 +72,7 @@ func (s *server) ServeAPISearch(w http.ResponseWriter, r *http.Request) {
+</a> 
+ 	search, err := cl.Query(&amp;q)
+ 	if err != nil {
+<a href="#h0-1-3" id="h0-1-3" class="d">-		writeError(w, 500, &quot;internal_error&quot;,
+</a><a href="#h0-1-4" id="h0-1-4" class="d">-			fmt.Sprintf(&quot;Talking to backend: %s&quot;, err.Error()))
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+		writeQueryError(w, err)
+</a> 		return
+ 	}
+ 
+<a href="#h0-2" id="h0-2" class="h">@@ -74,8 +84,7 @@ func (s *server) ServeAPISearch(w http.ResponseWriter, r *http.Request) {
+</a> 
+ 	reply.Info, err = search.Close()
+ 	if err != nil {
+<a href="#h0-2-3" id="h0-2-3" class="d">-		writeError(w, 500, &quot;internal_error&quot;,
+</a><a href="#h0-2-4" id="h0-2-4" class="d">-			fmt.Sprintf(&quot;Talking to backend: %s&quot;, err.Error()))
+</a><a href="#h0-2-5" id="h0-2-5" class="i">+		writeQueryError(w, err)
+</a> 		return
+ 	}
+ 
+<b>diff --git a/<a id="h1" href="../file/server/search.go">server/search.go</a> b/<a href="../file/server/search.go">server/search.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -1,200 +0,0 @@
+</a><a href="#h1-0-0" id="h1-0-0" class="d">-package server
+</a><a href="#h1-0-1" id="h1-0-1" class="d">-
+</a><a href="#h1-0-2" id="h1-0-2" class="d">-import (
+</a><a href="#h1-0-3" id="h1-0-3" class="d">-	&quot;fmt&quot;
+</a><a href="#h1-0-4" id="h1-0-4" class="d">-	&quot;log&quot;
+</a><a href="#h1-0-5" id="h1-0-5" class="d">-	&quot;time&quot;
+</a><a href="#h1-0-6" id="h1-0-6" class="d">-
+</a><a href="#h1-0-7" id="h1-0-7" class="d">-	&quot;code.google.com/p/go.net/websocket&quot;
+</a><a href="#h1-0-8" id="h1-0-8" class="d">-	&quot;github.com/livegrep/livegrep/client&quot;
+</a><a href="#h1-0-9" id="h1-0-9" class="d">-	&quot;github.com/livegrep/livegrep/jsonframe&quot;
+</a><a href="#h1-0-10" id="h1-0-10" class="d">-	&quot;github.com/livegrep/livegrep/server/backend&quot;
+</a><a href="#h1-0-11" id="h1-0-11" class="d">-)
+</a><a href="#h1-0-12" id="h1-0-12" class="d">-
+</a><a href="#h1-0-13" id="h1-0-13" class="d">-type searchConnection struct {
+</a><a href="#h1-0-14" id="h1-0-14" class="d">-	srv      *server
+</a><a href="#h1-0-15" id="h1-0-15" class="d">-	ws       *websocket.Conn
+</a><a href="#h1-0-16" id="h1-0-16" class="d">-	backend  *backend.Backend
+</a><a href="#h1-0-17" id="h1-0-17" class="d">-	client   client.Client
+</a><a href="#h1-0-18" id="h1-0-18" class="d">-	errors   chan error
+</a><a href="#h1-0-19" id="h1-0-19" class="d">-	incoming chan jsonframe.Op
+</a><a href="#h1-0-20" id="h1-0-20" class="d">-	outgoing chan jsonframe.Op
+</a><a href="#h1-0-21" id="h1-0-21" class="d">-	shutdown bool
+</a><a href="#h1-0-22" id="h1-0-22" class="d">-	q        struct {
+</a><a href="#h1-0-23" id="h1-0-23" class="d">-		last *OpQuery
+</a><a href="#h1-0-24" id="h1-0-24" class="d">-		// The time we dispatched &#39;last&#39;
+</a><a href="#h1-0-25" id="h1-0-25" class="d">-		t    time.Time
+</a><a href="#h1-0-26" id="h1-0-26" class="d">-		next *OpQuery
+</a><a href="#h1-0-27" id="h1-0-27" class="d">-	}
+</a><a href="#h1-0-28" id="h1-0-28" class="d">-}
+</a><a href="#h1-0-29" id="h1-0-29" class="d">-
+</a><a href="#h1-0-30" id="h1-0-30" class="d">-func (s *searchConnection) recvLoop() {
+</a><a href="#h1-0-31" id="h1-0-31" class="d">-	var op jsonframe.Op
+</a><a href="#h1-0-32" id="h1-0-32" class="d">-	for {
+</a><a href="#h1-0-33" id="h1-0-33" class="d">-		if err := OpCodec.Receive(s.ws, &amp;op); err != nil {
+</a><a href="#h1-0-34" id="h1-0-34" class="d">-			log.Printf(&quot;Error in receive: %s\n&quot;, err.Error())
+</a><a href="#h1-0-35" id="h1-0-35" class="d">-			if _, ok := err.(*ProtocolError); ok {
+</a><a href="#h1-0-36" id="h1-0-36" class="d">-				// TODO: is this a good idea?
+</a><a href="#h1-0-37" id="h1-0-37" class="d">-				// s.outgoing &lt;- &amp;OpError{err.Error()}
+</a><a href="#h1-0-38" id="h1-0-38" class="d">-				continue
+</a><a href="#h1-0-39" id="h1-0-39" class="d">-			} else {
+</a><a href="#h1-0-40" id="h1-0-40" class="d">-				s.errors &lt;- err
+</a><a href="#h1-0-41" id="h1-0-41" class="d">-				break
+</a><a href="#h1-0-42" id="h1-0-42" class="d">-			}
+</a><a href="#h1-0-43" id="h1-0-43" class="d">-		}
+</a><a href="#h1-0-44" id="h1-0-44" class="d">-		s.incoming &lt;- op
+</a><a href="#h1-0-45" id="h1-0-45" class="d">-		if s.shutdown {
+</a><a href="#h1-0-46" id="h1-0-46" class="d">-			break
+</a><a href="#h1-0-47" id="h1-0-47" class="d">-		}
+</a><a href="#h1-0-48" id="h1-0-48" class="d">-	}
+</a><a href="#h1-0-49" id="h1-0-49" class="d">-	close(s.incoming)
+</a><a href="#h1-0-50" id="h1-0-50" class="d">-}
+</a><a href="#h1-0-51" id="h1-0-51" class="d">-
+</a><a href="#h1-0-52" id="h1-0-52" class="d">-func (s *searchConnection) sendLoop() {
+</a><a href="#h1-0-53" id="h1-0-53" class="d">-	for op := range s.outgoing {
+</a><a href="#h1-0-54" id="h1-0-54" class="d">-		OpCodec.Send(s.ws, op)
+</a><a href="#h1-0-55" id="h1-0-55" class="d">-	}
+</a><a href="#h1-0-56" id="h1-0-56" class="d">-}
+</a><a href="#h1-0-57" id="h1-0-57" class="d">-
+</a><a href="#h1-0-58" id="h1-0-58" class="d">-func query(q *OpQuery) *client.Query {
+</a><a href="#h1-0-59" id="h1-0-59" class="d">-	return &amp;client.Query{
+</a><a href="#h1-0-60" id="h1-0-60" class="d">-		Line:     q.Line,
+</a><a href="#h1-0-61" id="h1-0-61" class="d">-		File:     q.File,
+</a><a href="#h1-0-62" id="h1-0-62" class="d">-		Repo:     q.Repo,
+</a><a href="#h1-0-63" id="h1-0-63" class="d">-		FoldCase: q.FoldCase,
+</a><a href="#h1-0-64" id="h1-0-64" class="d">-	}
+</a><a href="#h1-0-65" id="h1-0-65" class="d">-}
+</a><a href="#h1-0-66" id="h1-0-66" class="d">-
+</a><a href="#h1-0-67" id="h1-0-67" class="d">-func (s *searchConnection) handle() {
+</a><a href="#h1-0-68" id="h1-0-68" class="d">-	s.incoming = make(chan jsonframe.Op, 1)
+</a><a href="#h1-0-69" id="h1-0-69" class="d">-	s.outgoing = make(chan jsonframe.Op, 1)
+</a><a href="#h1-0-70" id="h1-0-70" class="d">-	s.errors = make(chan error, 1)
+</a><a href="#h1-0-71" id="h1-0-71" class="d">-
+</a><a href="#h1-0-72" id="h1-0-72" class="d">-	go s.recvLoop()
+</a><a href="#h1-0-73" id="h1-0-73" class="d">-	go s.sendLoop()
+</a><a href="#h1-0-74" id="h1-0-74" class="d">-	defer close(s.outgoing)
+</a><a href="#h1-0-75" id="h1-0-75" class="d">-
+</a><a href="#h1-0-76" id="h1-0-76" class="d">-	var search client.Search
+</a><a href="#h1-0-77" id="h1-0-77" class="d">-	var results &lt;-chan *client.Result
+</a><a href="#h1-0-78" id="h1-0-78" class="d">-	var err error
+</a><a href="#h1-0-79" id="h1-0-79" class="d">-
+</a><a href="#h1-0-80" id="h1-0-80" class="d">-	var clients &lt;-chan client.Client
+</a><a href="#h1-0-81" id="h1-0-81" class="d">-
+</a><a href="#h1-0-82" id="h1-0-82" class="d">-SearchLoop:
+</a><a href="#h1-0-83" id="h1-0-83" class="d">-	for {
+</a><a href="#h1-0-84" id="h1-0-84" class="d">-		select {
+</a><a href="#h1-0-85" id="h1-0-85" class="d">-		case op, ok := &lt;-s.incoming:
+</a><a href="#h1-0-86" id="h1-0-86" class="d">-			if !ok {
+</a><a href="#h1-0-87" id="h1-0-87" class="d">-				break
+</a><a href="#h1-0-88" id="h1-0-88" class="d">-			}
+</a><a href="#h1-0-89" id="h1-0-89" class="d">-			switch t := op.(type) {
+</a><a href="#h1-0-90" id="h1-0-90" class="d">-			case *OpQuery:
+</a><a href="#h1-0-91" id="h1-0-91" class="d">-				s.q.next = t
+</a><a href="#h1-0-92" id="h1-0-92" class="d">-			default:
+</a><a href="#h1-0-93" id="h1-0-93" class="d">-				s.outgoing &lt;- &amp;OpError{fmt.Sprintf(&quot;Invalid opcode %s&quot;, op.Opcode())}
+</a><a href="#h1-0-94" id="h1-0-94" class="d">-				break
+</a><a href="#h1-0-95" id="h1-0-95" class="d">-			}
+</a><a href="#h1-0-96" id="h1-0-96" class="d">-
+</a><a href="#h1-0-97" id="h1-0-97" class="d">-		case e := &lt;-s.errors:
+</a><a href="#h1-0-98" id="h1-0-98" class="d">-			log.Printf(&quot;error reading from client remote=%q error=%q\n&quot;,
+</a><a href="#h1-0-99" id="h1-0-99" class="d">-				s.ws.Request().RemoteAddr,
+</a><a href="#h1-0-100" id="h1-0-100" class="d">-				e.Error())
+</a><a href="#h1-0-101" id="h1-0-101" class="d">-			break SearchLoop
+</a><a href="#h1-0-102" id="h1-0-102" class="d">-		case res, ok := &lt;-results:
+</a><a href="#h1-0-103" id="h1-0-103" class="d">-			if ok {
+</a><a href="#h1-0-104" id="h1-0-104" class="d">-				s.outgoing &lt;- &amp;OpResult{s.q.last.Id, res}
+</a><a href="#h1-0-105" id="h1-0-105" class="d">-			} else {
+</a><a href="#h1-0-106" id="h1-0-106" class="d">-				st, err := search.Close()
+</a><a href="#h1-0-107" id="h1-0-107" class="d">-				s.backend.CheckIn(s.client)
+</a><a href="#h1-0-108" id="h1-0-108" class="d">-				s.client = nil
+</a><a href="#h1-0-109" id="h1-0-109" class="d">-				s.backend = nil
+</a><a href="#h1-0-110" id="h1-0-110" class="d">-				if err == nil {
+</a><a href="#h1-0-111" id="h1-0-111" class="d">-					duration := time.Since(s.q.t)
+</a><a href="#h1-0-112" id="h1-0-112" class="d">-					log.Printf(&quot;search done remote=%q id=%d query=%s millis=%d&quot;,
+</a><a href="#h1-0-113" id="h1-0-113" class="d">-						s.ws.Request().RemoteAddr,
+</a><a href="#h1-0-114" id="h1-0-114" class="d">-						s.q.last.Id,
+</a><a href="#h1-0-115" id="h1-0-115" class="d">-						asJSON{query(s.q.last)},
+</a><a href="#h1-0-116" id="h1-0-116" class="d">-						int64(duration/time.Millisecond))
+</a><a href="#h1-0-117" id="h1-0-117" class="d">-					s.outgoing &lt;- &amp;OpSearchDone{s.q.last.Id, int64(duration / time.Millisecond), st}
+</a><a href="#h1-0-118" id="h1-0-118" class="d">-				} else if _, ok := err.(client.QueryError); ok {
+</a><a href="#h1-0-119" id="h1-0-119" class="d">-					s.outgoing &lt;- &amp;OpQueryError{s.q.last.Id, err.Error()}
+</a><a href="#h1-0-120" id="h1-0-120" class="d">-				} else {
+</a><a href="#h1-0-121" id="h1-0-121" class="d">-					log.Printf(&quot;internal error doing search remote=%q id=%d error=%s&quot;,
+</a><a href="#h1-0-122" id="h1-0-122" class="d">-						s.ws.Request().RemoteAddr,
+</a><a href="#h1-0-123" id="h1-0-123" class="d">-						s.q.last.Id, asJSON{err.Error()})
+</a><a href="#h1-0-124" id="h1-0-124" class="d">-					if s.q.next == nil {
+</a><a href="#h1-0-125" id="h1-0-125" class="d">-						// retry the search
+</a><a href="#h1-0-126" id="h1-0-126" class="d">-						s.q.next = s.q.last
+</a><a href="#h1-0-127" id="h1-0-127" class="d">-						s.q.last = nil
+</a><a href="#h1-0-128" id="h1-0-128" class="d">-					}
+</a><a href="#h1-0-129" id="h1-0-129" class="d">-				}
+</a><a href="#h1-0-130" id="h1-0-130" class="d">-				results = nil
+</a><a href="#h1-0-131" id="h1-0-131" class="d">-				search = nil
+</a><a href="#h1-0-132" id="h1-0-132" class="d">-			}
+</a><a href="#h1-0-133" id="h1-0-133" class="d">-		case s.client = &lt;-clients:
+</a><a href="#h1-0-134" id="h1-0-134" class="d">-			clients = nil
+</a><a href="#h1-0-135" id="h1-0-135" class="d">-			q := query(s.q.next)
+</a><a href="#h1-0-136" id="h1-0-136" class="d">-			log.Printf(&quot;dispatching remote=%q id=%d query=%s&quot;,
+</a><a href="#h1-0-137" id="h1-0-137" class="d">-				s.ws.Request().RemoteAddr,
+</a><a href="#h1-0-138" id="h1-0-138" class="d">-				s.q.next.Id,
+</a><a href="#h1-0-139" id="h1-0-139" class="d">-				asJSON{q})
+</a><a href="#h1-0-140" id="h1-0-140" class="d">-			search, err = s.client.Query(q)
+</a><a href="#h1-0-141" id="h1-0-141" class="d">-			s.q.t = time.Now()
+</a><a href="#h1-0-142" id="h1-0-142" class="d">-			if err != nil {
+</a><a href="#h1-0-143" id="h1-0-143" class="d">-				s.outgoing &lt;- &amp;OpQueryError{s.q.next.Id, err.Error()}
+</a><a href="#h1-0-144" id="h1-0-144" class="d">-			} else {
+</a><a href="#h1-0-145" id="h1-0-145" class="d">-				if search == nil {
+</a><a href="#h1-0-146" id="h1-0-146" class="d">-					panic(&quot;nil search and nil error?&quot;)
+</a><a href="#h1-0-147" id="h1-0-147" class="d">-				}
+</a><a href="#h1-0-148" id="h1-0-148" class="d">-				s.q.last = s.q.next
+</a><a href="#h1-0-149" id="h1-0-149" class="d">-				results = search.Results()
+</a><a href="#h1-0-150" id="h1-0-150" class="d">-			}
+</a><a href="#h1-0-151" id="h1-0-151" class="d">-			s.q.next = nil
+</a><a href="#h1-0-152" id="h1-0-152" class="d">-		}
+</a><a href="#h1-0-153" id="h1-0-153" class="d">-		if s.q.next != nil &amp;&amp; results == nil {
+</a><a href="#h1-0-154" id="h1-0-154" class="d">-			if !s.shouldDispatch(s.q.next) {
+</a><a href="#h1-0-155" id="h1-0-155" class="d">-				s.q.next = nil
+</a><a href="#h1-0-156" id="h1-0-156" class="d">-				continue
+</a><a href="#h1-0-157" id="h1-0-157" class="d">-			}
+</a><a href="#h1-0-158" id="h1-0-158" class="d">-			if err = s.connectBackend(s.q.next.Backend); err != nil {
+</a><a href="#h1-0-159" id="h1-0-159" class="d">-				s.outgoing &lt;- &amp;OpQueryError{s.q.next.Id, err.Error()}
+</a><a href="#h1-0-160" id="h1-0-160" class="d">-				s.q.next = nil
+</a><a href="#h1-0-161" id="h1-0-161" class="d">-				continue
+</a><a href="#h1-0-162" id="h1-0-162" class="d">-			}
+</a><a href="#h1-0-163" id="h1-0-163" class="d">-			clients = s.backend.Clients
+</a><a href="#h1-0-164" id="h1-0-164" class="d">-		}
+</a><a href="#h1-0-165" id="h1-0-165" class="d">-	}
+</a><a href="#h1-0-166" id="h1-0-166" class="d">-
+</a><a href="#h1-0-167" id="h1-0-167" class="d">-	s.shutdown = true
+</a><a href="#h1-0-168" id="h1-0-168" class="d">-}
+</a><a href="#h1-0-169" id="h1-0-169" class="d">-
+</a><a href="#h1-0-170" id="h1-0-170" class="d">-func (s *searchConnection) shouldDispatch(q *OpQuery) bool {
+</a><a href="#h1-0-171" id="h1-0-171" class="d">-	if s.q.last == nil {
+</a><a href="#h1-0-172" id="h1-0-172" class="d">-		return true
+</a><a href="#h1-0-173" id="h1-0-173" class="d">-	}
+</a><a href="#h1-0-174" id="h1-0-174" class="d">-	if s.q.last.Backend != q.Backend ||
+</a><a href="#h1-0-175" id="h1-0-175" class="d">-		s.q.last.Line != q.Line ||
+</a><a href="#h1-0-176" id="h1-0-176" class="d">-		s.q.last.File != q.File ||
+</a><a href="#h1-0-177" id="h1-0-177" class="d">-		s.q.last.Repo != q.Repo ||
+</a><a href="#h1-0-178" id="h1-0-178" class="d">-		s.q.last.FoldCase != q.FoldCase {
+</a><a href="#h1-0-179" id="h1-0-179" class="d">-		return true
+</a><a href="#h1-0-180" id="h1-0-180" class="d">-	}
+</a><a href="#h1-0-181" id="h1-0-181" class="d">-	return false
+</a><a href="#h1-0-182" id="h1-0-182" class="d">-}
+</a><a href="#h1-0-183" id="h1-0-183" class="d">-
+</a><a href="#h1-0-184" id="h1-0-184" class="d">-func (s *searchConnection) connectBackend(backend string) error {
+</a><a href="#h1-0-185" id="h1-0-185" class="d">-	var ok bool
+</a><a href="#h1-0-186" id="h1-0-186" class="d">-	s.backend, ok = s.srv.bk[backend]
+</a><a href="#h1-0-187" id="h1-0-187" class="d">-	if !ok {
+</a><a href="#h1-0-188" id="h1-0-188" class="d">-		return fmt.Errorf(&quot;no such backend: %s&quot;, backend)
+</a><a href="#h1-0-189" id="h1-0-189" class="d">-	}
+</a><a href="#h1-0-190" id="h1-0-190" class="d">-	return nil
+</a><a href="#h1-0-191" id="h1-0-191" class="d">-}
+</a><a href="#h1-0-192" id="h1-0-192" class="d">-
+</a><a href="#h1-0-193" id="h1-0-193" class="d">-func (s *server) HandleWebsocket(ws *websocket.Conn) {
+</a><a href="#h1-0-194" id="h1-0-194" class="d">-	c := &amp;searchConnection{
+</a><a href="#h1-0-195" id="h1-0-195" class="d">-		srv: s,
+</a><a href="#h1-0-196" id="h1-0-196" class="d">-		ws:  ws,
+</a><a href="#h1-0-197" id="h1-0-197" class="d">-	}
+</a><a href="#h1-0-198" id="h1-0-198" class="d">-	c.handle()
+</a><a href="#h1-0-199" id="h1-0-199" class="d">-}
+</a><b>diff --git a/<a id="h2" href="../file/server/server.go">server/server.go</a> b/<a href="../file/server/server.go">server/server.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -5,7 +5,6 @@ import (
+</a> 	&quot;net/http&quot;
+ 	&quot;path&quot;
+ 
+<a href="#h2-0-3" id="h2-0-3" class="d">-	&quot;code.google.com/p/go.net/websocket&quot;
+</a> 	&quot;github.com/bmizerany/pat&quot;
+ 	&quot;github.com/livegrep/livegrep/server/backend&quot;
+ 	&quot;github.com/livegrep/livegrep/server/config&quot;
+<a href="#h2-1" id="h2-1" class="h">@@ -128,7 +127,6 @@ func New(cfg *config.Config) (http.Handler, error) {
+</a> 
+ 	mux := http.NewServeMux()
+ 	mux.Handle(&quot;/assets/&quot;, http.FileServer(http.Dir(path.Join(cfg.DocRoot, &quot;htdocs&quot;))))
+<a href="#h2-1-3" id="h2-1-3" class="d">-	mux.Handle(&quot;/socket&quot;, websocket.Handler(srv.HandleWebsocket))
+</a> 	mux.Handle(&quot;/&quot;, m)
+ 
+ 	srv.inner = &amp;requestLogger{mux}
+<b>diff --git a/<a id="h3" href="../file/web/htdocs/_bench_one.html">web/htdocs/_bench_one.html</a> b/<a href="../file/web/htdocs/_bench_one.html">web/htdocs/_bench_one.html</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -1,22 +0,0 @@
+</a><a href="#h3-0-0" id="h3-0-0" class="d">-&lt;html xmlns=&quot;http://www.w3.org/1999/xhtml&quot;&gt;
+</a><a href="#h3-0-1" id="h3-0-1" class="d">-  &lt;head&gt;
+</a><a href="#h3-0-2" id="h3-0-2" class="d">-    &lt;title&gt;code search&lt;/title&gt;
+</a><a href="#h3-0-3" id="h3-0-3" class="d">-    &lt;script language=&quot;javascript&quot; type=&quot;text/javascript&quot; src=&quot;js/jquery.js&quot;&gt;&lt;/script&gt;
+</a><a href="#h3-0-4" id="h3-0-4" class="d">-    &lt;script language=&quot;javascript&quot; type=&quot;text/javascript&quot; src=&quot;/socket.io/socket.io.js&quot;&gt;&lt;/script&gt;
+</a><a href="#h3-0-5" id="h3-0-5" class="d">-    &lt;script language=&quot;javascript&quot; type=&quot;text/javascript&quot; src=&quot;js/html.js&quot;&gt;&lt;/script&gt;
+</a><a href="#h3-0-6" id="h3-0-6" class="d">-    &lt;script language=&quot;javascript&quot; type=&quot;text/javascript&quot; src=&quot;codesearch.js&quot;&gt;&lt;/script&gt;
+</a><a href="#h3-0-7" id="h3-0-7" class="d">-    &lt;script language=&quot;javascript&quot; type=&quot;text/javascript&quot; src=&quot;bench.js&quot;&gt;&lt;/script&gt;
+</a><a href="#h3-0-8" id="h3-0-8" class="d">-    &lt;link rel=&quot;stylesheet&quot; href=&#39;css/codesearch.css&#39; /&gt;
+</a><a href="#h3-0-9" id="h3-0-9" class="d">-  &lt;/head&gt;
+</a><a href="#h3-0-10" id="h3-0-10" class="d">-  &lt;body&gt;
+</a><a href="#h3-0-11" id="h3-0-11" class="d">-    &lt;table&gt;
+</a><a href="#h3-0-12" id="h3-0-12" class="d">-      &lt;tr&gt;&lt;th&gt;Time:&lt;/th&gt;&lt;td&gt;&lt;span id=&quot;val_time&quot;&gt;0&lt;/span&gt;ms&lt;/td&gt;&lt;/tr&gt;
+</a><a href="#h3-0-13" id="h3-0-13" class="d">-      &lt;tr&gt;&lt;th&gt;Searches:&lt;/th&gt;&lt;td&gt;&lt;span id=&quot;val_searches&quot;&gt;0&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;
+</a><a href="#h3-0-14" id="h3-0-14" class="d">-      &lt;tr&gt;&lt;th&gt;Errors:&lt;/th&gt;&lt;td&gt;&lt;span id=&quot;val_errors&quot;&gt;0&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;
+</a><a href="#h3-0-15" id="h3-0-15" class="d">-      &lt;tr&gt;&lt;th&gt;QPS (5s):&lt;/th&gt;&lt;td&gt;&lt;span id=&quot;val_window&quot;&gt;0&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;
+</a><a href="#h3-0-16" id="h3-0-16" class="d">-      &lt;tr&gt;&lt;th&gt;Max (5s):&lt;/th&gt;&lt;td&gt;
+</a><a href="#h3-0-17" id="h3-0-17" class="d">-      &lt;span id=&quot;val_max&quot;&gt;0&lt;/span&gt;ms / &lt;span id=&quot;val_serv_max&quot;&gt;0&lt;/span&gt;ms
+</a><a href="#h3-0-18" id="h3-0-18" class="d">-      &lt;/td&gt;&lt;/tr&gt;
+</a><a href="#h3-0-19" id="h3-0-19" class="d">-    &lt;/table&gt;
+</a><a href="#h3-0-20" id="h3-0-20" class="d">-  &lt;/body&gt;
+</a><a href="#h3-0-21" id="h3-0-21" class="d">-&lt;/html&gt;
+</a><b>diff --git a/<a id="h4" href="../file/web/htdocs/assets/js/bench-top.js">web/htdocs/assets/js/bench-top.js</a> b/<a href="../file/web/htdocs/assets/js/bench-top.js">web/htdocs/assets/js/bench-top.js</a></b>
+<a href="#h4-0" id="h4-0" class="h">@@ -1,39 +0,0 @@
+</a><a href="#h4-0-0" id="h4-0-0" class="d">-var frames = [];
+</a><a href="#h4-0-1" id="h4-0-1" class="d">-var running = true;
+</a><a href="#h4-0-2" id="h4-0-2" class="d">-
+</a><a href="#h4-0-3" id="h4-0-3" class="d">-function add_one() {
+</a><a href="#h4-0-4" id="h4-0-4" class="d">-  var h = new HTMLFactory();
+</a><a href="#h4-0-5" id="h4-0-5" class="d">-  var iframe = h.iframe({src: &quot;_bench_one.html&quot;});
+</a><a href="#h4-0-6" id="h4-0-6" class="d">-  frames.push(iframe);
+</a><a href="#h4-0-7" id="h4-0-7" class="d">-  $(&#39;#bench&#39;).append(iframe);
+</a><a href="#h4-0-8" id="h4-0-8" class="d">-  return false;
+</a><a href="#h4-0-9" id="h4-0-9" class="d">-}
+</a><a href="#h4-0-10" id="h4-0-10" class="d">-
+</a><a href="#h4-0-11" id="h4-0-11" class="d">-function remove_one() {
+</a><a href="#h4-0-12" id="h4-0-12" class="d">-  if (frames.length == 0)
+</a><a href="#h4-0-13" id="h4-0-13" class="d">-    return;
+</a><a href="#h4-0-14" id="h4-0-14" class="d">-  var frame = frames.pop();
+</a><a href="#h4-0-15" id="h4-0-15" class="d">-  $(frame).remove()
+</a><a href="#h4-0-16" id="h4-0-16" class="d">-}
+</a><a href="#h4-0-17" id="h4-0-17" class="d">-
+</a><a href="#h4-0-18" id="h4-0-18" class="d">-function playpause() {
+</a><a href="#h4-0-19" id="h4-0-19" class="d">-  var btn = $(&#39;#playpause&#39;);
+</a><a href="#h4-0-20" id="h4-0-20" class="d">-  if (running) {
+</a><a href="#h4-0-21" id="h4-0-21" class="d">-    frames.forEach(function (f) {f.contentWindow.Benchmark.stop();});
+</a><a href="#h4-0-22" id="h4-0-22" class="d">-    btn.text(&quot;start&quot;);
+</a><a href="#h4-0-23" id="h4-0-23" class="d">-  } else {
+</a><a href="#h4-0-24" id="h4-0-24" class="d">-    frames.forEach(function (f) {f.contentWindow.Benchmark.start();});
+</a><a href="#h4-0-25" id="h4-0-25" class="d">-    btn.text(&quot;stop&quot;);
+</a><a href="#h4-0-26" id="h4-0-26" class="d">-  }
+</a><a href="#h4-0-27" id="h4-0-27" class="d">-  running = !running;
+</a><a href="#h4-0-28" id="h4-0-28" class="d">-}
+</a><a href="#h4-0-29" id="h4-0-29" class="d">-
+</a><a href="#h4-0-30" id="h4-0-30" class="d">-function startup() {
+</a><a href="#h4-0-31" id="h4-0-31" class="d">-  $(&#39;#addone&#39;).click(add_one);
+</a><a href="#h4-0-32" id="h4-0-32" class="d">-  $(&#39;#remove&#39;).click(remove_one);
+</a><a href="#h4-0-33" id="h4-0-33" class="d">-  $(&#39;#playpause&#39;).click(playpause);
+</a><a href="#h4-0-34" id="h4-0-34" class="d">-  for (var i = 0; i &lt; 4; i++)
+</a><a href="#h4-0-35" id="h4-0-35" class="d">-    add_one();
+</a><a href="#h4-0-36" id="h4-0-36" class="d">-}
+</a><a href="#h4-0-37" id="h4-0-37" class="d">-$(document).ready(startup);
+</a><a href="#h4-0-38" id="h4-0-38" class="d">-
+</a><b>diff --git a/<a id="h5" href="../file/web/htdocs/assets/js/bench.js">web/htdocs/assets/js/bench.js</a> b/<a href="../file/web/htdocs/assets/js/bench.js">web/htdocs/assets/js/bench.js</a></b>
+<a href="#h5-0" id="h5-0" class="h">@@ -1,112 +0,0 @@
+</a><a href="#h5-0-0" id="h5-0-0" class="d">-&quot;use strict&quot;;
+</a><a href="#h5-0-1" id="h5-0-1" class="d">-var Benchmark = function() {
+</a><a href="#h5-0-2" id="h5-0-2" class="d">-  var WINDOW = 5000;
+</a><a href="#h5-0-3" id="h5-0-3" class="d">-  var queries = [
+</a><a href="#h5-0-4" id="h5-0-4" class="d">-    &quot;____do&quot;,
+</a><a href="#h5-0-5" id="h5-0-5" class="d">-    &quot;errno\\W&quot;,
+</a><a href="#h5-0-6" id="h5-0-6" class="d">-    &quot;kmalloc\\(&quot;,
+</a><a href="#h5-0-7" id="h5-0-7" class="d">-    &quot;printk\\(&quot;,
+</a><a href="#h5-0-8" id="h5-0-8" class="d">-    &quot;^(\\s.*\\S)?kmalloc\\s*\\(&quot;,
+</a><a href="#h5-0-9" id="h5-0-9" class="d">-    &quot;^(\\s.*\\S)?printk\\s*\\(&quot;,
+</a><a href="#h5-0-10" id="h5-0-10" class="d">-    &quot;^(\\s.*\\S)?acct_&quot;,
+</a><a href="#h5-0-11" id="h5-0-11" class="d">-    &quot;.&quot;,
+</a><a href="#h5-0-12" id="h5-0-12" class="d">-    &quot;^$&quot;,
+</a><a href="#h5-0-13" id="h5-0-13" class="d">-    &quot;[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}&quot;,
+</a><a href="#h5-0-14" id="h5-0-14" class="d">-  ];
+</a><a href="#h5-0-15" id="h5-0-15" class="d">-
+</a><a href="#h5-0-16" id="h5-0-16" class="d">-  function max_time() {
+</a><a href="#h5-0-17" id="h5-0-17" class="d">-    var max = {time: 0};
+</a><a href="#h5-0-18" id="h5-0-18" class="d">-    Benchmark.responses.forEach(function (r) {
+</a><a href="#h5-0-19" id="h5-0-19" class="d">-                                  if (r.time &gt; max.time)
+</a><a href="#h5-0-20" id="h5-0-20" class="d">-                                    max = r
+</a><a href="#h5-0-21" id="h5-0-21" class="d">-                                });
+</a><a href="#h5-0-22" id="h5-0-22" class="d">-    return max;
+</a><a href="#h5-0-23" id="h5-0-23" class="d">-  }
+</a><a href="#h5-0-24" id="h5-0-24" class="d">-
+</a><a href="#h5-0-25" id="h5-0-25" class="d">-  function render() {
+</a><a href="#h5-0-26" id="h5-0-26" class="d">-    var now = new Date();
+</a><a href="#h5-0-27" id="h5-0-27" class="d">-    var ms = +(now - Benchmark.start_time)
+</a><a href="#h5-0-28" id="h5-0-28" class="d">-    $(&quot;#val_time&quot;).text(ms);
+</a><a href="#h5-0-29" id="h5-0-29" class="d">-    $(&quot;#val_searches&quot;).text(Benchmark.searches);
+</a><a href="#h5-0-30" id="h5-0-30" class="d">-    $(&quot;#val_errors&quot;).text(Benchmark.errors);
+</a><a href="#h5-0-31" id="h5-0-31" class="d">-    $(&quot;#val_window&quot;).text(1000 * Benchmark.responses.length /
+</a><a href="#h5-0-32" id="h5-0-32" class="d">-        (now - Benchmark.responses[0].end));
+</a><a href="#h5-0-33" id="h5-0-33" class="d">-    var max = max_time();
+</a><a href="#h5-0-34" id="h5-0-34" class="d">-    $(&quot;#val_max&quot;).text(max.time);
+</a><a href="#h5-0-35" id="h5-0-35" class="d">-    $(&quot;#val_serv_max&quot;).text(max.serv_time);
+</a><a href="#h5-0-36" id="h5-0-36" class="d">-  }
+</a><a href="#h5-0-37" id="h5-0-37" class="d">-
+</a><a href="#h5-0-38" id="h5-0-38" class="d">-  function done(search, error, time) {
+</a><a href="#h5-0-39" id="h5-0-39" class="d">-    var now = new Date();
+</a><a href="#h5-0-40" id="h5-0-40" class="d">-    Benchmark.searches++;
+</a><a href="#h5-0-41" id="h5-0-41" class="d">-    if (error)
+</a><a href="#h5-0-42" id="h5-0-42" class="d">-      Benchmark.errors++;
+</a><a href="#h5-0-43" id="h5-0-43" class="d">-    if (Benchmark.responses.length &amp;&amp;
+</a><a href="#h5-0-44" id="h5-0-44" class="d">-        search &lt; Benchmark.responses[Benchmark.responses.length - 1].id) {
+</a><a href="#h5-0-45" id="h5-0-45" class="d">-      console.log(&quot;Search moved backwards: %s &lt; %s&quot;,
+</a><a href="#h5-0-46" id="h5-0-46" class="d">-                 search, Benchmark.responses[Benchmark.responses.length - 1].id);
+</a><a href="#h5-0-47" id="h5-0-47" class="d">-    }
+</a><a href="#h5-0-48" id="h5-0-48" class="d">-    Benchmark.responses.push({
+</a><a href="#h5-0-49" id="h5-0-49" class="d">-                               end: now,
+</a><a href="#h5-0-50" id="h5-0-50" class="d">-                               time: now - Benchmark.search_start[search],
+</a><a href="#h5-0-51" id="h5-0-51" class="d">-                               serv_time: time,
+</a><a href="#h5-0-52" id="h5-0-52" class="d">-                               id: search
+</a><a href="#h5-0-53" id="h5-0-53" class="d">-                             });
+</a><a href="#h5-0-54" id="h5-0-54" class="d">-    while ((now - Benchmark.responses[0].end) &gt; WINDOW)
+</a><a href="#h5-0-55" id="h5-0-55" class="d">-      Benchmark.responses.shift(1);
+</a><a href="#h5-0-56" id="h5-0-56" class="d">-    render();
+</a><a href="#h5-0-57" id="h5-0-57" class="d">-    Object.keys(Benchmark.search_start).forEach(
+</a><a href="#h5-0-58" id="h5-0-58" class="d">-      function (n) {
+</a><a href="#h5-0-59" id="h5-0-59" class="d">-        if (+n &lt; search)
+</a><a href="#h5-0-60" id="h5-0-60" class="d">-          delete Benchmark.search_start[n];
+</a><a href="#h5-0-61" id="h5-0-61" class="d">-      });
+</a><a href="#h5-0-62" id="h5-0-62" class="d">-  }
+</a><a href="#h5-0-63" id="h5-0-63" class="d">-
+</a><a href="#h5-0-64" id="h5-0-64" class="d">-  function loop(i) {
+</a><a href="#h5-0-65" id="h5-0-65" class="d">-    if (i === queries.length)
+</a><a href="#h5-0-66" id="h5-0-66" class="d">-      i = 0;
+</a><a href="#h5-0-67" id="h5-0-67" class="d">-    Benchmark.search_start[++Benchmark.search_id] = new Date();
+</a><a href="#h5-0-68" id="h5-0-68" class="d">-    Codesearch.new_search(queries[i], null, Benchmark.search_id);
+</a><a href="#h5-0-69" id="h5-0-69" class="d">-    Benchmark.timer = setTimeout(function() {loop(i+1)}, 10);
+</a><a href="#h5-0-70" id="h5-0-70" class="d">-  }
+</a><a href="#h5-0-71" id="h5-0-71" class="d">-
+</a><a href="#h5-0-72" id="h5-0-72" class="d">-  return {
+</a><a href="#h5-0-73" id="h5-0-73" class="d">-    start_time: 0,
+</a><a href="#h5-0-74" id="h5-0-74" class="d">-    search_start: {},
+</a><a href="#h5-0-75" id="h5-0-75" class="d">-    search_id: 0,
+</a><a href="#h5-0-76" id="h5-0-76" class="d">-    searches: 0,
+</a><a href="#h5-0-77" id="h5-0-77" class="d">-    errors: 0,
+</a><a href="#h5-0-78" id="h5-0-78" class="d">-    responses: [],
+</a><a href="#h5-0-79" id="h5-0-79" class="d">-
+</a><a href="#h5-0-80" id="h5-0-80" class="d">-    timer: undefined,
+</a><a href="#h5-0-81" id="h5-0-81" class="d">-    onload: function() {
+</a><a href="#h5-0-82" id="h5-0-82" class="d">-      Codesearch.connect(Benchmark);
+</a><a href="#h5-0-83" id="h5-0-83" class="d">-    },
+</a><a href="#h5-0-84" id="h5-0-84" class="d">-    regex_error: function(search, err) {
+</a><a href="#h5-0-85" id="h5-0-85" class="d">-      done(search, true, 0);
+</a><a href="#h5-0-86" id="h5-0-86" class="d">-    },
+</a><a href="#h5-0-87" id="h5-0-87" class="d">-    match: function(search, match) {
+</a><a href="#h5-0-88" id="h5-0-88" class="d">-    },
+</a><a href="#h5-0-89" id="h5-0-89" class="d">-    search_done: function(search, time, why) {
+</a><a href="#h5-0-90" id="h5-0-90" class="d">-      done(search, false, time);
+</a><a href="#h5-0-91" id="h5-0-91" class="d">-    },
+</a><a href="#h5-0-92" id="h5-0-92" class="d">-    on_connect: function() {
+</a><a href="#h5-0-93" id="h5-0-93" class="d">-      if (Benchmark.timer === undefined)
+</a><a href="#h5-0-94" id="h5-0-94" class="d">-        Benchmark.start();
+</a><a href="#h5-0-95" id="h5-0-95" class="d">-    },
+</a><a href="#h5-0-96" id="h5-0-96" class="d">-    start: function() {
+</a><a href="#h5-0-97" id="h5-0-97" class="d">-      Benchmark.start_time = new Date();
+</a><a href="#h5-0-98" id="h5-0-98" class="d">-      Benchmark.searches = 0;
+</a><a href="#h5-0-99" id="h5-0-99" class="d">-      Benchmark.errors = 0;
+</a><a href="#h5-0-100" id="h5-0-100" class="d">-      loop(0);
+</a><a href="#h5-0-101" id="h5-0-101" class="d">-    },
+</a><a href="#h5-0-102" id="h5-0-102" class="d">-    stop: function() {
+</a><a href="#h5-0-103" id="h5-0-103" class="d">-      if (Benchmark.timer) {
+</a><a href="#h5-0-104" id="h5-0-104" class="d">-        clearTimeout(Benchmark.timer);
+</a><a href="#h5-0-105" id="h5-0-105" class="d">-        Benchmark.timer = null;
+</a><a href="#h5-0-106" id="h5-0-106" class="d">-      }
+</a><a href="#h5-0-107" id="h5-0-107" class="d">-    }
+</a><a href="#h5-0-108" id="h5-0-108" class="d">-  }
+</a><a href="#h5-0-109" id="h5-0-109" class="d">-}();
+</a><a href="#h5-0-110" id="h5-0-110" class="d">-
+</a><a href="#h5-0-111" id="h5-0-111" class="d">-$(document).ready(Benchmark.onload);
+</a><b>diff --git a/<a id="h6" href="../file/web/htdocs/assets/js/codesearch.js">web/htdocs/assets/js/codesearch.js</a> b/<a href="../file/web/htdocs/assets/js/codesearch.js">web/htdocs/assets/js/codesearch.js</a></b>
+<a href="#h6-0" id="h6-0" class="h">@@ -1,55 +1,66 @@
+</a> &quot;use strict&quot;;
+ var Codesearch = function() {
+   return {
+<a href="#h6-0-3" id="h6-0-3" class="d">-    socket: null,
+</a>     delegate: null,
+     retry_time: 50,
+<a href="#h6-0-6" id="h6-0-6" class="i">+    next_search: null,
+</a><a href="#h6-0-7" id="h6-0-7" class="i">+    in_flight: null,
+</a>     connect: function(delegate) {
+       if (delegate !== undefined)
+         Codesearch.delegate = delegate;
+<a href="#h6-0-11" id="h6-0-11" class="d">-      if (Codesearch.socket !== null)
+</a><a href="#h6-0-12" id="h6-0-12" class="d">-        return;
+</a><a href="#h6-0-13" id="h6-0-13" class="d">-      console.log(&quot;Attempting to connect via websocket...&quot;);
+</a><a href="#h6-0-14" id="h6-0-14" class="d">-
+</a><a href="#h6-0-15" id="h6-0-15" class="d">-      var proto = window.location.protocol.replace(&#39;http&#39;, &#39;ws&#39;);
+</a><a href="#h6-0-16" id="h6-0-16" class="d">-      var socket = new WebSocket(proto + &quot;//&quot; + window.location.host + &quot;/socket&quot;);
+</a><a href="#h6-0-17" id="h6-0-17" class="d">-      socket.onmessage = Codesearch.handle_frame
+</a><a href="#h6-0-18" id="h6-0-18" class="d">-      socket.onopen = function() {
+</a><a href="#h6-0-19" id="h6-0-19" class="d">-        Codesearch.socket = socket;
+</a><a href="#h6-0-20" id="h6-0-20" class="d">-        if (Codesearch.delegate.on_connect)
+</a><a href="#h6-0-21" id="h6-0-21" class="d">-          Codesearch.delegate.on_connect();
+</a><a href="#h6-0-22" id="h6-0-22" class="d">-        console.log(&quot;Connected!&quot;)
+</a><a href="#h6-0-23" id="h6-0-23" class="d">-        Codesearch.retry_time = 50;
+</a><a href="#h6-0-24" id="h6-0-24" class="d">-      }
+</a><a href="#h6-0-25" id="h6-0-25" class="d">-      socket.onerror = Codesearch.socket_error;
+</a><a href="#h6-0-26" id="h6-0-26" class="d">-      socket.onclose = Codesearch.socket_close;
+</a><a href="#h6-0-27" id="h6-0-27" class="i">+      if (Codesearch.delegate.on_connect)
+</a><a href="#h6-0-28" id="h6-0-28" class="i">+        setTimeout(0, Codesearch.delegate.on_connect)
+</a>     },
+     new_search: function(opts) {
+<a href="#h6-0-31" id="h6-0-31" class="d">-      if (Codesearch.socket !== null)
+</a><a href="#h6-0-32" id="h6-0-32" class="d">-        Codesearch.socket.send(JSON.stringify({opcode: &quot;query&quot;, body: opts}));
+</a><a href="#h6-0-33" id="h6-0-33" class="i">+      Codesearch.next_search = opts;
+</a><a href="#h6-0-34" id="h6-0-34" class="i">+      if (Codesearch.in_flight == null)
+</a><a href="#h6-0-35" id="h6-0-35" class="i">+        Codesearch.dispatch()
+</a>     },
+<a href="#h6-0-37" id="h6-0-37" class="d">-    handle_frame: function(frame) {
+</a><a href="#h6-0-38" id="h6-0-38" class="d">-      var op = JSON.parse(frame.data);
+</a><a href="#h6-0-39" id="h6-0-39" class="d">-      if (op.body.opcode == &quot;error&quot;) {
+</a><a href="#h6-0-40" id="h6-0-40" class="d">-        console.log(&quot;in-band error: &quot;, op.error)
+</a><a href="#h6-0-41" id="h6-0-41" class="d">-      } else if (op.opcode == &#39;result&#39;) {
+</a><a href="#h6-0-42" id="h6-0-42" class="d">-        Codesearch.delegate.match(op.body.id, op.body.result);
+</a><a href="#h6-0-43" id="h6-0-43" class="d">-      } else if (op.opcode == &#39;search_done&#39;) {
+</a><a href="#h6-0-44" id="h6-0-44" class="d">-        Codesearch.delegate.search_done(op.body.id, op.body.time, op.body.stats.why);
+</a><a href="#h6-0-45" id="h6-0-45" class="d">-      } else if (op.opcode == &#39;query_error&#39;) {
+</a><a href="#h6-0-46" id="h6-0-46" class="d">-        Codesearch.delegate.error(op.body.id, op.body.error);
+</a><a href="#h6-0-47" id="h6-0-47" class="d">-      } else {
+</a><a href="#h6-0-48" id="h6-0-48" class="d">-        console.log(&quot;unknown opcode: &quot;, op.opcode)
+</a><a href="#h6-0-49" id="h6-0-49" class="i">+    dispatch: function() {
+</a><a href="#h6-0-50" id="h6-0-50" class="i">+      if (!Codesearch.next_search)
+</a><a href="#h6-0-51" id="h6-0-51" class="i">+        return;
+</a><a href="#h6-0-52" id="h6-0-52" class="i">+      Codesearch.in_flight = Codesearch.next_search;
+</a><a href="#h6-0-53" id="h6-0-53" class="i">+      Codesearch.next_search = null;
+</a><a href="#h6-0-54" id="h6-0-54" class="i">+
+</a><a href="#h6-0-55" id="h6-0-55" class="i">+      var opts = Codesearch.in_flight;
+</a><a href="#h6-0-56" id="h6-0-56" class="i">+
+</a><a href="#h6-0-57" id="h6-0-57" class="i">+      var url = &quot;/api/v1/search/&quot;
+</a><a href="#h6-0-58" id="h6-0-58" class="i">+      if (&#39;backend&#39; in opts) {
+</a><a href="#h6-0-59" id="h6-0-59" class="i">+        url = url + opts.backend;
+</a>       }
+<a href="#h6-0-61" id="h6-0-61" class="d">-    },
+</a><a href="#h6-0-62" id="h6-0-62" class="d">-    socket_error: function(err) {
+</a><a href="#h6-0-63" id="h6-0-63" class="d">-      console.log(&quot;Socket error: &quot;, err);
+</a><a href="#h6-0-64" id="h6-0-64" class="d">-    },
+</a><a href="#h6-0-65" id="h6-0-65" class="d">-    socket_close: function() {
+</a><a href="#h6-0-66" id="h6-0-66" class="d">-      Codesearch.socket = null;
+</a><a href="#h6-0-67" id="h6-0-67" class="d">-      Codesearch.retry_time = Math.min(600 * 1000, Math.round(Codesearch.retry_time * 1.5));
+</a><a href="#h6-0-68" id="h6-0-68" class="d">-      console.log(&quot;Socket closed. Retry in &quot; + Codesearch.retry_time + &quot;ms.&quot;)
+</a><a href="#h6-0-69" id="h6-0-69" class="d">-      setTimeout(Codesearch.connect, Codesearch.retry_time)
+</a><a href="#h6-0-70" id="h6-0-70" class="i">+      var q = {};
+</a><a href="#h6-0-71" id="h6-0-71" class="i">+
+</a><a href="#h6-0-72" id="h6-0-72" class="i">+      [&#39;line&#39;,&#39;file&#39;, &#39;repo&#39;, &#39;fold_case&#39;].forEach(function (key) {
+</a><a href="#h6-0-73" id="h6-0-73" class="i">+        if(opts[key])
+</a><a href="#h6-0-74" id="h6-0-74" class="i">+          q[key] = opts[key];
+</a><a href="#h6-0-75" id="h6-0-75" class="i">+      });
+</a><a href="#h6-0-76" id="h6-0-76" class="i">+      if (q.fold_case !== true)
+</a><a href="#h6-0-77" id="h6-0-77" class="i">+        delete q.fold_case;
+</a><a href="#h6-0-78" id="h6-0-78" class="i">+
+</a><a href="#h6-0-79" id="h6-0-79" class="i">+      url = url + &quot;?&quot; + $.param(q);
+</a><a href="#h6-0-80" id="h6-0-80" class="i">+
+</a><a href="#h6-0-81" id="h6-0-81" class="i">+      var xhr = $.getJSON(url);
+</a><a href="#h6-0-82" id="h6-0-82" class="i">+      var start = new Date();
+</a><a href="#h6-0-83" id="h6-0-83" class="i">+      xhr.done(function (data) {
+</a><a href="#h6-0-84" id="h6-0-84" class="i">+        var elapsed = new Date() - start;
+</a><a href="#h6-0-85" id="h6-0-85" class="i">+        data.results.forEach(function (r) {
+</a><a href="#h6-0-86" id="h6-0-86" class="i">+          Codesearch.delegate.match(opts.id, r);
+</a><a href="#h6-0-87" id="h6-0-87" class="i">+        });
+</a><a href="#h6-0-88" id="h6-0-88" class="i">+        Codesearch.delegate.search_done(opts.id, elapsed, data.info.why);
+</a><a href="#h6-0-89" id="h6-0-89" class="i">+      });
+</a><a href="#h6-0-90" id="h6-0-90" class="i">+      xhr.error(function(data) {
+</a><a href="#h6-0-91" id="h6-0-91" class="i">+        window._err = data;
+</a><a href="#h6-0-92" id="h6-0-92" class="i">+        if (data.status &gt;= 400 &amp;&amp; data.status &lt; 500) {
+</a><a href="#h6-0-93" id="h6-0-93" class="i">+          var err = JSON.parse(data.responseText);
+</a><a href="#h6-0-94" id="h6-0-94" class="i">+          Codesearch.delegate.error(opts.id, err.error.message);
+</a><a href="#h6-0-95" id="h6-0-95" class="i">+        } else {
+</a><a href="#h6-0-96" id="h6-0-96" class="i">+          console.log(&quot;server error&quot;, data.status, data.responseText);
+</a><a href="#h6-0-97" id="h6-0-97" class="i">+        }
+</a><a href="#h6-0-98" id="h6-0-98" class="i">+      });
+</a><a href="#h6-0-99" id="h6-0-99" class="i">+      xhr.always(function() {
+</a><a href="#h6-0-100" id="h6-0-100" class="i">+        Codesearch.in_flight = null;
+</a><a href="#h6-0-101" id="h6-0-101" class="i">+        setTimeout(0, Codesearch.dispatch);
+</a><a href="#h6-0-102" id="h6-0-102" class="i">+      });
+</a>     }
+   };
+ }();
+<b>diff --git a/<a id="h7" href="../file/web/htdocs/bench.html">web/htdocs/bench.html</a> b/<a href="../file/web/htdocs/bench.html">web/htdocs/bench.html</a></b>
+<a href="#h7-0" id="h7-0" class="h">@@ -1,19 +0,0 @@
+</a><a href="#h7-0-0" id="h7-0-0" class="d">-&lt;html xmlns=&quot;http://www.w3.org/1999/xhtml&quot;&gt;
+</a><a href="#h7-0-1" id="h7-0-1" class="d">-  &lt;head&gt;
+</a><a href="#h7-0-2" id="h7-0-2" class="d">-    &lt;title&gt;benchmarking&lt;/title&gt;
+</a><a href="#h7-0-3" id="h7-0-3" class="d">-    &lt;link rel=&quot;stylesheet&quot; href=&#39;css/codesearch.css&#39; /&gt;
+</a><a href="#h7-0-4" id="h7-0-4" class="d">-    &lt;link rel=&quot;stylesheet&quot; href=&#39;css/bench.css&#39; /&gt;
+</a><a href="#h7-0-5" id="h7-0-5" class="d">-    &lt;script language=&quot;javascript&quot; type=&quot;text/javascript&quot; src=&quot;js/jquery.js&quot;&gt;&lt;/script&gt;
+</a><a href="#h7-0-6" id="h7-0-6" class="d">-    &lt;script language=&quot;javascript&quot; type=&quot;text/javascript&quot; src=&quot;js/html.js&quot;&gt;&lt;/script&gt;
+</a><a href="#h7-0-7" id="h7-0-7" class="d">-    &lt;script language=&#39;javascript&#39; type=&#39;text/javascript&#39; src=&#39;bench-top.js&#39;&gt; &lt;/script&gt;
+</a><a href="#h7-0-8" id="h7-0-8" class="d">-  &lt;/head&gt;
+</a><a href="#h7-0-9" id="h7-0-9" class="d">-  &lt;body&gt;
+</a><a href="#h7-0-10" id="h7-0-10" class="d">-    &lt;div id=&#39;bench&#39;&gt;
+</a><a href="#h7-0-11" id="h7-0-11" class="d">-      &lt;div class=&#39;controls&#39;&gt;
+</a><a href="#h7-0-12" id="h7-0-12" class="d">-      &lt;a href=&quot;#&quot; id=&#39;addone&#39;&gt;[+]&lt;/a&gt;
+</a><a href="#h7-0-13" id="h7-0-13" class="d">-      &lt;a href=&quot;#&quot; id=&#39;remove&#39;&gt;[-]&lt;/a&gt;
+</a><a href="#h7-0-14" id="h7-0-14" class="d">-      &lt;button id=&#39;playpause&#39; &quot;&gt;stop&lt;/button&gt;
+</a><a href="#h7-0-15" id="h7-0-15" class="d">-      &lt;/div&gt;
+</a><a href="#h7-0-16" id="h7-0-16" class="d">-    &lt;/div&gt;
+</a><a href="#h7-0-17" id="h7-0-17" class="d">-  &lt;/body&gt;
+</a><a href="#h7-0-18" id="h7-0-18" class="d">-&lt;/html&gt;
+</a></pre>
+</div>
+</body>
+</html>

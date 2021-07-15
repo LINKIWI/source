@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>indexes[] only really needs to be kChunkSize / kMinFilterRatio large. - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/e974ac25f16c9964ee011b487c7c3a6f0e7a330c">e974ac25f16c9964ee011b487c7c3a6f0e7a330c</a>
+<b>parent</b> <a href="../commit/1143a246e577140b43ac281020ab2976ff7b74c9">1143a246e577140b43ac281020ab2976ff7b74c9</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Sun, 26 Feb 2012 10:07:58 -0500
+
+indexes[] only really needs to be kChunkSize / kMinFilterRatio large.
+
+If we&#39;re ever populating it past that point, we&#39;re wasting work,
+anyways.
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">codesearch.cc</a></td><td> | </td><td class="num">13</td><td><span class="i">++++++++</span><span class="d">-----</span></td></tr>
+</table></pre><pre>1 file changed, 8 insertions(+), 5 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/codesearch.cc">codesearch.cc</a> b/<a href="../file/codesearch.cc">codesearch.cc</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -33,6 +33,9 @@ using namespace std;
+</a> const int    kMaxMatches   = 50;
+ const int    kContextLines = 3;
+ 
+<a href="#h0-0-3" id="h0-0-3" class="i">+const size_t kMinSkip = 250;
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+const int kMinFilterRatio = 50;
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+
+</a> #ifdef PROFILE_CODESEARCH
+ DEFINE_bool(debug_search, false, &quot;Produce debugging output about the search process&quot;);
+ #define log_profile(format, ...) do {                   \
+<a href="#h0-1" id="h0-1" class="h">@@ -434,7 +437,7 @@ void searcher::filtered_search(const chunk *chunk)
+</a> {
+     static per_thread&lt;vector&lt;uint32_t&gt; &gt; indexes;
+     if (!indexes.get()) {
+<a href="#h0-1-3" id="h0-1-3" class="d">-        indexes.put(new vector&lt;uint32_t&gt;(kChunkSpace));
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+        indexes.put(new vector&lt;uint32_t&gt;(kChunkSpace / kMinFilterRatio));
+</a>     }
+     int count = 0;
+     {
+<a href="#h0-2" id="h0-2" class="h">@@ -447,6 +450,10 @@ void searcher::filtered_search(const chunk *chunk)
+</a>             walk_state st = stack.back();
+             stack.pop_back();
+             if (!st.key || st.key-&gt;empty() || (st.right - st.left) &lt;= 100) {
+<a href="#h0-2-3" id="h0-2-3" class="i">+                if ((count + st.right - st.left) &gt; indexes-&gt;size()) {
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+                    count = indexes-&gt;size() + 1;
+</a><a href="#h0-2-5" id="h0-2-5" class="i">+                    break;
+</a><a href="#h0-2-6" id="h0-2-6" class="i">+                }
+</a>                 memcpy(&amp;(*indexes)[count], st.left,
+                        (st.right - st.left) * sizeof(uint32_t));
+                 count += (st.right - st.left);
+<a href="#h0-3" id="h0-3" class="h">@@ -484,7 +491,6 @@ void searcher::filtered_search(const chunk *chunk)
+</a>                 }
+             }
+         }
+<a href="#h0-3-3" id="h0-3-3" class="d">-
+</a>     }
+ 
+     search_lines(&amp;(*indexes)[0], count, chunk);
+<a href="#h0-4" id="h0-4" class="h">@@ -498,9 +504,6 @@ struct match_finger {
+</a>         chunk_(chunk), it_(chunk-&gt;files.begin()) {};
+ };
+ 
+<a href="#h0-4-3" id="h0-4-3" class="d">-const size_t kMinSkip = 250;
+</a><a href="#h0-4-4" id="h0-4-4" class="d">-const int kMinFilterRatio = 50;
+</a><a href="#h0-4-5" id="h0-4-5" class="d">-
+</a> void searcher::search_lines(uint32_t *indexes, int count,
+                             const chunk *chunk)
+ {
+</pre>
+</div>
+</body>
+</html>

@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>cmd/livegrep-index-builder: Move repository path construction to Project method - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/ccdc9136304bdde745f2ee2a3d4ce972c7bb9e73">ccdc9136304bdde745f2ee2a3d4ce972c7bb9e73</a>
+<b>parent</b> <a href="../commit/4bcec081716f7dc13561724e387853e16bd39601">4bcec081716f7dc13561724e387853e16bd39601</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sun, 27 Sep 2020 12:28:57 -0700
+
+cmd/livegrep-index-builder: Move repository path construction to Project method
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">cmd/livegrep-index-builder/codehost/BUILD</a></td><td> | </td><td class="num">1</td><td><span class="i">+</span><span class="d"></span></td></tr>
+<tr><td class="A">A</td><td><a href="#h1">cmd/livegrep-index-builder/codehost/project.go</a></td><td> | </td><td class="num">34</td><td><span class="i">++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">cmd/livegrep-index-builder/codehost/types.go</a></td><td> | </td><td class="num">10</td><td><span class="i"></span><span class="d">----------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">cmd/livegrep-index-builder/config.go</a></td><td> | </td><td class="num">2</td><td><span class="i">+</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h4">cmd/livegrep-index-builder/main.go</a></td><td> | </td><td class="num">20</td><td><span class="i">+++++++++++++</span><span class="d">-------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h5">cmd/livegrep-index-builder/vcs.go</a></td><td> | </td><td class="num">31</td><td><span class="i">+++++++++</span><span class="d">----------------------</span></td></tr>
+</table></pre><pre>6 files changed, 58 insertions(+), 40 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/cmd/livegrep-index-builder/codehost/BUILD">cmd/livegrep-index-builder/codehost/BUILD</a> b/<a href="../file/cmd/livegrep-index-builder/codehost/BUILD">cmd/livegrep-index-builder/codehost/BUILD</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -4,6 +4,7 @@ go_library(
+</a>     name = &quot;go_default_library&quot;,
+     srcs = [
+         &quot;gitlab.go&quot;,
+<a href="#h0-0-3" id="h0-0-3" class="i">+        &quot;project.go&quot;,
+</a>         &quot;static.go&quot;,
+         &quot;types.go&quot;,
+     ],
+<b>diff --git a/<a id="h1" href="../file/cmd/livegrep-index-builder/codehost/project.go">cmd/livegrep-index-builder/codehost/project.go</a> b/<a href="../file/cmd/livegrep-index-builder/codehost/project.go">cmd/livegrep-index-builder/codehost/project.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -0,0 +1,34 @@
+</a><a href="#h1-0-0" id="h1-0-0" class="i">+package codehost
+</a><a href="#h1-0-1" id="h1-0-1" class="i">+
+</a><a href="#h1-0-2" id="h1-0-2" class="i">+import (
+</a><a href="#h1-0-3" id="h1-0-3" class="i">+	&quot;crypto/sha256&quot;
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+	&quot;encoding/base64&quot;
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+	&quot;path&quot;
+</a><a href="#h1-0-6" id="h1-0-6" class="i">+)
+</a><a href="#h1-0-7" id="h1-0-7" class="i">+
+</a><a href="#h1-0-8" id="h1-0-8" class="i">+// Project describes a single project returned from the code host backend. It is assumed that there
+</a><a href="#h1-0-9" id="h1-0-9" class="i">+// exists a one-to-one mapping between a project and indexed repository.
+</a><a href="#h1-0-10" id="h1-0-10" class="i">+type Project struct {
+</a><a href="#h1-0-11" id="h1-0-11" class="i">+	Name       string
+</a><a href="#h1-0-12" id="h1-0-12" class="i">+	Revision   string
+</a><a href="#h1-0-13" id="h1-0-13" class="i">+	Remote     string
+</a><a href="#h1-0-14" id="h1-0-14" class="i">+	URLPattern string
+</a><a href="#h1-0-15" id="h1-0-15" class="i">+	Labels     []string
+</a><a href="#h1-0-16" id="h1-0-16" class="i">+}
+</a><a href="#h1-0-17" id="h1-0-17" class="i">+
+</a><a href="#h1-0-18" id="h1-0-18" class="i">+// Checksum returns a string that can be used to uniquely identify the repository storage associated
+</a><a href="#h1-0-19" id="h1-0-19" class="i">+// with this project. It hashes the repository name and remote to generate a filesystem-safe path.
+</a><a href="#h1-0-20" id="h1-0-20" class="i">+func (p *Project) Checksum() string {
+</a><a href="#h1-0-21" id="h1-0-21" class="i">+	hasher := sha256.New()
+</a><a href="#h1-0-22" id="h1-0-22" class="i">+	hasher.Write([]byte(p.Name))
+</a><a href="#h1-0-23" id="h1-0-23" class="i">+	hasher.Write([]byte(p.Remote))
+</a><a href="#h1-0-24" id="h1-0-24" class="i">+	hash := hasher.Sum(nil)
+</a><a href="#h1-0-25" id="h1-0-25" class="i">+
+</a><a href="#h1-0-26" id="h1-0-26" class="i">+	return base64.URLEncoding.EncodeToString(hash)
+</a><a href="#h1-0-27" id="h1-0-27" class="i">+}
+</a><a href="#h1-0-28" id="h1-0-28" class="i">+
+</a><a href="#h1-0-29" id="h1-0-29" class="i">+// Path generates a path on disk from a base root path that would be suitable for storage of this
+</a><a href="#h1-0-30" id="h1-0-30" class="i">+// project&#39;s repository.
+</a><a href="#h1-0-31" id="h1-0-31" class="i">+func (p *Project) RepositoryPath(basePath string) string {
+</a><a href="#h1-0-32" id="h1-0-32" class="i">+	return path.Join(basePath, p.Checksum())
+</a><a href="#h1-0-33" id="h1-0-33" class="i">+}
+</a><b>diff --git a/<a id="h2" href="../file/cmd/livegrep-index-builder/codehost/types.go">cmd/livegrep-index-builder/codehost/types.go</a> b/<a href="../file/cmd/livegrep-index-builder/codehost/types.go">cmd/livegrep-index-builder/codehost/types.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -10,16 +10,6 @@ const (
+</a> // Factory types a function that creates a CodeHost instance given a map of key-value parameters.
+ type Factory func(params map[string]string) (CodeHost, error)
+ 
+<a href="#h2-0-3" id="h2-0-3" class="d">-// Project describes a single project returned from the code host backend. It is assumed that there
+</a><a href="#h2-0-4" id="h2-0-4" class="d">-// exists a one-to-one mapping between a project and indexed repository.
+</a><a href="#h2-0-5" id="h2-0-5" class="d">-type Project struct {
+</a><a href="#h2-0-6" id="h2-0-6" class="d">-	Name       string
+</a><a href="#h2-0-7" id="h2-0-7" class="d">-	Revision   string
+</a><a href="#h2-0-8" id="h2-0-8" class="d">-	Remote     string
+</a><a href="#h2-0-9" id="h2-0-9" class="d">-	URLPattern string
+</a><a href="#h2-0-10" id="h2-0-10" class="d">-	Labels     []string
+</a><a href="#h2-0-11" id="h2-0-11" class="d">-}
+</a><a href="#h2-0-12" id="h2-0-12" class="d">-
+</a> // CodeHost is any backend that can provide a list of Projects.
+ type CodeHost interface {
+ 	// ListProjects retrieves a list of eligible projects for indexing.
+<b>diff --git a/<a id="h3" href="../file/cmd/livegrep-index-builder/config.go">cmd/livegrep-index-builder/config.go</a> b/<a href="../file/cmd/livegrep-index-builder/config.go">cmd/livegrep-index-builder/config.go</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -15,7 +15,7 @@ func indexConfig(name string, repoBasePath string, projects []*codehost.Project)
+</a> 
+ 	for _, project := range projects {
+ 		repo := &amp;pb.RepoSpec{
+<a href="#h3-0-3" id="h3-0-3" class="d">-			Path:      diskRepoPath(repoBasePath, project.Name, project.Remote),
+</a><a href="#h3-0-4" id="h3-0-4" class="i">+			Path:      project.RepositoryPath(repoBasePath),
+</a> 			Name:      project.Name,
+ 			Revisions: []string{fmt.Sprintf(&quot;origin/%s&quot;, project.Revision)},
+ 			Metadata: &amp;pb.Metadata{
+<b>diff --git a/<a id="h4" href="../file/cmd/livegrep-index-builder/main.go">cmd/livegrep-index-builder/main.go</a> b/<a href="../file/cmd/livegrep-index-builder/main.go">cmd/livegrep-index-builder/main.go</a></b>
+<a href="#h4-0" id="h4-0" class="h">@@ -74,18 +74,24 @@ func main() {
+</a> 	for _, project := range projects {
+ 		syncTasks = append(syncTasks, func(project *codehost.Project) taskClosure {
+ 			return func() error {
+<a href="#h4-0-3" id="h4-0-3" class="d">-				log.Printf(&quot;synchronizing repository: name=%s remote=%s&quot;, project.Name, project.Remote)
+</a><a href="#h4-0-4" id="h4-0-4" class="d">-
+</a><a href="#h4-0-5" id="h4-0-5" class="d">-				return syncRepository(project.Name, project.Remote, *flagRepoBasePath, *flagPrivateKeyPath)
+</a><a href="#h4-0-6" id="h4-0-6" class="i">+				log.Printf(
+</a><a href="#h4-0-7" id="h4-0-7" class="i">+					&quot;synchronizing repository: name=%s remote=%s path=%s&quot;,
+</a><a href="#h4-0-8" id="h4-0-8" class="i">+					project.Name,
+</a><a href="#h4-0-9" id="h4-0-9" class="i">+					project.Remote,
+</a><a href="#h4-0-10" id="h4-0-10" class="i">+					project.RepositoryPath(*flagRepoBasePath),
+</a><a href="#h4-0-11" id="h4-0-11" class="i">+				)
+</a><a href="#h4-0-12" id="h4-0-12" class="i">+
+</a><a href="#h4-0-13" id="h4-0-13" class="i">+				err := syncRepository(project, *flagRepoBasePath, *flagPrivateKeyPath)
+</a><a href="#h4-0-14" id="h4-0-14" class="i">+				if err != nil {
+</a><a href="#h4-0-15" id="h4-0-15" class="i">+					log.Printf(&quot;encountered synchronization error: name=%s err=%v&quot;, project.Name, err)
+</a><a href="#h4-0-16" id="h4-0-16" class="i">+				}
+</a><a href="#h4-0-17" id="h4-0-17" class="i">+
+</a><a href="#h4-0-18" id="h4-0-18" class="i">+				return err
+</a> 			}
+ 		}(project))
+ 	}
+ 
+ 	if errs := executeTasks(syncTasks, *flagRepoSyncConcurrency); len(errs) &gt; 0 {
+<a href="#h4-0-24" id="h4-0-24" class="d">-		for _, err := range errs {
+</a><a href="#h4-0-25" id="h4-0-25" class="d">-			log.Printf(&quot;encountered synchronization error: err=%v&quot;, err)
+</a><a href="#h4-0-26" id="h4-0-26" class="d">-		}
+</a><a href="#h4-0-27" id="h4-0-27" class="d">-
+</a> 		panic(fmt.Errorf(&quot;repository synchronization encountered nonzero errors: errs=%d&quot;, len(errs)))
+ 	}
+ 
+<b>diff --git a/<a id="h5" href="../file/cmd/livegrep-index-builder/vcs.go">cmd/livegrep-index-builder/vcs.go</a> b/<a href="../file/cmd/livegrep-index-builder/vcs.go">cmd/livegrep-index-builder/vcs.go</a></b>
+<a href="#h5-0" id="h5-0" class="h">@@ -1,22 +1,21 @@
+</a> package main
+ 
+ import (
+<a href="#h5-0-3" id="h5-0-3" class="d">-	&quot;crypto/sha256&quot;
+</a><a href="#h5-0-4" id="h5-0-4" class="d">-	&quot;encoding/base64&quot;
+</a> 	&quot;io/ioutil&quot;
+<a href="#h5-0-6" id="h5-0-6" class="d">-	&quot;path&quot;
+</a> 
+ 	&quot;golang.org/x/crypto/ssh&quot;
+ 	&quot;gopkg.in/src-d/go-git.v4&quot;
+ 	&quot;gopkg.in/src-d/go-git.v4/plumbing/transport&quot;
+ 	gitssh &quot;gopkg.in/src-d/go-git.v4/plumbing/transport/ssh&quot;
+<a href="#h5-0-12" id="h5-0-12" class="i">+
+</a><a href="#h5-0-13" id="h5-0-13" class="i">+	&quot;github.com/livegrep/livegrep/cmd/livegrep-index-builder/codehost&quot;
+</a> )
+ 
+ // syncRepository clones a new repository or fetches an existing repository on disk.
+<a href="#h5-0-17" id="h5-0-17" class="d">-func syncRepository(name string, remote string, basePath string, keyPath string) error {
+</a><a href="#h5-0-18" id="h5-0-18" class="i">+func syncRepository(project *codehost.Project, basePath string, keyPath string) error {
+</a> 	var auth transport.AuthMethod
+ 
+<a href="#h5-0-21" id="h5-0-21" class="d">-	repoPath := diskRepoPath(basePath, name, remote)
+</a><a href="#h5-0-22" id="h5-0-22" class="i">+	repoPath := project.RepositoryPath(basePath)
+</a> 
+ 	if keyPath != &quot;&quot; {
+ 		sshKey, err := ioutil.ReadFile(keyPath)
+<a href="#h5-1" id="h5-1" class="h">@@ -38,9 +37,9 @@ func syncRepository(name string, remote string, basePath string, keyPath string)
+</a> 	if err == git.ErrRepositoryNotExists {
+ 		cloneOpts := &amp;git.CloneOptions{
+ 			RemoteName: &quot;origin&quot;,
+<a href="#h5-1-3" id="h5-1-3" class="d">-			URL: remote,
+</a><a href="#h5-1-4" id="h5-1-4" class="d">-			Auth: auth,
+</a><a href="#h5-1-5" id="h5-1-5" class="d">-			Depth: 1,
+</a><a href="#h5-1-6" id="h5-1-6" class="i">+			URL:        project.Remote,
+</a><a href="#h5-1-7" id="h5-1-7" class="i">+			Auth:       auth,
+</a><a href="#h5-1-8" id="h5-1-8" class="i">+			Depth:      1,
+</a> 		}
+ 		_, err = git.PlainClone(repoPath, false, cloneOpts)
+ 		return err
+<a href="#h5-2" id="h5-2" class="h">@@ -51,8 +50,8 @@ func syncRepository(name string, remote string, basePath string, keyPath string)
+</a> 	// Otherwise, simply fetch against the existing remote
+ 	fetchOpts := &amp;git.FetchOptions{
+ 		RemoteName: &quot;origin&quot;,
+<a href="#h5-2-3" id="h5-2-3" class="d">-		Auth: auth,
+</a><a href="#h5-2-4" id="h5-2-4" class="d">-		Depth: 1,
+</a><a href="#h5-2-5" id="h5-2-5" class="i">+		Auth:       auth,
+</a><a href="#h5-2-6" id="h5-2-6" class="i">+		Depth:      1,
+</a> 	}
+ 	if err := repo.Fetch(fetchOpts); err != nil {
+ 		if err != git.NoErrAlreadyUpToDate {
+<a href="#h5-3" id="h5-3" class="h">@@ -62,15 +61,3 @@ func syncRepository(name string, remote string, basePath string, keyPath string)
+</a> 
+ 	return nil
+ }
+<a href="#h5-3-3" id="h5-3-3" class="d">-
+</a><a href="#h5-3-4" id="h5-3-4" class="d">-// diskRepoPath generates a path on disk where a repository should be stored. It hashes the
+</a><a href="#h5-3-5" id="h5-3-5" class="d">-// repository name to generate filesystem-safe paths. A single repository can be uniquely identified
+</a><a href="#h5-3-6" id="h5-3-6" class="d">-// by the combination of its name and remote.
+</a><a href="#h5-3-7" id="h5-3-7" class="d">-func diskRepoPath(basePath string, name string, remote string) string {
+</a><a href="#h5-3-8" id="h5-3-8" class="d">-	hasher := sha256.New()
+</a><a href="#h5-3-9" id="h5-3-9" class="d">-	hasher.Write([]byte(name))
+</a><a href="#h5-3-10" id="h5-3-10" class="d">-	hasher.Write([]byte(remote))
+</a><a href="#h5-3-11" id="h5-3-11" class="d">-	hash := hasher.Sum(nil)
+</a><a href="#h5-3-12" id="h5-3-12" class="d">-
+</a><a href="#h5-3-13" id="h5-3-13" class="d">-	return path.Join(basePath, base64.URLEncoding.EncodeToString(hash))
+</a><a href="#h5-3-14" id="h5-3-14" class="d">-}
+</a></pre>
+</div>
+</body>
+</html>

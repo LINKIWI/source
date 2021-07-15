@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>refactor: share url construction logic - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/1266cfa830db11a06df8cec2e1aea1fc47eafbcc">1266cfa830db11a06df8cec2e1aea1fc47eafbcc</a>
+<b>parent</b> <a href="../commit/6f85e90af84622725d94443beecb0de3c73b499d">6f85e90af84622725d94443beecb0de3c73b499d</a>
+<b>Author:</b> Josiah Boning &lt;<a href="mailto:josiah@dropbox.com">josiah@dropbox.com</a>&gt;
+<b>Date:</b>   Fri, 25 Aug 2017 01:03:18 +0000
+
+refactor: share url construction logic
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">web/htdocs/assets/js/codesearch_ui.js</a></td><td> | </td><td class="num">108</td><td><span class="i">++++++++++++++++++++++++++++++++</span><span class="d">-----------------------------------------------</span></td></tr>
+</table></pre><pre>1 file changed, 43 insertions(+), 65 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/web/htdocs/assets/js/codesearch_ui.js">web/htdocs/assets/js/codesearch_ui.js</a> b/<a href="../file/web/htdocs/assets/js/codesearch_ui.js">web/htdocs/assets/js/codesearch_ui.js</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -47,6 +47,45 @@ function shorten(ref) {
+</a>   return ref;
+ }
+ 
+<a href="#h0-0-3" id="h0-0-3" class="i">+function url(tree, version, path, lno) {
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+  if (tree in CodesearchUI.intervalViewRepos) {
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+    return internalUrl(tree, path, lno);
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+  } else {
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+    return externalUrl(tree, version, path, lno);
+</a><a href="#h0-0-8" id="h0-0-8" class="i">+  }
+</a><a href="#h0-0-9" id="h0-0-9" class="i">+}
+</a><a href="#h0-0-10" id="h0-0-10" class="i">+
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+function internalUrl(tree, path, lno) {
+</a><a href="#h0-0-12" id="h0-0-12" class="i">+  var url = &quot;/view/&quot; + tree + &quot;/&quot; + path;
+</a><a href="#h0-0-13" id="h0-0-13" class="i">+  if (lno !== undefined) {
+</a><a href="#h0-0-14" id="h0-0-14" class="i">+    url += &quot;#L&quot; + lno;
+</a><a href="#h0-0-15" id="h0-0-15" class="i">+  }
+</a><a href="#h0-0-16" id="h0-0-16" class="i">+  return url;
+</a><a href="#h0-0-17" id="h0-0-17" class="i">+}
+</a><a href="#h0-0-18" id="h0-0-18" class="i">+
+</a><a href="#h0-0-19" id="h0-0-19" class="i">+function externalUrl(tree, version, path, lno) {
+</a><a href="#h0-0-20" id="h0-0-20" class="i">+  var backend = Codesearch.in_flight.backend;
+</a><a href="#h0-0-21" id="h0-0-21" class="i">+  var repo_map = CodesearchUI.repo_urls[backend];
+</a><a href="#h0-0-22" id="h0-0-22" class="i">+  if (!repo_map) {
+</a><a href="#h0-0-23" id="h0-0-23" class="i">+    return null;
+</a><a href="#h0-0-24" id="h0-0-24" class="i">+  }
+</a><a href="#h0-0-25" id="h0-0-25" class="i">+  if (!repo_map[tree]) {
+</a><a href="#h0-0-26" id="h0-0-26" class="i">+    return null;
+</a><a href="#h0-0-27" id="h0-0-27" class="i">+  }
+</a><a href="#h0-0-28" id="h0-0-28" class="i">+
+</a><a href="#h0-0-29" id="h0-0-29" class="i">+  if (lno === undefined) {
+</a><a href="#h0-0-30" id="h0-0-30" class="i">+      lno = 1;
+</a><a href="#h0-0-31" id="h0-0-31" class="i">+  }
+</a><a href="#h0-0-32" id="h0-0-32" class="i">+
+</a><a href="#h0-0-33" id="h0-0-33" class="i">+  // the order of these replacements is used to minimize conflicts
+</a><a href="#h0-0-34" id="h0-0-34" class="i">+  var url = repo_map[tree];
+</a><a href="#h0-0-35" id="h0-0-35" class="i">+  url = url.replace(&#39;{lno}&#39;, lno);
+</a><a href="#h0-0-36" id="h0-0-36" class="i">+  url = url.replace(&#39;{version}&#39;, shorten(version));
+</a><a href="#h0-0-37" id="h0-0-37" class="i">+  url = url.replace(&#39;{name}&#39;, tree);
+</a><a href="#h0-0-38" id="h0-0-38" class="i">+  url = url.replace(&#39;{path}&#39;, path);
+</a><a href="#h0-0-39" id="h0-0-39" class="i">+  return url;
+</a><a href="#h0-0-40" id="h0-0-40" class="i">+}
+</a><a href="#h0-0-41" id="h0-0-41" class="i">+
+</a> var MatchView = Backbone.View.extend({
+   tagName: &#39;div&#39;,
+   initialize: function() {
+<a href="#h0-1" id="h0-1" class="h">@@ -130,41 +169,11 @@ var Match = Backbone.Model.extend({
+</a>   },
+ 
+   url: function(lno) {
+<a href="#h0-1-3" id="h0-1-3" class="d">-    if (this.get(&#39;tree&#39;) in CodesearchUI.intervalViewRepos) {
+</a><a href="#h0-1-4" id="h0-1-4" class="d">-      return this.internalUrl(lno);
+</a><a href="#h0-1-5" id="h0-1-5" class="d">-    } else {
+</a><a href="#h0-1-6" id="h0-1-6" class="d">-      return this.externalUrl(lno);
+</a><a href="#h0-1-7" id="h0-1-7" class="d">-    }
+</a><a href="#h0-1-8" id="h0-1-8" class="d">-  },
+</a><a href="#h0-1-9" id="h0-1-9" class="d">-  internalUrl: function(lno) {
+</a><a href="#h0-1-10" id="h0-1-10" class="d">-    return &quot;/view/&quot; + this.get(&#39;tree&#39;) + &quot;/&quot; + this.get(&#39;path&#39;) + &quot;#L&quot; + this.get(&#39;lno&#39;);
+</a><a href="#h0-1-11" id="h0-1-11" class="d">-  },
+</a><a href="#h0-1-12" id="h0-1-12" class="d">-  externalUrl: function(lno) {
+</a><a href="#h0-1-13" id="h0-1-13" class="d">-    var name = this.get(&#39;tree&#39;);
+</a><a href="#h0-1-14" id="h0-1-14" class="d">-    var ref = this.get(&#39;version&#39;);
+</a><a href="#h0-1-15" id="h0-1-15" class="d">-
+</a><a href="#h0-1-16" id="h0-1-16" class="d">-    var repo_map;
+</a><a href="#h0-1-17" id="h0-1-17" class="d">-    var backend = Codesearch.in_flight.backend;
+</a><a href="#h0-1-18" id="h0-1-18" class="d">-    repo_map = CodesearchUI.repo_urls[backend];
+</a><a href="#h0-1-19" id="h0-1-19" class="d">-    if (!repo_map) {
+</a><a href="#h0-1-20" id="h0-1-20" class="d">-      return null;
+</a><a href="#h0-1-21" id="h0-1-21" class="d">-    }
+</a><a href="#h0-1-22" id="h0-1-22" class="d">-    if (!repo_map[name]) {
+</a><a href="#h0-1-23" id="h0-1-23" class="d">-      return null;
+</a><a href="#h0-1-24" id="h0-1-24" class="d">-    }
+</a><a href="#h0-1-25" id="h0-1-25" class="d">-
+</a>     if (lno === undefined) {
+<a href="#h0-1-27" id="h0-1-27" class="d">-        lno = this.get(&#39;lno&#39;);
+</a><a href="#h0-1-28" id="h0-1-28" class="i">+      lno = this.get(&#39;lno&#39;);
+</a>     }
+<a href="#h0-1-30" id="h0-1-30" class="d">-
+</a><a href="#h0-1-31" id="h0-1-31" class="d">-    // the order of these replacements is used to minimize conflicts
+</a><a href="#h0-1-32" id="h0-1-32" class="d">-    var url = repo_map[name];
+</a><a href="#h0-1-33" id="h0-1-33" class="d">-    url = url.replace(&#39;{lno}&#39;, lno);
+</a><a href="#h0-1-34" id="h0-1-34" class="d">-    url = url.replace(&#39;{version}&#39;, shorten(ref));
+</a><a href="#h0-1-35" id="h0-1-35" class="d">-    url = url.replace(&#39;{name}&#39;, name);
+</a><a href="#h0-1-36" id="h0-1-36" class="d">-    url = url.replace(&#39;{path}&#39;, this.get(&#39;path&#39;));
+</a><a href="#h0-1-37" id="h0-1-37" class="d">-    return url;
+</a><a href="#h0-1-38" id="h0-1-38" class="d">-  }
+</a><a href="#h0-1-39" id="h0-1-39" class="i">+    return url(this.get(&#39;tree&#39;), this.get(&#39;version&#39;), this.get(&#39;path&#39;), lno);
+</a><a href="#h0-1-40" id="h0-1-40" class="i">+  },
+</a> });
+ 
+ /** A set of Matches at a single path. */
+<a href="#h0-2" id="h0-2" class="h">@@ -272,39 +281,8 @@ var FileMatch = Backbone.Model.extend({
+</a>   },
+ 
+   url: function() {
+<a href="#h0-2-3" id="h0-2-3" class="d">-    if (this.get(&#39;tree&#39;) in CodesearchUI.intervalViewRepos) {
+</a><a href="#h0-2-4" id="h0-2-4" class="d">-      return this.internalUrl();
+</a><a href="#h0-2-5" id="h0-2-5" class="d">-    } else {
+</a><a href="#h0-2-6" id="h0-2-6" class="d">-      return this.externalUrl();
+</a><a href="#h0-2-7" id="h0-2-7" class="d">-    }
+</a><a href="#h0-2-8" id="h0-2-8" class="d">-  },
+</a><a href="#h0-2-9" id="h0-2-9" class="d">-  internalUrl: function() {
+</a><a href="#h0-2-10" id="h0-2-10" class="d">-    return &quot;/view/&quot; + this.get(&#39;tree&#39;) + &quot;/&quot; + this.get(&#39;path&#39;);
+</a><a href="#h0-2-11" id="h0-2-11" class="i">+    return url(this.get(&#39;tree&#39;), this.get(&#39;version&#39;), this.get(&#39;path&#39;));
+</a>   },
+<a href="#h0-2-13" id="h0-2-13" class="d">-  externalUrl: function() {
+</a><a href="#h0-2-14" id="h0-2-14" class="d">-    var name = this.get(&#39;tree&#39;);
+</a><a href="#h0-2-15" id="h0-2-15" class="d">-    var ref = this.get(&#39;version&#39;);
+</a><a href="#h0-2-16" id="h0-2-16" class="d">-
+</a><a href="#h0-2-17" id="h0-2-17" class="d">-    var repo_map;
+</a><a href="#h0-2-18" id="h0-2-18" class="d">-    var backend = Codesearch.in_flight.backend;
+</a><a href="#h0-2-19" id="h0-2-19" class="d">-    repo_map = CodesearchUI.repo_urls[backend];
+</a><a href="#h0-2-20" id="h0-2-20" class="d">-    if (!repo_map) {
+</a><a href="#h0-2-21" id="h0-2-21" class="d">-      return null;
+</a><a href="#h0-2-22" id="h0-2-22" class="d">-    }
+</a><a href="#h0-2-23" id="h0-2-23" class="d">-    if (!repo_map[name]) {
+</a><a href="#h0-2-24" id="h0-2-24" class="d">-      return null;
+</a><a href="#h0-2-25" id="h0-2-25" class="d">-    }
+</a><a href="#h0-2-26" id="h0-2-26" class="d">-
+</a><a href="#h0-2-27" id="h0-2-27" class="d">-    var lno = 1;
+</a><a href="#h0-2-28" id="h0-2-28" class="d">-
+</a><a href="#h0-2-29" id="h0-2-29" class="d">-    // the order of these replacements is used to minimize conflicts
+</a><a href="#h0-2-30" id="h0-2-30" class="d">-    var url = repo_map[name];
+</a><a href="#h0-2-31" id="h0-2-31" class="d">-    url = url.replace(&#39;{lno}&#39;, lno);
+</a><a href="#h0-2-32" id="h0-2-32" class="d">-    url = url.replace(&#39;{version}&#39;, shorten(ref));
+</a><a href="#h0-2-33" id="h0-2-33" class="d">-    url = url.replace(&#39;{name}&#39;, name);
+</a><a href="#h0-2-34" id="h0-2-34" class="d">-    url = url.replace(&#39;{path}&#39;, this.get(&#39;path&#39;));
+</a><a href="#h0-2-35" id="h0-2-35" class="d">-    return url;
+</a><a href="#h0-2-36" id="h0-2-36" class="d">-  }
+</a> });
+ 
+ var FileMatchView = Backbone.View.extend({
+</pre>
+</div>
+</body>
+</html>

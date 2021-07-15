@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>If a tag index is provided, search it first - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a>
+<b>parent</b> <a href="../commit/e0017e5ca345fe5354186ca30c08d7d302db783e">e0017e5ca345fe5354186ca30c08d7d302db783e</a>
+<b>Author:</b> Brandon Rhodes &lt;<a href="mailto:brhodes@dropbox.com">brhodes@dropbox.com</a>&gt;
+<b>Date:</b>   Thu,  5 Oct 2017 18:02:26 +0000
+
+If a tag index is provided, search it first
+
+On the assumption that tagged lines have greater semantic weight than
+other lines that match the user’s search, let’s power a search by
+consulting the tags index first then falling back to the main index.
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">src/codesearch.cc</a></td><td> | </td><td class="num">9</td><td><span class="i">+</span><span class="d">--------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">src/codesearch.h</a></td><td> | </td><td class="num">14</td><td><span class="i">+++++++</span><span class="d">-------</span></td></tr>
+<tr><td class="D">D</td><td><a href="#h2">src/proto/go_proto</a></td><td> | </td><td class="num">2</td><td><span class="i"></span><span class="d">--</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">src/tagsearch.cc</a></td><td> | </td><td class="num">36</td><td><span class="i">+++++++++++++++++++++++++++</span><span class="d">---------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h4">src/tools/grpc_server.cc</a></td><td> | </td><td class="num">141</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">---------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h5">web/src/codesearch/codesearch_ui.js</a></td><td> | </td><td class="num">4</td><td><span class="i"></span><span class="d">----</span></td></tr>
+</table></pre><pre>6 files changed, 149 insertions(+), 57 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/src/codesearch.cc">src/codesearch.cc</a> b/<a href="../file/src/codesearch.cc">src/codesearch.cc</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -52,7 +52,6 @@ DEFINE_bool(index, true, &quot;Create a suffix-array index to speed searches.&quot;);
+</a> DEFINE_bool(compress, true, &quot;Compress file contents linewise&quot;);
+ DEFINE_bool(drop_cache, false, &quot;Drop caches before each search&quot;);
+ DEFINE_bool(search, true, &quot;Actually do the search.&quot;);
+<a href="#h0-0-3" id="h0-0-3" class="d">-DEFINE_int32(max_matches, 50, &quot;The default maximum number of results to return for a single query.&quot;);
+</a> DEFINE_int32(timeout, 1000, &quot;The number of milliseconds a single search may run for.&quot;);
+ DEFINE_int32(threads, 4, &quot;Number of threads to use.&quot;);
+ DEFINE_int32(line_limit, 1024, &quot;Maximum line length to index.&quot;);
+<a href="#h0-1" id="h0-1" class="h">@@ -112,13 +111,7 @@ const StringPiece empty_string(NULL, 0);
+</a> 
+ class search_limiter {
+ public:
+<a href="#h0-1-3" id="h0-1-3" class="d">-    search_limiter(int query_max_matches) : matches_(0), exit_reason_(kExitNone) {
+</a><a href="#h0-1-4" id="h0-1-4" class="d">-        if (FLAGS_max_matches &amp;&amp; !query_max_matches) {
+</a><a href="#h0-1-5" id="h0-1-5" class="d">-            max_matches_ = FLAGS_max_matches;
+</a><a href="#h0-1-6" id="h0-1-6" class="d">-        } else {
+</a><a href="#h0-1-7" id="h0-1-7" class="d">-            max_matches_ = query_max_matches;
+</a><a href="#h0-1-8" id="h0-1-8" class="d">-        }
+</a><a href="#h0-1-9" id="h0-1-9" class="d">-
+</a><a href="#h0-1-10" id="h0-1-10" class="i">+    search_limiter(int query_max_matches) : matches_(0), max_matches_(query_max_matches), exit_reason_(kExitNone) {
+</a>         if (FLAGS_timeout &lt;= 0) {
+             deadline_.tv_sec = numeric_limits&lt;time_t&gt;::max();
+         } else {
+<b>diff --git a/<a id="h1" href="../file/src/codesearch.h">src/codesearch.h</a> b/<a href="../file/src/codesearch.h">src/codesearch.h</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -127,14 +127,14 @@ struct query {
+</a>     std::string trace_id;
+     int32_t max_matches;
+ 
+<a href="#h1-0-3" id="h1-0-3" class="d">-    std::unique_ptr&lt;RE2&gt; line_pat;
+</a><a href="#h1-0-4" id="h1-0-4" class="d">-    std::unique_ptr&lt;RE2&gt; file_pat;
+</a><a href="#h1-0-5" id="h1-0-5" class="d">-    std::unique_ptr&lt;RE2&gt; tree_pat;
+</a><a href="#h1-0-6" id="h1-0-6" class="d">-    std::unique_ptr&lt;RE2&gt; tags_pat;
+</a><a href="#h1-0-7" id="h1-0-7" class="i">+    std::shared_ptr&lt;RE2&gt; line_pat;
+</a><a href="#h1-0-8" id="h1-0-8" class="i">+    std::shared_ptr&lt;RE2&gt; file_pat;
+</a><a href="#h1-0-9" id="h1-0-9" class="i">+    std::shared_ptr&lt;RE2&gt; tree_pat;
+</a><a href="#h1-0-10" id="h1-0-10" class="i">+    std::shared_ptr&lt;RE2&gt; tags_pat;
+</a>     struct {
+<a href="#h1-0-12" id="h1-0-12" class="d">-        std::unique_ptr&lt;RE2&gt; file_pat;
+</a><a href="#h1-0-13" id="h1-0-13" class="d">-        std::unique_ptr&lt;RE2&gt; tree_pat;
+</a><a href="#h1-0-14" id="h1-0-14" class="d">-        std::unique_ptr&lt;RE2&gt; tags_pat;
+</a><a href="#h1-0-15" id="h1-0-15" class="i">+        std::shared_ptr&lt;RE2&gt; file_pat;
+</a><a href="#h1-0-16" id="h1-0-16" class="i">+        std::shared_ptr&lt;RE2&gt; tree_pat;
+</a><a href="#h1-0-17" id="h1-0-17" class="i">+        std::shared_ptr&lt;RE2&gt; tags_pat;
+</a>     } negate;
+ 
+     bool filename_only;
+<b>diff --git a/<a id="h2" href="../file/src/proto/go_proto">src/proto/go_proto</a> b/<a href="../file/src/proto/go_proto">src/proto/go_proto</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -1 +0,0 @@
+</a><a href="#h2-0-0" id="h2-0-0" class="d">-../../bazel-genfiles/src/proto
+</a><a href="#h2-0-1" id="h2-0-1" class="d">-\ No newline at end of file
+</a><b>diff --git a/<a id="h3" href="../file/src/tagsearch.cc">src/tagsearch.cc</a> b/<a href="../file/src/tagsearch.cc">src/tagsearch.cc</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -18,21 +18,21 @@ using boost::filesystem::path;
+</a> 
+ namespace {
+ 
+<a href="#h3-0-3" id="h3-0-3" class="d">-std::string create_partial_regex(RE2 *re, const char *wildstar) {
+</a><a href="#h3-0-4" id="h3-0-4" class="i">+std::string create_partial_regex(RE2 *re, const char *wildchar) {
+</a>     if (!re)
+<a href="#h3-0-6" id="h3-0-6" class="d">-        return wildstar;
+</a><a href="#h3-0-7" id="h3-0-7" class="i">+        return std::string(wildchar) + &quot;+&quot;;
+</a> 
+     std::string pattern = re-&gt;pattern();
+ 
+     if (pattern.front() == &#39;^&#39;)
+<a href="#h3-0-12" id="h3-0-12" class="d">-        pattern.erase(pattern.begin());
+</a><a href="#h3-0-13" id="h3-0-13" class="i">+        pattern.erase(0, 1);
+</a>     else
+<a href="#h3-0-15" id="h3-0-15" class="d">-        pattern.insert(0, wildstar);
+</a><a href="#h3-0-16" id="h3-0-16" class="i">+        pattern.insert(0, std::string(wildchar) + &quot;*&quot;);
+</a> 
+     if (pattern.back() == &#39;$&#39;)
+         pattern.erase(pattern.size() - 1);
+     else
+<a href="#h3-0-21" id="h3-0-21" class="d">-        pattern.append(wildstar);
+</a><a href="#h3-0-22" id="h3-0-22" class="i">+        pattern.append(std::string(wildchar) + &quot;*&quot;);
+</a> 
+     return pattern;
+ }
+<a href="#h3-1" id="h3-1" class="h">@@ -124,8 +124,26 @@ bool tag_searcher::transform(query *q, match_result *m) const {
+</a> }
+ 
+ std::string tag_searcher::create_tag_line_regex_from_query(query *q) {
+<a href="#h3-1-3" id="h3-1-3" class="d">-    return create_tag_line_regex(create_partial_regex(q-&gt;line_pat.get(), &quot;[^\t]*&quot;),
+</a><a href="#h3-1-4" id="h3-1-4" class="d">-                                 create_partial_regex(q-&gt;file_pat.get(), &quot;[^\t]*&quot;),
+</a><a href="#h3-1-5" id="h3-1-5" class="d">-                                 &quot;\\d+&quot;,
+</a><a href="#h3-1-6" id="h3-1-6" class="d">-                                 create_partial_regex(q-&gt;tags_pat.get(), &quot;.*&quot;));
+</a><a href="#h3-1-7" id="h3-1-7" class="i">+    /* To make tag searches as efficient as possible, we return a
+</a><a href="#h3-1-8" id="h3-1-8" class="i">+       pattern that is only as long as it needs to be to specify all of
+</a><a href="#h3-1-9" id="h3-1-9" class="i">+       the query constraints.  In particular, it used to be a minor
+</a><a href="#h3-1-10" id="h3-1-10" class="i">+       disaster that a simple tags search for a 2-letter string like
+</a><a href="#h3-1-11" id="h3-1-11" class="i">+       &quot;Ab&quot; produced an RE that also contained the substring &quot;;\&quot;\t&quot;,
+</a><a href="#h3-1-12" id="h3-1-12" class="i">+       because that 3-character substring was more attractive to the
+</a><a href="#h3-1-13" id="h3-1-13" class="i">+       indexing logic than the 2-character pattern &quot;Ab&quot; but, alas, those
+</a><a href="#h3-1-14" id="h3-1-14" class="i">+       3 characters appeared in every single line of the tags file and
+</a><a href="#h3-1-15" id="h3-1-15" class="i">+       were therefore worthless for reducing the search space. */
+</a><a href="#h3-1-16" id="h3-1-16" class="i">+    std::string regex(&quot;^&quot;);
+</a><a href="#h3-1-17" id="h3-1-17" class="i">+    regex += create_partial_regex(q-&gt;line_pat.get(), &quot;[^\t]&quot;);
+</a><a href="#h3-1-18" id="h3-1-18" class="i">+    regex += &quot;\t&quot;;
+</a><a href="#h3-1-19" id="h3-1-19" class="i">+    if (q-&gt;file_pat || q-&gt;tags_pat) {
+</a><a href="#h3-1-20" id="h3-1-20" class="i">+        regex += create_partial_regex(q-&gt;file_pat.get(), &quot;[^\t]&quot;);
+</a><a href="#h3-1-21" id="h3-1-21" class="i">+        regex += &quot;\t&quot;;
+</a><a href="#h3-1-22" id="h3-1-22" class="i">+        if (q-&gt;tags_pat) {
+</a><a href="#h3-1-23" id="h3-1-23" class="i">+            regex += &quot;\\d+;\&quot;\t&quot;;
+</a><a href="#h3-1-24" id="h3-1-24" class="i">+            regex += create_partial_regex(q-&gt;tags_pat.get(), &quot;.&quot;);
+</a><a href="#h3-1-25" id="h3-1-25" class="i">+            regex += &quot;$&quot;;
+</a><a href="#h3-1-26" id="h3-1-26" class="i">+        }
+</a><a href="#h3-1-27" id="h3-1-27" class="i">+    }
+</a><a href="#h3-1-28" id="h3-1-28" class="i">+    return regex;
+</a> }
+<b>diff --git a/<a id="h4" href="../file/src/tools/grpc_server.cc">src/tools/grpc_server.cc</a> b/<a href="../file/src/tools/grpc_server.cc">src/tools/grpc_server.cc</a></b>
+<a href="#h4-0" id="h4-0" class="h">@@ -8,6 +8,7 @@
+</a> #include &quot;src/tools/limits.h&quot;
+ #include &quot;src/tools/grpc_server.h&quot;
+ 
+<a href="#h4-0-3" id="h4-0-3" class="i">+#include &quot;gflags/gflags.h&quot;
+</a> #include &lt;json-c/json.h&gt;
+ 
+ #include &lt;algorithm&gt;
+<a href="#h4-1" id="h4-1" class="h">@@ -24,6 +25,8 @@ using grpc::StatusCode;
+</a> 
+ using std::string;
+ 
+<a href="#h4-1-3" id="h4-1-3" class="i">+DEFINE_int32(max_matches, 50, &quot;The default maximum number of matches to return for a single query.&quot;);
+</a><a href="#h4-1-4" id="h4-1-4" class="i">+
+</a> class CodeSearchImpl final : public CodeSearch::Service {
+  public:
+     explicit CodeSearchImpl(code_searcher *cs, code_searcher *tagdata, std::promise&lt;void&gt; *reload_request);
+<a href="#h4-2" id="h4-2" class="h">@@ -106,12 +109,12 @@ Status CodeSearchImpl::Info(ServerContext* context, const ::InfoRequest* request
+</a>     return Status::OK;
+ }
+ 
+<a href="#h4-2-3" id="h4-2-3" class="d">-Status extract_regex(std::unique_ptr&lt;RE2&gt; *out,
+</a><a href="#h4-2-4" id="h4-2-4" class="i">+Status extract_regex(std::shared_ptr&lt;RE2&gt; *out,
+</a>                      const std::string &amp;label,
+                      const std::string &amp;input,
+                      bool case_sensitive) {
+     if (input.empty()) {
+<a href="#h4-2-9" id="h4-2-9" class="d">-        out-&gt;reset(nullptr);
+</a><a href="#h4-2-10" id="h4-2-10" class="i">+        out-&gt;reset();
+</a>         return Status::OK;
+     }
+ 
+<a href="#h4-3" id="h4-3" class="h">@@ -119,7 +122,7 @@ Status extract_regex(std::unique_ptr&lt;RE2&gt; *out,
+</a>     default_re2_options(opts);
+     opts.set_case_sensitive(case_sensitive);
+ 
+<a href="#h4-3-3" id="h4-3-3" class="d">-    std::unique_ptr&lt;RE2&gt; re(new RE2(input, opts));
+</a><a href="#h4-3-4" id="h4-3-4" class="i">+    std::shared_ptr&lt;RE2&gt; re(new RE2(input, opts));
+</a>     if (!re-&gt;ok()) {
+         return Status(StatusCode::INVALID_ARGUMENT, label + &quot;: &quot; + re-&gt;error());
+     }
+<a href="#h4-4" id="h4-4" class="h">@@ -127,11 +130,11 @@ Status extract_regex(std::unique_ptr&lt;RE2&gt; *out,
+</a>     return Status::OK;
+ }
+ 
+<a href="#h4-4-3" id="h4-4-3" class="d">-Status extract_regex(std::unique_ptr&lt;RE2&gt; *out,
+</a><a href="#h4-4-4" id="h4-4-4" class="i">+Status extract_regex(std::shared_ptr&lt;RE2&gt; *out,
+</a>                      const std::string &amp;label,
+                      const std::string &amp;input) {
+     if (input.empty()) {
+<a href="#h4-4-8" id="h4-4-8" class="d">-        out-&gt;reset(nullptr);
+</a><a href="#h4-4-9" id="h4-4-9" class="i">+        out-&gt;reset();
+</a>         return Status::OK;
+     }
+     bool case_sensitive = std::any_of(input.begin(), input.end(), isupper);
+<a href="#h4-5" id="h4-5" class="h">@@ -159,9 +162,31 @@ Status parse_query(query *q, const ::Query* request, ::CodeSearchResult* respons
+</a> 
+ class add_match {
+ public:
+<a href="#h4-5-3" id="h4-5-3" class="d">-    add_match(CodeSearchResult* response) : response_(response) {}
+</a><a href="#h4-5-4" id="h4-5-4" class="i">+    typedef std::set&lt;std::string&gt; line_set;
+</a><a href="#h4-5-5" id="h4-5-5" class="i">+
+</a><a href="#h4-5-6" id="h4-5-6" class="i">+    add_match(CodeSearchResult* response)
+</a><a href="#h4-5-7" id="h4-5-7" class="i">+        : unique_lines_(NULL), response_(response) {}
+</a><a href="#h4-5-8" id="h4-5-8" class="i">+
+</a><a href="#h4-5-9" id="h4-5-9" class="i">+    add_match(line_set* unique_lines, CodeSearchResult* response)
+</a><a href="#h4-5-10" id="h4-5-10" class="i">+        : unique_lines_(unique_lines), response_(response) {}
+</a><a href="#h4-5-11" id="h4-5-11" class="i">+
+</a><a href="#h4-5-12" id="h4-5-12" class="i">+    int match_count() {
+</a><a href="#h4-5-13" id="h4-5-13" class="i">+        return response_-&gt;results_size();
+</a><a href="#h4-5-14" id="h4-5-14" class="i">+    }
+</a> 
+     void operator()(const match_result *m) const {
+<a href="#h4-5-17" id="h4-5-17" class="i">+        if (unique_lines_ != NULL) {
+</a><a href="#h4-5-18" id="h4-5-18" class="i">+            // Avoid a duplicate if a line is returned once from the
+</a><a href="#h4-5-19" id="h4-5-19" class="i">+            // tags search then again during the main corpus search.
+</a><a href="#h4-5-20" id="h4-5-20" class="i">+            std::string key = std::string(m-&gt;file-&gt;tree-&gt;name)
+</a><a href="#h4-5-21" id="h4-5-21" class="i">+              + &quot; &quot; + std::string(m-&gt;file-&gt;tree-&gt;version)
+</a><a href="#h4-5-22" id="h4-5-22" class="i">+              + &quot; &quot; + std::string(m-&gt;file-&gt;path)
+</a><a href="#h4-5-23" id="h4-5-23" class="i">+              + &quot; &quot; + std::to_string(m-&gt;lno);
+</a><a href="#h4-5-24" id="h4-5-24" class="i">+            bool was_inserted = unique_lines_-&gt;insert(key).second;
+</a><a href="#h4-5-25" id="h4-5-25" class="i">+            if (!was_inserted)
+</a><a href="#h4-5-26" id="h4-5-26" class="i">+                return;
+</a><a href="#h4-5-27" id="h4-5-27" class="i">+        }
+</a><a href="#h4-5-28" id="h4-5-28" class="i">+
+</a>         auto result = response_-&gt;add_results();
+         result-&gt;set_tree(m-&gt;file-&gt;tree-&gt;name);
+         result-&gt;set_version(m-&gt;file-&gt;tree-&gt;version);
+<a href="#h4-6" id="h4-6" class="h">@@ -189,10 +214,37 @@ public:
+</a>     }
+ 
+ private:
+<a href="#h4-6-3" id="h4-6-3" class="i">+    line_set* unique_lines_;
+</a>     CodeSearchResult* response_;
+ };
+ 
+<a href="#h4-6-7" id="h4-6-7" class="d">-static std::string pat(const std::unique_ptr&lt;RE2&gt; &amp;p) {
+</a><a href="#h4-6-8" id="h4-6-8" class="i">+static void run_tags_search(const query&amp; main_query, code_searcher *tagdata,
+</a><a href="#h4-6-9" id="h4-6-9" class="i">+                            add_match&amp; cb, tag_searcher* searcher,
+</a><a href="#h4-6-10" id="h4-6-10" class="i">+                            match_stats&amp; stats) {
+</a><a href="#h4-6-11" id="h4-6-11" class="i">+    // copy of the query we can modify without altering the caller&#39;s copy
+</a><a href="#h4-6-12" id="h4-6-12" class="i">+    query q = main_query;
+</a><a href="#h4-6-13" id="h4-6-13" class="i">+
+</a><a href="#h4-6-14" id="h4-6-14" class="i">+    // the negation constraints will be checked when we transform the match
+</a><a href="#h4-6-15" id="h4-6-15" class="i">+    // (unfortunately, we can&#39;t construct a line query that checks these)
+</a><a href="#h4-6-16" id="h4-6-16" class="i">+    query constraints;
+</a><a href="#h4-6-17" id="h4-6-17" class="i">+    constraints.negate.file_pat.swap(q.negate.file_pat);
+</a><a href="#h4-6-18" id="h4-6-18" class="i">+    constraints.negate.tags_pat.swap(q.negate.tags_pat);
+</a><a href="#h4-6-19" id="h4-6-19" class="i">+
+</a><a href="#h4-6-20" id="h4-6-20" class="i">+    // modify the line pattern to match the constraints that we can handle now
+</a><a href="#h4-6-21" id="h4-6-21" class="i">+    std::string regex = tag_searcher::create_tag_line_regex_from_query(&amp;q);
+</a><a href="#h4-6-22" id="h4-6-22" class="i">+    q.line_pat.reset(new RE2(regex, q.line_pat-&gt;options()));
+</a><a href="#h4-6-23" id="h4-6-23" class="i">+    q.file_pat.reset();
+</a><a href="#h4-6-24" id="h4-6-24" class="i">+    q.tags_pat.reset();
+</a><a href="#h4-6-25" id="h4-6-25" class="i">+
+</a><a href="#h4-6-26" id="h4-6-26" class="i">+    code_searcher::search_thread search(tagdata);
+</a><a href="#h4-6-27" id="h4-6-27" class="i">+    search.match(q,
+</a><a href="#h4-6-28" id="h4-6-28" class="i">+                 cb,
+</a><a href="#h4-6-29" id="h4-6-29" class="i">+                 cb,
+</a><a href="#h4-6-30" id="h4-6-30" class="i">+                 boost::bind(&amp;tag_searcher::transform, searcher, &amp;constraints, _1),
+</a><a href="#h4-6-31" id="h4-6-31" class="i">+                 &amp;stats);
+</a><a href="#h4-6-32" id="h4-6-32" class="i">+}
+</a><a href="#h4-6-33" id="h4-6-33" class="i">+
+</a><a href="#h4-6-34" id="h4-6-34" class="i">+static std::string pat(const std::shared_ptr&lt;RE2&gt; &amp;p) {
+</a>     if (p.get() == 0)
+         return &quot;&quot;;
+     return p-&gt;pattern();
+<a href="#h4-7" id="h4-7" class="h">@@ -210,7 +262,10 @@ Status CodeSearchImpl::Search(ServerContext* context, const ::Query* request, ::
+</a>         return st;
+ 
+     q.trace_id = current_trace_id();
+<a href="#h4-7-3" id="h4-7-3" class="i">+
+</a>     q.max_matches = request-&gt;max_matches();
+<a href="#h4-7-5" id="h4-7-5" class="i">+    if (q.max_matches &lt;= 0 &amp;&amp; FLAGS_max_matches)
+</a><a href="#h4-7-6" id="h4-7-6" class="i">+        q.max_matches = FLAGS_max_matches;
+</a> 
+     log(q.trace_id,
+         &quot;processing query line=&#39;%s&#39; file=&#39;%s&#39; tree=&#39;%s&#39; tags=&#39;%s&#39; &quot;
+<a href="#h4-8" id="h4-8" class="h">@@ -235,8 +290,58 @@ Status CodeSearchImpl::Search(ServerContext* context, const ::Query* request, ::
+</a>         return Status(StatusCode::INVALID_ARGUMENT, &quot;Parse error&quot;);
+     }
+ 
+<a href="#h4-8-3" id="h4-8-3" class="i">+    string line_pat = q.line_pat-&gt;pattern();
+</a><a href="#h4-8-4" id="h4-8-4" class="i">+
+</a><a href="#h4-8-5" id="h4-8-5" class="i">+    /* Patterns like &quot;User.*Info&quot; and &quot;p\d+&quot; might be genuine attempts
+</a><a href="#h4-8-6" id="h4-8-6" class="i">+       to match tags, so we cannot too quickly dismiss odd-looking REs
+</a><a href="#h4-8-7" id="h4-8-7" class="i">+       as justifying our skipping the phases of a tags search.  But we
+</a><a href="#h4-8-8" id="h4-8-8" class="i">+       can at least special-case a few characters that would not ever
+</a><a href="#h4-8-9" id="h4-8-9" class="i">+       appear in a pattern that matches tags.
+</a><a href="#h4-8-10" id="h4-8-10" class="i">+       TODO(brandon-rhodes): make this more sophisticated. */
+</a><a href="#h4-8-11" id="h4-8-11" class="i">+    bool might_match_tags =
+</a><a href="#h4-8-12" id="h4-8-12" class="i">+        // Characters that can&#39;t appear in an RE that matches a tag.
+</a><a href="#h4-8-13" id="h4-8-13" class="i">+        line_pat.find_first_of(&quot; !\&quot;#%&amp;&#39;,-/;&lt;=&gt;@`&quot;) == string::npos
+</a><a href="#h4-8-14" id="h4-8-14" class="i">+        // If the user anchored the RE, then we can only run it against
+</a><a href="#h4-8-15" id="h4-8-15" class="i">+        // whole lines from the corpus, never against tags.
+</a><a href="#h4-8-16" id="h4-8-16" class="i">+        &amp;&amp; line_pat.front() != &#39;^&#39;
+</a><a href="#h4-8-17" id="h4-8-17" class="i">+        &amp;&amp; line_pat.back() != &#39;$&#39;
+</a><a href="#h4-8-18" id="h4-8-18" class="i">+        ;
+</a><a href="#h4-8-19" id="h4-8-19" class="i">+
+</a>     match_stats stats;
+<a href="#h4-8-21" id="h4-8-21" class="d">-    if (q.tags_pat == NULL) {
+</a><a href="#h4-8-22" id="h4-8-22" class="i">+    if (q.tags_pat == NULL &amp;&amp; tagdata_ &amp;&amp; might_match_tags) {
+</a><a href="#h4-8-23" id="h4-8-23" class="i">+        string regex;
+</a><a href="#h4-8-24" id="h4-8-24" class="i">+        int32_t max_matches = q.max_matches;  // remember original value
+</a><a href="#h4-8-25" id="h4-8-25" class="i">+
+</a><a href="#h4-8-26" id="h4-8-26" class="i">+        add_match::line_set unique_lines;
+</a><a href="#h4-8-27" id="h4-8-27" class="i">+        add_match cb(&amp;unique_lines, response);
+</a><a href="#h4-8-28" id="h4-8-28" class="i">+
+</a><a href="#h4-8-29" id="h4-8-29" class="i">+        /* To surface the most important matches first, start with tags.
+</a><a href="#h4-8-30" id="h4-8-30" class="i">+           First pass: is the pattern an exact match for any tags? */
+</a><a href="#h4-8-31" id="h4-8-31" class="i">+        regex = &quot;^&quot; + line_pat + &quot;$&quot;;
+</a><a href="#h4-8-32" id="h4-8-32" class="i">+        q.line_pat.reset(new RE2(regex, q.line_pat-&gt;options()));
+</a><a href="#h4-8-33" id="h4-8-33" class="i">+        run_tags_search(q, tagdata_, cb, tagmatch_, stats);
+</a><a href="#h4-8-34" id="h4-8-34" class="i">+
+</a><a href="#h4-8-35" id="h4-8-35" class="i">+        q.max_matches = max_matches - cb.match_count();
+</a><a href="#h4-8-36" id="h4-8-36" class="i">+        if (q.max_matches &gt; 0) {
+</a><a href="#h4-8-37" id="h4-8-37" class="i">+
+</a><a href="#h4-8-38" id="h4-8-38" class="i">+            /* Second pass: is the pattern a prefix match for any tags? */
+</a><a href="#h4-8-39" id="h4-8-39" class="i">+            regex = &quot;^&quot; + line_pat + &quot;[^\t]&quot;;
+</a><a href="#h4-8-40" id="h4-8-40" class="i">+            q.line_pat.reset(new RE2(regex, q.line_pat-&gt;options()));
+</a><a href="#h4-8-41" id="h4-8-41" class="i">+            run_tags_search(q, tagdata_, cb, tagmatch_, stats);
+</a><a href="#h4-8-42" id="h4-8-42" class="i">+
+</a><a href="#h4-8-43" id="h4-8-43" class="i">+            q.max_matches = max_matches - cb.match_count();
+</a><a href="#h4-8-44" id="h4-8-44" class="i">+            if (q.max_matches &gt; 0) {
+</a><a href="#h4-8-45" id="h4-8-45" class="i">+
+</a><a href="#h4-8-46" id="h4-8-46" class="i">+              /* Third and final pass: full corpus search. */
+</a><a href="#h4-8-47" id="h4-8-47" class="i">+              q.line_pat.reset(new RE2(line_pat, q.line_pat-&gt;options()));
+</a><a href="#h4-8-48" id="h4-8-48" class="i">+              code_searcher::search_thread *search;
+</a><a href="#h4-8-49" id="h4-8-49" class="i">+              if (!pool_.try_pop(&amp;search))
+</a><a href="#h4-8-50" id="h4-8-50" class="i">+                search = new code_searcher::search_thread(cs_);
+</a><a href="#h4-8-51" id="h4-8-51" class="i">+              search-&gt;match(q, cb, cb, &amp;stats);
+</a><a href="#h4-8-52" id="h4-8-52" class="i">+              pool_.push(search);
+</a><a href="#h4-8-53" id="h4-8-53" class="i">+            }
+</a><a href="#h4-8-54" id="h4-8-54" class="i">+        }
+</a><a href="#h4-8-55" id="h4-8-55" class="i">+    } else if (q.tags_pat == NULL) {
+</a>         code_searcher::search_thread *search;
+         if (!pool_.try_pop(&amp;search))
+             search = new code_searcher::search_thread(cs_);
+<a href="#h4-9" id="h4-9" class="h">@@ -247,26 +352,8 @@ Status CodeSearchImpl::Search(ServerContext* context, const ::Query* request, ::
+</a>         if (tagdata_ == NULL)
+             return Status(StatusCode::FAILED_PRECONDITION, &quot;No tags file available.&quot;);
+ 
+<a href="#h4-9-3" id="h4-9-3" class="d">-        code_searcher::search_thread search(tagdata_);
+</a><a href="#h4-9-4" id="h4-9-4" class="d">-
+</a><a href="#h4-9-5" id="h4-9-5" class="d">-        // the negation constraints will be checked when we transform the match
+</a><a href="#h4-9-6" id="h4-9-6" class="d">-        // (unfortunately, we can&#39;t construct a line query that checks these)
+</a><a href="#h4-9-7" id="h4-9-7" class="d">-        query constraints;
+</a><a href="#h4-9-8" id="h4-9-8" class="d">-        constraints.negate.file_pat.swap(q.negate.file_pat);
+</a><a href="#h4-9-9" id="h4-9-9" class="d">-        constraints.negate.tags_pat.swap(q.negate.tags_pat);
+</a><a href="#h4-9-10" id="h4-9-10" class="d">-
+</a><a href="#h4-9-11" id="h4-9-11" class="d">-        // modify the line pattern to match the constraints that we can handle now
+</a><a href="#h4-9-12" id="h4-9-12" class="d">-        std::string regex = tag_searcher::create_tag_line_regex_from_query(&amp;q);
+</a><a href="#h4-9-13" id="h4-9-13" class="d">-        q.line_pat.reset(new RE2(regex, q.line_pat-&gt;options()));
+</a><a href="#h4-9-14" id="h4-9-14" class="d">-        q.file_pat.reset();
+</a><a href="#h4-9-15" id="h4-9-15" class="d">-        q.tags_pat.reset();
+</a><a href="#h4-9-16" id="h4-9-16" class="d">-
+</a>         add_match cb(response);
+<a href="#h4-9-18" id="h4-9-18" class="d">-        search.match(q,
+</a><a href="#h4-9-19" id="h4-9-19" class="d">-                     cb,
+</a><a href="#h4-9-20" id="h4-9-20" class="d">-                     cb,
+</a><a href="#h4-9-21" id="h4-9-21" class="d">-                     boost::bind(&amp;tag_searcher::transform, tagmatch_, &amp;constraints, _1),
+</a><a href="#h4-9-22" id="h4-9-22" class="d">-                     &amp;stats);
+</a><a href="#h4-9-23" id="h4-9-23" class="i">+        run_tags_search(q, tagdata_, cb, tagmatch_, stats);
+</a>     }
+ 
+     auto out_stats = response-&gt;mutable_stats();
+<b>diff --git a/<a id="h5" href="../file/web/src/codesearch/codesearch_ui.js">web/src/codesearch/codesearch_ui.js</a> b/<a href="../file/web/src/codesearch/codesearch_ui.js">web/src/codesearch/codesearch_ui.js</a></b>
+<a href="#h5-0" id="h5-0" class="h">@@ -252,10 +252,6 @@ var FileGroup = Backbone.Model.extend({
+</a> 
+ /** A set of matches that are automatically grouped by path. */
+ var SearchResultSet = Backbone.Collection.extend({
+<a href="#h5-0-3" id="h5-0-3" class="d">-  comparator: function(file_group) {
+</a><a href="#h5-0-4" id="h5-0-4" class="d">-    return file_group.id;
+</a><a href="#h5-0-5" id="h5-0-5" class="d">-  },
+</a><a href="#h5-0-6" id="h5-0-6" class="d">-
+</a>   add_match: function(match) {
+     var path_info = match.path_info();
+     var file_group = this.get(path_info.id);
+</pre>
+</div>
+</body>
+</html>

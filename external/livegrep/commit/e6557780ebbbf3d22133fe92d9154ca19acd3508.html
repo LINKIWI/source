@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Port the server to use Context. - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/e6557780ebbbf3d22133fe92d9154ca19acd3508">e6557780ebbbf3d22133fe92d9154ca19acd3508</a>
+<b>parent</b> <a href="../commit/597d9e40eb5fde28984763384ed6ff6f1b7bdeb2">597d9e40eb5fde28984763384ed6ff6f1b7bdeb2</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Tue,  2 Dec 2014 11:12:22 -0500
+
+Port the server to use Context.
+
+And add better logging now that we can correlate things.
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">server/api.go</a></td><td> | </td><td class="num">39</td><td><span class="i">+++++++++++++++++++++++++</span><span class="d">--------------</span></td></tr>
+<tr><td class="A">A</td><td><a href="#h1">server/log/log.go</a></td><td> | </td><td class="num">21</td><td><span class="i">+++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="A">A</td><td><a href="#h2">server/reqid/reqid.go</a></td><td> | </td><td class="num">32</td><td><span class="i">++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">server/server.go</a></td><td> | </td><td class="num">54</td><td><span class="i">++++++++++++++++++++++++++++++++++++</span><span class="d">------------------</span></td></tr>
+</table></pre><pre>4 files changed, 114 insertions(+), 32 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/server/api.go">server/api.go</a> b/<a href="../file/server/api.go">server/api.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -3,33 +3,37 @@ package server
+</a> import (
+ 	&quot;encoding/json&quot;
+ 	&quot;fmt&quot;
+<a href="#h0-0-3" id="h0-0-3" class="d">-	&quot;log&quot;
+</a> 	&quot;net/http&quot;
+ 
+<a href="#h0-0-6" id="h0-0-6" class="i">+	&quot;code.google.com/p/go.net/context&quot;
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+
+</a> 	&quot;github.com/livegrep/livegrep/client&quot;
+ 	&quot;github.com/livegrep/livegrep/server/api&quot;
+ 	&quot;github.com/livegrep/livegrep/server/backend&quot;
+<a href="#h0-0-11" id="h0-0-11" class="i">+	&quot;github.com/livegrep/livegrep/server/log&quot;
+</a> )
+ 
+<a href="#h0-0-14" id="h0-0-14" class="d">-func replyJSON(w http.ResponseWriter, status int, obj interface{}) {
+</a><a href="#h0-0-15" id="h0-0-15" class="i">+func replyJSON(ctx context.Context, w http.ResponseWriter, status int, obj interface{}) {
+</a> 	w.WriteHeader(status)
+ 	enc := json.NewEncoder(w)
+ 	if err := enc.Encode(obj); err != nil {
+<a href="#h0-0-19" id="h0-0-19" class="d">-		log.Printf(&quot;writing http response, data=%s err=%s&quot;,
+</a><a href="#h0-0-20" id="h0-0-20" class="i">+		log.Printf(ctx, &quot;writing http response, data=%s err=%s&quot;,
+</a> 			asJSON{obj},
+ 			err.Error())
+ 	}
+ }
+ 
+<a href="#h0-0-26" id="h0-0-26" class="d">-func writeError(w http.ResponseWriter, status int, code, message string) {
+</a><a href="#h0-0-27" id="h0-0-27" class="d">-	replyJSON(w, status, &amp;api.ReplyError{Err: api.InnerError{Code: code, Message: message}})
+</a><a href="#h0-0-28" id="h0-0-28" class="i">+func writeError(ctx context.Context, w http.ResponseWriter, status int, code, message string) {
+</a><a href="#h0-0-29" id="h0-0-29" class="i">+	log.Printf(ctx, &quot;query error status=%d code=%s message=%s&quot;,
+</a><a href="#h0-0-30" id="h0-0-30" class="i">+		status, code, message)
+</a><a href="#h0-0-31" id="h0-0-31" class="i">+	replyJSON(ctx, w, status, &amp;api.ReplyError{Err: api.InnerError{Code: code, Message: message}})
+</a> }
+ 
+<a href="#h0-0-34" id="h0-0-34" class="d">-func writeQueryError(w http.ResponseWriter, err error) {
+</a><a href="#h0-0-35" id="h0-0-35" class="i">+func writeQueryError(ctx context.Context, w http.ResponseWriter, err error) {
+</a> 	if qe, ok := err.(client.QueryError); ok {
+<a href="#h0-0-37" id="h0-0-37" class="d">-		writeError(w, 400, &quot;query_error&quot;, qe.Err)
+</a><a href="#h0-0-38" id="h0-0-38" class="i">+		writeError(ctx, w, 400, &quot;query_error&quot;, qe.Err)
+</a> 	} else {
+<a href="#h0-0-40" id="h0-0-40" class="d">-		writeError(w, 500, &quot;internal_error&quot;,
+</a><a href="#h0-0-41" id="h0-0-41" class="i">+		writeError(ctx, w, 500, &quot;internal_error&quot;,
+</a> 			fmt.Sprintf(&quot;Talking to backend: %s&quot;, err.Error()))
+ 	}
+ 	return
+<a href="#h0-1" id="h0-1" class="h">@@ -45,13 +49,14 @@ func parseQuery(r *http.Request) client.Query {
+</a> 	}
+ }
+ 
+<a href="#h0-1-3" id="h0-1-3" class="d">-func (s *server) ServeAPISearch(w http.ResponseWriter, r *http.Request) {
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+func (s *server) ServeAPISearch(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+</a> 	backendName := r.URL.Query().Get(&quot;:backend&quot;)
+ 	var backend *backend.Backend
+ 	if backendName != &quot;&quot; {
+ 		backend = s.bk[backendName]
+ 		if backend == nil {
+<a href="#h0-1-10" id="h0-1-10" class="d">-			writeError(w, 400, &quot;bad_backend&quot;, fmt.Sprintf(&quot;Unknown backend: %s&quot;, backendName))
+</a><a href="#h0-1-11" id="h0-1-11" class="i">+			writeError(ctx, w, 400, &quot;bad_backend&quot;,
+</a><a href="#h0-1-12" id="h0-1-12" class="i">+				fmt.Sprintf(&quot;Unknown backend: %s&quot;, backendName))
+</a> 			return
+ 		}
+ 	} else {
+<a href="#h0-2" id="h0-2" class="h">@@ -63,7 +68,8 @@ func (s *server) ServeAPISearch(w http.ResponseWriter, r *http.Request) {
+</a> 	q := parseQuery(r)
+ 
+ 	if q.Line == &quot;&quot; {
+<a href="#h0-2-3" id="h0-2-3" class="d">-		writeError(w, 400, &quot;bad_query&quot;, &quot;You must specify a &#39;line&#39; regex.&quot;)
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+		writeError(ctx, w, 400, &quot;bad_query&quot;,
+</a><a href="#h0-2-5" id="h0-2-5" class="i">+			&quot;You must specify a &#39;line&#39; regex.&quot;)
+</a> 		return
+ 	}
+ 
+<a href="#h0-3" id="h0-3" class="h">@@ -72,7 +78,7 @@ func (s *server) ServeAPISearch(w http.ResponseWriter, r *http.Request) {
+</a> 
+ 	search, err := cl.Query(&amp;q)
+ 	if err != nil {
+<a href="#h0-3-3" id="h0-3-3" class="d">-		writeQueryError(w, err)
+</a><a href="#h0-3-4" id="h0-3-4" class="i">+		writeQueryError(ctx, w, err)
+</a> 		return
+ 	}
+ 
+<a href="#h0-4" id="h0-4" class="h">@@ -84,9 +90,14 @@ func (s *server) ServeAPISearch(w http.ResponseWriter, r *http.Request) {
+</a> 
+ 	reply.Info, err = search.Close()
+ 	if err != nil {
+<a href="#h0-4-3" id="h0-4-3" class="d">-		writeQueryError(w, err)
+</a><a href="#h0-4-4" id="h0-4-4" class="i">+		writeQueryError(ctx, w, err)
+</a> 		return
+ 	}
+ 
+<a href="#h0-4-8" id="h0-4-8" class="d">-	replyJSON(w, 200, reply)
+</a><a href="#h0-4-9" id="h0-4-9" class="i">+	log.Printf(ctx,
+</a><a href="#h0-4-10" id="h0-4-10" class="i">+		&quot;responding success results=%d why=%s&quot;,
+</a><a href="#h0-4-11" id="h0-4-11" class="i">+		len(reply.Results),
+</a><a href="#h0-4-12" id="h0-4-12" class="i">+		reply.Info.ExitReason)
+</a><a href="#h0-4-13" id="h0-4-13" class="i">+
+</a><a href="#h0-4-14" id="h0-4-14" class="i">+	replyJSON(ctx, w, 200, reply)
+</a> }
+<b>diff --git a/<a id="h1" href="../file/server/log/log.go">server/log/log.go</a> b/<a href="../file/server/log/log.go">server/log/log.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -0,0 +1,21 @@
+</a><a href="#h1-0-0" id="h1-0-0" class="i">+package log
+</a><a href="#h1-0-1" id="h1-0-1" class="i">+
+</a><a href="#h1-0-2" id="h1-0-2" class="i">+import (
+</a><a href="#h1-0-3" id="h1-0-3" class="i">+	&quot;bytes&quot;
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+	&quot;fmt&quot;
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+	&quot;time&quot;
+</a><a href="#h1-0-6" id="h1-0-6" class="i">+
+</a><a href="#h1-0-7" id="h1-0-7" class="i">+	&quot;code.google.com/p/go.net/context&quot;
+</a><a href="#h1-0-8" id="h1-0-8" class="i">+	&quot;github.com/livegrep/livegrep/server/reqid&quot;
+</a><a href="#h1-0-9" id="h1-0-9" class="i">+)
+</a><a href="#h1-0-10" id="h1-0-10" class="i">+
+</a><a href="#h1-0-11" id="h1-0-11" class="i">+func Printf(c context.Context, msg string, args ...interface{}) {
+</a><a href="#h1-0-12" id="h1-0-12" class="i">+	var line bytes.Buffer
+</a><a href="#h1-0-13" id="h1-0-13" class="i">+	line.WriteString(time.Now().UTC().Format(&quot;[2006-01-02T15:04:05.999] &quot;))
+</a><a href="#h1-0-14" id="h1-0-14" class="i">+
+</a><a href="#h1-0-15" id="h1-0-15" class="i">+	if reqID, ok := reqid.FromContext(c); ok {
+</a><a href="#h1-0-16" id="h1-0-16" class="i">+		fmt.Fprintf(&amp;line, &quot;[%s] &quot;, reqID)
+</a><a href="#h1-0-17" id="h1-0-17" class="i">+	}
+</a><a href="#h1-0-18" id="h1-0-18" class="i">+	fmt.Fprintf(&amp;line, msg, args...)
+</a><a href="#h1-0-19" id="h1-0-19" class="i">+	fmt.Println(line.String())
+</a><a href="#h1-0-20" id="h1-0-20" class="i">+}
+</a><b>diff --git a/<a id="h2" href="../file/server/reqid/reqid.go">server/reqid/reqid.go</a> b/<a href="../file/server/reqid/reqid.go">server/reqid/reqid.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -0,0 +1,32 @@
+</a><a href="#h2-0-0" id="h2-0-0" class="i">+package reqid
+</a><a href="#h2-0-1" id="h2-0-1" class="i">+
+</a><a href="#h2-0-2" id="h2-0-2" class="i">+import (
+</a><a href="#h2-0-3" id="h2-0-3" class="i">+	&quot;crypto/rand&quot;
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+	&quot;encoding/hex&quot;
+</a><a href="#h2-0-5" id="h2-0-5" class="i">+	&quot;fmt&quot;
+</a><a href="#h2-0-6" id="h2-0-6" class="i">+
+</a><a href="#h2-0-7" id="h2-0-7" class="i">+	&quot;code.google.com/p/go.net/context&quot;
+</a><a href="#h2-0-8" id="h2-0-8" class="i">+)
+</a><a href="#h2-0-9" id="h2-0-9" class="i">+
+</a><a href="#h2-0-10" id="h2-0-10" class="i">+type key int
+</a><a href="#h2-0-11" id="h2-0-11" class="i">+
+</a><a href="#h2-0-12" id="h2-0-12" class="i">+const reqIDKey key = 0
+</a><a href="#h2-0-13" id="h2-0-13" class="i">+
+</a><a href="#h2-0-14" id="h2-0-14" class="i">+type RequestID string
+</a><a href="#h2-0-15" id="h2-0-15" class="i">+
+</a><a href="#h2-0-16" id="h2-0-16" class="i">+func New() RequestID {
+</a><a href="#h2-0-17" id="h2-0-17" class="i">+	bytes := make([]byte, 16)
+</a><a href="#h2-0-18" id="h2-0-18" class="i">+	if _, err := rand.Read(bytes); err != nil {
+</a><a href="#h2-0-19" id="h2-0-19" class="i">+		panic(fmt.Sprintf(&quot;rand.Read: %v&quot;, err))
+</a><a href="#h2-0-20" id="h2-0-20" class="i">+	}
+</a><a href="#h2-0-21" id="h2-0-21" class="i">+	return RequestID(hex.EncodeToString(bytes))
+</a><a href="#h2-0-22" id="h2-0-22" class="i">+}
+</a><a href="#h2-0-23" id="h2-0-23" class="i">+
+</a><a href="#h2-0-24" id="h2-0-24" class="i">+func NewContext(ctx context.Context, reqID RequestID) context.Context {
+</a><a href="#h2-0-25" id="h2-0-25" class="i">+	return context.WithValue(ctx, reqIDKey, reqID)
+</a><a href="#h2-0-26" id="h2-0-26" class="i">+}
+</a><a href="#h2-0-27" id="h2-0-27" class="i">+
+</a><a href="#h2-0-28" id="h2-0-28" class="i">+func FromContext(ctx context.Context) (RequestID, bool) {
+</a><a href="#h2-0-29" id="h2-0-29" class="i">+	reqID, ok := ctx.Value(reqIDKey).(RequestID)
+</a><a href="#h2-0-30" id="h2-0-30" class="i">+	return reqID, ok
+</a><a href="#h2-0-31" id="h2-0-31" class="i">+}
+</a><b>diff --git a/<a id="h3" href="../file/server/server.go">server/server.go</a> b/<a href="../file/server/server.go">server/server.go</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -5,9 +5,13 @@ import (
+</a> 	&quot;net/http&quot;
+ 	&quot;path&quot;
+ 
+<a href="#h3-0-3" id="h3-0-3" class="i">+	&quot;code.google.com/p/go.net/context&quot;
+</a><a href="#h3-0-4" id="h3-0-4" class="i">+
+</a> 	&quot;github.com/bmizerany/pat&quot;
+ 	&quot;github.com/livegrep/livegrep/server/backend&quot;
+ 	&quot;github.com/livegrep/livegrep/server/config&quot;
+<a href="#h3-0-8" id="h3-0-8" class="i">+	&quot;github.com/livegrep/livegrep/server/log&quot;
+</a><a href="#h3-0-9" id="h3-0-9" class="i">+	&quot;github.com/livegrep/livegrep/server/reqid&quot;
+</a> )
+ 
+ type server struct {
+<a href="#h3-1" id="h3-1" class="h">@@ -28,11 +32,11 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+</a> 	s.inner.ServeHTTP(w, r)
+ }
+ 
+<a href="#h3-1-3" id="h3-1-3" class="d">-func (s *server) ServeRoot(w http.ResponseWriter, r *http.Request) {
+</a><a href="#h3-1-4" id="h3-1-4" class="i">+func (s *server) ServeRoot(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+</a> 	http.Redirect(w, r, &quot;/search&quot;, 303)
+ }
+ 
+<a href="#h3-1-8" id="h3-1-8" class="d">-func (s *server) ServeSearch(w http.ResponseWriter, r *http.Request) {
+</a><a href="#h3-1-9" id="h3-1-9" class="i">+func (s *server) ServeSearch(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+</a> 	gh := make(map[string]map[string]string, len(s.bk))
+ 	backends := make([]*backend.Backend, 0, len(s.bk))
+ 	for _, bk := range s.bk {
+<a href="#h3-2" id="h3-2" class="h">@@ -47,11 +51,11 @@ func (s *server) ServeSearch(w http.ResponseWriter, r *http.Request) {
+</a> 		}
+ 		bk.I.Unlock()
+ 	}
+<a href="#h3-2-3" id="h3-2-3" class="d">-	ctx := &amp;searchContext{
+</a><a href="#h3-2-4" id="h3-2-4" class="i">+	data := &amp;searchContext{
+</a> 		GithubRepos: gh,
+ 		Backends:    backends,
+ 	}
+<a href="#h3-2-8" id="h3-2-8" class="d">-	body, err := s.executeTemplate(s.t.searchPage, ctx)
+</a><a href="#h3-2-9" id="h3-2-9" class="i">+	body, err := s.executeTemplate(s.t.searchPage, data)
+</a> 	if err != nil {
+ 		http.Error(w, err.Error(), 500)
+ 		return
+<a href="#h3-3" id="h3-3" class="h">@@ -63,7 +67,7 @@ func (s *server) ServeSearch(w http.ResponseWriter, r *http.Request) {
+</a> 	})
+ }
+ 
+<a href="#h3-3-3" id="h3-3-3" class="d">-func (s *server) ServeAbout(w http.ResponseWriter, r *http.Request) {
+</a><a href="#h3-3-4" id="h3-3-4" class="i">+func (s *server) ServeAbout(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+</a> 	body, err := s.executeTemplate(s.t.aboutPage, nil)
+ 	if err != nil {
+ 		http.Error(w, err.Error(), 500)
+<a href="#h3-4" id="h3-4" class="h">@@ -88,18 +92,18 @@ func (s *server) requestProtocol(r *http.Request) string {
+</a> 	return &quot;http&quot;
+ }
+ 
+<a href="#h3-4-3" id="h3-4-3" class="d">-func (s *server) ServeOpensearch(w http.ResponseWriter, r *http.Request) {
+</a><a href="#h3-4-4" id="h3-4-4" class="d">-	ctx := &amp;opensearchContext{}
+</a><a href="#h3-4-5" id="h3-4-5" class="d">-	ctx.BaseURL += s.requestProtocol(r) + &quot;://&quot; + r.Host + &quot;/&quot;
+</a><a href="#h3-4-6" id="h3-4-6" class="i">+func (s *server) ServeOpensearch(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+</a><a href="#h3-4-7" id="h3-4-7" class="i">+	data := &amp;opensearchContext{}
+</a><a href="#h3-4-8" id="h3-4-8" class="i">+	data.BaseURL += s.requestProtocol(r) + &quot;://&quot; + r.Host + &quot;/&quot;
+</a> 
+ 	for _, bk := range s.bk {
+ 		if bk.I.Name != &quot;&quot; {
+<a href="#h3-4-12" id="h3-4-12" class="d">-			ctx.BackendName = bk.I.Name
+</a><a href="#h3-4-13" id="h3-4-13" class="i">+			data.BackendName = bk.I.Name
+</a> 			break
+ 		}
+ 	}
+ 
+<a href="#h3-4-18" id="h3-4-18" class="d">-	body, err := s.executeTemplate(s.t.opensearchXML, ctx)
+</a><a href="#h3-4-19" id="h3-4-19" class="i">+	body, err := s.executeTemplate(s.t.opensearchXML, data)
+</a> 	if err != nil {
+ 		http.Error(w, err.Error(), 500)
+ 		return
+<a href="#h3-5" id="h3-5" class="h">@@ -107,6 +111,20 @@ func (s *server) ServeOpensearch(w http.ResponseWriter, r *http.Request) {
+</a> 	w.Write(body)
+ }
+ 
+<a href="#h3-5-3" id="h3-5-3" class="i">+type handler func(c context.Context, w http.ResponseWriter, r *http.Request)
+</a><a href="#h3-5-4" id="h3-5-4" class="i">+
+</a><a href="#h3-5-5" id="h3-5-5" class="i">+func (h handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+</a><a href="#h3-5-6" id="h3-5-6" class="i">+	ctx := context.Background()
+</a><a href="#h3-5-7" id="h3-5-7" class="i">+	ctx = reqid.NewContext(ctx, reqid.New())
+</a><a href="#h3-5-8" id="h3-5-8" class="i">+	log.Printf(ctx, &quot;http request: remote=%q method=%q url=%q&quot;,
+</a><a href="#h3-5-9" id="h3-5-9" class="i">+		r.RemoteAddr, r.Method, r.URL)
+</a><a href="#h3-5-10" id="h3-5-10" class="i">+	h(ctx, w, r)
+</a><a href="#h3-5-11" id="h3-5-11" class="i">+}
+</a><a href="#h3-5-12" id="h3-5-12" class="i">+
+</a><a href="#h3-5-13" id="h3-5-13" class="i">+func (s *server) Handler(f func(c context.Context, w http.ResponseWriter, r *http.Request)) http.Handler {
+</a><a href="#h3-5-14" id="h3-5-14" class="i">+	return handler(f)
+</a><a href="#h3-5-15" id="h3-5-15" class="i">+}
+</a><a href="#h3-5-16" id="h3-5-16" class="i">+
+</a> func New(cfg *config.Config) (http.Handler, error) {
+ 	srv := &amp;server{config: cfg, bk: make(map[string]*backend.Backend)}
+ 	srv.loadTemplates()
+<a href="#h3-6" id="h3-6" class="h">@@ -116,20 +134,20 @@ func New(cfg *config.Config) (http.Handler, error) {
+</a> 	}
+ 
+ 	m := pat.New()
+<a href="#h3-6-3" id="h3-6-3" class="d">-	m.Add(&quot;GET&quot;, &quot;/&quot;, http.HandlerFunc(srv.ServeRoot))
+</a><a href="#h3-6-4" id="h3-6-4" class="d">-	m.Add(&quot;GET&quot;, &quot;/search/&quot;, http.HandlerFunc(srv.ServeSearch))
+</a><a href="#h3-6-5" id="h3-6-5" class="d">-	m.Add(&quot;GET&quot;, &quot;/search/:backend&quot;, http.HandlerFunc(srv.ServeSearch))
+</a><a href="#h3-6-6" id="h3-6-6" class="d">-	m.Add(&quot;GET&quot;, &quot;/about&quot;, http.HandlerFunc(srv.ServeAbout))
+</a><a href="#h3-6-7" id="h3-6-7" class="d">-	m.Add(&quot;GET&quot;, &quot;/opensearch.xml&quot;, http.HandlerFunc(srv.ServeOpensearch))
+</a><a href="#h3-6-8" id="h3-6-8" class="i">+	m.Add(&quot;GET&quot;, &quot;/&quot;, srv.Handler(srv.ServeRoot))
+</a><a href="#h3-6-9" id="h3-6-9" class="i">+	m.Add(&quot;GET&quot;, &quot;/search/&quot;, srv.Handler(srv.ServeSearch))
+</a><a href="#h3-6-10" id="h3-6-10" class="i">+	m.Add(&quot;GET&quot;, &quot;/search/:backend&quot;, srv.Handler(srv.ServeSearch))
+</a><a href="#h3-6-11" id="h3-6-11" class="i">+	m.Add(&quot;GET&quot;, &quot;/about&quot;, srv.Handler(srv.ServeAbout))
+</a><a href="#h3-6-12" id="h3-6-12" class="i">+	m.Add(&quot;GET&quot;, &quot;/opensearch.xml&quot;, srv.Handler(srv.ServeOpensearch))
+</a> 
+<a href="#h3-6-14" id="h3-6-14" class="d">-	m.Add(&quot;GET&quot;, &quot;/api/v1/search/&quot;, http.HandlerFunc(srv.ServeAPISearch))
+</a><a href="#h3-6-15" id="h3-6-15" class="d">-	m.Add(&quot;GET&quot;, &quot;/api/v1/search/:backend&quot;, http.HandlerFunc(srv.ServeAPISearch))
+</a><a href="#h3-6-16" id="h3-6-16" class="i">+	m.Add(&quot;GET&quot;, &quot;/api/v1/search/&quot;, srv.Handler(srv.ServeAPISearch))
+</a><a href="#h3-6-17" id="h3-6-17" class="i">+	m.Add(&quot;GET&quot;, &quot;/api/v1/search/:backend&quot;, srv.Handler(srv.ServeAPISearch))
+</a> 
+ 	mux := http.NewServeMux()
+ 	mux.Handle(&quot;/assets/&quot;, http.FileServer(http.Dir(path.Join(cfg.DocRoot, &quot;htdocs&quot;))))
+ 	mux.Handle(&quot;/&quot;, m)
+ 
+<a href="#h3-6-23" id="h3-6-23" class="d">-	srv.inner = &amp;requestLogger{mux}
+</a><a href="#h3-6-24" id="h3-6-24" class="i">+	srv.inner = mux
+</a> 
+ 	return srv, nil
+ }
+</pre>
+</div>
+</body>
+</html>

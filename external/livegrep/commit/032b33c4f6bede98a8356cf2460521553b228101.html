@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Take dnode reconnection into our own hands. - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/032b33c4f6bede98a8356cf2460521553b228101">032b33c4f6bede98a8356cf2460521553b228101</a>
+<b>parent</b> <a href="../commit/5877633a2966252456994bd9f109a404130454e5">5877633a2966252456994bd9f109a404130454e5</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Mon, 22 Oct 2012 21:28:28 -0700
+
+Take dnode reconnection into our own hands.
+
+I think this works much better.
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">web/appserver.js</a></td><td> | </td><td class="num">55</td><td><span class="i">++++++++++++++++++++++++++++++++++</span><span class="d">---------------------</span></td></tr>
+</table></pre><pre>1 file changed, 34 insertions(+), 21 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/web/appserver.js">web/appserver.js</a> b/<a href="../file/web/appserver.js">web/appserver.js</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -1,5 +1,6 @@
+</a> var dnode  = require(&#39;dnode&#39;),
+     fs     = require(&#39;fs&#39;),
+<a href="#h0-0-2" id="h0-0-2" class="i">+    net    = require(&#39;net&#39;),
+</a>     log4js = require(&#39;log4js&#39;),
+     util   = require(&#39;util&#39;),
+     path   = require(&#39;path&#39;),
+<a href="#h0-1" id="h0-1" class="h">@@ -182,9 +183,12 @@ function ConnectionPool(server, name, config) {
+</a>       for (var i = 0; i &lt; config.BACKEND_CONNECTIONS; i++) {
+         (function() {
+            var remote = null;
+<a href="#h0-1-3" id="h0-1-3" class="d">-           var connection = null;
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+           var delay = 100;
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+           var d = null;
+</a><a href="#h0-1-6" id="h0-1-6" class="i">+           var stream = null;
+</a> 
+            function ready() {
+<a href="#h0-1-9" id="h0-1-9" class="i">+             if (!remote) return;
+</a>              logger.debug(&#39;Remote ready!&#39;);
+              if (remote.cs_ready) {
+                logger.debug(&#39;(already queued)!&#39;);
+<a href="#h0-2" id="h0-2" class="h">@@ -193,34 +197,43 @@ function ConnectionPool(server, name, config) {
+</a>              remote.cs_ready = true;
+              parent.remotes.push(remote);
+              parent.dispatch();
+<a href="#h0-2-3" id="h0-2-3" class="i">+             delay = 100;
+</a>            }
+ 
+            function disconnected() {
+<a href="#h0-2-7" id="h0-2-7" class="d">-             logger.info(&quot;Lost connection to backend&quot;)
+</a><a href="#h0-2-8" id="h0-2-8" class="i">+             logger.info(&quot;Lost connection to backend. Reconnect in %d...&quot;, delay);
+</a><a href="#h0-2-9" id="h0-2-9" class="i">+             stream.end();
+</a>              parent.remotes = parent.remotes.filter(function (r) {return r !== remote});
+              parent.connections = parent.connections.filter(
+<a href="#h0-2-12" id="h0-2-12" class="d">-               function (c) { return c !== connection});
+</a><a href="#h0-2-13" id="h0-2-13" class="d">-             if (remote.cs_client)
+</a><a href="#h0-2-14" id="h0-2-14" class="i">+               function (c) { return c !== d});
+</a><a href="#h0-2-15" id="h0-2-15" class="i">+             if (remote &amp;&amp; remote.cs_client)
+</a>                remote.cs_client.search_done();
+<a href="#h0-2-17" id="h0-2-17" class="i">+             setTimeout(connect, delay)
+</a><a href="#h0-2-18" id="h0-2-18" class="i">+             delay = Math.min(delay * 2, 60*1000);
+</a>            }
+ 
+<a href="#h0-2-21" id="h0-2-21" class="d">-           dnode({ ready: ready }).
+</a><a href="#h0-2-22" id="h0-2-22" class="d">-             connect(
+</a><a href="#h0-2-23" id="h0-2-23" class="d">-               bk[0], bk[1],
+</a><a href="#h0-2-24" id="h0-2-24" class="d">-               function (r, conn) {
+</a><a href="#h0-2-25" id="h0-2-25" class="d">-                 parent.connections.push(conn);
+</a><a href="#h0-2-26" id="h0-2-26" class="d">-                 remote = r;
+</a><a href="#h0-2-27" id="h0-2-27" class="d">-                 connection = conn;
+</a><a href="#h0-2-28" id="h0-2-28" class="d">-                 remote.cs_ready  = false;
+</a><a href="#h0-2-29" id="h0-2-29" class="d">-                 remote.cs_client = null;
+</a><a href="#h0-2-30" id="h0-2-30" class="d">-                 logger.info(&quot;Connected to codesearch daemon.&quot;);
+</a><a href="#h0-2-31" id="h0-2-31" class="d">-                 conn.on(&#39;ready&#39;,     ready);
+</a><a href="#h0-2-32" id="h0-2-32" class="d">-                 conn.on(&#39;reconnect&#39;, ready);
+</a><a href="#h0-2-33" id="h0-2-33" class="d">-                 conn.on(&#39;close&#39;,     disconnected);
+</a><a href="#h0-2-34" id="h0-2-34" class="d">-                 conn.on(&#39;end&#39;,       disconnected);
+</a><a href="#h0-2-35" id="h0-2-35" class="d">-               }, {
+</a><a href="#h0-2-36" id="h0-2-36" class="d">-                 reconnect: 200
+</a><a href="#h0-2-37" id="h0-2-37" class="d">-               });
+</a><a href="#h0-2-38" id="h0-2-38" class="i">+           function connect() {
+</a><a href="#h0-2-39" id="h0-2-39" class="i">+             d = dnode({ ready: ready });
+</a><a href="#h0-2-40" id="h0-2-40" class="i">+             d.on(&#39;remote&#39;, function(r) {
+</a><a href="#h0-2-41" id="h0-2-41" class="i">+                    parent.connections.push(d);
+</a><a href="#h0-2-42" id="h0-2-42" class="i">+                    remote = r;
+</a><a href="#h0-2-43" id="h0-2-43" class="i">+                    remote.cs_ready  = false;
+</a><a href="#h0-2-44" id="h0-2-44" class="i">+                    remote.cs_client = null;
+</a><a href="#h0-2-45" id="h0-2-45" class="i">+                    logger.info(&quot;Connected to codesearch daemon.&quot;);
+</a><a href="#h0-2-46" id="h0-2-46" class="i">+                  });
+</a><a href="#h0-2-47" id="h0-2-47" class="i">+             d.on(&#39;ready&#39;,     ready);
+</a><a href="#h0-2-48" id="h0-2-48" class="i">+             d.on(&#39;close&#39;,     disconnected);
+</a><a href="#h0-2-49" id="h0-2-49" class="i">+             d.on(&#39;end&#39;,       disconnected);
+</a><a href="#h0-2-50" id="h0-2-50" class="i">+             d.on(&#39;error&#39;,     disconnected);
+</a><a href="#h0-2-51" id="h0-2-51" class="i">+             stream = net.connect({
+</a><a href="#h0-2-52" id="h0-2-52" class="i">+                                    host: bk[0],
+</a><a href="#h0-2-53" id="h0-2-53" class="i">+                                    port: bk[1]
+</a><a href="#h0-2-54" id="h0-2-54" class="i">+                                  });
+</a><a href="#h0-2-55" id="h0-2-55" class="i">+             stream.on(&#39;error&#39;,   disconnected);
+</a><a href="#h0-2-56" id="h0-2-56" class="i">+             stream.pipe(d).pipe(stream);
+</a><a href="#h0-2-57" id="h0-2-57" class="i">+           }
+</a><a href="#h0-2-58" id="h0-2-58" class="i">+
+</a><a href="#h0-2-59" id="h0-2-59" class="i">+           connect();
+</a>          })();
+       }
+     });
+</pre>
+</div>
+</body>
+</html>

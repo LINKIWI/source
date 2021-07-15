@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Port searching to std::thread - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/c9bc9d1bee55d6135462d2dd42af3ef7436db345">c9bc9d1bee55d6135462d2dd42af3ef7436db345</a>
+<b>parent</b> <a href="../commit/20e169ed5f5975ce428a14f706ca8ec6992a6e73">20e169ed5f5975ce428a14f706ca8ec6992a6e73</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Sun,  8 Jun 2014 13:51:55 -0400
+
+Port searching to std::thread
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">src/codesearch.cc</a></td><td> | </td><td class="num">18</td><td><span class="i">+++++</span><span class="d">-------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">src/codesearch.h</a></td><td> | </td><td class="num">5</td><td><span class="i">+++</span><span class="d">--</span></td></tr>
+</table></pre><pre>2 files changed, 8 insertions(+), 15 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/src/codesearch.cc">src/codesearch.cc</a> b/<a href="../file/src/codesearch.cc">src/codesearch.cc</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -961,12 +961,10 @@ void searcher::finish_group(match_group *group) {
+</a> }
+ 
+ code_searcher::search_thread::search_thread(code_searcher *cs)
+<a href="#h0-0-3" id="h0-0-3" class="d">-    : cs_(cs), threads_(new pthread_t[FLAGS_threads]) {
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+    : cs_(cs) {
+</a>     if (FLAGS_search) {
+<a href="#h0-0-6" id="h0-0-6" class="d">-        int err;
+</a>         for (int i = 0; i &lt; FLAGS_threads; ++i)
+<a href="#h0-0-8" id="h0-0-8" class="d">-            if ((err = pthread_create(&amp;threads_[i], NULL, search_one, this)) != 0)
+</a><a href="#h0-0-9" id="h0-0-9" class="d">-                die(&quot;pthread_create: %s&quot;, strerror(err));
+</a><a href="#h0-0-10" id="h0-0-10" class="i">+            threads_.push_back(std::move(std::thread(search_one, this)));
+</a>     }
+ }
+ 
+<a href="#h0-1" id="h0-1" class="h">@@ -1017,16 +1015,11 @@ void code_searcher::search_thread::match_internal(const query &amp;q,
+</a> 
+ code_searcher::search_thread::~search_thread() {
+     queue_.close();
+<a href="#h0-1-3" id="h0-1-3" class="d">-    if (threads_) {
+</a><a href="#h0-1-4" id="h0-1-4" class="d">-        for (int i = 0; i &lt; FLAGS_threads; ++i)
+</a><a href="#h0-1-5" id="h0-1-5" class="d">-            pthread_join(threads_[i], 0);
+</a><a href="#h0-1-6" id="h0-1-6" class="d">-    }
+</a><a href="#h0-1-7" id="h0-1-7" class="d">-    delete[] threads_;
+</a><a href="#h0-1-8" id="h0-1-8" class="i">+    for (auto it = threads_.begin(); it != threads_.end(); ++it)
+</a><a href="#h0-1-9" id="h0-1-9" class="i">+        it-&gt;join();
+</a> }
+ 
+<a href="#h0-1-12" id="h0-1-12" class="d">-void* code_searcher::search_thread::search_one(void *p) {
+</a><a href="#h0-1-13" id="h0-1-13" class="d">-    search_thread *me = static_cast&lt;search_thread*&gt;(p);
+</a><a href="#h0-1-14" id="h0-1-14" class="d">-
+</a><a href="#h0-1-15" id="h0-1-15" class="i">+void code_searcher::search_thread::search_one(search_thread *me) {
+</a>     job *j;
+     while (me-&gt;queue_.pop(&amp;j)) {
+         chunk *c;
+<a href="#h0-2" id="h0-2" class="h">@@ -1037,7 +1030,6 @@ void* code_searcher::search_thread::search_one(void *p) {
+</a>         if (--j-&gt;pending == 0)
+             j-&gt;search-&gt;queue_.close();
+     }
+<a href="#h0-2-3" id="h0-2-3" class="d">-    return NULL;
+</a> }
+ 
+ void default_re2_options(RE2::Options &amp;opts) {
+<b>diff --git a/<a id="h1" href="../file/src/codesearch.h">src/codesearch.h</a> b/<a href="../file/src/codesearch.h">src/codesearch.h</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -14,6 +14,7 @@
+</a> #include &lt;fstream&gt;
+ #include &lt;atomic&gt;
+ #include &lt;mutex&gt;
+<a href="#h1-0-3" id="h1-0-3" class="i">+#include &lt;thread&gt;
+</a> #include &lt;boost/intrusive_ptr.hpp&gt;
+ 
+ #ifdef USE_DENSE_HASH_SET
+<a href="#h1-1" id="h1-1" class="h">@@ -209,10 +210,10 @@ public:
+</a>         };
+ 
+         const code_searcher *cs_;
+<a href="#h1-1-3" id="h1-1-3" class="d">-        pthread_t *threads_;
+</a><a href="#h1-1-4" id="h1-1-4" class="i">+        vector&lt;std::thread&gt; threads_;
+</a>         thread_queue&lt;job*&gt; queue_;
+ 
+<a href="#h1-1-7" id="h1-1-7" class="d">-        static void* search_one(void *);
+</a><a href="#h1-1-8" id="h1-1-8" class="i">+        static void search_one(search_thread *);
+</a>     private:
+         search_thread(const search_thread&amp;);
+         void operator=(const search_thread&amp;);
+</pre>
+</div>
+</body>
+</html>

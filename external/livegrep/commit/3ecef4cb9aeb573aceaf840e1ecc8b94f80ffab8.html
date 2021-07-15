@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>There&#39;s no need for the search_functor class. - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/3ecef4cb9aeb573aceaf840e1ecc8b94f80ffab8">3ecef4cb9aeb573aceaf840e1ecc8b94f80ffab8</a>
+<b>parent</b> <a href="../commit/10b30d55ec45d152e4d19b55d349e3554556405b">10b30d55ec45d152e4d19b55d349e3554556405b</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Sun,  8 Jan 2012 11:17:04 -0500
+
+There&#39;s no need for the search_functor class.
+
+A normal function works just as well, and we can even make it a static
+member inside search_thread.
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">codesearch.cc</a></td><td> | </td><td class="num">26</td><td><span class="i">++++++++++++</span><span class="d">--------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">codesearch.h</a></td><td> | </td><td class="num">6</td><td><span class="i">++++</span><span class="d">--</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">thread_pool.h</a></td><td> | </td><td class="num">4</td><td><span class="i">++</span><span class="d">--</span></td></tr>
+</table></pre><pre>3 files changed, 18 insertions(+), 18 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/codesearch.cc">codesearch.cc</a> b/<a href="../file/codesearch.cc">codesearch.cc</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -237,7 +237,7 @@ protected:
+</a>     timeval limit_;
+     exit_reason exit_reason_;
+ 
+<a href="#h0-0-3" id="h0-0-3" class="d">-    friend class search_functor;
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+    friend class code_searcher::search_thread;
+</a> };
+ 
+ code_searcher::code_searcher()
+<a href="#h0-1" id="h0-1" class="h">@@ -296,16 +296,6 @@ void code_searcher::dump_stats() {
+</a>     printf(&quot;Lines: %ld (dedup: %ld)\n&quot;, stats_.lines, stats_.dedup_lines);
+ }
+ 
+<a href="#h0-1-3" id="h0-1-3" class="d">-struct search_functor {
+</a><a href="#h0-1-4" id="h0-1-4" class="d">-    bool operator()(const pair&lt;searcher*, chunk*&gt;&amp; pair) {
+</a><a href="#h0-1-5" id="h0-1-5" class="d">-        if (!pair.first)
+</a><a href="#h0-1-6" id="h0-1-6" class="d">-            return true;
+</a><a href="#h0-1-7" id="h0-1-7" class="d">-        (*pair.first)(pair.second);
+</a><a href="#h0-1-8" id="h0-1-8" class="d">-        pair.first-&gt;queue_.push(NULL);
+</a><a href="#h0-1-9" id="h0-1-9" class="d">-        return false;
+</a><a href="#h0-1-10" id="h0-1-10" class="d">-    }
+</a><a href="#h0-1-11" id="h0-1-11" class="d">-};
+</a><a href="#h0-1-12" id="h0-1-12" class="d">-
+</a> void code_searcher::finalize() {
+     assert(!finalized_);
+     finalized_ = true;
+<a href="#h0-2" id="h0-2" class="h">@@ -622,12 +612,12 @@ int code_searcher::search_thread::match(RE2&amp; pat, match_stats *stats, exit_reaso
+</a>     match_result *m;
+     int matches = 0;
+     int pending = cs_-&gt;alloc_-&gt;size();
+<a href="#h0-2-3" id="h0-2-3" class="d">-    static search_functor apply;
+</a> 
+     assert(cs_-&gt;finalized_);
+     if (!pool_)
+<a href="#h0-2-7" id="h0-2-7" class="d">-        pool_ = new thread_pool&lt;pair&lt;searcher*, chunk*&gt;, search_functor &gt;
+</a><a href="#h0-2-8" id="h0-2-8" class="d">-            (FLAGS_threads, apply);
+</a><a href="#h0-2-9" id="h0-2-9" class="i">+        pool_ = new thread_pool&lt;pair&lt;searcher*, chunk*&gt;,
+</a><a href="#h0-2-10" id="h0-2-10" class="i">+                                bool(*)(const pair&lt;searcher*, chunk*&gt;&amp;)&gt;
+</a><a href="#h0-2-11" id="h0-2-11" class="i">+        (FLAGS_threads, &amp;search_one);
+</a> 
+     thread_queue&lt;match_result*&gt; results;
+     searcher search(cs_, results, pat);
+<a href="#h0-3" id="h0-3" class="h">@@ -706,3 +696,11 @@ code_searcher::search_thread::~search_thread() {
+</a>         delete pool_;
+     }
+ }
+<a href="#h0-3-3" id="h0-3-3" class="i">+
+</a><a href="#h0-3-4" id="h0-3-4" class="i">+bool code_searcher::search_thread::search_one(const pair&lt;searcher*, chunk*&gt;&amp; pair) {
+</a><a href="#h0-3-5" id="h0-3-5" class="i">+    if (!pair.first)
+</a><a href="#h0-3-6" id="h0-3-6" class="i">+        return true;
+</a><a href="#h0-3-7" id="h0-3-7" class="i">+    (*pair.first)(pair.second);
+</a><a href="#h0-3-8" id="h0-3-8" class="i">+    pair.first-&gt;queue_.push(NULL);
+</a><a href="#h0-3-9" id="h0-3-9" class="i">+    return false;
+</a><a href="#h0-3-10" id="h0-3-10" class="i">+}
+</a><b>diff --git a/<a id="h1" href="../file/codesearch.h">codesearch.h</a> b/<a href="../file/codesearch.h">codesearch.h</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -70,7 +70,6 @@ enum exit_reason {
+</a> 
+ struct chunk;
+ struct chunk_file;
+<a href="#h1-0-3" id="h1-0-3" class="d">-struct search_functor;
+</a> 
+ struct search_file {
+     string path;
+<a href="#h1-1" id="h1-1" class="h">@@ -102,7 +101,10 @@ public:
+</a>         void print_match_json(const match_result *m);
+ 
+         const code_searcher *cs_;
+<a href="#h1-1-3" id="h1-1-3" class="d">-        thread_pool&lt;pair&lt;searcher*, chunk*&gt;, search_functor&gt; *pool_;
+</a><a href="#h1-1-4" id="h1-1-4" class="i">+        thread_pool&lt;pair&lt;searcher*, chunk*&gt;,
+</a><a href="#h1-1-5" id="h1-1-5" class="i">+                    bool(*)(const pair&lt;searcher*, chunk*&gt;&amp;)&gt; *pool_;
+</a><a href="#h1-1-6" id="h1-1-6" class="i">+
+</a><a href="#h1-1-7" id="h1-1-7" class="i">+        static bool search_one(const pair&lt;searcher*, chunk*&gt;&amp; pair);
+</a>     };
+     friend class search_thread;
+ protected:
+<b>diff --git a/<a id="h2" href="../file/thread_pool.h">thread_pool.h</a> b/<a href="../file/thread_pool.h">thread_pool.h</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -8,7 +8,7 @@
+</a> template &lt;class J, class DoIt&gt;
+ class thread_pool {
+ public:
+<a href="#h2-0-3" id="h2-0-3" class="d">-    thread_pool (int nthreads, DoIt&amp; fn)
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+    thread_pool (int nthreads, DoIt fn)
+</a>         : nthreads_(nthreads), fn_(fn) {
+         threads_ = new pthread_t[nthreads_];
+         for (int i = 0; i &lt; nthreads_; i++) {
+<a href="#h2-1" id="h2-1" class="h">@@ -32,7 +32,7 @@ protected:
+</a>     int nthreads_;
+     pthread_t *threads_;
+     thread_queue&lt;J&gt; queue_;
+<a href="#h2-1-3" id="h2-1-3" class="d">-    DoIt&amp; fn_;
+</a><a href="#h2-1-4" id="h2-1-4" class="i">+    DoIt fn_;
+</a> 
+     static void *worker(void *arg) {
+         thread_pool *pool = static_cast&lt;thread_pool*&gt;(arg);
+</pre>
+</div>
+</body>
+</html>

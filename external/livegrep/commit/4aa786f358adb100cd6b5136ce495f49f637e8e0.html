@@ -1,0 +1,2108 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Add a GRPC interface to codesearch - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/4aa786f358adb100cd6b5136ce495f49f637e8e0">4aa786f358adb100cd6b5136ce495f49f637e8e0</a>
+<b>parent</b> <a href="../commit/7666a3ad6e6634347710033af89cdd55f90431f6">7666a3ad6e6634347710033af89cdd55f90431f6</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Wed, 24 Aug 2016 19:45:54 -0700
+
+Add a GRPC interface to codesearch
+
+And port `livegrep` to it.
+
+<b>Diffstat:</b>
+<table><tr><td class="D">D</td><td><a href="#h0">client/BUILD</a></td><td> | </td><td class="num">31</td><td><span class="i"></span><span class="d">-------------------------------</span></td></tr>
+<tr><td class="D">D</td><td><a href="#h1">client/client.go</a></td><td> | </td><td class="num">179</td><td><span class="i"></span><span class="d">-------------------------------------------------------------------------------</span></td></tr>
+<tr><td class="D">D</td><td><a href="#h2">client/client_test.go</a></td><td> | </td><td class="num">234</td><td><span class="i"></span><span class="d">-------------------------------------------------------------------------------</span></td></tr>
+<tr><td class="D">D</td><td><a href="#h3">client/test/BUILD</a></td><td> | </td><td class="num">33</td><td><span class="i"></span><span class="d">---------------------------------</span></td></tr>
+<tr><td class="D">D</td><td><a href="#h4">client/types.go</a></td><td> | </td><td class="num">86</td><td><span class="i"></span><span class="d">-------------------------------------------------------------------------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h5">cmd/livegrep-github-reindex/BUILD</a></td><td> | </td><td class="num">5</td><td><span class="i">++</span><span class="d">---</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h6">server/BUILD</a></td><td> | </td><td class="num">9</td><td><span class="i">+++</span><span class="d">------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h7">server/api.go</a></td><td> | </td><td class="num">68</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++</span><span class="d">--------------------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h8">server/api/BUILD</a></td><td> | </td><td class="num">3</td><td><span class="i"></span><span class="d">---</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h9">server/api/types.go</a></td><td> | </td><td class="num">26</td><td><span class="i">++++++++++++++++++++++</span><span class="d">----</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h10">server/backend.go</a></td><td> | </td><td class="num">105</td><td><span class="i">++++++++++++++++++++++</span><span class="d">---------------------------------------------------------</span></td></tr>
+<tr><td class="D">D</td><td><a href="#h11">server/backend_test.go</a></td><td> | </td><td class="num">102</td><td><span class="i"></span><span class="d">-------------------------------------------------------------------------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h12">server/log/BUILD</a></td><td> | </td><td class="num">4</td><td><span class="i">+</span><span class="d">---</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h13">server/query.go</a></td><td> | </td><td class="num">12</td><td><span class="i">++++++</span><span class="d">------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h14">server/query_test.go</a></td><td> | </td><td class="num">59</td><td><span class="i">++++++++++++++++++++++++</span><span class="d">-----------------------------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h15">server/reqid/BUILD</a></td><td> | </td><td class="num">4</td><td><span class="i">+</span><span class="d">---</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h16">server/server.go</a></td><td> | </td><td class="num">4</td><td><span class="i">+</span><span class="d">---</span></td></tr>
+<tr><td class="D">D</td><td><a href="#h17">vendor/golang.org/x/net/LICENSE</a></td><td> | </td><td class="num">27</td><td><span class="i"></span><span class="d">---------------------------</span></td></tr>
+<tr><td class="D">D</td><td><a href="#h18">vendor/golang.org/x/net/PATENTS</a></td><td> | </td><td class="num">22</td><td><span class="i"></span><span class="d">----------------------</span></td></tr>
+<tr><td class="D">D</td><td><a href="#h19">vendor/golang.org/x/net/context/BUILD</a></td><td> | </td><td class="num">19</td><td><span class="i"></span><span class="d">-------------------</span></td></tr>
+<tr><td class="D">D</td><td><a href="#h20">vendor/golang.org/x/net/context/context.go</a></td><td> | </td><td class="num">156</td><td><span class="i"></span><span class="d">-------------------------------------------------------------------------------</span></td></tr>
+<tr><td class="D">D</td><td><a href="#h21">vendor/golang.org/x/net/context/go17.go</a></td><td> | </td><td class="num">72</td><td><span class="i"></span><span class="d">------------------------------------------------------------------------</span></td></tr>
+<tr><td class="D">D</td><td><a href="#h22">vendor/golang.org/x/net/context/pre_go17.go</a></td><td> | </td><td class="num">300</td><td><span class="i"></span><span class="d">-------------------------------------------------------------------------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h23">vendor/golang.org/x/oauth2/BUILD</a></td><td> | </td><td class="num">4</td><td><span class="i">+</span><span class="d">---</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h24">vendor/golang.org/x/oauth2/internal/BUILD</a></td><td> | </td><td class="num">4</td><td><span class="i">+</span><span class="d">---</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h25">vendor/google.golang.org/appengine/internal/BUILD</a></td><td> | </td><td class="num">5</td><td><span class="i">++</span><span class="d">---</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h26">vendor/google.golang.org/appengine/urlfetch/BUILD</a></td><td> | </td><td class="num">5</td><td><span class="i">++</span><span class="d">---</span></td></tr>
+</table></pre><pre>27 files changed, 137 insertions(+), 1441 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/client/BUILD">client/BUILD</a> b/<a href="../file/client/BUILD">client/BUILD</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -1,31 +0,0 @@
+</a><a href="#h0-0-0" id="h0-0-0" class="d">-
+</a><a href="#h0-0-1" id="h0-0-1" class="d">-load(&quot;@io_bazel_rules_go//go:def.bzl&quot;,
+</a><a href="#h0-0-2" id="h0-0-2" class="d">-  &quot;go_binary&quot;,
+</a><a href="#h0-0-3" id="h0-0-3" class="d">-  &quot;go_library&quot;,
+</a><a href="#h0-0-4" id="h0-0-4" class="d">-  &quot;go_test&quot;,
+</a><a href="#h0-0-5" id="h0-0-5" class="d">-)
+</a><a href="#h0-0-6" id="h0-0-6" class="d">-
+</a><a href="#h0-0-7" id="h0-0-7" class="d">-go_library(
+</a><a href="#h0-0-8" id="h0-0-8" class="d">-name = &quot;go_default_library&quot;,
+</a><a href="#h0-0-9" id="h0-0-9" class="d">-  srcs = [
+</a><a href="#h0-0-10" id="h0-0-10" class="d">-    &quot;client.go&quot;,
+</a><a href="#h0-0-11" id="h0-0-11" class="d">-    &quot;types.go&quot;,
+</a><a href="#h0-0-12" id="h0-0-12" class="d">-  ],
+</a><a href="#h0-0-13" id="h0-0-13" class="d">-  deps = [
+</a><a href="#h0-0-14" id="h0-0-14" class="d">-    &quot;//jsonframe:go_default_library&quot;,
+</a><a href="#h0-0-15" id="h0-0-15" class="d">-  ],
+</a><a href="#h0-0-16" id="h0-0-16" class="d">-  visibility = [&quot;//visibility:public&quot;],
+</a><a href="#h0-0-17" id="h0-0-17" class="d">-)
+</a><a href="#h0-0-18" id="h0-0-18" class="d">-
+</a><a href="#h0-0-19" id="h0-0-19" class="d">-
+</a><a href="#h0-0-20" id="h0-0-20" class="d">-go_test(
+</a><a href="#h0-0-21" id="h0-0-21" class="d">-  name = &quot;go_default_test&quot;,
+</a><a href="#h0-0-22" id="h0-0-22" class="d">-  srcs = [
+</a><a href="#h0-0-23" id="h0-0-23" class="d">-    &quot;client_test.go&quot;,
+</a><a href="#h0-0-24" id="h0-0-24" class="d">-  ],
+</a><a href="#h0-0-25" id="h0-0-25" class="d">-  deps = [
+</a><a href="#h0-0-26" id="h0-0-26" class="d">-    &quot;//vendor/gopkg.in/check.v1:go_default_library&quot;,
+</a><a href="#h0-0-27" id="h0-0-27" class="d">-  ],
+</a><a href="#h0-0-28" id="h0-0-28" class="d">-  library = &quot;:go_default_library&quot;,
+</a><a href="#h0-0-29" id="h0-0-29" class="d">-)
+</a><a href="#h0-0-30" id="h0-0-30" class="d">-
+</a><b>diff --git a/<a id="h1" href="../file/client/client.go">client/client.go</a> b/<a href="../file/client/client.go">client/client.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -1,179 +0,0 @@
+</a><a href="#h1-0-0" id="h1-0-0" class="d">-package client
+</a><a href="#h1-0-1" id="h1-0-1" class="d">-
+</a><a href="#h1-0-2" id="h1-0-2" class="d">-import (
+</a><a href="#h1-0-3" id="h1-0-3" class="d">-	&quot;encoding/json&quot;
+</a><a href="#h1-0-4" id="h1-0-4" class="d">-	&quot;errors&quot;
+</a><a href="#h1-0-5" id="h1-0-5" class="d">-	&quot;fmt&quot;
+</a><a href="#h1-0-6" id="h1-0-6" class="d">-	&quot;io&quot;
+</a><a href="#h1-0-7" id="h1-0-7" class="d">-	&quot;net&quot;
+</a><a href="#h1-0-8" id="h1-0-8" class="d">-
+</a><a href="#h1-0-9" id="h1-0-9" class="d">-	&quot;github.com/livegrep/livegrep/jsonframe&quot;
+</a><a href="#h1-0-10" id="h1-0-10" class="d">-)
+</a><a href="#h1-0-11" id="h1-0-11" class="d">-
+</a><a href="#h1-0-12" id="h1-0-12" class="d">-var ops jsonframe.Marshaler
+</a><a href="#h1-0-13" id="h1-0-13" class="d">-
+</a><a href="#h1-0-14" id="h1-0-14" class="d">-func init() {
+</a><a href="#h1-0-15" id="h1-0-15" class="d">-	ops.Register(new(Result))
+</a><a href="#h1-0-16" id="h1-0-16" class="d">-	ops.Register(new(ReplyError))
+</a><a href="#h1-0-17" id="h1-0-17" class="d">-	ops.Register(new(ServerInfo))
+</a><a href="#h1-0-18" id="h1-0-18" class="d">-	ops.Register(new(Stats))
+</a><a href="#h1-0-19" id="h1-0-19" class="d">-	ops.Register(new(Query))
+</a><a href="#h1-0-20" id="h1-0-20" class="d">-}
+</a><a href="#h1-0-21" id="h1-0-21" class="d">-
+</a><a href="#h1-0-22" id="h1-0-22" class="d">-type client struct {
+</a><a href="#h1-0-23" id="h1-0-23" class="d">-	conn    io.ReadWriteCloser
+</a><a href="#h1-0-24" id="h1-0-24" class="d">-	queries chan *search
+</a><a href="#h1-0-25" id="h1-0-25" class="d">-	errors  chan error
+</a><a href="#h1-0-26" id="h1-0-26" class="d">-	error   error
+</a><a href="#h1-0-27" id="h1-0-27" class="d">-	ready   chan *ServerInfo
+</a><a href="#h1-0-28" id="h1-0-28" class="d">-	info    *ServerInfo
+</a><a href="#h1-0-29" id="h1-0-29" class="d">-}
+</a><a href="#h1-0-30" id="h1-0-30" class="d">-
+</a><a href="#h1-0-31" id="h1-0-31" class="d">-type search struct {
+</a><a href="#h1-0-32" id="h1-0-32" class="d">-	query   *Query
+</a><a href="#h1-0-33" id="h1-0-33" class="d">-	results chan *Result
+</a><a href="#h1-0-34" id="h1-0-34" class="d">-	errors  chan error
+</a><a href="#h1-0-35" id="h1-0-35" class="d">-	stats   chan *Stats
+</a><a href="#h1-0-36" id="h1-0-36" class="d">-}
+</a><a href="#h1-0-37" id="h1-0-37" class="d">-
+</a><a href="#h1-0-38" id="h1-0-38" class="d">-func Dial(network, address string) (Client, error) {
+</a><a href="#h1-0-39" id="h1-0-39" class="d">-	conn, err := net.Dial(network, address)
+</a><a href="#h1-0-40" id="h1-0-40" class="d">-	if err != nil {
+</a><a href="#h1-0-41" id="h1-0-41" class="d">-		return nil, err
+</a><a href="#h1-0-42" id="h1-0-42" class="d">-	}
+</a><a href="#h1-0-43" id="h1-0-43" class="d">-
+</a><a href="#h1-0-44" id="h1-0-44" class="d">-	return New(conn)
+</a><a href="#h1-0-45" id="h1-0-45" class="d">-}
+</a><a href="#h1-0-46" id="h1-0-46" class="d">-
+</a><a href="#h1-0-47" id="h1-0-47" class="d">-func New(conn io.ReadWriteCloser) (Client, error) {
+</a><a href="#h1-0-48" id="h1-0-48" class="d">-	var err error
+</a><a href="#h1-0-49" id="h1-0-49" class="d">-
+</a><a href="#h1-0-50" id="h1-0-50" class="d">-	cl := &amp;client{
+</a><a href="#h1-0-51" id="h1-0-51" class="d">-		conn:    conn,
+</a><a href="#h1-0-52" id="h1-0-52" class="d">-		queries: make(chan *search),
+</a><a href="#h1-0-53" id="h1-0-53" class="d">-		errors:  make(chan error, 1),
+</a><a href="#h1-0-54" id="h1-0-54" class="d">-		ready:   make(chan *ServerInfo),
+</a><a href="#h1-0-55" id="h1-0-55" class="d">-	}
+</a><a href="#h1-0-56" id="h1-0-56" class="d">-
+</a><a href="#h1-0-57" id="h1-0-57" class="d">-	go cl.loop()
+</a><a href="#h1-0-58" id="h1-0-58" class="d">-
+</a><a href="#h1-0-59" id="h1-0-59" class="d">-	select {
+</a><a href="#h1-0-60" id="h1-0-60" class="d">-	case cl.info = &lt;-cl.ready:
+</a><a href="#h1-0-61" id="h1-0-61" class="d">-	case err = &lt;-cl.errors:
+</a><a href="#h1-0-62" id="h1-0-62" class="d">-		close(cl.queries)
+</a><a href="#h1-0-63" id="h1-0-63" class="d">-		return nil, err
+</a><a href="#h1-0-64" id="h1-0-64" class="d">-	}
+</a><a href="#h1-0-65" id="h1-0-65" class="d">-
+</a><a href="#h1-0-66" id="h1-0-66" class="d">-	return cl, nil
+</a><a href="#h1-0-67" id="h1-0-67" class="d">-}
+</a><a href="#h1-0-68" id="h1-0-68" class="d">-
+</a><a href="#h1-0-69" id="h1-0-69" class="d">-func (c *client) Info() *ServerInfo {
+</a><a href="#h1-0-70" id="h1-0-70" class="d">-	return c.info
+</a><a href="#h1-0-71" id="h1-0-71" class="d">-}
+</a><a href="#h1-0-72" id="h1-0-72" class="d">-
+</a><a href="#h1-0-73" id="h1-0-73" class="d">-func (c *client) Err() error {
+</a><a href="#h1-0-74" id="h1-0-74" class="d">-	if c.error != nil {
+</a><a href="#h1-0-75" id="h1-0-75" class="d">-		return c.error
+</a><a href="#h1-0-76" id="h1-0-76" class="d">-	}
+</a><a href="#h1-0-77" id="h1-0-77" class="d">-	select {
+</a><a href="#h1-0-78" id="h1-0-78" class="d">-	case c.error = &lt;-c.errors:
+</a><a href="#h1-0-79" id="h1-0-79" class="d">-	default:
+</a><a href="#h1-0-80" id="h1-0-80" class="d">-	}
+</a><a href="#h1-0-81" id="h1-0-81" class="d">-	return c.error
+</a><a href="#h1-0-82" id="h1-0-82" class="d">-}
+</a><a href="#h1-0-83" id="h1-0-83" class="d">-
+</a><a href="#h1-0-84" id="h1-0-84" class="d">-func (c *client) Query(q *Query) (Search, error) {
+</a><a href="#h1-0-85" id="h1-0-85" class="d">-	s := &amp;search{q, make(chan *Result), make(chan error, 1), make(chan *Stats, 1)}
+</a><a href="#h1-0-86" id="h1-0-86" class="d">-	select {
+</a><a href="#h1-0-87" id="h1-0-87" class="d">-	case e, ok := &lt;-c.errors:
+</a><a href="#h1-0-88" id="h1-0-88" class="d">-		if !ok {
+</a><a href="#h1-0-89" id="h1-0-89" class="d">-			e = errors.New(&quot;use of a closed Client&quot;)
+</a><a href="#h1-0-90" id="h1-0-90" class="d">-		}
+</a><a href="#h1-0-91" id="h1-0-91" class="d">-		c.error = e
+</a><a href="#h1-0-92" id="h1-0-92" class="d">-		return nil, e
+</a><a href="#h1-0-93" id="h1-0-93" class="d">-	case c.queries &lt;- s:
+</a><a href="#h1-0-94" id="h1-0-94" class="d">-		return s, nil
+</a><a href="#h1-0-95" id="h1-0-95" class="d">-	}
+</a><a href="#h1-0-96" id="h1-0-96" class="d">-}
+</a><a href="#h1-0-97" id="h1-0-97" class="d">-
+</a><a href="#h1-0-98" id="h1-0-98" class="d">-func (c *client) Close() {
+</a><a href="#h1-0-99" id="h1-0-99" class="d">-	close(c.queries)
+</a><a href="#h1-0-100" id="h1-0-100" class="d">-}
+</a><a href="#h1-0-101" id="h1-0-101" class="d">-
+</a><a href="#h1-0-102" id="h1-0-102" class="d">-func (c *client) loop() {
+</a><a href="#h1-0-103" id="h1-0-103" class="d">-	defer c.conn.Close()
+</a><a href="#h1-0-104" id="h1-0-104" class="d">-	defer close(c.errors)
+</a><a href="#h1-0-105" id="h1-0-105" class="d">-	encoder := json.NewEncoder(c.conn)
+</a><a href="#h1-0-106" id="h1-0-106" class="d">-	decoder := json.NewDecoder(c.conn)
+</a><a href="#h1-0-107" id="h1-0-107" class="d">-
+</a><a href="#h1-0-108" id="h1-0-108" class="d">-	for {
+</a><a href="#h1-0-109" id="h1-0-109" class="d">-		op, err := ops.Decode(decoder)
+</a><a href="#h1-0-110" id="h1-0-110" class="d">-		if err != nil {
+</a><a href="#h1-0-111" id="h1-0-111" class="d">-			c.errors &lt;- err
+</a><a href="#h1-0-112" id="h1-0-112" class="d">-			return
+</a><a href="#h1-0-113" id="h1-0-113" class="d">-		}
+</a><a href="#h1-0-114" id="h1-0-114" class="d">-		if info, ok := op.(*ServerInfo); !ok {
+</a><a href="#h1-0-115" id="h1-0-115" class="d">-			bytes, _ := ops.Marshal(op)
+</a><a href="#h1-0-116" id="h1-0-116" class="d">-			c.errors &lt;- fmt.Errorf(&quot;Expected op: &#39;%s&#39;, got: %s (%s)&quot;,
+</a><a href="#h1-0-117" id="h1-0-117" class="d">-				new(ServerInfo).Opcode(), op.Opcode(), bytes)
+</a><a href="#h1-0-118" id="h1-0-118" class="d">-			return
+</a><a href="#h1-0-119" id="h1-0-119" class="d">-		} else {
+</a><a href="#h1-0-120" id="h1-0-120" class="d">-			select {
+</a><a href="#h1-0-121" id="h1-0-121" class="d">-			case c.ready &lt;- info:
+</a><a href="#h1-0-122" id="h1-0-122" class="d">-			default:
+</a><a href="#h1-0-123" id="h1-0-123" class="d">-			}
+</a><a href="#h1-0-124" id="h1-0-124" class="d">-		}
+</a><a href="#h1-0-125" id="h1-0-125" class="d">-
+</a><a href="#h1-0-126" id="h1-0-126" class="d">-		q, ok := &lt;-c.queries
+</a><a href="#h1-0-127" id="h1-0-127" class="d">-		if !ok {
+</a><a href="#h1-0-128" id="h1-0-128" class="d">-			break
+</a><a href="#h1-0-129" id="h1-0-129" class="d">-		}
+</a><a href="#h1-0-130" id="h1-0-130" class="d">-		if e := ops.Encode(encoder, q.query); e != nil {
+</a><a href="#h1-0-131" id="h1-0-131" class="d">-			q.errors &lt;- e
+</a><a href="#h1-0-132" id="h1-0-132" class="d">-			close(q.errors)
+</a><a href="#h1-0-133" id="h1-0-133" class="d">-			close(q.results)
+</a><a href="#h1-0-134" id="h1-0-134" class="d">-			close(q.stats)
+</a><a href="#h1-0-135" id="h1-0-135" class="d">-			continue
+</a><a href="#h1-0-136" id="h1-0-136" class="d">-		}
+</a><a href="#h1-0-137" id="h1-0-137" class="d">-		done := false
+</a><a href="#h1-0-138" id="h1-0-138" class="d">-	ResultLoop:
+</a><a href="#h1-0-139" id="h1-0-139" class="d">-		for {
+</a><a href="#h1-0-140" id="h1-0-140" class="d">-			op, err = ops.Decode(decoder)
+</a><a href="#h1-0-141" id="h1-0-141" class="d">-			if err != nil {
+</a><a href="#h1-0-142" id="h1-0-142" class="d">-				break
+</a><a href="#h1-0-143" id="h1-0-143" class="d">-			}
+</a><a href="#h1-0-144" id="h1-0-144" class="d">-			switch concrete := op.(type) {
+</a><a href="#h1-0-145" id="h1-0-145" class="d">-			case *ReplyError:
+</a><a href="#h1-0-146" id="h1-0-146" class="d">-				q.errors &lt;- QueryError{q.query, string(*concrete)}
+</a><a href="#h1-0-147" id="h1-0-147" class="d">-				done = true
+</a><a href="#h1-0-148" id="h1-0-148" class="d">-				break ResultLoop
+</a><a href="#h1-0-149" id="h1-0-149" class="d">-			case *Stats:
+</a><a href="#h1-0-150" id="h1-0-150" class="d">-				q.stats &lt;- concrete
+</a><a href="#h1-0-151" id="h1-0-151" class="d">-				done = true
+</a><a href="#h1-0-152" id="h1-0-152" class="d">-				break ResultLoop
+</a><a href="#h1-0-153" id="h1-0-153" class="d">-			case *Result:
+</a><a href="#h1-0-154" id="h1-0-154" class="d">-				q.results &lt;- concrete
+</a><a href="#h1-0-155" id="h1-0-155" class="d">-			}
+</a><a href="#h1-0-156" id="h1-0-156" class="d">-		}
+</a><a href="#h1-0-157" id="h1-0-157" class="d">-
+</a><a href="#h1-0-158" id="h1-0-158" class="d">-		if err != nil {
+</a><a href="#h1-0-159" id="h1-0-159" class="d">-			q.errors &lt;- err
+</a><a href="#h1-0-160" id="h1-0-160" class="d">-		} else if !done {
+</a><a href="#h1-0-161" id="h1-0-161" class="d">-			q.errors &lt;- errors.New(&quot;connection closed unexpectedly&quot;)
+</a><a href="#h1-0-162" id="h1-0-162" class="d">-		}
+</a><a href="#h1-0-163" id="h1-0-163" class="d">-
+</a><a href="#h1-0-164" id="h1-0-164" class="d">-		close(q.errors)
+</a><a href="#h1-0-165" id="h1-0-165" class="d">-		close(q.results)
+</a><a href="#h1-0-166" id="h1-0-166" class="d">-		close(q.stats)
+</a><a href="#h1-0-167" id="h1-0-167" class="d">-	}
+</a><a href="#h1-0-168" id="h1-0-168" class="d">-}
+</a><a href="#h1-0-169" id="h1-0-169" class="d">-
+</a><a href="#h1-0-170" id="h1-0-170" class="d">-func (s *search) Results() &lt;-chan *Result {
+</a><a href="#h1-0-171" id="h1-0-171" class="d">-	return s.results
+</a><a href="#h1-0-172" id="h1-0-172" class="d">-}
+</a><a href="#h1-0-173" id="h1-0-173" class="d">-
+</a><a href="#h1-0-174" id="h1-0-174" class="d">-func (s *search) Close() (*Stats, error) {
+</a><a href="#h1-0-175" id="h1-0-175" class="d">-	for _ = range s.results {
+</a><a href="#h1-0-176" id="h1-0-176" class="d">-	}
+</a><a href="#h1-0-177" id="h1-0-177" class="d">-	return &lt;-s.stats, &lt;-s.errors
+</a><a href="#h1-0-178" id="h1-0-178" class="d">-}
+</a><b>diff --git a/<a id="h2" href="../file/client/client_test.go">client/client_test.go</a> b/<a href="../file/client/client_test.go">client/client_test.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -1,234 +0,0 @@
+</a><a href="#h2-0-0" id="h2-0-0" class="d">-package client
+</a><a href="#h2-0-1" id="h2-0-1" class="d">-
+</a><a href="#h2-0-2" id="h2-0-2" class="d">-import (
+</a><a href="#h2-0-3" id="h2-0-3" class="d">-	&quot;encoding/json&quot;
+</a><a href="#h2-0-4" id="h2-0-4" class="d">-	&quot;io&quot;
+</a><a href="#h2-0-5" id="h2-0-5" class="d">-	&quot;net&quot;
+</a><a href="#h2-0-6" id="h2-0-6" class="d">-	&quot;strings&quot;
+</a><a href="#h2-0-7" id="h2-0-7" class="d">-	&quot;testing&quot;
+</a><a href="#h2-0-8" id="h2-0-8" class="d">-
+</a><a href="#h2-0-9" id="h2-0-9" class="d">-	&quot;gopkg.in/check.v1&quot;
+</a><a href="#h2-0-10" id="h2-0-10" class="d">-)
+</a><a href="#h2-0-11" id="h2-0-11" class="d">-
+</a><a href="#h2-0-12" id="h2-0-12" class="d">-func Test(t *testing.T) { check.TestingT(t) }
+</a><a href="#h2-0-13" id="h2-0-13" class="d">-
+</a><a href="#h2-0-14" id="h2-0-14" class="d">-type ClientSuite struct {
+</a><a href="#h2-0-15" id="h2-0-15" class="d">-	client Client
+</a><a href="#h2-0-16" id="h2-0-16" class="d">-}
+</a><a href="#h2-0-17" id="h2-0-17" class="d">-
+</a><a href="#h2-0-18" id="h2-0-18" class="d">-func (c *ClientSuite) TearDownTest(*check.C) {
+</a><a href="#h2-0-19" id="h2-0-19" class="d">-	if c.client != nil {
+</a><a href="#h2-0-20" id="h2-0-20" class="d">-		c.client.Close()
+</a><a href="#h2-0-21" id="h2-0-21" class="d">-	}
+</a><a href="#h2-0-22" id="h2-0-22" class="d">-}
+</a><a href="#h2-0-23" id="h2-0-23" class="d">-
+</a><a href="#h2-0-24" id="h2-0-24" class="d">-var _ = check.Suite(&amp;ClientSuite{})
+</a><a href="#h2-0-25" id="h2-0-25" class="d">-
+</a><a href="#h2-0-26" id="h2-0-26" class="d">-var (
+</a><a href="#h2-0-27" id="h2-0-27" class="d">-	Equals = check.Equals
+</a><a href="#h2-0-28" id="h2-0-28" class="d">-	IsNil  = check.IsNil
+</a><a href="#h2-0-29" id="h2-0-29" class="d">-	Not    = check.Not
+</a><a href="#h2-0-30" id="h2-0-30" class="d">-)
+</a><a href="#h2-0-31" id="h2-0-31" class="d">-
+</a><a href="#h2-0-32" id="h2-0-32" class="d">-type MockServer struct {
+</a><a href="#h2-0-33" id="h2-0-33" class="d">-	Info    *ServerInfo
+</a><a href="#h2-0-34" id="h2-0-34" class="d">-	Results []*Result
+</a><a href="#h2-0-35" id="h2-0-35" class="d">-}
+</a><a href="#h2-0-36" id="h2-0-36" class="d">-
+</a><a href="#h2-0-37" id="h2-0-37" class="d">-func (m *MockServer) handle(conn net.Conn) {
+</a><a href="#h2-0-38" id="h2-0-38" class="d">-	defer conn.Close()
+</a><a href="#h2-0-39" id="h2-0-39" class="d">-
+</a><a href="#h2-0-40" id="h2-0-40" class="d">-	encoder := json.NewEncoder(conn)
+</a><a href="#h2-0-41" id="h2-0-41" class="d">-	decoder := json.NewDecoder(conn)
+</a><a href="#h2-0-42" id="h2-0-42" class="d">-	for {
+</a><a href="#h2-0-43" id="h2-0-43" class="d">-		ops.Encode(encoder, m.Info)
+</a><a href="#h2-0-44" id="h2-0-44" class="d">-
+</a><a href="#h2-0-45" id="h2-0-45" class="d">-		if op, err := ops.Decode(decoder); err != nil {
+</a><a href="#h2-0-46" id="h2-0-46" class="d">-			if err == io.EOF {
+</a><a href="#h2-0-47" id="h2-0-47" class="d">-				return
+</a><a href="#h2-0-48" id="h2-0-48" class="d">-			}
+</a><a href="#h2-0-49" id="h2-0-49" class="d">-			panic(err.Error())
+</a><a href="#h2-0-50" id="h2-0-50" class="d">-		} else {
+</a><a href="#h2-0-51" id="h2-0-51" class="d">-			if op.(*Query) == nil {
+</a><a href="#h2-0-52" id="h2-0-52" class="d">-				panic(&quot;expected query&quot;)
+</a><a href="#h2-0-53" id="h2-0-53" class="d">-			}
+</a><a href="#h2-0-54" id="h2-0-54" class="d">-		}
+</a><a href="#h2-0-55" id="h2-0-55" class="d">-
+</a><a href="#h2-0-56" id="h2-0-56" class="d">-		for _, r := range m.Results {
+</a><a href="#h2-0-57" id="h2-0-57" class="d">-			ops.Encode(encoder, r)
+</a><a href="#h2-0-58" id="h2-0-58" class="d">-		}
+</a><a href="#h2-0-59" id="h2-0-59" class="d">-
+</a><a href="#h2-0-60" id="h2-0-60" class="d">-		ops.Encode(encoder, &amp;Stats{})
+</a><a href="#h2-0-61" id="h2-0-61" class="d">-	}
+</a><a href="#h2-0-62" id="h2-0-62" class="d">-}
+</a><a href="#h2-0-63" id="h2-0-63" class="d">-
+</a><a href="#h2-0-64" id="h2-0-64" class="d">-func runMockServer(handle func(net.Conn)) &lt;-chan string {
+</a><a href="#h2-0-65" id="h2-0-65" class="d">-	ready := make(chan string, 1)
+</a><a href="#h2-0-66" id="h2-0-66" class="d">-	go func() {
+</a><a href="#h2-0-67" id="h2-0-67" class="d">-		defer close(ready)
+</a><a href="#h2-0-68" id="h2-0-68" class="d">-		ln, err := net.Listen(&quot;tcp4&quot;, &quot;:0&quot;)
+</a><a href="#h2-0-69" id="h2-0-69" class="d">-		if err != nil {
+</a><a href="#h2-0-70" id="h2-0-70" class="d">-			panic(err.Error())
+</a><a href="#h2-0-71" id="h2-0-71" class="d">-		}
+</a><a href="#h2-0-72" id="h2-0-72" class="d">-		defer ln.Close()
+</a><a href="#h2-0-73" id="h2-0-73" class="d">-		ready &lt;- ln.Addr().String()
+</a><a href="#h2-0-74" id="h2-0-74" class="d">-		conn, err := ln.Accept()
+</a><a href="#h2-0-75" id="h2-0-75" class="d">-		if err != nil {
+</a><a href="#h2-0-76" id="h2-0-76" class="d">-			panic(err.Error())
+</a><a href="#h2-0-77" id="h2-0-77" class="d">-		}
+</a><a href="#h2-0-78" id="h2-0-78" class="d">-		handle(conn)
+</a><a href="#h2-0-79" id="h2-0-79" class="d">-	}()
+</a><a href="#h2-0-80" id="h2-0-80" class="d">-	return ready
+</a><a href="#h2-0-81" id="h2-0-81" class="d">-}
+</a><a href="#h2-0-82" id="h2-0-82" class="d">-
+</a><a href="#h2-0-83" id="h2-0-83" class="d">-func (s *ClientSuite) connect(c *check.C, addr string) {
+</a><a href="#h2-0-84" id="h2-0-84" class="d">-	var err error
+</a><a href="#h2-0-85" id="h2-0-85" class="d">-	s.client, err = Dial(&quot;tcp&quot;, addr)
+</a><a href="#h2-0-86" id="h2-0-86" class="d">-	if err != nil {
+</a><a href="#h2-0-87" id="h2-0-87" class="d">-		c.Fatalf(&quot;connecting to %s: %s&quot;, addr, err.Error())
+</a><a href="#h2-0-88" id="h2-0-88" class="d">-	}
+</a><a href="#h2-0-89" id="h2-0-89" class="d">-}
+</a><a href="#h2-0-90" id="h2-0-90" class="d">-
+</a><a href="#h2-0-91" id="h2-0-91" class="d">-func (s *ClientSuite) TestQuery(c *check.C) {
+</a><a href="#h2-0-92" id="h2-0-92" class="d">-	s.connect(c, &lt;-runMockServer((&amp;MockServer{
+</a><a href="#h2-0-93" id="h2-0-93" class="d">-		Results: []*Result{
+</a><a href="#h2-0-94" id="h2-0-94" class="d">-			{Line: &quot;match line 1&quot;},
+</a><a href="#h2-0-95" id="h2-0-95" class="d">-		},
+</a><a href="#h2-0-96" id="h2-0-96" class="d">-	}).handle))
+</a><a href="#h2-0-97" id="h2-0-97" class="d">-	search, err := s.client.Query(&amp;Query{Line: &quot;.&quot;})
+</a><a href="#h2-0-98" id="h2-0-98" class="d">-	c.Assert(err, check.IsNil)
+</a><a href="#h2-0-99" id="h2-0-99" class="d">-	var n int
+</a><a href="#h2-0-100" id="h2-0-100" class="d">-	for r := range search.Results() {
+</a><a href="#h2-0-101" id="h2-0-101" class="d">-		n++
+</a><a href="#h2-0-102" id="h2-0-102" class="d">-		c.Assert(r.Line, check.Not(Equals), &quot;&quot;)
+</a><a href="#h2-0-103" id="h2-0-103" class="d">-	}
+</a><a href="#h2-0-104" id="h2-0-104" class="d">-	c.Assert(n, Equals, 1)
+</a><a href="#h2-0-105" id="h2-0-105" class="d">-	st, e := search.Close()
+</a><a href="#h2-0-106" id="h2-0-106" class="d">-	c.Assert(e, IsNil)
+</a><a href="#h2-0-107" id="h2-0-107" class="d">-	c.Assert(st, Not(IsNil))
+</a><a href="#h2-0-108" id="h2-0-108" class="d">-}
+</a><a href="#h2-0-109" id="h2-0-109" class="d">-
+</a><a href="#h2-0-110" id="h2-0-110" class="d">-func (s *ClientSuite) TestTwoQueries(c *check.C) {
+</a><a href="#h2-0-111" id="h2-0-111" class="d">-	s.connect(c, &lt;-runMockServer((&amp;MockServer{
+</a><a href="#h2-0-112" id="h2-0-112" class="d">-		Results: []*Result{
+</a><a href="#h2-0-113" id="h2-0-113" class="d">-			{Line: &quot;match line 1&quot;},
+</a><a href="#h2-0-114" id="h2-0-114" class="d">-		},
+</a><a href="#h2-0-115" id="h2-0-115" class="d">-	}).handle))
+</a><a href="#h2-0-116" id="h2-0-116" class="d">-
+</a><a href="#h2-0-117" id="h2-0-117" class="d">-	search, err := s.client.Query(&amp;Query{Line: &quot;.&quot;})
+</a><a href="#h2-0-118" id="h2-0-118" class="d">-	c.Assert(err, IsNil)
+</a><a href="#h2-0-119" id="h2-0-119" class="d">-	_, err = search.Close()
+</a><a href="#h2-0-120" id="h2-0-120" class="d">-	c.Assert(err, IsNil)
+</a><a href="#h2-0-121" id="h2-0-121" class="d">-
+</a><a href="#h2-0-122" id="h2-0-122" class="d">-	search, err = s.client.Query(&amp;Query{Line: &quot;.&quot;})
+</a><a href="#h2-0-123" id="h2-0-123" class="d">-	c.Assert(err, IsNil)
+</a><a href="#h2-0-124" id="h2-0-124" class="d">-	n := 0
+</a><a href="#h2-0-125" id="h2-0-125" class="d">-	for _ = range search.Results() {
+</a><a href="#h2-0-126" id="h2-0-126" class="d">-		n++
+</a><a href="#h2-0-127" id="h2-0-127" class="d">-	}
+</a><a href="#h2-0-128" id="h2-0-128" class="d">-	_, err = search.Close()
+</a><a href="#h2-0-129" id="h2-0-129" class="d">-	if err != nil {
+</a><a href="#h2-0-130" id="h2-0-130" class="d">-		c.Fatalf(&quot;Unexpected error: %s&quot;, err.Error())
+</a><a href="#h2-0-131" id="h2-0-131" class="d">-	}
+</a><a href="#h2-0-132" id="h2-0-132" class="d">-	c.Assert(n, Not(Equals), 0)
+</a><a href="#h2-0-133" id="h2-0-133" class="d">-}
+</a><a href="#h2-0-134" id="h2-0-134" class="d">-
+</a><a href="#h2-0-135" id="h2-0-135" class="d">-func (s *ClientSuite) TestLongLine(c *check.C) {
+</a><a href="#h2-0-136" id="h2-0-136" class="d">-	longLine := strings.Repeat(&quot;X&quot;, 1&lt;&lt;16)
+</a><a href="#h2-0-137" id="h2-0-137" class="d">-	s.connect(c, &lt;-runMockServer((&amp;MockServer{
+</a><a href="#h2-0-138" id="h2-0-138" class="d">-		Results: []*Result{
+</a><a href="#h2-0-139" id="h2-0-139" class="d">-			{Line: longLine},
+</a><a href="#h2-0-140" id="h2-0-140" class="d">-		},
+</a><a href="#h2-0-141" id="h2-0-141" class="d">-	}).handle))
+</a><a href="#h2-0-142" id="h2-0-142" class="d">-	search, err := s.client.Query(&amp;Query{Line: &quot;.&quot;})
+</a><a href="#h2-0-143" id="h2-0-143" class="d">-	c.Assert(err, IsNil)
+</a><a href="#h2-0-144" id="h2-0-144" class="d">-	var rs []*Result
+</a><a href="#h2-0-145" id="h2-0-145" class="d">-	for r := range search.Results() {
+</a><a href="#h2-0-146" id="h2-0-146" class="d">-		rs = append(rs, r)
+</a><a href="#h2-0-147" id="h2-0-147" class="d">-	}
+</a><a href="#h2-0-148" id="h2-0-148" class="d">-
+</a><a href="#h2-0-149" id="h2-0-149" class="d">-	c.Assert(len(rs), Equals, 1)
+</a><a href="#h2-0-150" id="h2-0-150" class="d">-	c.Assert(rs[0].Line, Equals, longLine)
+</a><a href="#h2-0-151" id="h2-0-151" class="d">-}
+</a><a href="#h2-0-152" id="h2-0-152" class="d">-
+</a><a href="#h2-0-153" id="h2-0-153" class="d">-type MockServerQueryError struct {
+</a><a href="#h2-0-154" id="h2-0-154" class="d">-	Info *ServerInfo
+</a><a href="#h2-0-155" id="h2-0-155" class="d">-	Err  string
+</a><a href="#h2-0-156" id="h2-0-156" class="d">-}
+</a><a href="#h2-0-157" id="h2-0-157" class="d">-
+</a><a href="#h2-0-158" id="h2-0-158" class="d">-func (m *MockServerQueryError) handle(conn net.Conn) {
+</a><a href="#h2-0-159" id="h2-0-159" class="d">-	defer conn.Close()
+</a><a href="#h2-0-160" id="h2-0-160" class="d">-	encoder := json.NewEncoder(conn)
+</a><a href="#h2-0-161" id="h2-0-161" class="d">-	decoder := json.NewDecoder(conn)
+</a><a href="#h2-0-162" id="h2-0-162" class="d">-	for {
+</a><a href="#h2-0-163" id="h2-0-163" class="d">-		ops.Encode(encoder, m.Info)
+</a><a href="#h2-0-164" id="h2-0-164" class="d">-
+</a><a href="#h2-0-165" id="h2-0-165" class="d">-		if op, err := ops.Decode(decoder); err != nil {
+</a><a href="#h2-0-166" id="h2-0-166" class="d">-			if err == io.EOF {
+</a><a href="#h2-0-167" id="h2-0-167" class="d">-				return
+</a><a href="#h2-0-168" id="h2-0-168" class="d">-			}
+</a><a href="#h2-0-169" id="h2-0-169" class="d">-			panic(err.Error())
+</a><a href="#h2-0-170" id="h2-0-170" class="d">-		} else {
+</a><a href="#h2-0-171" id="h2-0-171" class="d">-			if op.(*Query) == nil {
+</a><a href="#h2-0-172" id="h2-0-172" class="d">-				panic(&quot;expected query&quot;)
+</a><a href="#h2-0-173" id="h2-0-173" class="d">-			}
+</a><a href="#h2-0-174" id="h2-0-174" class="d">-		}
+</a><a href="#h2-0-175" id="h2-0-175" class="d">-
+</a><a href="#h2-0-176" id="h2-0-176" class="d">-		re := ReplyError(m.Err)
+</a><a href="#h2-0-177" id="h2-0-177" class="d">-		ops.Encode(encoder, &amp;re)
+</a><a href="#h2-0-178" id="h2-0-178" class="d">-	}
+</a><a href="#h2-0-179" id="h2-0-179" class="d">-}
+</a><a href="#h2-0-180" id="h2-0-180" class="d">-
+</a><a href="#h2-0-181" id="h2-0-181" class="d">-func (s *ClientSuite) TestBadRegex(c *check.C) {
+</a><a href="#h2-0-182" id="h2-0-182" class="d">-	errStr := &quot;Invalid query: (&quot;
+</a><a href="#h2-0-183" id="h2-0-183" class="d">-	s.connect(c, &lt;-runMockServer((&amp;MockServerQueryError{
+</a><a href="#h2-0-184" id="h2-0-184" class="d">-		Err: errStr,
+</a><a href="#h2-0-185" id="h2-0-185" class="d">-	}).handle))
+</a><a href="#h2-0-186" id="h2-0-186" class="d">-
+</a><a href="#h2-0-187" id="h2-0-187" class="d">-	search, err := s.client.Query(&amp;Query{Line: &quot;(&quot;})
+</a><a href="#h2-0-188" id="h2-0-188" class="d">-	c.Assert(err, IsNil)
+</a><a href="#h2-0-189" id="h2-0-189" class="d">-	for _ = range search.Results() {
+</a><a href="#h2-0-190" id="h2-0-190" class="d">-		c.Fatal(&quot;Got back a result from an erroneous query!&quot;)
+</a><a href="#h2-0-191" id="h2-0-191" class="d">-	}
+</a><a href="#h2-0-192" id="h2-0-192" class="d">-	st, e := search.Close()
+</a><a href="#h2-0-193" id="h2-0-193" class="d">-	c.Assert(st, IsNil)
+</a><a href="#h2-0-194" id="h2-0-194" class="d">-	if e == nil {
+</a><a href="#h2-0-195" id="h2-0-195" class="d">-		c.Fatal(&quot;Didn&#39;t get back an error&quot;)
+</a><a href="#h2-0-196" id="h2-0-196" class="d">-	}
+</a><a href="#h2-0-197" id="h2-0-197" class="d">-	if q, ok := e.(QueryError); ok {
+</a><a href="#h2-0-198" id="h2-0-198" class="d">-		c.Assert(q.Query.Line, Equals, &quot;(&quot;)
+</a><a href="#h2-0-199" id="h2-0-199" class="d">-		c.Assert(q.Err, Equals, errStr)
+</a><a href="#h2-0-200" id="h2-0-200" class="d">-	} else {
+</a><a href="#h2-0-201" id="h2-0-201" class="d">-		c.Fatalf(&quot;Error %v wasn&#39;t a QueryError&quot;, e)
+</a><a href="#h2-0-202" id="h2-0-202" class="d">-	}
+</a><a href="#h2-0-203" id="h2-0-203" class="d">-}
+</a><a href="#h2-0-204" id="h2-0-204" class="d">-
+</a><a href="#h2-0-205" id="h2-0-205" class="d">-func mockServerShutdown() &lt;-chan string {
+</a><a href="#h2-0-206" id="h2-0-206" class="d">-	return runMockServer(func(conn net.Conn) {
+</a><a href="#h2-0-207" id="h2-0-207" class="d">-		ops.Encode(json.NewEncoder(conn), &amp;ServerInfo{})
+</a><a href="#h2-0-208" id="h2-0-208" class="d">-		conn.Close()
+</a><a href="#h2-0-209" id="h2-0-209" class="d">-	})
+</a><a href="#h2-0-210" id="h2-0-210" class="d">-}
+</a><a href="#h2-0-211" id="h2-0-211" class="d">-
+</a><a href="#h2-0-212" id="h2-0-212" class="d">-func (s *ClientSuite) TestShutdown(c *check.C) {
+</a><a href="#h2-0-213" id="h2-0-213" class="d">-	addr := &lt;-mockServerShutdown()
+</a><a href="#h2-0-214" id="h2-0-214" class="d">-
+</a><a href="#h2-0-215" id="h2-0-215" class="d">-	s.connect(c, addr)
+</a><a href="#h2-0-216" id="h2-0-216" class="d">-
+</a><a href="#h2-0-217" id="h2-0-217" class="d">-	search, err := s.client.Query(&amp;Query{Line: &quot;l&quot;})
+</a><a href="#h2-0-218" id="h2-0-218" class="d">-	c.Assert(err, IsNil)
+</a><a href="#h2-0-219" id="h2-0-219" class="d">-	c.Assert(search, Not(IsNil))
+</a><a href="#h2-0-220" id="h2-0-220" class="d">-
+</a><a href="#h2-0-221" id="h2-0-221" class="d">-	results := search.Results()
+</a><a href="#h2-0-222" id="h2-0-222" class="d">-	c.Assert(results, Not(IsNil))
+</a><a href="#h2-0-223" id="h2-0-223" class="d">-	for r := range results {
+</a><a href="#h2-0-224" id="h2-0-224" class="d">-		c.Errorf(&quot;Got a result back: %+v&quot;, r)
+</a><a href="#h2-0-225" id="h2-0-225" class="d">-	}
+</a><a href="#h2-0-226" id="h2-0-226" class="d">-	st, err := search.Close()
+</a><a href="#h2-0-227" id="h2-0-227" class="d">-	c.Assert(st, IsNil)
+</a><a href="#h2-0-228" id="h2-0-228" class="d">-	c.Assert(err, Not(IsNil))
+</a><a href="#h2-0-229" id="h2-0-229" class="d">-
+</a><a href="#h2-0-230" id="h2-0-230" class="d">-	search, err = s.client.Query(&amp;Query{Line: &quot;l&quot;})
+</a><a href="#h2-0-231" id="h2-0-231" class="d">-	c.Assert(err, Not(IsNil))
+</a><a href="#h2-0-232" id="h2-0-232" class="d">-	c.Assert(search, IsNil)
+</a><a href="#h2-0-233" id="h2-0-233" class="d">-}
+</a><b>diff --git a/<a id="h3" href="../file/client/test/BUILD">client/test/BUILD</a> b/<a href="../file/client/test/BUILD">client/test/BUILD</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -1,33 +0,0 @@
+</a><a href="#h3-0-0" id="h3-0-0" class="d">-
+</a><a href="#h3-0-1" id="h3-0-1" class="d">-load(&quot;@io_bazel_rules_go//go:def.bzl&quot;,
+</a><a href="#h3-0-2" id="h3-0-2" class="d">-  &quot;go_binary&quot;,
+</a><a href="#h3-0-3" id="h3-0-3" class="d">-  &quot;go_library&quot;,
+</a><a href="#h3-0-4" id="h3-0-4" class="d">-  &quot;go_test&quot;,
+</a><a href="#h3-0-5" id="h3-0-5" class="d">-)
+</a><a href="#h3-0-6" id="h3-0-6" class="d">-
+</a><a href="#h3-0-7" id="h3-0-7" class="d">-go_library(
+</a><a href="#h3-0-8" id="h3-0-8" class="d">-name = &quot;go_default_library&quot;,
+</a><a href="#h3-0-9" id="h3-0-9" class="d">-  srcs = [
+</a><a href="#h3-0-10" id="h3-0-10" class="d">-    &quot;testutil.go&quot;,
+</a><a href="#h3-0-11" id="h3-0-11" class="d">-  ],
+</a><a href="#h3-0-12" id="h3-0-12" class="d">-  deps = [
+</a><a href="#h3-0-13" id="h3-0-13" class="d">-    &quot;//client:go_default_library&quot;,
+</a><a href="#h3-0-14" id="h3-0-14" class="d">-  ],
+</a><a href="#h3-0-15" id="h3-0-15" class="d">-  visibility = [&quot;//visibility:public&quot;],
+</a><a href="#h3-0-16" id="h3-0-16" class="d">-)
+</a><a href="#h3-0-17" id="h3-0-17" class="d">-
+</a><a href="#h3-0-18" id="h3-0-18" class="d">-
+</a><a href="#h3-0-19" id="h3-0-19" class="d">-go_test(
+</a><a href="#h3-0-20" id="h3-0-20" class="d">-  name = &quot;go_default_test&quot;,
+</a><a href="#h3-0-21" id="h3-0-21" class="d">-  srcs = [
+</a><a href="#h3-0-22" id="h3-0-22" class="d">-    &quot;bench_test.go&quot;,
+</a><a href="#h3-0-23" id="h3-0-23" class="d">-    &quot;integration_test.go&quot;,
+</a><a href="#h3-0-24" id="h3-0-24" class="d">-    &quot;mock_test.go&quot;,
+</a><a href="#h3-0-25" id="h3-0-25" class="d">-  ],
+</a><a href="#h3-0-26" id="h3-0-26" class="d">-  deps = [
+</a><a href="#h3-0-27" id="h3-0-27" class="d">-    &quot;//client:go_default_library&quot;,
+</a><a href="#h3-0-28" id="h3-0-28" class="d">-    &quot;//vendor/gopkg.in/check.v1:go_default_library&quot;,
+</a><a href="#h3-0-29" id="h3-0-29" class="d">-  ],
+</a><a href="#h3-0-30" id="h3-0-30" class="d">-  library = &quot;:go_default_library&quot;,
+</a><a href="#h3-0-31" id="h3-0-31" class="d">-)
+</a><a href="#h3-0-32" id="h3-0-32" class="d">-
+</a><b>diff --git a/<a id="h4" href="../file/client/types.go">client/types.go</a> b/<a href="../file/client/types.go">client/types.go</a></b>
+<a href="#h4-0" id="h4-0" class="h">@@ -1,86 +0,0 @@
+</a><a href="#h4-0-0" id="h4-0-0" class="d">-package client
+</a><a href="#h4-0-1" id="h4-0-1" class="d">-
+</a><a href="#h4-0-2" id="h4-0-2" class="d">-type Query struct {
+</a><a href="#h4-0-3" id="h4-0-3" class="d">-	Line     string `json:&quot;line&quot;`
+</a><a href="#h4-0-4" id="h4-0-4" class="d">-	File     string `json:&quot;file&quot;`
+</a><a href="#h4-0-5" id="h4-0-5" class="d">-	Repo     string `json:&quot;repo&quot;`
+</a><a href="#h4-0-6" id="h4-0-6" class="d">-	Tags     string `json:&quot;tags&quot;`
+</a><a href="#h4-0-7" id="h4-0-7" class="d">-	FoldCase bool   `json:&quot;fold_case&quot;`
+</a><a href="#h4-0-8" id="h4-0-8" class="d">-	Not      struct {
+</a><a href="#h4-0-9" id="h4-0-9" class="d">-		File string `json:&quot;file&quot;`
+</a><a href="#h4-0-10" id="h4-0-10" class="d">-		Repo string `json:&quot;repo&quot;`
+</a><a href="#h4-0-11" id="h4-0-11" class="d">-		Tags string `json:&quot;tags&quot;`
+</a><a href="#h4-0-12" id="h4-0-12" class="d">-	} `json:&quot;not&quot;`
+</a><a href="#h4-0-13" id="h4-0-13" class="d">-}
+</a><a href="#h4-0-14" id="h4-0-14" class="d">-
+</a><a href="#h4-0-15" id="h4-0-15" class="d">-func (q *Query) Opcode() string {
+</a><a href="#h4-0-16" id="h4-0-16" class="d">-	return &quot;query&quot;
+</a><a href="#h4-0-17" id="h4-0-17" class="d">-}
+</a><a href="#h4-0-18" id="h4-0-18" class="d">-
+</a><a href="#h4-0-19" id="h4-0-19" class="d">-type QueryError struct {
+</a><a href="#h4-0-20" id="h4-0-20" class="d">-	Query *Query
+</a><a href="#h4-0-21" id="h4-0-21" class="d">-	Err   string
+</a><a href="#h4-0-22" id="h4-0-22" class="d">-}
+</a><a href="#h4-0-23" id="h4-0-23" class="d">-
+</a><a href="#h4-0-24" id="h4-0-24" class="d">-func (q QueryError) Error() string {
+</a><a href="#h4-0-25" id="h4-0-25" class="d">-	return q.Err
+</a><a href="#h4-0-26" id="h4-0-26" class="d">-}
+</a><a href="#h4-0-27" id="h4-0-27" class="d">-
+</a><a href="#h4-0-28" id="h4-0-28" class="d">-type Result struct {
+</a><a href="#h4-0-29" id="h4-0-29" class="d">-	Tree          string   `json:&quot;tree&quot;`
+</a><a href="#h4-0-30" id="h4-0-30" class="d">-	Version       string   `json:&quot;version&quot;`
+</a><a href="#h4-0-31" id="h4-0-31" class="d">-	Path          string   `json:&quot;path&quot;`
+</a><a href="#h4-0-32" id="h4-0-32" class="d">-	LineNumber    int      `json:&quot;lno&quot;`
+</a><a href="#h4-0-33" id="h4-0-33" class="d">-	ContextBefore []string `json:&quot;context_before&quot;`
+</a><a href="#h4-0-34" id="h4-0-34" class="d">-	ContextAfter  []string `json:&quot;context_after&quot;`
+</a><a href="#h4-0-35" id="h4-0-35" class="d">-	Bounds        [2]int   `json:&quot;bounds&quot;`
+</a><a href="#h4-0-36" id="h4-0-36" class="d">-	Line          string   `json:&quot;line&quot;`
+</a><a href="#h4-0-37" id="h4-0-37" class="d">-}
+</a><a href="#h4-0-38" id="h4-0-38" class="d">-
+</a><a href="#h4-0-39" id="h4-0-39" class="d">-func (r *Result) Opcode() string {
+</a><a href="#h4-0-40" id="h4-0-40" class="d">-	return &quot;match&quot;
+</a><a href="#h4-0-41" id="h4-0-41" class="d">-}
+</a><a href="#h4-0-42" id="h4-0-42" class="d">-
+</a><a href="#h4-0-43" id="h4-0-43" class="d">-type Stats struct {
+</a><a href="#h4-0-44" id="h4-0-44" class="d">-	RE2Time     int64  `json:&quot;re2_time&quot;`
+</a><a href="#h4-0-45" id="h4-0-45" class="d">-	GitTime     int64  `json:&quot;git_time&quot;`
+</a><a href="#h4-0-46" id="h4-0-46" class="d">-	SortTime    int64  `json:&quot;sort_time&quot;`
+</a><a href="#h4-0-47" id="h4-0-47" class="d">-	IndexTime   int64  `json:&quot;index_time&quot;`
+</a><a href="#h4-0-48" id="h4-0-48" class="d">-	AnalyzeTime int64  `json:&quot;analyze_time&quot;`
+</a><a href="#h4-0-49" id="h4-0-49" class="d">-	ExitReason  string `json:&quot;why&quot;`
+</a><a href="#h4-0-50" id="h4-0-50" class="d">-}
+</a><a href="#h4-0-51" id="h4-0-51" class="d">-
+</a><a href="#h4-0-52" id="h4-0-52" class="d">-func (s *Stats) Opcode() string {
+</a><a href="#h4-0-53" id="h4-0-53" class="d">-	return &quot;done&quot;
+</a><a href="#h4-0-54" id="h4-0-54" class="d">-}
+</a><a href="#h4-0-55" id="h4-0-55" class="d">-
+</a><a href="#h4-0-56" id="h4-0-56" class="d">-type ServerInfo struct {
+</a><a href="#h4-0-57" id="h4-0-57" class="d">-	Name  string `json:&quot;name&quot;`
+</a><a href="#h4-0-58" id="h4-0-58" class="d">-	Trees []struct {
+</a><a href="#h4-0-59" id="h4-0-59" class="d">-		Name     string                 `json:&quot;name&quot;`
+</a><a href="#h4-0-60" id="h4-0-60" class="d">-		Version  string                 `json:&quot;version&quot;`
+</a><a href="#h4-0-61" id="h4-0-61" class="d">-		Metadata map[string]interface{} `json:&quot;metadata&quot;`
+</a><a href="#h4-0-62" id="h4-0-62" class="d">-	} `json:&quot;trees&quot;`
+</a><a href="#h4-0-63" id="h4-0-63" class="d">-}
+</a><a href="#h4-0-64" id="h4-0-64" class="d">-
+</a><a href="#h4-0-65" id="h4-0-65" class="d">-func (s *ServerInfo) Opcode() string {
+</a><a href="#h4-0-66" id="h4-0-66" class="d">-	return &quot;ready&quot;
+</a><a href="#h4-0-67" id="h4-0-67" class="d">-}
+</a><a href="#h4-0-68" id="h4-0-68" class="d">-
+</a><a href="#h4-0-69" id="h4-0-69" class="d">-type ReplyError string
+</a><a href="#h4-0-70" id="h4-0-70" class="d">-
+</a><a href="#h4-0-71" id="h4-0-71" class="d">-func (r *ReplyError) Opcode() string {
+</a><a href="#h4-0-72" id="h4-0-72" class="d">-	return &quot;error&quot;
+</a><a href="#h4-0-73" id="h4-0-73" class="d">-}
+</a><a href="#h4-0-74" id="h4-0-74" class="d">-
+</a><a href="#h4-0-75" id="h4-0-75" class="d">-type Client interface {
+</a><a href="#h4-0-76" id="h4-0-76" class="d">-	Query(q *Query) (Search, error)
+</a><a href="#h4-0-77" id="h4-0-77" class="d">-	Close()
+</a><a href="#h4-0-78" id="h4-0-78" class="d">-	Info() *ServerInfo
+</a><a href="#h4-0-79" id="h4-0-79" class="d">-	Err() error
+</a><a href="#h4-0-80" id="h4-0-80" class="d">-}
+</a><a href="#h4-0-81" id="h4-0-81" class="d">-
+</a><a href="#h4-0-82" id="h4-0-82" class="d">-type Search interface {
+</a><a href="#h4-0-83" id="h4-0-83" class="d">-	Results() &lt;-chan *Result
+</a><a href="#h4-0-84" id="h4-0-84" class="d">-	Close() (*Stats, error)
+</a><a href="#h4-0-85" id="h4-0-85" class="d">-}
+</a><b>diff --git a/<a id="h5" href="../file/cmd/livegrep-github-reindex/BUILD">cmd/livegrep-github-reindex/BUILD</a> b/<a href="../file/cmd/livegrep-github-reindex/BUILD">cmd/livegrep-github-reindex/BUILD</a></b>
+<a href="#h5-0" id="h5-0" class="h">@@ -13,10 +13,9 @@ name = &quot;livegrep-github-reindex&quot;,
+</a>   ],
+   deps = [
+     &quot;//vendor/github.com/google/go-github/github:go_default_library&quot;,
+<a href="#h5-0-3" id="h5-0-3" class="d">-    &quot;//vendor/golang.org/x/net/context:go_default_library&quot;,
+</a>     &quot;//vendor/golang.org/x/oauth2:go_default_library&quot;,
+<a href="#h5-0-5" id="h5-0-5" class="i">+
+</a><a href="#h5-0-6" id="h5-0-6" class="i">+    &quot;@org_golang_x_net//:context&quot;,
+</a>   ],
+   visibility = [&quot;//visibility:public&quot;],
+ )
+<a href="#h5-0-10" id="h5-0-10" class="d">-
+</a><a href="#h5-0-11" id="h5-0-11" class="d">-
+</a><b>diff --git a/<a id="h6" href="../file/server/BUILD">server/BUILD</a> b/<a href="../file/server/BUILD">server/BUILD</a></b>
+<a href="#h6-0" id="h6-0" class="h">@@ -17,15 +17,16 @@ name = &quot;go_default_library&quot;,
+</a>     &quot;templates.go&quot;,
+   ],
+   deps = [
+<a href="#h6-0-3" id="h6-0-3" class="d">-    &quot;//client:go_default_library&quot;,
+</a>     &quot;//server/api:go_default_library&quot;,
+     &quot;//server/config:go_default_library&quot;,
+     &quot;//server/log:go_default_library&quot;,
+     &quot;//server/reqid:go_default_library&quot;,
+     &quot;//server/templates:go_default_library&quot;,
+<a href="#h6-0-9" id="h6-0-9" class="i">+    &quot;//src/proto:go_proto&quot;,
+</a>     &quot;//vendor/github.com/bmizerany/pat:go_default_library&quot;,
+     &quot;//vendor/github.com/honeycombio/libhoney-go:go_default_library&quot;,
+<a href="#h6-0-12" id="h6-0-12" class="d">-    &quot;//vendor/golang.org/x/net/context:go_default_library&quot;,
+</a><a href="#h6-0-13" id="h6-0-13" class="i">+    &quot;@org_golang_google_grpc//:go_default_library&quot;,
+</a><a href="#h6-0-14" id="h6-0-14" class="i">+    &quot;@org_golang_x_net//:context&quot;,
+</a>   ],
+   visibility = [&quot;//visibility:public&quot;],
+ )
+<a href="#h6-1" id="h6-1" class="h">@@ -34,13 +35,9 @@ name = &quot;go_default_library&quot;,
+</a> go_test(
+   name = &quot;go_default_test&quot;,
+   srcs = [
+<a href="#h6-1-3" id="h6-1-3" class="d">-    &quot;backend_test.go&quot;,
+</a>     &quot;query_test.go&quot;,
+   ],
+   deps = [
+<a href="#h6-1-7" id="h6-1-7" class="d">-    &quot;//client/test:go_default_library&quot;,
+</a><a href="#h6-1-8" id="h6-1-8" class="d">-    &quot;//client:go_default_library&quot;,
+</a>   ],
+   library = &quot;:go_default_library&quot;,
+ )
+<a href="#h6-1-12" id="h6-1-12" class="d">-
+</a><b>diff --git a/<a id="h7" href="../file/server/api.go">server/api.go</a> b/<a href="../file/server/api.go">server/api.go</a></b>
+<a href="#h7-0" id="h7-0" class="h">@@ -8,10 +8,11 @@ import (
+</a> 
+ 	&quot;golang.org/x/net/context&quot;
+ 
+<a href="#h7-0-3" id="h7-0-3" class="d">-	&quot;github.com/livegrep/livegrep/client&quot;
+</a> 	&quot;github.com/livegrep/livegrep/server/api&quot;
+ 	&quot;github.com/livegrep/livegrep/server/log&quot;
+ 	&quot;github.com/livegrep/livegrep/server/reqid&quot;
+<a href="#h7-0-7" id="h7-0-7" class="i">+
+</a><a href="#h7-0-8" id="h7-0-8" class="i">+	pb &quot;github.com/livegrep/livegrep/src/proto/go_proto&quot;
+</a> )
+ 
+ func replyJSON(ctx context.Context, w http.ResponseWriter, status int, obj interface{}) {
+<a href="#h7-1" id="h7-1" class="h">@@ -31,18 +32,18 @@ func writeError(ctx context.Context, w http.ResponseWriter, status int, code, me
+</a> }
+ 
+ func writeQueryError(ctx context.Context, w http.ResponseWriter, err error) {
+<a href="#h7-1-3" id="h7-1-3" class="d">-	if qe, ok := err.(client.QueryError); ok {
+</a><a href="#h7-1-4" id="h7-1-4" class="i">+	/*	if qe, ok := err.(client.QueryError); ok {
+</a> 		writeError(ctx, w, 400, &quot;query_error&quot;, qe.Err)
+<a href="#h7-1-6" id="h7-1-6" class="d">-	} else {
+</a><a href="#h7-1-7" id="h7-1-7" class="d">-		writeError(ctx, w, 500, &quot;internal_error&quot;,
+</a><a href="#h7-1-8" id="h7-1-8" class="d">-			fmt.Sprintf(&quot;Talking to backend: %s&quot;, err.Error()))
+</a><a href="#h7-1-9" id="h7-1-9" class="d">-	}
+</a><a href="#h7-1-10" id="h7-1-10" class="d">-	return
+</a><a href="#h7-1-11" id="h7-1-11" class="i">+	} else { */
+</a><a href="#h7-1-12" id="h7-1-12" class="i">+	writeError(ctx, w, 500, &quot;internal_error&quot;,
+</a><a href="#h7-1-13" id="h7-1-13" class="i">+		fmt.Sprintf(&quot;Talking to backend: %s&quot;, err.Error()))
+</a><a href="#h7-1-14" id="h7-1-14" class="i">+	/*	}
+</a><a href="#h7-1-15" id="h7-1-15" class="i">+		return */
+</a> }
+ 
+<a href="#h7-1-18" id="h7-1-18" class="d">-func extractQuery(ctx context.Context, r *http.Request) (client.Query, error) {
+</a><a href="#h7-1-19" id="h7-1-19" class="i">+func extractQuery(ctx context.Context, r *http.Request) (pb.Query, error) {
+</a> 	params := r.URL.Query()
+<a href="#h7-1-21" id="h7-1-21" class="d">-	var query client.Query
+</a><a href="#h7-1-22" id="h7-1-22" class="i">+	var query pb.Query
+</a> 	var err error
+ 	if q, ok := params[&quot;q&quot;]; ok {
+ 		query, err = ParseQuery(q[0])
+<a href="#h7-2" id="h7-2" class="h">@@ -69,33 +70,51 @@ var (
+</a> 	ErrTimedOut = errors.New(&quot;timed out talking to backend&quot;)
+ )
+ 
+<a href="#h7-2-3" id="h7-2-3" class="d">-func (s *server) doSearch(ctx context.Context, backend *Backend, q *client.Query) (*api.ReplySearch, error) {
+</a><a href="#h7-2-4" id="h7-2-4" class="d">-	var cl client.Client
+</a><a href="#h7-2-5" id="h7-2-5" class="d">-	var search client.Search
+</a><a href="#h7-2-6" id="h7-2-6" class="i">+func stringSlice(ss []string) []string {
+</a><a href="#h7-2-7" id="h7-2-7" class="i">+	if ss != nil {
+</a><a href="#h7-2-8" id="h7-2-8" class="i">+		return ss
+</a><a href="#h7-2-9" id="h7-2-9" class="i">+	}
+</a><a href="#h7-2-10" id="h7-2-10" class="i">+	return []string{}
+</a><a href="#h7-2-11" id="h7-2-11" class="i">+}
+</a><a href="#h7-2-12" id="h7-2-12" class="i">+
+</a><a href="#h7-2-13" id="h7-2-13" class="i">+func (s *server) doSearch(ctx context.Context, backend *Backend, q *pb.Query) (*api.ReplySearch, error) {
+</a><a href="#h7-2-14" id="h7-2-14" class="i">+	var search *pb.CodeSearchResult
+</a> 	var err error
+ 
+ 	select {
+<a href="#h7-2-18" id="h7-2-18" class="d">-	case cl = &lt;-backend.Clients:
+</a><a href="#h7-2-19" id="h7-2-19" class="i">+	case &lt;-backend.Ready:
+</a> 	case &lt;-ctx.Done():
+ 		return nil, ErrTimedOut
+ 	}
+<a href="#h7-2-23" id="h7-2-23" class="d">-	defer backend.CheckIn(cl)
+</a> 
+<a href="#h7-2-25" id="h7-2-25" class="d">-	search, err = cl.Query(q)
+</a><a href="#h7-2-26" id="h7-2-26" class="i">+	search, err = backend.Codesearch.Search(ctx, q)
+</a> 	if err != nil {
+ 		log.Printf(ctx, &quot;error talking to backend err=%s&quot;, err)
+ 		return nil, err
+ 	}
+ 
+<a href="#h7-2-32" id="h7-2-32" class="d">-	reply := &amp;api.ReplySearch{Results: make([]*client.Result, 0)}
+</a><a href="#h7-2-33" id="h7-2-33" class="i">+	reply := &amp;api.ReplySearch{Results: make([]*api.Result, 0)}
+</a> 
+<a href="#h7-2-35" id="h7-2-35" class="d">-	for r := range search.Results() {
+</a><a href="#h7-2-36" id="h7-2-36" class="d">-		reply.Results = append(reply.Results, r)
+</a><a href="#h7-2-37" id="h7-2-37" class="i">+	for _, r := range search.Results {
+</a><a href="#h7-2-38" id="h7-2-38" class="i">+		reply.Results = append(reply.Results, &amp;api.Result{
+</a><a href="#h7-2-39" id="h7-2-39" class="i">+			Tree:          r.Tree,
+</a><a href="#h7-2-40" id="h7-2-40" class="i">+			Version:       r.Version,
+</a><a href="#h7-2-41" id="h7-2-41" class="i">+			Path:          r.Path,
+</a><a href="#h7-2-42" id="h7-2-42" class="i">+			LineNumber:    int(r.LineNumber),
+</a><a href="#h7-2-43" id="h7-2-43" class="i">+			ContextBefore: stringSlice(r.ContextBefore),
+</a><a href="#h7-2-44" id="h7-2-44" class="i">+			ContextAfter:  stringSlice(r.ContextAfter),
+</a><a href="#h7-2-45" id="h7-2-45" class="i">+			Bounds:        [2]int{int(r.Bounds.Left), int(r.Bounds.Right)},
+</a><a href="#h7-2-46" id="h7-2-46" class="i">+			Line:          r.Line,
+</a><a href="#h7-2-47" id="h7-2-47" class="i">+		})
+</a> 	}
+ 
+<a href="#h7-2-50" id="h7-2-50" class="d">-	reply.Info, err = search.Close()
+</a><a href="#h7-2-51" id="h7-2-51" class="d">-	if err != nil {
+</a><a href="#h7-2-52" id="h7-2-52" class="d">-		return nil, err
+</a><a href="#h7-2-53" id="h7-2-53" class="i">+	reply.Info = &amp;api.Stats{
+</a><a href="#h7-2-54" id="h7-2-54" class="i">+		RE2Time:     search.Stats.Re2Time,
+</a><a href="#h7-2-55" id="h7-2-55" class="i">+		GitTime:     search.Stats.GitTime,
+</a><a href="#h7-2-56" id="h7-2-56" class="i">+		SortTime:    search.Stats.SortTime,
+</a><a href="#h7-2-57" id="h7-2-57" class="i">+		IndexTime:   search.Stats.IndexTime,
+</a><a href="#h7-2-58" id="h7-2-58" class="i">+		AnalyzeTime: search.Stats.AnalyzeTime,
+</a><a href="#h7-2-59" id="h7-2-59" class="i">+		ExitReason:  search.Stats.ExitReason.String(),
+</a> 	}
+ 	return reply, nil
+ }
+<a href="#h7-3" id="h7-3" class="h">@@ -139,9 +158,6 @@ func (s *server) ServeAPISearch(ctx context.Context, w http.ResponseWriter, r *h
+</a> 		if err == ErrTimedOut {
+ 			break
+ 		}
+<a href="#h7-3-3" id="h7-3-3" class="d">-		if _, ok := err.(client.QueryError); ok {
+</a><a href="#h7-3-4" id="h7-3-4" class="d">-			break
+</a><a href="#h7-3-5" id="h7-3-5" class="d">-		}
+</a> 		log.Printf(ctx, &quot;error querying try=%d err=%q&quot;, tries, err)
+ 	}
+ 
+<a href="#h7-4" id="h7-4" class="h">@@ -162,8 +178,8 @@ func (s *server) ServeAPISearch(ctx context.Context, w http.ResponseWriter, r *h
+</a> 		e.AddField(&quot;query_file&quot;, q.File)
+ 		e.AddField(&quot;query_repo&quot;, q.Repo)
+ 		e.AddField(&quot;query_foldcase&quot;, q.FoldCase)
+<a href="#h7-4-3" id="h7-4-3" class="d">-		e.AddField(&quot;query_not_file&quot;, q.Not.File)
+</a><a href="#h7-4-4" id="h7-4-4" class="d">-		e.AddField(&quot;query_not_repo&quot;, q.Not.Repo)
+</a><a href="#h7-4-5" id="h7-4-5" class="i">+		e.AddField(&quot;query_not_file&quot;, q.NotFile)
+</a><a href="#h7-4-6" id="h7-4-6" class="i">+		e.AddField(&quot;query_not_repo&quot;, q.NotRepo)
+</a> 
+ 		e.AddField(&quot;result_count&quot;, len(reply.Results))
+ 		e.AddField(&quot;re2_time&quot;, reply.Info.RE2Time)
+<b>diff --git a/<a id="h8" href="../file/server/api/BUILD">server/api/BUILD</a> b/<a href="../file/server/api/BUILD">server/api/BUILD</a></b>
+<a href="#h8-0" id="h8-0" class="h">@@ -11,9 +11,6 @@ name = &quot;go_default_library&quot;,
+</a>     &quot;types.go&quot;,
+   ],
+   deps = [
+<a href="#h8-0-3" id="h8-0-3" class="d">-    &quot;//client:go_default_library&quot;,
+</a>   ],
+   visibility = [&quot;//visibility:public&quot;],
+ )
+<a href="#h8-0-7" id="h8-0-7" class="d">-
+</a><a href="#h8-0-8" id="h8-0-8" class="d">-
+</a><b>diff --git a/<a id="h9" href="../file/server/api/types.go">server/api/types.go</a> b/<a href="../file/server/api/types.go">server/api/types.go</a></b>
+<a href="#h9-0" id="h9-0" class="h">@@ -1,7 +1,5 @@
+</a> package api
+ 
+<a href="#h9-0-2" id="h9-0-2" class="d">-import &quot;github.com/livegrep/livegrep/client&quot;
+</a><a href="#h9-0-3" id="h9-0-3" class="d">-
+</a> type InnerError struct {
+ 	Code    string `json:&quot;code&quot;`
+ 	Message string `json:&quot;message&quot;`
+<a href="#h9-1" id="h9-1" class="h">@@ -14,6 +12,26 @@ type ReplyError struct {
+</a> 
+ // ReplySearch is returned to /api/v1/search/:backend
+ type ReplySearch struct {
+<a href="#h9-1-3" id="h9-1-3" class="d">-	Info    *client.Stats    `json:&quot;info&quot;`
+</a><a href="#h9-1-4" id="h9-1-4" class="d">-	Results []*client.Result `json:&quot;results&quot;`
+</a><a href="#h9-1-5" id="h9-1-5" class="i">+	Info    *Stats    `json:&quot;info&quot;`
+</a><a href="#h9-1-6" id="h9-1-6" class="i">+	Results []*Result `json:&quot;results&quot;`
+</a><a href="#h9-1-7" id="h9-1-7" class="i">+}
+</a><a href="#h9-1-8" id="h9-1-8" class="i">+
+</a><a href="#h9-1-9" id="h9-1-9" class="i">+type Stats struct {
+</a><a href="#h9-1-10" id="h9-1-10" class="i">+	RE2Time     int64  `json:&quot;re2_time&quot;`
+</a><a href="#h9-1-11" id="h9-1-11" class="i">+	GitTime     int64  `json:&quot;git_time&quot;`
+</a><a href="#h9-1-12" id="h9-1-12" class="i">+	SortTime    int64  `json:&quot;sort_time&quot;`
+</a><a href="#h9-1-13" id="h9-1-13" class="i">+	IndexTime   int64  `json:&quot;index_time&quot;`
+</a><a href="#h9-1-14" id="h9-1-14" class="i">+	AnalyzeTime int64  `json:&quot;analyze_time&quot;`
+</a><a href="#h9-1-15" id="h9-1-15" class="i">+	ExitReason  string `json:&quot;why&quot;`
+</a><a href="#h9-1-16" id="h9-1-16" class="i">+}
+</a><a href="#h9-1-17" id="h9-1-17" class="i">+
+</a><a href="#h9-1-18" id="h9-1-18" class="i">+type Result struct {
+</a><a href="#h9-1-19" id="h9-1-19" class="i">+	Tree          string   `json:&quot;tree&quot;`
+</a><a href="#h9-1-20" id="h9-1-20" class="i">+	Version       string   `json:&quot;version&quot;`
+</a><a href="#h9-1-21" id="h9-1-21" class="i">+	Path          string   `json:&quot;path&quot;`
+</a><a href="#h9-1-22" id="h9-1-22" class="i">+	LineNumber    int      `json:&quot;lno&quot;`
+</a><a href="#h9-1-23" id="h9-1-23" class="i">+	ContextBefore []string `json:&quot;context_before&quot;`
+</a><a href="#h9-1-24" id="h9-1-24" class="i">+	ContextAfter  []string `json:&quot;context_after&quot;`
+</a><a href="#h9-1-25" id="h9-1-25" class="i">+	Bounds        [2]int   `json:&quot;bounds&quot;`
+</a><a href="#h9-1-26" id="h9-1-26" class="i">+	Line          string   `json:&quot;line&quot;`
+</a> }
+<b>diff --git a/<a id="h10" href="../file/server/backend.go">server/backend.go</a> b/<a href="../file/server/backend.go">server/backend.go</a></b>
+<a href="#h10-0" id="h10-0" class="h">@@ -1,23 +1,14 @@
+</a> package server
+ 
+ import (
+<a href="#h10-0-3" id="h10-0-3" class="i">+	&quot;context&quot;
+</a> 	&quot;log&quot;
+ 	&quot;net/url&quot;
+ 	&quot;sync&quot;
+ 	&quot;time&quot;
+ 
+<a href="#h10-0-9" id="h10-0-9" class="d">-	&quot;github.com/livegrep/livegrep/client&quot;
+</a><a href="#h10-0-10" id="h10-0-10" class="d">-)
+</a><a href="#h10-0-11" id="h10-0-11" class="d">-
+</a><a href="#h10-0-12" id="h10-0-12" class="d">-const (
+</a><a href="#h10-0-13" id="h10-0-13" class="d">-	defaultPoolSize = 8
+</a><a href="#h10-0-14" id="h10-0-14" class="d">-)
+</a><a href="#h10-0-15" id="h10-0-15" class="d">-
+</a><a href="#h10-0-16" id="h10-0-16" class="d">-var (
+</a><a href="#h10-0-17" id="h10-0-17" class="d">-	// maximum time to wait after a failed connection
+</a><a href="#h10-0-18" id="h10-0-18" class="d">-	// attempt. `var` not `const` so it can be retried by the
+</a><a href="#h10-0-19" id="h10-0-19" class="d">-	// tests.
+</a><a href="#h10-0-20" id="h10-0-20" class="d">-	maxBackoff = 10 * time.Second
+</a><a href="#h10-0-21" id="h10-0-21" class="i">+	pb &quot;github.com/livegrep/livegrep/src/proto/go_proto&quot;
+</a><a href="#h10-0-22" id="h10-0-22" class="i">+	&quot;google.golang.org/grpc&quot;
+</a> )
+ 
+ type Tree struct {
+<a href="#h10-1" id="h10-1" class="h">@@ -33,85 +24,47 @@ type I struct {
+</a> }
+ 
+ type Backend struct {
+<a href="#h10-1-3" id="h10-1-3" class="d">-	Id       string
+</a><a href="#h10-1-4" id="h10-1-4" class="d">-	Dial     func() (client.Client, error)
+</a><a href="#h10-1-5" id="h10-1-5" class="d">-	PoolSize int
+</a><a href="#h10-1-6" id="h10-1-6" class="d">-	I        *I
+</a><a href="#h10-1-7" id="h10-1-7" class="d">-	Clients  chan client.Client
+</a><a href="#h10-1-8" id="h10-1-8" class="i">+	Id         string
+</a><a href="#h10-1-9" id="h10-1-9" class="i">+	Addr       string
+</a><a href="#h10-1-10" id="h10-1-10" class="i">+	I          *I
+</a><a href="#h10-1-11" id="h10-1-11" class="i">+	Codesearch pb.CodeSearchClient
+</a><a href="#h10-1-12" id="h10-1-12" class="i">+	Ready      chan struct{}
+</a> 
+<a href="#h10-1-14" id="h10-1-14" class="d">-	pending chan struct{}
+</a><a href="#h10-1-15" id="h10-1-15" class="d">-	backoff time.Duration
+</a><a href="#h10-1-16" id="h10-1-16" class="i">+	client *grpc.ClientConn
+</a> }
+ 
+ func (bk *Backend) Start() {
+<a href="#h10-1-20" id="h10-1-20" class="d">-	if bk.PoolSize == 0 {
+</a><a href="#h10-1-21" id="h10-1-21" class="d">-		bk.PoolSize = defaultPoolSize
+</a><a href="#h10-1-22" id="h10-1-22" class="d">-	}
+</a><a href="#h10-1-23" id="h10-1-23" class="d">-	bk.Clients = make(chan client.Client, bk.PoolSize)
+</a><a href="#h10-1-24" id="h10-1-24" class="d">-	bk.pending = make(chan struct{}, bk.PoolSize)
+</a><a href="#h10-1-25" id="h10-1-25" class="d">-	bk.backoff = 10 * time.Millisecond
+</a> 	if bk.I == nil {
+ 		bk.I = &amp;I{Name: bk.Id}
+ 	}
+<a href="#h10-1-29" id="h10-1-29" class="d">-	for i := 0; i &lt; bk.PoolSize; i++ {
+</a><a href="#h10-1-30" id="h10-1-30" class="d">-		bk.pending &lt;- struct{}{}
+</a><a href="#h10-1-31" id="h10-1-31" class="d">-	}
+</a><a href="#h10-1-32" id="h10-1-32" class="d">-	go bk.connectLoop()
+</a><a href="#h10-1-33" id="h10-1-33" class="d">-}
+</a><a href="#h10-1-34" id="h10-1-34" class="d">-
+</a><a href="#h10-1-35" id="h10-1-35" class="d">-func (bk *Backend) CheckIn(c client.Client) {
+</a><a href="#h10-1-36" id="h10-1-36" class="d">-	if c.Err() != nil {
+</a><a href="#h10-1-37" id="h10-1-37" class="d">-		c.Close()
+</a><a href="#h10-1-38" id="h10-1-38" class="d">-		bk.pending &lt;- struct{}{}
+</a><a href="#h10-1-39" id="h10-1-39" class="d">-		return
+</a><a href="#h10-1-40" id="h10-1-40" class="d">-	}
+</a><a href="#h10-1-41" id="h10-1-41" class="d">-
+</a><a href="#h10-1-42" id="h10-1-42" class="d">-	bk.Clients &lt;- c
+</a><a href="#h10-1-43" id="h10-1-43" class="i">+	bk.Ready = make(chan struct{})
+</a><a href="#h10-1-44" id="h10-1-44" class="i">+	go bk.poll()
+</a> }
+ 
+<a href="#h10-1-47" id="h10-1-47" class="d">-func (bk *Backend) Close() {
+</a><a href="#h10-1-48" id="h10-1-48" class="d">-drain:
+</a><a href="#h10-1-49" id="h10-1-49" class="i">+func (bk *Backend) poll() {
+</a> 	for {
+<a href="#h10-1-51" id="h10-1-51" class="d">-		select {
+</a><a href="#h10-1-52" id="h10-1-52" class="d">-		case &lt;-bk.pending:
+</a><a href="#h10-1-53" id="h10-1-53" class="d">-		default:
+</a><a href="#h10-1-54" id="h10-1-54" class="d">-			break drain
+</a><a href="#h10-1-55" id="h10-1-55" class="d">-		}
+</a><a href="#h10-1-56" id="h10-1-56" class="d">-	}
+</a><a href="#h10-1-57" id="h10-1-57" class="d">-	close(bk.pending)
+</a><a href="#h10-1-58" id="h10-1-58" class="d">-	for c := range bk.Clients {
+</a><a href="#h10-1-59" id="h10-1-59" class="d">-		c.Close()
+</a><a href="#h10-1-60" id="h10-1-60" class="d">-	}
+</a><a href="#h10-1-61" id="h10-1-61" class="d">-}
+</a><a href="#h10-1-62" id="h10-1-62" class="d">-
+</a><a href="#h10-1-63" id="h10-1-63" class="d">-func (bk *Backend) connectLoop() {
+</a><a href="#h10-1-64" id="h10-1-64" class="d">-	for _ = range bk.pending {
+</a><a href="#h10-1-65" id="h10-1-65" class="d">-	retry:
+</a><a href="#h10-1-66" id="h10-1-66" class="d">-		cl, err := bk.Dial()
+</a><a href="#h10-1-67" id="h10-1-67" class="d">-		if err != nil {
+</a><a href="#h10-1-68" id="h10-1-68" class="d">-			log.Printf(&quot;Connection error: backend=%s error=%s&quot;,
+</a><a href="#h10-1-69" id="h10-1-69" class="d">-				bk.Id, err.Error())
+</a><a href="#h10-1-70" id="h10-1-70" class="d">-			bk.backoff *= 2
+</a><a href="#h10-1-71" id="h10-1-71" class="d">-			if bk.backoff &gt; maxBackoff {
+</a><a href="#h10-1-72" id="h10-1-72" class="d">-				bk.backoff = maxBackoff
+</a><a href="#h10-1-73" id="h10-1-73" class="i">+		if bk.Codesearch == nil {
+</a><a href="#h10-1-74" id="h10-1-74" class="i">+			conn, err := grpc.Dial(bk.Addr, grpc.WithInsecure())
+</a><a href="#h10-1-75" id="h10-1-75" class="i">+			if err != nil {
+</a><a href="#h10-1-76" id="h10-1-76" class="i">+				log.Printf(&quot;Dial: %s: %v&quot;, bk.Addr, err)
+</a><a href="#h10-1-77" id="h10-1-77" class="i">+				time.Sleep(30 * time.Second)
+</a><a href="#h10-1-78" id="h10-1-78" class="i">+				continue
+</a> 			}
+<a href="#h10-1-80" id="h10-1-80" class="d">-			time.Sleep(bk.backoff)
+</a><a href="#h10-1-81" id="h10-1-81" class="d">-			goto retry
+</a><a href="#h10-1-82" id="h10-1-82" class="d">-		}
+</a><a href="#h10-1-83" id="h10-1-83" class="d">-
+</a><a href="#h10-1-84" id="h10-1-84" class="d">-		log.Printf(&quot;Connected: backend=%s&quot;, bk.Id)
+</a><a href="#h10-1-85" id="h10-1-85" class="d">-		bk.backoff = 10 * time.Millisecond
+</a><a href="#h10-1-86" id="h10-1-86" class="i">+			bk.Codesearch = pb.NewCodeSearchClient(conn)
+</a><a href="#h10-1-87" id="h10-1-87" class="i">+			close(bk.Ready)
+</a> 
+<a href="#h10-1-89" id="h10-1-89" class="d">-		if info := cl.Info(); info != nil {
+</a><a href="#h10-1-90" id="h10-1-90" class="i">+		}
+</a><a href="#h10-1-91" id="h10-1-91" class="i">+		info, e := bk.Codesearch.Info(context.Background(), &amp;pb.InfoRequest{})
+</a><a href="#h10-1-92" id="h10-1-92" class="i">+		if e == nil {
+</a> 			bk.refresh(info)
+<a href="#h10-1-94" id="h10-1-94" class="i">+		} else {
+</a><a href="#h10-1-95" id="h10-1-95" class="i">+			log.Printf(&quot;refresh %s: %v&quot;, bk.Id, e)
+</a> 		}
+<a href="#h10-1-97" id="h10-1-97" class="d">-		bk.Clients &lt;- cl
+</a><a href="#h10-1-98" id="h10-1-98" class="d">-
+</a><a href="#h10-1-99" id="h10-1-99" class="i">+		time.Sleep(60 * time.Second)
+</a> 	}
+<a href="#h10-1-101" id="h10-1-101" class="d">-	close(bk.Clients)
+</a> }
+ 
+<a href="#h10-1-104" id="h10-1-104" class="d">-func (bk *Backend) refresh(info *client.ServerInfo) {
+</a><a href="#h10-1-105" id="h10-1-105" class="i">+func (bk *Backend) refresh(info *pb.ServerInfo) {
+</a> 	bk.I.Lock()
+ 	defer bk.I.Unlock()
+ 
+<a href="#h10-2" id="h10-2" class="h">@@ -123,10 +76,10 @@ func (bk *Backend) refresh(info *client.ServerInfo) {
+</a> 		for _, r := range info.Trees {
+ 			pattern := &quot;&quot;
+ 			if v, ok := r.Metadata[&quot;url-pattern&quot;]; ok {
+<a href="#h10-2-3" id="h10-2-3" class="d">-				pattern = v.(string)
+</a><a href="#h10-2-4" id="h10-2-4" class="i">+				pattern = v
+</a> 			}
+ 			if v, ok := r.Metadata[&quot;github&quot;]; ok {
+<a href="#h10-2-7" id="h10-2-7" class="d">-				value := v.(string)
+</a><a href="#h10-2-8" id="h10-2-8" class="i">+				value := v
+</a> 				base := &quot;&quot;
+ 				_, err := url.ParseRequestURI(value)
+ 				if err != nil {
+<b>diff --git a/<a id="h11" href="../file/server/backend_test.go">server/backend_test.go</a> b/<a href="../file/server/backend_test.go">server/backend_test.go</a></b>
+<a href="#h11-0" id="h11-0" class="h">@@ -1,102 +0,0 @@
+</a><a href="#h11-0-0" id="h11-0-0" class="d">-package server
+</a><a href="#h11-0-1" id="h11-0-1" class="d">-
+</a><a href="#h11-0-2" id="h11-0-2" class="d">-import (
+</a><a href="#h11-0-3" id="h11-0-3" class="d">-	&quot;errors&quot;
+</a><a href="#h11-0-4" id="h11-0-4" class="d">-	&quot;testing&quot;
+</a><a href="#h11-0-5" id="h11-0-5" class="d">-	&quot;time&quot;
+</a><a href="#h11-0-6" id="h11-0-6" class="d">-
+</a><a href="#h11-0-7" id="h11-0-7" class="d">-	&quot;github.com/livegrep/livegrep/client&quot;
+</a><a href="#h11-0-8" id="h11-0-8" class="d">-	&quot;github.com/livegrep/livegrep/client/test&quot;
+</a><a href="#h11-0-9" id="h11-0-9" class="d">-)
+</a><a href="#h11-0-10" id="h11-0-10" class="d">-
+</a><a href="#h11-0-11" id="h11-0-11" class="d">-func init() {
+</a><a href="#h11-0-12" id="h11-0-12" class="d">-	maxBackoff = 1 * time.Millisecond
+</a><a href="#h11-0-13" id="h11-0-13" class="d">-}
+</a><a href="#h11-0-14" id="h11-0-14" class="d">-
+</a><a href="#h11-0-15" id="h11-0-15" class="d">-func TestFailedDial(t *testing.T) {
+</a><a href="#h11-0-16" id="h11-0-16" class="d">-	tries := 0
+</a><a href="#h11-0-17" id="h11-0-17" class="d">-	dial := func() (client.Client, error) {
+</a><a href="#h11-0-18" id="h11-0-18" class="d">-		tries++
+</a><a href="#h11-0-19" id="h11-0-19" class="d">-		if tries &lt; 10 {
+</a><a href="#h11-0-20" id="h11-0-20" class="d">-			return nil, errors.New(&quot;connect error&quot;)
+</a><a href="#h11-0-21" id="h11-0-21" class="d">-		}
+</a><a href="#h11-0-22" id="h11-0-22" class="d">-		return &amp;test.MockClient{
+</a><a href="#h11-0-23" id="h11-0-23" class="d">-			QueryError: errors.New(&quot;query failed&quot;),
+</a><a href="#h11-0-24" id="h11-0-24" class="d">-		}, nil
+</a><a href="#h11-0-25" id="h11-0-25" class="d">-	}
+</a><a href="#h11-0-26" id="h11-0-26" class="d">-
+</a><a href="#h11-0-27" id="h11-0-27" class="d">-	bk := &amp;Backend{
+</a><a href="#h11-0-28" id="h11-0-28" class="d">-		Id:       &quot;search&quot;,
+</a><a href="#h11-0-29" id="h11-0-29" class="d">-		Dial:     dial,
+</a><a href="#h11-0-30" id="h11-0-30" class="d">-		PoolSize: 2,
+</a><a href="#h11-0-31" id="h11-0-31" class="d">-	}
+</a><a href="#h11-0-32" id="h11-0-32" class="d">-
+</a><a href="#h11-0-33" id="h11-0-33" class="d">-	bk.Start()
+</a><a href="#h11-0-34" id="h11-0-34" class="d">-	defer bk.Close()
+</a><a href="#h11-0-35" id="h11-0-35" class="d">-
+</a><a href="#h11-0-36" id="h11-0-36" class="d">-	select {
+</a><a href="#h11-0-37" id="h11-0-37" class="d">-	case &lt;-time.After(1 * time.Second):
+</a><a href="#h11-0-38" id="h11-0-38" class="d">-		t.Fatal(&quot;timed out waiting for dial&quot;)
+</a><a href="#h11-0-39" id="h11-0-39" class="d">-	case &lt;-bk.Clients:
+</a><a href="#h11-0-40" id="h11-0-40" class="d">-	}
+</a><a href="#h11-0-41" id="h11-0-41" class="d">-
+</a><a href="#h11-0-42" id="h11-0-42" class="d">-}
+</a><a href="#h11-0-43" id="h11-0-43" class="d">-
+</a><a href="#h11-0-44" id="h11-0-44" class="d">-func assertClosed(t *testing.T, bk *Backend) {
+</a><a href="#h11-0-45" id="h11-0-45" class="d">-	select {
+</a><a href="#h11-0-46" id="h11-0-46" class="d">-	case _, ok := &lt;-bk.pending:
+</a><a href="#h11-0-47" id="h11-0-47" class="d">-		if ok {
+</a><a href="#h11-0-48" id="h11-0-48" class="d">-			t.Fatal(&quot;pending data&quot;)
+</a><a href="#h11-0-49" id="h11-0-49" class="d">-		}
+</a><a href="#h11-0-50" id="h11-0-50" class="d">-	default:
+</a><a href="#h11-0-51" id="h11-0-51" class="d">-		t.Fatal(&quot;pending not closed&quot;)
+</a><a href="#h11-0-52" id="h11-0-52" class="d">-	}
+</a><a href="#h11-0-53" id="h11-0-53" class="d">-	select {
+</a><a href="#h11-0-54" id="h11-0-54" class="d">-	case _, ok := &lt;-bk.Clients:
+</a><a href="#h11-0-55" id="h11-0-55" class="d">-		if ok {
+</a><a href="#h11-0-56" id="h11-0-56" class="d">-			t.Fatal(&quot;clients data&quot;)
+</a><a href="#h11-0-57" id="h11-0-57" class="d">-		}
+</a><a href="#h11-0-58" id="h11-0-58" class="d">-	default:
+</a><a href="#h11-0-59" id="h11-0-59" class="d">-		t.Fatal(&quot;clients not closed&quot;)
+</a><a href="#h11-0-60" id="h11-0-60" class="d">-	}
+</a><a href="#h11-0-61" id="h11-0-61" class="d">-}
+</a><a href="#h11-0-62" id="h11-0-62" class="d">-
+</a><a href="#h11-0-63" id="h11-0-63" class="d">-func TestCloseClients(t *testing.T) {
+</a><a href="#h11-0-64" id="h11-0-64" class="d">-	var clients []*test.MockClient
+</a><a href="#h11-0-65" id="h11-0-65" class="d">-	dial := func() (client.Client, error) {
+</a><a href="#h11-0-66" id="h11-0-66" class="d">-		cl := &amp;test.MockClient{
+</a><a href="#h11-0-67" id="h11-0-67" class="d">-			QueryError: errors.New(&quot;query failed&quot;),
+</a><a href="#h11-0-68" id="h11-0-68" class="d">-		}
+</a><a href="#h11-0-69" id="h11-0-69" class="d">-		clients = append(clients, cl)
+</a><a href="#h11-0-70" id="h11-0-70" class="d">-		return cl, nil
+</a><a href="#h11-0-71" id="h11-0-71" class="d">-	}
+</a><a href="#h11-0-72" id="h11-0-72" class="d">-	bk := &amp;Backend{
+</a><a href="#h11-0-73" id="h11-0-73" class="d">-		Dial: dial,
+</a><a href="#h11-0-74" id="h11-0-74" class="d">-		Id:   &quot;q&quot;,
+</a><a href="#h11-0-75" id="h11-0-75" class="d">-	}
+</a><a href="#h11-0-76" id="h11-0-76" class="d">-	bk.Start()
+</a><a href="#h11-0-77" id="h11-0-77" class="d">-	for i := 0; i &lt; bk.PoolSize; i++ {
+</a><a href="#h11-0-78" id="h11-0-78" class="d">-		cl := &lt;-bk.Clients
+</a><a href="#h11-0-79" id="h11-0-79" class="d">-		bk.CheckIn(cl)
+</a><a href="#h11-0-80" id="h11-0-80" class="d">-	}
+</a><a href="#h11-0-81" id="h11-0-81" class="d">-	bk.Close()
+</a><a href="#h11-0-82" id="h11-0-82" class="d">-	for i, cl := range clients {
+</a><a href="#h11-0-83" id="h11-0-83" class="d">-		if !cl.Closed {
+</a><a href="#h11-0-84" id="h11-0-84" class="d">-			t.Fatal(&quot;failed to close&quot;, i)
+</a><a href="#h11-0-85" id="h11-0-85" class="d">-		}
+</a><a href="#h11-0-86" id="h11-0-86" class="d">-	}
+</a><a href="#h11-0-87" id="h11-0-87" class="d">-	assertClosed(t, bk)
+</a><a href="#h11-0-88" id="h11-0-88" class="d">-}
+</a><a href="#h11-0-89" id="h11-0-89" class="d">-
+</a><a href="#h11-0-90" id="h11-0-90" class="d">-func TestCloseNoClients(t *testing.T) {
+</a><a href="#h11-0-91" id="h11-0-91" class="d">-	dial := func() (client.Client, error) {
+</a><a href="#h11-0-92" id="h11-0-92" class="d">-		return nil, errors.New(&quot;error&quot;)
+</a><a href="#h11-0-93" id="h11-0-93" class="d">-	}
+</a><a href="#h11-0-94" id="h11-0-94" class="d">-	bk := &amp;Backend{
+</a><a href="#h11-0-95" id="h11-0-95" class="d">-		Dial: dial,
+</a><a href="#h11-0-96" id="h11-0-96" class="d">-		Id:   &quot;q&quot;,
+</a><a href="#h11-0-97" id="h11-0-97" class="d">-	}
+</a><a href="#h11-0-98" id="h11-0-98" class="d">-	bk.Start()
+</a><a href="#h11-0-99" id="h11-0-99" class="d">-	bk.Close()
+</a><a href="#h11-0-100" id="h11-0-100" class="d">-	assertClosed(t, bk)
+</a><a href="#h11-0-101" id="h11-0-101" class="d">-}
+</a><b>diff --git a/<a id="h12" href="../file/server/log/BUILD">server/log/BUILD</a> b/<a href="../file/server/log/BUILD">server/log/BUILD</a></b>
+<a href="#h12-0" id="h12-0" class="h">@@ -12,9 +12,7 @@ name = &quot;go_default_library&quot;,
+</a>   ],
+   deps = [
+     &quot;//server/reqid:go_default_library&quot;,
+<a href="#h12-0-3" id="h12-0-3" class="d">-    &quot;//vendor/golang.org/x/net/context:go_default_library&quot;,
+</a><a href="#h12-0-4" id="h12-0-4" class="i">+    &quot;@org_golang_x_net//:context&quot;,
+</a>   ],
+   visibility = [&quot;//visibility:public&quot;],
+ )
+<a href="#h12-0-8" id="h12-0-8" class="d">-
+</a><a href="#h12-0-9" id="h12-0-9" class="d">-
+</a><b>diff --git a/<a id="h13" href="../file/server/query.go">server/query.go</a> b/<a href="../file/server/query.go">server/query.go</a></b>
+<a href="#h13-0" id="h13-0" class="h">@@ -7,12 +7,12 @@ import (
+</a> 	&quot;strings&quot;
+ 	&quot;unicode/utf8&quot;
+ 
+<a href="#h13-0-3" id="h13-0-3" class="d">-	&quot;github.com/livegrep/livegrep/client&quot;
+</a><a href="#h13-0-4" id="h13-0-4" class="i">+	pb &quot;github.com/livegrep/livegrep/src/proto/go_proto&quot;
+</a> )
+ 
+ var pieceRE = regexp.MustCompile(`\(|(?:^([a-zA-Z0-9-]+):|\\.)| `)
+ 
+<a href="#h13-0-9" id="h13-0-9" class="d">-func ParseQuery(query string) (client.Query, error) {
+</a><a href="#h13-0-10" id="h13-0-10" class="i">+func ParseQuery(query string) (pb.Query, error) {
+</a> 	ops := make(map[string]string)
+ 	key := &quot;&quot;
+ 	q := strings.TrimSpace(query)
+<a href="#h13-1" id="h13-1" class="h">@@ -78,13 +78,13 @@ func ParseQuery(query string) (client.Query, error) {
+</a> 		}
+ 	}
+ 
+<a href="#h13-1-3" id="h13-1-3" class="d">-	var out client.Query
+</a><a href="#h13-1-4" id="h13-1-4" class="i">+	var out pb.Query
+</a> 	out.File = ops[&quot;file&quot;]
+ 	out.Repo = ops[&quot;repo&quot;]
+ 	out.Tags = ops[&quot;tags&quot;]
+<a href="#h13-1-8" id="h13-1-8" class="d">-	out.Not.File = ops[&quot;-file&quot;]
+</a><a href="#h13-1-9" id="h13-1-9" class="d">-	out.Not.Repo = ops[&quot;-repo&quot;]
+</a><a href="#h13-1-10" id="h13-1-10" class="d">-	out.Not.Tags = ops[&quot;-tags&quot;]
+</a><a href="#h13-1-11" id="h13-1-11" class="i">+	out.NotFile = ops[&quot;-file&quot;]
+</a><a href="#h13-1-12" id="h13-1-12" class="i">+	out.NotRepo = ops[&quot;-repo&quot;]
+</a><a href="#h13-1-13" id="h13-1-13" class="i">+	out.NotTags = ops[&quot;-tags&quot;]
+</a> 	var bits []string
+ 	for _, k := range []string{&quot;&quot;, &quot;case&quot;, &quot;lit&quot;} {
+ 		bit := strings.TrimSpace(ops[k])
+<b>diff --git a/<a id="h14" href="../file/server/query_test.go">server/query_test.go</a> b/<a href="../file/server/query_test.go">server/query_test.go</a></b>
+<a href="#h14-0" id="h14-0" class="h">@@ -4,36 +4,25 @@ import (
+</a> 	&quot;reflect&quot;
+ 	&quot;testing&quot;
+ 
+<a href="#h14-0-3" id="h14-0-3" class="d">-	&quot;github.com/livegrep/livegrep/client&quot;
+</a><a href="#h14-0-4" id="h14-0-4" class="i">+	pb &quot;github.com/livegrep/livegrep/src/proto/go_proto&quot;
+</a> )
+ 
+ func TestParseQuery(t *testing.T) {
+<a href="#h14-0-8" id="h14-0-8" class="d">-	Not := func(file, repo, tags string) struct {
+</a><a href="#h14-0-9" id="h14-0-9" class="d">-		File string `json:&quot;file&quot;`
+</a><a href="#h14-0-10" id="h14-0-10" class="d">-		Repo string `json:&quot;repo&quot;`
+</a><a href="#h14-0-11" id="h14-0-11" class="d">-		Tags string `json:&quot;tags&quot;`
+</a><a href="#h14-0-12" id="h14-0-12" class="d">-	} {
+</a><a href="#h14-0-13" id="h14-0-13" class="d">-		return struct {
+</a><a href="#h14-0-14" id="h14-0-14" class="d">-			File string `json:&quot;file&quot;`
+</a><a href="#h14-0-15" id="h14-0-15" class="d">-			Repo string `json:&quot;repo&quot;`
+</a><a href="#h14-0-16" id="h14-0-16" class="d">-			Tags string `json:&quot;tags&quot;`
+</a><a href="#h14-0-17" id="h14-0-17" class="d">-		}{file, repo, tags}
+</a><a href="#h14-0-18" id="h14-0-18" class="d">-	}
+</a> 	cases := []struct {
+ 		in  string
+<a href="#h14-0-21" id="h14-0-21" class="d">-		out client.Query
+</a><a href="#h14-0-22" id="h14-0-22" class="i">+		out pb.Query
+</a> 	}{
+ 		{
+ 			&quot;hello&quot;,
+<a href="#h14-0-26" id="h14-0-26" class="d">-			client.Query{Line: &quot;hello&quot;, FoldCase: true},
+</a><a href="#h14-0-27" id="h14-0-27" class="i">+			pb.Query{Line: &quot;hello&quot;, FoldCase: true},
+</a> 		},
+ 		{
+ 			&quot;a b c&quot;,
+<a href="#h14-0-31" id="h14-0-31" class="d">-			client.Query{Line: &quot;a b c&quot;, FoldCase: true},
+</a><a href="#h14-0-32" id="h14-0-32" class="i">+			pb.Query{Line: &quot;a b c&quot;, FoldCase: true},
+</a> 		},
+ 		{
+ 			&quot;line file:.rb&quot;,
+<a href="#h14-0-36" id="h14-0-36" class="d">-			client.Query{
+</a><a href="#h14-0-37" id="h14-0-37" class="i">+			pb.Query{
+</a> 				Line:     &quot;line&quot;,
+ 				File:     &quot;.rb&quot;,
+ 				FoldCase: true,
+<a href="#h14-1" id="h14-1" class="h">@@ -41,79 +30,79 @@ func TestParseQuery(t *testing.T) {
+</a> 		},
+ 		{
+ 			&quot; a  &quot;,
+<a href="#h14-1-3" id="h14-1-3" class="d">-			client.Query{Line: &quot;a&quot;, FoldCase: true},
+</a><a href="#h14-1-4" id="h14-1-4" class="i">+			pb.Query{Line: &quot;a&quot;, FoldCase: true},
+</a> 		},
+ 		{
+ 			&quot;( a  )&quot;,
+<a href="#h14-1-8" id="h14-1-8" class="d">-			client.Query{Line: &quot;( a  )&quot;, FoldCase: true},
+</a><a href="#h14-1-9" id="h14-1-9" class="i">+			pb.Query{Line: &quot;( a  )&quot;, FoldCase: true},
+</a> 		},
+ 		{
+ 			&quot;Aa&quot;,
+<a href="#h14-1-13" id="h14-1-13" class="d">-			client.Query{Line: &quot;Aa&quot;, FoldCase: false},
+</a><a href="#h14-1-14" id="h14-1-14" class="i">+			pb.Query{Line: &quot;Aa&quot;, FoldCase: false},
+</a> 		},
+ 		{
+ 			&quot;case:abc&quot;,
+<a href="#h14-1-18" id="h14-1-18" class="d">-			client.Query{Line: &quot;abc&quot;, FoldCase: false},
+</a><a href="#h14-1-19" id="h14-1-19" class="i">+			pb.Query{Line: &quot;abc&quot;, FoldCase: false},
+</a> 		},
+ 		{
+ 			&quot;case:abc file:^kernel/&quot;,
+<a href="#h14-1-23" id="h14-1-23" class="d">-			client.Query{Line: &quot;abc&quot;, FoldCase: false, File: &quot;^kernel/&quot;},
+</a><a href="#h14-1-24" id="h14-1-24" class="i">+			pb.Query{Line: &quot;abc&quot;, FoldCase: false, File: &quot;^kernel/&quot;},
+</a> 		},
+ 		{
+ 			&quot;case:abc file:( )&quot;,
+<a href="#h14-1-28" id="h14-1-28" class="d">-			client.Query{Line: &quot;abc&quot;, FoldCase: false, File: &quot;( )&quot;},
+</a><a href="#h14-1-29" id="h14-1-29" class="i">+			pb.Query{Line: &quot;abc&quot;, FoldCase: false, File: &quot;( )&quot;},
+</a> 		},
+ 		{
+ 			&quot;a file:b c&quot;,
+<a href="#h14-1-33" id="h14-1-33" class="d">-			client.Query{Line: &quot;a c&quot;, FoldCase: true, File: &quot;b&quot;},
+</a><a href="#h14-1-34" id="h14-1-34" class="i">+			pb.Query{Line: &quot;a c&quot;, FoldCase: true, File: &quot;b&quot;},
+</a> 		},
+ 		{
+ 			&quot;a file:((abc()())()) c&quot;,
+<a href="#h14-1-38" id="h14-1-38" class="d">-			client.Query{Line: &quot;a c&quot;, FoldCase: true, File: &quot;((abc()())())&quot;},
+</a><a href="#h14-1-39" id="h14-1-39" class="i">+			pb.Query{Line: &quot;a c&quot;, FoldCase: true, File: &quot;((abc()())())&quot;},
+</a> 		},
+ 		{
+ 			&quot;(  () (   &quot;,
+<a href="#h14-1-43" id="h14-1-43" class="d">-			client.Query{Line: &quot;(  () (&quot;, FoldCase: true},
+</a><a href="#h14-1-44" id="h14-1-44" class="i">+			pb.Query{Line: &quot;(  () (&quot;, FoldCase: true},
+</a> 		},
+ 		{
+ 			`a file:\(`,
+<a href="#h14-1-48" id="h14-1-48" class="d">-			client.Query{Line: &quot;a&quot;, File: `\(`, FoldCase: true},
+</a><a href="#h14-1-49" id="h14-1-49" class="i">+			pb.Query{Line: &quot;a&quot;, File: `\(`, FoldCase: true},
+</a> 		},
+ 		{
+ 			`a file:(\()`,
+<a href="#h14-1-53" id="h14-1-53" class="d">-			client.Query{Line: &quot;a&quot;, File: `(\()`, FoldCase: true},
+</a><a href="#h14-1-54" id="h14-1-54" class="i">+			pb.Query{Line: &quot;a&quot;, File: `(\()`, FoldCase: true},
+</a> 		},
+ 		{
+ 			`(`,
+<a href="#h14-1-58" id="h14-1-58" class="d">-			client.Query{Line: &quot;(&quot;, FoldCase: true},
+</a><a href="#h14-1-59" id="h14-1-59" class="i">+			pb.Query{Line: &quot;(&quot;, FoldCase: true},
+</a> 		},
+ 		{
+ 			`(file:)`,
+<a href="#h14-1-63" id="h14-1-63" class="d">-			client.Query{Line: &quot;(file:)&quot;, FoldCase: true},
+</a><a href="#h14-1-64" id="h14-1-64" class="i">+			pb.Query{Line: &quot;(file:)&quot;, FoldCase: true},
+</a> 		},
+ 		{
+ 			`re tags:kind:function`,
+<a href="#h14-1-68" id="h14-1-68" class="d">-			client.Query{Line: &quot;re&quot;, FoldCase: true, Tags: &quot;kind:function&quot;},
+</a><a href="#h14-1-69" id="h14-1-69" class="i">+			pb.Query{Line: &quot;re&quot;, FoldCase: true, Tags: &quot;kind:function&quot;},
+</a> 		},
+ 		{
+ 			`-file:Godep re`,
+<a href="#h14-1-73" id="h14-1-73" class="d">-			client.Query{Line: &quot;re&quot;, Not: Not(&quot;Godep&quot;, &quot;&quot;, &quot;&quot;), FoldCase: true},
+</a><a href="#h14-1-74" id="h14-1-74" class="i">+			pb.Query{Line: &quot;re&quot;, NotFile: &quot;Godep&quot;, FoldCase: true},
+</a> 		},
+ 		{
+ 			`-file:. -repo:Godep re`,
+<a href="#h14-1-78" id="h14-1-78" class="d">-			client.Query{Line: &quot;re&quot;, Not: Not(&quot;.&quot;, &quot;Godep&quot;, &quot;&quot;), FoldCase: true},
+</a><a href="#h14-1-79" id="h14-1-79" class="i">+			pb.Query{Line: &quot;re&quot;, NotFile: &quot;.&quot;, NotRepo: &quot;Godep&quot;, FoldCase: true},
+</a> 		},
+ 		{
+ 			`-tags:kind:class re`,
+<a href="#h14-1-83" id="h14-1-83" class="d">-			client.Query{Line: &quot;re&quot;, Not: Not(&quot;&quot;, &quot;&quot;, &quot;kind:class&quot;), FoldCase: true},
+</a><a href="#h14-1-84" id="h14-1-84" class="i">+			pb.Query{Line: &quot;re&quot;, NotTags: &quot;kind:class&quot;, FoldCase: true},
+</a> 		},
+ 		{
+ 			`case:foo:`,
+<a href="#h14-1-88" id="h14-1-88" class="d">-			client.Query{Line: &quot;foo:&quot;, FoldCase: false},
+</a><a href="#h14-1-89" id="h14-1-89" class="i">+			pb.Query{Line: &quot;foo:&quot;, FoldCase: false},
+</a> 		},
+ 		{
+ 			`lit:.`,
+<a href="#h14-1-93" id="h14-1-93" class="d">-			client.Query{Line: `\.`, FoldCase: false},
+</a><a href="#h14-1-94" id="h14-1-94" class="i">+			pb.Query{Line: `\.`, FoldCase: false},
+</a> 		},
+ 	}
+ 
+<b>diff --git a/<a id="h15" href="../file/server/reqid/BUILD">server/reqid/BUILD</a> b/<a href="../file/server/reqid/BUILD">server/reqid/BUILD</a></b>
+<a href="#h15-0" id="h15-0" class="h">@@ -11,9 +11,7 @@ name = &quot;go_default_library&quot;,
+</a>     &quot;reqid.go&quot;,
+   ],
+   deps = [
+<a href="#h15-0-3" id="h15-0-3" class="d">-    &quot;//vendor/golang.org/x/net/context:go_default_library&quot;,
+</a><a href="#h15-0-4" id="h15-0-4" class="i">+    &quot;@org_golang_x_net//:context&quot;,
+</a>   ],
+   visibility = [&quot;//visibility:public&quot;],
+ )
+<a href="#h15-0-8" id="h15-0-8" class="d">-
+</a><a href="#h15-0-9" id="h15-0-9" class="d">-
+</a><b>diff --git a/<a id="h16" href="../file/server/server.go">server/server.go</a> b/<a href="../file/server/server.go">server/server.go</a></b>
+<a href="#h16-0" id="h16-0" class="h">@@ -14,7 +14,6 @@ import (
+</a> 	&quot;github.com/bmizerany/pat&quot;
+ 	libhoney &quot;github.com/honeycombio/libhoney-go&quot;
+ 
+<a href="#h16-0-3" id="h16-0-3" class="d">-	&quot;github.com/livegrep/livegrep/client&quot;
+</a> 	&quot;github.com/livegrep/livegrep/server/config&quot;
+ 	&quot;github.com/livegrep/livegrep/server/log&quot;
+ 	&quot;github.com/livegrep/livegrep/server/reqid&quot;
+<a href="#h16-1" id="h16-1" class="h">@@ -182,10 +181,9 @@ func New(cfg *config.Config) (http.Handler, error) {
+</a> 	}
+ 
+ 	for _, bk := range srv.config.Backends {
+<a href="#h16-1-3" id="h16-1-3" class="d">-		addr := bk.Addr
+</a> 		be := &amp;Backend{
+ 			Id:   bk.Id,
+<a href="#h16-1-6" id="h16-1-6" class="d">-			Dial: func() (client.Client, error) { return client.Dial(&quot;tcp&quot;, addr) },
+</a><a href="#h16-1-7" id="h16-1-7" class="i">+			Addr: bk.Addr,
+</a> 		}
+ 		be.Start()
+ 		srv.bk[be.Id] = be
+<b>diff --git a/<a id="h17" href="../file/vendor/golang.org/x/net/LICENSE">vendor/golang.org/x/net/LICENSE</a> b/<a href="../file/vendor/golang.org/x/net/LICENSE">vendor/golang.org/x/net/LICENSE</a></b>
+<a href="#h17-0" id="h17-0" class="h">@@ -1,27 +0,0 @@
+</a><a href="#h17-0-0" id="h17-0-0" class="d">-Copyright (c) 2009 The Go Authors. All rights reserved.
+</a><a href="#h17-0-1" id="h17-0-1" class="d">-
+</a><a href="#h17-0-2" id="h17-0-2" class="d">-Redistribution and use in source and binary forms, with or without
+</a><a href="#h17-0-3" id="h17-0-3" class="d">-modification, are permitted provided that the following conditions are
+</a><a href="#h17-0-4" id="h17-0-4" class="d">-met:
+</a><a href="#h17-0-5" id="h17-0-5" class="d">-
+</a><a href="#h17-0-6" id="h17-0-6" class="d">-   * Redistributions of source code must retain the above copyright
+</a><a href="#h17-0-7" id="h17-0-7" class="d">-notice, this list of conditions and the following disclaimer.
+</a><a href="#h17-0-8" id="h17-0-8" class="d">-   * Redistributions in binary form must reproduce the above
+</a><a href="#h17-0-9" id="h17-0-9" class="d">-copyright notice, this list of conditions and the following disclaimer
+</a><a href="#h17-0-10" id="h17-0-10" class="d">-in the documentation and/or other materials provided with the
+</a><a href="#h17-0-11" id="h17-0-11" class="d">-distribution.
+</a><a href="#h17-0-12" id="h17-0-12" class="d">-   * Neither the name of Google Inc. nor the names of its
+</a><a href="#h17-0-13" id="h17-0-13" class="d">-contributors may be used to endorse or promote products derived from
+</a><a href="#h17-0-14" id="h17-0-14" class="d">-this software without specific prior written permission.
+</a><a href="#h17-0-15" id="h17-0-15" class="d">-
+</a><a href="#h17-0-16" id="h17-0-16" class="d">-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+</a><a href="#h17-0-17" id="h17-0-17" class="d">-&quot;AS IS&quot; AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+</a><a href="#h17-0-18" id="h17-0-18" class="d">-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+</a><a href="#h17-0-19" id="h17-0-19" class="d">-A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+</a><a href="#h17-0-20" id="h17-0-20" class="d">-OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+</a><a href="#h17-0-21" id="h17-0-21" class="d">-SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+</a><a href="#h17-0-22" id="h17-0-22" class="d">-LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+</a><a href="#h17-0-23" id="h17-0-23" class="d">-DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+</a><a href="#h17-0-24" id="h17-0-24" class="d">-THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+</a><a href="#h17-0-25" id="h17-0-25" class="d">-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+</a><a href="#h17-0-26" id="h17-0-26" class="d">-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+</a><b>diff --git a/<a id="h18" href="../file/vendor/golang.org/x/net/PATENTS">vendor/golang.org/x/net/PATENTS</a> b/<a href="../file/vendor/golang.org/x/net/PATENTS">vendor/golang.org/x/net/PATENTS</a></b>
+<a href="#h18-0" id="h18-0" class="h">@@ -1,22 +0,0 @@
+</a><a href="#h18-0-0" id="h18-0-0" class="d">-Additional IP Rights Grant (Patents)
+</a><a href="#h18-0-1" id="h18-0-1" class="d">-
+</a><a href="#h18-0-2" id="h18-0-2" class="d">-&quot;This implementation&quot; means the copyrightable works distributed by
+</a><a href="#h18-0-3" id="h18-0-3" class="d">-Google as part of the Go project.
+</a><a href="#h18-0-4" id="h18-0-4" class="d">-
+</a><a href="#h18-0-5" id="h18-0-5" class="d">-Google hereby grants to You a perpetual, worldwide, non-exclusive,
+</a><a href="#h18-0-6" id="h18-0-6" class="d">-no-charge, royalty-free, irrevocable (except as stated in this section)
+</a><a href="#h18-0-7" id="h18-0-7" class="d">-patent license to make, have made, use, offer to sell, sell, import,
+</a><a href="#h18-0-8" id="h18-0-8" class="d">-transfer and otherwise run, modify and propagate the contents of this
+</a><a href="#h18-0-9" id="h18-0-9" class="d">-implementation of Go, where such license applies only to those patent
+</a><a href="#h18-0-10" id="h18-0-10" class="d">-claims, both currently owned or controlled by Google and acquired in
+</a><a href="#h18-0-11" id="h18-0-11" class="d">-the future, licensable by Google that are necessarily infringed by this
+</a><a href="#h18-0-12" id="h18-0-12" class="d">-implementation of Go.  This grant does not include claims that would be
+</a><a href="#h18-0-13" id="h18-0-13" class="d">-infringed only as a consequence of further modification of this
+</a><a href="#h18-0-14" id="h18-0-14" class="d">-implementation.  If you or your agent or exclusive licensee institute or
+</a><a href="#h18-0-15" id="h18-0-15" class="d">-order or agree to the institution of patent litigation against any
+</a><a href="#h18-0-16" id="h18-0-16" class="d">-entity (including a cross-claim or counterclaim in a lawsuit) alleging
+</a><a href="#h18-0-17" id="h18-0-17" class="d">-that this implementation of Go or any code incorporated within this
+</a><a href="#h18-0-18" id="h18-0-18" class="d">-implementation of Go constitutes direct or contributory patent
+</a><a href="#h18-0-19" id="h18-0-19" class="d">-infringement, or inducement of patent infringement, then any patent
+</a><a href="#h18-0-20" id="h18-0-20" class="d">-rights granted to you under this License for this implementation of Go
+</a><a href="#h18-0-21" id="h18-0-21" class="d">-shall terminate as of the date such litigation is filed.
+</a><b>diff --git a/<a id="h19" href="../file/vendor/golang.org/x/net/context/BUILD">vendor/golang.org/x/net/context/BUILD</a> b/<a href="../file/vendor/golang.org/x/net/context/BUILD">vendor/golang.org/x/net/context/BUILD</a></b>
+<a href="#h19-0" id="h19-0" class="h">@@ -1,19 +0,0 @@
+</a><a href="#h19-0-0" id="h19-0-0" class="d">-
+</a><a href="#h19-0-1" id="h19-0-1" class="d">-load(&quot;@io_bazel_rules_go//go:def.bzl&quot;,
+</a><a href="#h19-0-2" id="h19-0-2" class="d">-  &quot;go_binary&quot;,
+</a><a href="#h19-0-3" id="h19-0-3" class="d">-  &quot;go_library&quot;,
+</a><a href="#h19-0-4" id="h19-0-4" class="d">-  &quot;go_test&quot;,
+</a><a href="#h19-0-5" id="h19-0-5" class="d">-)
+</a><a href="#h19-0-6" id="h19-0-6" class="d">-
+</a><a href="#h19-0-7" id="h19-0-7" class="d">-go_library(
+</a><a href="#h19-0-8" id="h19-0-8" class="d">-name = &quot;go_default_library&quot;,
+</a><a href="#h19-0-9" id="h19-0-9" class="d">-  srcs = [
+</a><a href="#h19-0-10" id="h19-0-10" class="d">-    &quot;context.go&quot;,
+</a><a href="#h19-0-11" id="h19-0-11" class="d">-    &quot;go17.go&quot;,
+</a><a href="#h19-0-12" id="h19-0-12" class="d">-  ],
+</a><a href="#h19-0-13" id="h19-0-13" class="d">-  deps = [
+</a><a href="#h19-0-14" id="h19-0-14" class="d">-  ],
+</a><a href="#h19-0-15" id="h19-0-15" class="d">-  visibility = [&quot;//visibility:public&quot;],
+</a><a href="#h19-0-16" id="h19-0-16" class="d">-)
+</a><a href="#h19-0-17" id="h19-0-17" class="d">-
+</a><a href="#h19-0-18" id="h19-0-18" class="d">-
+</a><b>diff --git a/<a id="h20" href="../file/vendor/golang.org/x/net/context/context.go">vendor/golang.org/x/net/context/context.go</a> b/<a href="../file/vendor/golang.org/x/net/context/context.go">vendor/golang.org/x/net/context/context.go</a></b>
+<a href="#h20-0" id="h20-0" class="h">@@ -1,156 +0,0 @@
+</a><a href="#h20-0-0" id="h20-0-0" class="d">-// Copyright 2014 The Go Authors. All rights reserved.
+</a><a href="#h20-0-1" id="h20-0-1" class="d">-// Use of this source code is governed by a BSD-style
+</a><a href="#h20-0-2" id="h20-0-2" class="d">-// license that can be found in the LICENSE file.
+</a><a href="#h20-0-3" id="h20-0-3" class="d">-
+</a><a href="#h20-0-4" id="h20-0-4" class="d">-// Package context defines the Context type, which carries deadlines,
+</a><a href="#h20-0-5" id="h20-0-5" class="d">-// cancelation signals, and other request-scoped values across API boundaries
+</a><a href="#h20-0-6" id="h20-0-6" class="d">-// and between processes.
+</a><a href="#h20-0-7" id="h20-0-7" class="d">-//
+</a><a href="#h20-0-8" id="h20-0-8" class="d">-// Incoming requests to a server should create a Context, and outgoing calls to
+</a><a href="#h20-0-9" id="h20-0-9" class="d">-// servers should accept a Context.  The chain of function calls between must
+</a><a href="#h20-0-10" id="h20-0-10" class="d">-// propagate the Context, optionally replacing it with a modified copy created
+</a><a href="#h20-0-11" id="h20-0-11" class="d">-// using WithDeadline, WithTimeout, WithCancel, or WithValue.
+</a><a href="#h20-0-12" id="h20-0-12" class="d">-//
+</a><a href="#h20-0-13" id="h20-0-13" class="d">-// Programs that use Contexts should follow these rules to keep interfaces
+</a><a href="#h20-0-14" id="h20-0-14" class="d">-// consistent across packages and enable static analysis tools to check context
+</a><a href="#h20-0-15" id="h20-0-15" class="d">-// propagation:
+</a><a href="#h20-0-16" id="h20-0-16" class="d">-//
+</a><a href="#h20-0-17" id="h20-0-17" class="d">-// Do not store Contexts inside a struct type; instead, pass a Context
+</a><a href="#h20-0-18" id="h20-0-18" class="d">-// explicitly to each function that needs it.  The Context should be the first
+</a><a href="#h20-0-19" id="h20-0-19" class="d">-// parameter, typically named ctx:
+</a><a href="#h20-0-20" id="h20-0-20" class="d">-//
+</a><a href="#h20-0-21" id="h20-0-21" class="d">-// 	func DoSomething(ctx context.Context, arg Arg) error {
+</a><a href="#h20-0-22" id="h20-0-22" class="d">-// 		// ... use ctx ...
+</a><a href="#h20-0-23" id="h20-0-23" class="d">-// 	}
+</a><a href="#h20-0-24" id="h20-0-24" class="d">-//
+</a><a href="#h20-0-25" id="h20-0-25" class="d">-// Do not pass a nil Context, even if a function permits it.  Pass context.TODO
+</a><a href="#h20-0-26" id="h20-0-26" class="d">-// if you are unsure about which Context to use.
+</a><a href="#h20-0-27" id="h20-0-27" class="d">-//
+</a><a href="#h20-0-28" id="h20-0-28" class="d">-// Use context Values only for request-scoped data that transits processes and
+</a><a href="#h20-0-29" id="h20-0-29" class="d">-// APIs, not for passing optional parameters to functions.
+</a><a href="#h20-0-30" id="h20-0-30" class="d">-//
+</a><a href="#h20-0-31" id="h20-0-31" class="d">-// The same Context may be passed to functions running in different goroutines;
+</a><a href="#h20-0-32" id="h20-0-32" class="d">-// Contexts are safe for simultaneous use by multiple goroutines.
+</a><a href="#h20-0-33" id="h20-0-33" class="d">-//
+</a><a href="#h20-0-34" id="h20-0-34" class="d">-// See http://blog.golang.org/context for example code for a server that uses
+</a><a href="#h20-0-35" id="h20-0-35" class="d">-// Contexts.
+</a><a href="#h20-0-36" id="h20-0-36" class="d">-package context // import &quot;golang.org/x/net/context&quot;
+</a><a href="#h20-0-37" id="h20-0-37" class="d">-
+</a><a href="#h20-0-38" id="h20-0-38" class="d">-import &quot;time&quot;
+</a><a href="#h20-0-39" id="h20-0-39" class="d">-
+</a><a href="#h20-0-40" id="h20-0-40" class="d">-// A Context carries a deadline, a cancelation signal, and other values across
+</a><a href="#h20-0-41" id="h20-0-41" class="d">-// API boundaries.
+</a><a href="#h20-0-42" id="h20-0-42" class="d">-//
+</a><a href="#h20-0-43" id="h20-0-43" class="d">-// Context&#39;s methods may be called by multiple goroutines simultaneously.
+</a><a href="#h20-0-44" id="h20-0-44" class="d">-type Context interface {
+</a><a href="#h20-0-45" id="h20-0-45" class="d">-	// Deadline returns the time when work done on behalf of this context
+</a><a href="#h20-0-46" id="h20-0-46" class="d">-	// should be canceled.  Deadline returns ok==false when no deadline is
+</a><a href="#h20-0-47" id="h20-0-47" class="d">-	// set.  Successive calls to Deadline return the same results.
+</a><a href="#h20-0-48" id="h20-0-48" class="d">-	Deadline() (deadline time.Time, ok bool)
+</a><a href="#h20-0-49" id="h20-0-49" class="d">-
+</a><a href="#h20-0-50" id="h20-0-50" class="d">-	// Done returns a channel that&#39;s closed when work done on behalf of this
+</a><a href="#h20-0-51" id="h20-0-51" class="d">-	// context should be canceled.  Done may return nil if this context can
+</a><a href="#h20-0-52" id="h20-0-52" class="d">-	// never be canceled.  Successive calls to Done return the same value.
+</a><a href="#h20-0-53" id="h20-0-53" class="d">-	//
+</a><a href="#h20-0-54" id="h20-0-54" class="d">-	// WithCancel arranges for Done to be closed when cancel is called;
+</a><a href="#h20-0-55" id="h20-0-55" class="d">-	// WithDeadline arranges for Done to be closed when the deadline
+</a><a href="#h20-0-56" id="h20-0-56" class="d">-	// expires; WithTimeout arranges for Done to be closed when the timeout
+</a><a href="#h20-0-57" id="h20-0-57" class="d">-	// elapses.
+</a><a href="#h20-0-58" id="h20-0-58" class="d">-	//
+</a><a href="#h20-0-59" id="h20-0-59" class="d">-	// Done is provided for use in select statements:
+</a><a href="#h20-0-60" id="h20-0-60" class="d">-	//
+</a><a href="#h20-0-61" id="h20-0-61" class="d">-	//  // Stream generates values with DoSomething and sends them to out
+</a><a href="#h20-0-62" id="h20-0-62" class="d">-	//  // until DoSomething returns an error or ctx.Done is closed.
+</a><a href="#h20-0-63" id="h20-0-63" class="d">-	//  func Stream(ctx context.Context, out &lt;-chan Value) error {
+</a><a href="#h20-0-64" id="h20-0-64" class="d">-	//  	for {
+</a><a href="#h20-0-65" id="h20-0-65" class="d">-	//  		v, err := DoSomething(ctx)
+</a><a href="#h20-0-66" id="h20-0-66" class="d">-	//  		if err != nil {
+</a><a href="#h20-0-67" id="h20-0-67" class="d">-	//  			return err
+</a><a href="#h20-0-68" id="h20-0-68" class="d">-	//  		}
+</a><a href="#h20-0-69" id="h20-0-69" class="d">-	//  		select {
+</a><a href="#h20-0-70" id="h20-0-70" class="d">-	//  		case &lt;-ctx.Done():
+</a><a href="#h20-0-71" id="h20-0-71" class="d">-	//  			return ctx.Err()
+</a><a href="#h20-0-72" id="h20-0-72" class="d">-	//  		case out &lt;- v:
+</a><a href="#h20-0-73" id="h20-0-73" class="d">-	//  		}
+</a><a href="#h20-0-74" id="h20-0-74" class="d">-	//  	}
+</a><a href="#h20-0-75" id="h20-0-75" class="d">-	//  }
+</a><a href="#h20-0-76" id="h20-0-76" class="d">-	//
+</a><a href="#h20-0-77" id="h20-0-77" class="d">-	// See http://blog.golang.org/pipelines for more examples of how to use
+</a><a href="#h20-0-78" id="h20-0-78" class="d">-	// a Done channel for cancelation.
+</a><a href="#h20-0-79" id="h20-0-79" class="d">-	Done() &lt;-chan struct{}
+</a><a href="#h20-0-80" id="h20-0-80" class="d">-
+</a><a href="#h20-0-81" id="h20-0-81" class="d">-	// Err returns a non-nil error value after Done is closed.  Err returns
+</a><a href="#h20-0-82" id="h20-0-82" class="d">-	// Canceled if the context was canceled or DeadlineExceeded if the
+</a><a href="#h20-0-83" id="h20-0-83" class="d">-	// context&#39;s deadline passed.  No other values for Err are defined.
+</a><a href="#h20-0-84" id="h20-0-84" class="d">-	// After Done is closed, successive calls to Err return the same value.
+</a><a href="#h20-0-85" id="h20-0-85" class="d">-	Err() error
+</a><a href="#h20-0-86" id="h20-0-86" class="d">-
+</a><a href="#h20-0-87" id="h20-0-87" class="d">-	// Value returns the value associated with this context for key, or nil
+</a><a href="#h20-0-88" id="h20-0-88" class="d">-	// if no value is associated with key.  Successive calls to Value with
+</a><a href="#h20-0-89" id="h20-0-89" class="d">-	// the same key returns the same result.
+</a><a href="#h20-0-90" id="h20-0-90" class="d">-	//
+</a><a href="#h20-0-91" id="h20-0-91" class="d">-	// Use context values only for request-scoped data that transits
+</a><a href="#h20-0-92" id="h20-0-92" class="d">-	// processes and API boundaries, not for passing optional parameters to
+</a><a href="#h20-0-93" id="h20-0-93" class="d">-	// functions.
+</a><a href="#h20-0-94" id="h20-0-94" class="d">-	//
+</a><a href="#h20-0-95" id="h20-0-95" class="d">-	// A key identifies a specific value in a Context.  Functions that wish
+</a><a href="#h20-0-96" id="h20-0-96" class="d">-	// to store values in Context typically allocate a key in a global
+</a><a href="#h20-0-97" id="h20-0-97" class="d">-	// variable then use that key as the argument to context.WithValue and
+</a><a href="#h20-0-98" id="h20-0-98" class="d">-	// Context.Value.  A key can be any type that supports equality;
+</a><a href="#h20-0-99" id="h20-0-99" class="d">-	// packages should define keys as an unexported type to avoid
+</a><a href="#h20-0-100" id="h20-0-100" class="d">-	// collisions.
+</a><a href="#h20-0-101" id="h20-0-101" class="d">-	//
+</a><a href="#h20-0-102" id="h20-0-102" class="d">-	// Packages that define a Context key should provide type-safe accessors
+</a><a href="#h20-0-103" id="h20-0-103" class="d">-	// for the values stores using that key:
+</a><a href="#h20-0-104" id="h20-0-104" class="d">-	//
+</a><a href="#h20-0-105" id="h20-0-105" class="d">-	// 	// Package user defines a User type that&#39;s stored in Contexts.
+</a><a href="#h20-0-106" id="h20-0-106" class="d">-	// 	package user
+</a><a href="#h20-0-107" id="h20-0-107" class="d">-	//
+</a><a href="#h20-0-108" id="h20-0-108" class="d">-	// 	import &quot;golang.org/x/net/context&quot;
+</a><a href="#h20-0-109" id="h20-0-109" class="d">-	//
+</a><a href="#h20-0-110" id="h20-0-110" class="d">-	// 	// User is the type of value stored in the Contexts.
+</a><a href="#h20-0-111" id="h20-0-111" class="d">-	// 	type User struct {...}
+</a><a href="#h20-0-112" id="h20-0-112" class="d">-	//
+</a><a href="#h20-0-113" id="h20-0-113" class="d">-	// 	// key is an unexported type for keys defined in this package.
+</a><a href="#h20-0-114" id="h20-0-114" class="d">-	// 	// This prevents collisions with keys defined in other packages.
+</a><a href="#h20-0-115" id="h20-0-115" class="d">-	// 	type key int
+</a><a href="#h20-0-116" id="h20-0-116" class="d">-	//
+</a><a href="#h20-0-117" id="h20-0-117" class="d">-	// 	// userKey is the key for user.User values in Contexts.  It is
+</a><a href="#h20-0-118" id="h20-0-118" class="d">-	// 	// unexported; clients use user.NewContext and user.FromContext
+</a><a href="#h20-0-119" id="h20-0-119" class="d">-	// 	// instead of using this key directly.
+</a><a href="#h20-0-120" id="h20-0-120" class="d">-	// 	var userKey key = 0
+</a><a href="#h20-0-121" id="h20-0-121" class="d">-	//
+</a><a href="#h20-0-122" id="h20-0-122" class="d">-	// 	// NewContext returns a new Context that carries value u.
+</a><a href="#h20-0-123" id="h20-0-123" class="d">-	// 	func NewContext(ctx context.Context, u *User) context.Context {
+</a><a href="#h20-0-124" id="h20-0-124" class="d">-	// 		return context.WithValue(ctx, userKey, u)
+</a><a href="#h20-0-125" id="h20-0-125" class="d">-	// 	}
+</a><a href="#h20-0-126" id="h20-0-126" class="d">-	//
+</a><a href="#h20-0-127" id="h20-0-127" class="d">-	// 	// FromContext returns the User value stored in ctx, if any.
+</a><a href="#h20-0-128" id="h20-0-128" class="d">-	// 	func FromContext(ctx context.Context) (*User, bool) {
+</a><a href="#h20-0-129" id="h20-0-129" class="d">-	// 		u, ok := ctx.Value(userKey).(*User)
+</a><a href="#h20-0-130" id="h20-0-130" class="d">-	// 		return u, ok
+</a><a href="#h20-0-131" id="h20-0-131" class="d">-	// 	}
+</a><a href="#h20-0-132" id="h20-0-132" class="d">-	Value(key interface{}) interface{}
+</a><a href="#h20-0-133" id="h20-0-133" class="d">-}
+</a><a href="#h20-0-134" id="h20-0-134" class="d">-
+</a><a href="#h20-0-135" id="h20-0-135" class="d">-// Background returns a non-nil, empty Context. It is never canceled, has no
+</a><a href="#h20-0-136" id="h20-0-136" class="d">-// values, and has no deadline.  It is typically used by the main function,
+</a><a href="#h20-0-137" id="h20-0-137" class="d">-// initialization, and tests, and as the top-level Context for incoming
+</a><a href="#h20-0-138" id="h20-0-138" class="d">-// requests.
+</a><a href="#h20-0-139" id="h20-0-139" class="d">-func Background() Context {
+</a><a href="#h20-0-140" id="h20-0-140" class="d">-	return background
+</a><a href="#h20-0-141" id="h20-0-141" class="d">-}
+</a><a href="#h20-0-142" id="h20-0-142" class="d">-
+</a><a href="#h20-0-143" id="h20-0-143" class="d">-// TODO returns a non-nil, empty Context.  Code should use context.TODO when
+</a><a href="#h20-0-144" id="h20-0-144" class="d">-// it&#39;s unclear which Context to use or it is not yet available (because the
+</a><a href="#h20-0-145" id="h20-0-145" class="d">-// surrounding function has not yet been extended to accept a Context
+</a><a href="#h20-0-146" id="h20-0-146" class="d">-// parameter).  TODO is recognized by static analysis tools that determine
+</a><a href="#h20-0-147" id="h20-0-147" class="d">-// whether Contexts are propagated correctly in a program.
+</a><a href="#h20-0-148" id="h20-0-148" class="d">-func TODO() Context {
+</a><a href="#h20-0-149" id="h20-0-149" class="d">-	return todo
+</a><a href="#h20-0-150" id="h20-0-150" class="d">-}
+</a><a href="#h20-0-151" id="h20-0-151" class="d">-
+</a><a href="#h20-0-152" id="h20-0-152" class="d">-// A CancelFunc tells an operation to abandon its work.
+</a><a href="#h20-0-153" id="h20-0-153" class="d">-// A CancelFunc does not wait for the work to stop.
+</a><a href="#h20-0-154" id="h20-0-154" class="d">-// After the first call, subsequent calls to a CancelFunc do nothing.
+</a><a href="#h20-0-155" id="h20-0-155" class="d">-type CancelFunc func()
+</a><b>diff --git a/<a id="h21" href="../file/vendor/golang.org/x/net/context/go17.go">vendor/golang.org/x/net/context/go17.go</a> b/<a href="../file/vendor/golang.org/x/net/context/go17.go">vendor/golang.org/x/net/context/go17.go</a></b>
+<a href="#h21-0" id="h21-0" class="h">@@ -1,72 +0,0 @@
+</a><a href="#h21-0-0" id="h21-0-0" class="d">-// Copyright 2016 The Go Authors. All rights reserved.
+</a><a href="#h21-0-1" id="h21-0-1" class="d">-// Use of this source code is governed by a BSD-style
+</a><a href="#h21-0-2" id="h21-0-2" class="d">-// license that can be found in the LICENSE file.
+</a><a href="#h21-0-3" id="h21-0-3" class="d">-
+</a><a href="#h21-0-4" id="h21-0-4" class="d">-// +build go1.7
+</a><a href="#h21-0-5" id="h21-0-5" class="d">-
+</a><a href="#h21-0-6" id="h21-0-6" class="d">-package context
+</a><a href="#h21-0-7" id="h21-0-7" class="d">-
+</a><a href="#h21-0-8" id="h21-0-8" class="d">-import (
+</a><a href="#h21-0-9" id="h21-0-9" class="d">-	&quot;context&quot; // standard library&#39;s context, as of Go 1.7
+</a><a href="#h21-0-10" id="h21-0-10" class="d">-	&quot;time&quot;
+</a><a href="#h21-0-11" id="h21-0-11" class="d">-)
+</a><a href="#h21-0-12" id="h21-0-12" class="d">-
+</a><a href="#h21-0-13" id="h21-0-13" class="d">-var (
+</a><a href="#h21-0-14" id="h21-0-14" class="d">-	todo       = context.TODO()
+</a><a href="#h21-0-15" id="h21-0-15" class="d">-	background = context.Background()
+</a><a href="#h21-0-16" id="h21-0-16" class="d">-)
+</a><a href="#h21-0-17" id="h21-0-17" class="d">-
+</a><a href="#h21-0-18" id="h21-0-18" class="d">-// Canceled is the error returned by Context.Err when the context is canceled.
+</a><a href="#h21-0-19" id="h21-0-19" class="d">-var Canceled = context.Canceled
+</a><a href="#h21-0-20" id="h21-0-20" class="d">-
+</a><a href="#h21-0-21" id="h21-0-21" class="d">-// DeadlineExceeded is the error returned by Context.Err when the context&#39;s
+</a><a href="#h21-0-22" id="h21-0-22" class="d">-// deadline passes.
+</a><a href="#h21-0-23" id="h21-0-23" class="d">-var DeadlineExceeded = context.DeadlineExceeded
+</a><a href="#h21-0-24" id="h21-0-24" class="d">-
+</a><a href="#h21-0-25" id="h21-0-25" class="d">-// WithCancel returns a copy of parent with a new Done channel. The returned
+</a><a href="#h21-0-26" id="h21-0-26" class="d">-// context&#39;s Done channel is closed when the returned cancel function is called
+</a><a href="#h21-0-27" id="h21-0-27" class="d">-// or when the parent context&#39;s Done channel is closed, whichever happens first.
+</a><a href="#h21-0-28" id="h21-0-28" class="d">-//
+</a><a href="#h21-0-29" id="h21-0-29" class="d">-// Canceling this context releases resources associated with it, so code should
+</a><a href="#h21-0-30" id="h21-0-30" class="d">-// call cancel as soon as the operations running in this Context complete.
+</a><a href="#h21-0-31" id="h21-0-31" class="d">-func WithCancel(parent Context) (ctx Context, cancel CancelFunc) {
+</a><a href="#h21-0-32" id="h21-0-32" class="d">-	ctx, f := context.WithCancel(parent)
+</a><a href="#h21-0-33" id="h21-0-33" class="d">-	return ctx, CancelFunc(f)
+</a><a href="#h21-0-34" id="h21-0-34" class="d">-}
+</a><a href="#h21-0-35" id="h21-0-35" class="d">-
+</a><a href="#h21-0-36" id="h21-0-36" class="d">-// WithDeadline returns a copy of the parent context with the deadline adjusted
+</a><a href="#h21-0-37" id="h21-0-37" class="d">-// to be no later than d.  If the parent&#39;s deadline is already earlier than d,
+</a><a href="#h21-0-38" id="h21-0-38" class="d">-// WithDeadline(parent, d) is semantically equivalent to parent.  The returned
+</a><a href="#h21-0-39" id="h21-0-39" class="d">-// context&#39;s Done channel is closed when the deadline expires, when the returned
+</a><a href="#h21-0-40" id="h21-0-40" class="d">-// cancel function is called, or when the parent context&#39;s Done channel is
+</a><a href="#h21-0-41" id="h21-0-41" class="d">-// closed, whichever happens first.
+</a><a href="#h21-0-42" id="h21-0-42" class="d">-//
+</a><a href="#h21-0-43" id="h21-0-43" class="d">-// Canceling this context releases resources associated with it, so code should
+</a><a href="#h21-0-44" id="h21-0-44" class="d">-// call cancel as soon as the operations running in this Context complete.
+</a><a href="#h21-0-45" id="h21-0-45" class="d">-func WithDeadline(parent Context, deadline time.Time) (Context, CancelFunc) {
+</a><a href="#h21-0-46" id="h21-0-46" class="d">-	ctx, f := context.WithDeadline(parent, deadline)
+</a><a href="#h21-0-47" id="h21-0-47" class="d">-	return ctx, CancelFunc(f)
+</a><a href="#h21-0-48" id="h21-0-48" class="d">-}
+</a><a href="#h21-0-49" id="h21-0-49" class="d">-
+</a><a href="#h21-0-50" id="h21-0-50" class="d">-// WithTimeout returns WithDeadline(parent, time.Now().Add(timeout)).
+</a><a href="#h21-0-51" id="h21-0-51" class="d">-//
+</a><a href="#h21-0-52" id="h21-0-52" class="d">-// Canceling this context releases resources associated with it, so code should
+</a><a href="#h21-0-53" id="h21-0-53" class="d">-// call cancel as soon as the operations running in this Context complete:
+</a><a href="#h21-0-54" id="h21-0-54" class="d">-//
+</a><a href="#h21-0-55" id="h21-0-55" class="d">-// 	func slowOperationWithTimeout(ctx context.Context) (Result, error) {
+</a><a href="#h21-0-56" id="h21-0-56" class="d">-// 		ctx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
+</a><a href="#h21-0-57" id="h21-0-57" class="d">-// 		defer cancel()  // releases resources if slowOperation completes before timeout elapses
+</a><a href="#h21-0-58" id="h21-0-58" class="d">-// 		return slowOperation(ctx)
+</a><a href="#h21-0-59" id="h21-0-59" class="d">-// 	}
+</a><a href="#h21-0-60" id="h21-0-60" class="d">-func WithTimeout(parent Context, timeout time.Duration) (Context, CancelFunc) {
+</a><a href="#h21-0-61" id="h21-0-61" class="d">-	return WithDeadline(parent, time.Now().Add(timeout))
+</a><a href="#h21-0-62" id="h21-0-62" class="d">-}
+</a><a href="#h21-0-63" id="h21-0-63" class="d">-
+</a><a href="#h21-0-64" id="h21-0-64" class="d">-// WithValue returns a copy of parent in which the value associated with key is
+</a><a href="#h21-0-65" id="h21-0-65" class="d">-// val.
+</a><a href="#h21-0-66" id="h21-0-66" class="d">-//
+</a><a href="#h21-0-67" id="h21-0-67" class="d">-// Use context Values only for request-scoped data that transits processes and
+</a><a href="#h21-0-68" id="h21-0-68" class="d">-// APIs, not for passing optional parameters to functions.
+</a><a href="#h21-0-69" id="h21-0-69" class="d">-func WithValue(parent Context, key interface{}, val interface{}) Context {
+</a><a href="#h21-0-70" id="h21-0-70" class="d">-	return context.WithValue(parent, key, val)
+</a><a href="#h21-0-71" id="h21-0-71" class="d">-}
+</a><b>diff --git a/<a id="h22" href="../file/vendor/golang.org/x/net/context/pre_go17.go">vendor/golang.org/x/net/context/pre_go17.go</a> b/<a href="../file/vendor/golang.org/x/net/context/pre_go17.go">vendor/golang.org/x/net/context/pre_go17.go</a></b>
+<a href="#h22-0" id="h22-0" class="h">@@ -1,300 +0,0 @@
+</a><a href="#h22-0-0" id="h22-0-0" class="d">-// Copyright 2014 The Go Authors. All rights reserved.
+</a><a href="#h22-0-1" id="h22-0-1" class="d">-// Use of this source code is governed by a BSD-style
+</a><a href="#h22-0-2" id="h22-0-2" class="d">-// license that can be found in the LICENSE file.
+</a><a href="#h22-0-3" id="h22-0-3" class="d">-
+</a><a href="#h22-0-4" id="h22-0-4" class="d">-// +build !go1.7
+</a><a href="#h22-0-5" id="h22-0-5" class="d">-
+</a><a href="#h22-0-6" id="h22-0-6" class="d">-package context
+</a><a href="#h22-0-7" id="h22-0-7" class="d">-
+</a><a href="#h22-0-8" id="h22-0-8" class="d">-import (
+</a><a href="#h22-0-9" id="h22-0-9" class="d">-	&quot;errors&quot;
+</a><a href="#h22-0-10" id="h22-0-10" class="d">-	&quot;fmt&quot;
+</a><a href="#h22-0-11" id="h22-0-11" class="d">-	&quot;sync&quot;
+</a><a href="#h22-0-12" id="h22-0-12" class="d">-	&quot;time&quot;
+</a><a href="#h22-0-13" id="h22-0-13" class="d">-)
+</a><a href="#h22-0-14" id="h22-0-14" class="d">-
+</a><a href="#h22-0-15" id="h22-0-15" class="d">-// An emptyCtx is never canceled, has no values, and has no deadline.  It is not
+</a><a href="#h22-0-16" id="h22-0-16" class="d">-// struct{}, since vars of this type must have distinct addresses.
+</a><a href="#h22-0-17" id="h22-0-17" class="d">-type emptyCtx int
+</a><a href="#h22-0-18" id="h22-0-18" class="d">-
+</a><a href="#h22-0-19" id="h22-0-19" class="d">-func (*emptyCtx) Deadline() (deadline time.Time, ok bool) {
+</a><a href="#h22-0-20" id="h22-0-20" class="d">-	return
+</a><a href="#h22-0-21" id="h22-0-21" class="d">-}
+</a><a href="#h22-0-22" id="h22-0-22" class="d">-
+</a><a href="#h22-0-23" id="h22-0-23" class="d">-func (*emptyCtx) Done() &lt;-chan struct{} {
+</a><a href="#h22-0-24" id="h22-0-24" class="d">-	return nil
+</a><a href="#h22-0-25" id="h22-0-25" class="d">-}
+</a><a href="#h22-0-26" id="h22-0-26" class="d">-
+</a><a href="#h22-0-27" id="h22-0-27" class="d">-func (*emptyCtx) Err() error {
+</a><a href="#h22-0-28" id="h22-0-28" class="d">-	return nil
+</a><a href="#h22-0-29" id="h22-0-29" class="d">-}
+</a><a href="#h22-0-30" id="h22-0-30" class="d">-
+</a><a href="#h22-0-31" id="h22-0-31" class="d">-func (*emptyCtx) Value(key interface{}) interface{} {
+</a><a href="#h22-0-32" id="h22-0-32" class="d">-	return nil
+</a><a href="#h22-0-33" id="h22-0-33" class="d">-}
+</a><a href="#h22-0-34" id="h22-0-34" class="d">-
+</a><a href="#h22-0-35" id="h22-0-35" class="d">-func (e *emptyCtx) String() string {
+</a><a href="#h22-0-36" id="h22-0-36" class="d">-	switch e {
+</a><a href="#h22-0-37" id="h22-0-37" class="d">-	case background:
+</a><a href="#h22-0-38" id="h22-0-38" class="d">-		return &quot;context.Background&quot;
+</a><a href="#h22-0-39" id="h22-0-39" class="d">-	case todo:
+</a><a href="#h22-0-40" id="h22-0-40" class="d">-		return &quot;context.TODO&quot;
+</a><a href="#h22-0-41" id="h22-0-41" class="d">-	}
+</a><a href="#h22-0-42" id="h22-0-42" class="d">-	return &quot;unknown empty Context&quot;
+</a><a href="#h22-0-43" id="h22-0-43" class="d">-}
+</a><a href="#h22-0-44" id="h22-0-44" class="d">-
+</a><a href="#h22-0-45" id="h22-0-45" class="d">-var (
+</a><a href="#h22-0-46" id="h22-0-46" class="d">-	background = new(emptyCtx)
+</a><a href="#h22-0-47" id="h22-0-47" class="d">-	todo       = new(emptyCtx)
+</a><a href="#h22-0-48" id="h22-0-48" class="d">-)
+</a><a href="#h22-0-49" id="h22-0-49" class="d">-
+</a><a href="#h22-0-50" id="h22-0-50" class="d">-// Canceled is the error returned by Context.Err when the context is canceled.
+</a><a href="#h22-0-51" id="h22-0-51" class="d">-var Canceled = errors.New(&quot;context canceled&quot;)
+</a><a href="#h22-0-52" id="h22-0-52" class="d">-
+</a><a href="#h22-0-53" id="h22-0-53" class="d">-// DeadlineExceeded is the error returned by Context.Err when the context&#39;s
+</a><a href="#h22-0-54" id="h22-0-54" class="d">-// deadline passes.
+</a><a href="#h22-0-55" id="h22-0-55" class="d">-var DeadlineExceeded = errors.New(&quot;context deadline exceeded&quot;)
+</a><a href="#h22-0-56" id="h22-0-56" class="d">-
+</a><a href="#h22-0-57" id="h22-0-57" class="d">-// WithCancel returns a copy of parent with a new Done channel. The returned
+</a><a href="#h22-0-58" id="h22-0-58" class="d">-// context&#39;s Done channel is closed when the returned cancel function is called
+</a><a href="#h22-0-59" id="h22-0-59" class="d">-// or when the parent context&#39;s Done channel is closed, whichever happens first.
+</a><a href="#h22-0-60" id="h22-0-60" class="d">-//
+</a><a href="#h22-0-61" id="h22-0-61" class="d">-// Canceling this context releases resources associated with it, so code should
+</a><a href="#h22-0-62" id="h22-0-62" class="d">-// call cancel as soon as the operations running in this Context complete.
+</a><a href="#h22-0-63" id="h22-0-63" class="d">-func WithCancel(parent Context) (ctx Context, cancel CancelFunc) {
+</a><a href="#h22-0-64" id="h22-0-64" class="d">-	c := newCancelCtx(parent)
+</a><a href="#h22-0-65" id="h22-0-65" class="d">-	propagateCancel(parent, c)
+</a><a href="#h22-0-66" id="h22-0-66" class="d">-	return c, func() { c.cancel(true, Canceled) }
+</a><a href="#h22-0-67" id="h22-0-67" class="d">-}
+</a><a href="#h22-0-68" id="h22-0-68" class="d">-
+</a><a href="#h22-0-69" id="h22-0-69" class="d">-// newCancelCtx returns an initialized cancelCtx.
+</a><a href="#h22-0-70" id="h22-0-70" class="d">-func newCancelCtx(parent Context) *cancelCtx {
+</a><a href="#h22-0-71" id="h22-0-71" class="d">-	return &amp;cancelCtx{
+</a><a href="#h22-0-72" id="h22-0-72" class="d">-		Context: parent,
+</a><a href="#h22-0-73" id="h22-0-73" class="d">-		done:    make(chan struct{}),
+</a><a href="#h22-0-74" id="h22-0-74" class="d">-	}
+</a><a href="#h22-0-75" id="h22-0-75" class="d">-}
+</a><a href="#h22-0-76" id="h22-0-76" class="d">-
+</a><a href="#h22-0-77" id="h22-0-77" class="d">-// propagateCancel arranges for child to be canceled when parent is.
+</a><a href="#h22-0-78" id="h22-0-78" class="d">-func propagateCancel(parent Context, child canceler) {
+</a><a href="#h22-0-79" id="h22-0-79" class="d">-	if parent.Done() == nil {
+</a><a href="#h22-0-80" id="h22-0-80" class="d">-		return // parent is never canceled
+</a><a href="#h22-0-81" id="h22-0-81" class="d">-	}
+</a><a href="#h22-0-82" id="h22-0-82" class="d">-	if p, ok := parentCancelCtx(parent); ok {
+</a><a href="#h22-0-83" id="h22-0-83" class="d">-		p.mu.Lock()
+</a><a href="#h22-0-84" id="h22-0-84" class="d">-		if p.err != nil {
+</a><a href="#h22-0-85" id="h22-0-85" class="d">-			// parent has already been canceled
+</a><a href="#h22-0-86" id="h22-0-86" class="d">-			child.cancel(false, p.err)
+</a><a href="#h22-0-87" id="h22-0-87" class="d">-		} else {
+</a><a href="#h22-0-88" id="h22-0-88" class="d">-			if p.children == nil {
+</a><a href="#h22-0-89" id="h22-0-89" class="d">-				p.children = make(map[canceler]bool)
+</a><a href="#h22-0-90" id="h22-0-90" class="d">-			}
+</a><a href="#h22-0-91" id="h22-0-91" class="d">-			p.children[child] = true
+</a><a href="#h22-0-92" id="h22-0-92" class="d">-		}
+</a><a href="#h22-0-93" id="h22-0-93" class="d">-		p.mu.Unlock()
+</a><a href="#h22-0-94" id="h22-0-94" class="d">-	} else {
+</a><a href="#h22-0-95" id="h22-0-95" class="d">-		go func() {
+</a><a href="#h22-0-96" id="h22-0-96" class="d">-			select {
+</a><a href="#h22-0-97" id="h22-0-97" class="d">-			case &lt;-parent.Done():
+</a><a href="#h22-0-98" id="h22-0-98" class="d">-				child.cancel(false, parent.Err())
+</a><a href="#h22-0-99" id="h22-0-99" class="d">-			case &lt;-child.Done():
+</a><a href="#h22-0-100" id="h22-0-100" class="d">-			}
+</a><a href="#h22-0-101" id="h22-0-101" class="d">-		}()
+</a><a href="#h22-0-102" id="h22-0-102" class="d">-	}
+</a><a href="#h22-0-103" id="h22-0-103" class="d">-}
+</a><a href="#h22-0-104" id="h22-0-104" class="d">-
+</a><a href="#h22-0-105" id="h22-0-105" class="d">-// parentCancelCtx follows a chain of parent references until it finds a
+</a><a href="#h22-0-106" id="h22-0-106" class="d">-// *cancelCtx.  This function understands how each of the concrete types in this
+</a><a href="#h22-0-107" id="h22-0-107" class="d">-// package represents its parent.
+</a><a href="#h22-0-108" id="h22-0-108" class="d">-func parentCancelCtx(parent Context) (*cancelCtx, bool) {
+</a><a href="#h22-0-109" id="h22-0-109" class="d">-	for {
+</a><a href="#h22-0-110" id="h22-0-110" class="d">-		switch c := parent.(type) {
+</a><a href="#h22-0-111" id="h22-0-111" class="d">-		case *cancelCtx:
+</a><a href="#h22-0-112" id="h22-0-112" class="d">-			return c, true
+</a><a href="#h22-0-113" id="h22-0-113" class="d">-		case *timerCtx:
+</a><a href="#h22-0-114" id="h22-0-114" class="d">-			return c.cancelCtx, true
+</a><a href="#h22-0-115" id="h22-0-115" class="d">-		case *valueCtx:
+</a><a href="#h22-0-116" id="h22-0-116" class="d">-			parent = c.Context
+</a><a href="#h22-0-117" id="h22-0-117" class="d">-		default:
+</a><a href="#h22-0-118" id="h22-0-118" class="d">-			return nil, false
+</a><a href="#h22-0-119" id="h22-0-119" class="d">-		}
+</a><a href="#h22-0-120" id="h22-0-120" class="d">-	}
+</a><a href="#h22-0-121" id="h22-0-121" class="d">-}
+</a><a href="#h22-0-122" id="h22-0-122" class="d">-
+</a><a href="#h22-0-123" id="h22-0-123" class="d">-// removeChild removes a context from its parent.
+</a><a href="#h22-0-124" id="h22-0-124" class="d">-func removeChild(parent Context, child canceler) {
+</a><a href="#h22-0-125" id="h22-0-125" class="d">-	p, ok := parentCancelCtx(parent)
+</a><a href="#h22-0-126" id="h22-0-126" class="d">-	if !ok {
+</a><a href="#h22-0-127" id="h22-0-127" class="d">-		return
+</a><a href="#h22-0-128" id="h22-0-128" class="d">-	}
+</a><a href="#h22-0-129" id="h22-0-129" class="d">-	p.mu.Lock()
+</a><a href="#h22-0-130" id="h22-0-130" class="d">-	if p.children != nil {
+</a><a href="#h22-0-131" id="h22-0-131" class="d">-		delete(p.children, child)
+</a><a href="#h22-0-132" id="h22-0-132" class="d">-	}
+</a><a href="#h22-0-133" id="h22-0-133" class="d">-	p.mu.Unlock()
+</a><a href="#h22-0-134" id="h22-0-134" class="d">-}
+</a><a href="#h22-0-135" id="h22-0-135" class="d">-
+</a><a href="#h22-0-136" id="h22-0-136" class="d">-// A canceler is a context type that can be canceled directly.  The
+</a><a href="#h22-0-137" id="h22-0-137" class="d">-// implementations are *cancelCtx and *timerCtx.
+</a><a href="#h22-0-138" id="h22-0-138" class="d">-type canceler interface {
+</a><a href="#h22-0-139" id="h22-0-139" class="d">-	cancel(removeFromParent bool, err error)
+</a><a href="#h22-0-140" id="h22-0-140" class="d">-	Done() &lt;-chan struct{}
+</a><a href="#h22-0-141" id="h22-0-141" class="d">-}
+</a><a href="#h22-0-142" id="h22-0-142" class="d">-
+</a><a href="#h22-0-143" id="h22-0-143" class="d">-// A cancelCtx can be canceled.  When canceled, it also cancels any children
+</a><a href="#h22-0-144" id="h22-0-144" class="d">-// that implement canceler.
+</a><a href="#h22-0-145" id="h22-0-145" class="d">-type cancelCtx struct {
+</a><a href="#h22-0-146" id="h22-0-146" class="d">-	Context
+</a><a href="#h22-0-147" id="h22-0-147" class="d">-
+</a><a href="#h22-0-148" id="h22-0-148" class="d">-	done chan struct{} // closed by the first cancel call.
+</a><a href="#h22-0-149" id="h22-0-149" class="d">-
+</a><a href="#h22-0-150" id="h22-0-150" class="d">-	mu       sync.Mutex
+</a><a href="#h22-0-151" id="h22-0-151" class="d">-	children map[canceler]bool // set to nil by the first cancel call
+</a><a href="#h22-0-152" id="h22-0-152" class="d">-	err      error             // set to non-nil by the first cancel call
+</a><a href="#h22-0-153" id="h22-0-153" class="d">-}
+</a><a href="#h22-0-154" id="h22-0-154" class="d">-
+</a><a href="#h22-0-155" id="h22-0-155" class="d">-func (c *cancelCtx) Done() &lt;-chan struct{} {
+</a><a href="#h22-0-156" id="h22-0-156" class="d">-	return c.done
+</a><a href="#h22-0-157" id="h22-0-157" class="d">-}
+</a><a href="#h22-0-158" id="h22-0-158" class="d">-
+</a><a href="#h22-0-159" id="h22-0-159" class="d">-func (c *cancelCtx) Err() error {
+</a><a href="#h22-0-160" id="h22-0-160" class="d">-	c.mu.Lock()
+</a><a href="#h22-0-161" id="h22-0-161" class="d">-	defer c.mu.Unlock()
+</a><a href="#h22-0-162" id="h22-0-162" class="d">-	return c.err
+</a><a href="#h22-0-163" id="h22-0-163" class="d">-}
+</a><a href="#h22-0-164" id="h22-0-164" class="d">-
+</a><a href="#h22-0-165" id="h22-0-165" class="d">-func (c *cancelCtx) String() string {
+</a><a href="#h22-0-166" id="h22-0-166" class="d">-	return fmt.Sprintf(&quot;%v.WithCancel&quot;, c.Context)
+</a><a href="#h22-0-167" id="h22-0-167" class="d">-}
+</a><a href="#h22-0-168" id="h22-0-168" class="d">-
+</a><a href="#h22-0-169" id="h22-0-169" class="d">-// cancel closes c.done, cancels each of c&#39;s children, and, if
+</a><a href="#h22-0-170" id="h22-0-170" class="d">-// removeFromParent is true, removes c from its parent&#39;s children.
+</a><a href="#h22-0-171" id="h22-0-171" class="d">-func (c *cancelCtx) cancel(removeFromParent bool, err error) {
+</a><a href="#h22-0-172" id="h22-0-172" class="d">-	if err == nil {
+</a><a href="#h22-0-173" id="h22-0-173" class="d">-		panic(&quot;context: internal error: missing cancel error&quot;)
+</a><a href="#h22-0-174" id="h22-0-174" class="d">-	}
+</a><a href="#h22-0-175" id="h22-0-175" class="d">-	c.mu.Lock()
+</a><a href="#h22-0-176" id="h22-0-176" class="d">-	if c.err != nil {
+</a><a href="#h22-0-177" id="h22-0-177" class="d">-		c.mu.Unlock()
+</a><a href="#h22-0-178" id="h22-0-178" class="d">-		return // already canceled
+</a><a href="#h22-0-179" id="h22-0-179" class="d">-	}
+</a><a href="#h22-0-180" id="h22-0-180" class="d">-	c.err = err
+</a><a href="#h22-0-181" id="h22-0-181" class="d">-	close(c.done)
+</a><a href="#h22-0-182" id="h22-0-182" class="d">-	for child := range c.children {
+</a><a href="#h22-0-183" id="h22-0-183" class="d">-		// NOTE: acquiring the child&#39;s lock while holding parent&#39;s lock.
+</a><a href="#h22-0-184" id="h22-0-184" class="d">-		child.cancel(false, err)
+</a><a href="#h22-0-185" id="h22-0-185" class="d">-	}
+</a><a href="#h22-0-186" id="h22-0-186" class="d">-	c.children = nil
+</a><a href="#h22-0-187" id="h22-0-187" class="d">-	c.mu.Unlock()
+</a><a href="#h22-0-188" id="h22-0-188" class="d">-
+</a><a href="#h22-0-189" id="h22-0-189" class="d">-	if removeFromParent {
+</a><a href="#h22-0-190" id="h22-0-190" class="d">-		removeChild(c.Context, c)
+</a><a href="#h22-0-191" id="h22-0-191" class="d">-	}
+</a><a href="#h22-0-192" id="h22-0-192" class="d">-}
+</a><a href="#h22-0-193" id="h22-0-193" class="d">-
+</a><a href="#h22-0-194" id="h22-0-194" class="d">-// WithDeadline returns a copy of the parent context with the deadline adjusted
+</a><a href="#h22-0-195" id="h22-0-195" class="d">-// to be no later than d.  If the parent&#39;s deadline is already earlier than d,
+</a><a href="#h22-0-196" id="h22-0-196" class="d">-// WithDeadline(parent, d) is semantically equivalent to parent.  The returned
+</a><a href="#h22-0-197" id="h22-0-197" class="d">-// context&#39;s Done channel is closed when the deadline expires, when the returned
+</a><a href="#h22-0-198" id="h22-0-198" class="d">-// cancel function is called, or when the parent context&#39;s Done channel is
+</a><a href="#h22-0-199" id="h22-0-199" class="d">-// closed, whichever happens first.
+</a><a href="#h22-0-200" id="h22-0-200" class="d">-//
+</a><a href="#h22-0-201" id="h22-0-201" class="d">-// Canceling this context releases resources associated with it, so code should
+</a><a href="#h22-0-202" id="h22-0-202" class="d">-// call cancel as soon as the operations running in this Context complete.
+</a><a href="#h22-0-203" id="h22-0-203" class="d">-func WithDeadline(parent Context, deadline time.Time) (Context, CancelFunc) {
+</a><a href="#h22-0-204" id="h22-0-204" class="d">-	if cur, ok := parent.Deadline(); ok &amp;&amp; cur.Before(deadline) {
+</a><a href="#h22-0-205" id="h22-0-205" class="d">-		// The current deadline is already sooner than the new one.
+</a><a href="#h22-0-206" id="h22-0-206" class="d">-		return WithCancel(parent)
+</a><a href="#h22-0-207" id="h22-0-207" class="d">-	}
+</a><a href="#h22-0-208" id="h22-0-208" class="d">-	c := &amp;timerCtx{
+</a><a href="#h22-0-209" id="h22-0-209" class="d">-		cancelCtx: newCancelCtx(parent),
+</a><a href="#h22-0-210" id="h22-0-210" class="d">-		deadline:  deadline,
+</a><a href="#h22-0-211" id="h22-0-211" class="d">-	}
+</a><a href="#h22-0-212" id="h22-0-212" class="d">-	propagateCancel(parent, c)
+</a><a href="#h22-0-213" id="h22-0-213" class="d">-	d := deadline.Sub(time.Now())
+</a><a href="#h22-0-214" id="h22-0-214" class="d">-	if d &lt;= 0 {
+</a><a href="#h22-0-215" id="h22-0-215" class="d">-		c.cancel(true, DeadlineExceeded) // deadline has already passed
+</a><a href="#h22-0-216" id="h22-0-216" class="d">-		return c, func() { c.cancel(true, Canceled) }
+</a><a href="#h22-0-217" id="h22-0-217" class="d">-	}
+</a><a href="#h22-0-218" id="h22-0-218" class="d">-	c.mu.Lock()
+</a><a href="#h22-0-219" id="h22-0-219" class="d">-	defer c.mu.Unlock()
+</a><a href="#h22-0-220" id="h22-0-220" class="d">-	if c.err == nil {
+</a><a href="#h22-0-221" id="h22-0-221" class="d">-		c.timer = time.AfterFunc(d, func() {
+</a><a href="#h22-0-222" id="h22-0-222" class="d">-			c.cancel(true, DeadlineExceeded)
+</a><a href="#h22-0-223" id="h22-0-223" class="d">-		})
+</a><a href="#h22-0-224" id="h22-0-224" class="d">-	}
+</a><a href="#h22-0-225" id="h22-0-225" class="d">-	return c, func() { c.cancel(true, Canceled) }
+</a><a href="#h22-0-226" id="h22-0-226" class="d">-}
+</a><a href="#h22-0-227" id="h22-0-227" class="d">-
+</a><a href="#h22-0-228" id="h22-0-228" class="d">-// A timerCtx carries a timer and a deadline.  It embeds a cancelCtx to
+</a><a href="#h22-0-229" id="h22-0-229" class="d">-// implement Done and Err.  It implements cancel by stopping its timer then
+</a><a href="#h22-0-230" id="h22-0-230" class="d">-// delegating to cancelCtx.cancel.
+</a><a href="#h22-0-231" id="h22-0-231" class="d">-type timerCtx struct {
+</a><a href="#h22-0-232" id="h22-0-232" class="d">-	*cancelCtx
+</a><a href="#h22-0-233" id="h22-0-233" class="d">-	timer *time.Timer // Under cancelCtx.mu.
+</a><a href="#h22-0-234" id="h22-0-234" class="d">-
+</a><a href="#h22-0-235" id="h22-0-235" class="d">-	deadline time.Time
+</a><a href="#h22-0-236" id="h22-0-236" class="d">-}
+</a><a href="#h22-0-237" id="h22-0-237" class="d">-
+</a><a href="#h22-0-238" id="h22-0-238" class="d">-func (c *timerCtx) Deadline() (deadline time.Time, ok bool) {
+</a><a href="#h22-0-239" id="h22-0-239" class="d">-	return c.deadline, true
+</a><a href="#h22-0-240" id="h22-0-240" class="d">-}
+</a><a href="#h22-0-241" id="h22-0-241" class="d">-
+</a><a href="#h22-0-242" id="h22-0-242" class="d">-func (c *timerCtx) String() string {
+</a><a href="#h22-0-243" id="h22-0-243" class="d">-	return fmt.Sprintf(&quot;%v.WithDeadline(%s [%s])&quot;, c.cancelCtx.Context, c.deadline, c.deadline.Sub(time.Now()))
+</a><a href="#h22-0-244" id="h22-0-244" class="d">-}
+</a><a href="#h22-0-245" id="h22-0-245" class="d">-
+</a><a href="#h22-0-246" id="h22-0-246" class="d">-func (c *timerCtx) cancel(removeFromParent bool, err error) {
+</a><a href="#h22-0-247" id="h22-0-247" class="d">-	c.cancelCtx.cancel(false, err)
+</a><a href="#h22-0-248" id="h22-0-248" class="d">-	if removeFromParent {
+</a><a href="#h22-0-249" id="h22-0-249" class="d">-		// Remove this timerCtx from its parent cancelCtx&#39;s children.
+</a><a href="#h22-0-250" id="h22-0-250" class="d">-		removeChild(c.cancelCtx.Context, c)
+</a><a href="#h22-0-251" id="h22-0-251" class="d">-	}
+</a><a href="#h22-0-252" id="h22-0-252" class="d">-	c.mu.Lock()
+</a><a href="#h22-0-253" id="h22-0-253" class="d">-	if c.timer != nil {
+</a><a href="#h22-0-254" id="h22-0-254" class="d">-		c.timer.Stop()
+</a><a href="#h22-0-255" id="h22-0-255" class="d">-		c.timer = nil
+</a><a href="#h22-0-256" id="h22-0-256" class="d">-	}
+</a><a href="#h22-0-257" id="h22-0-257" class="d">-	c.mu.Unlock()
+</a><a href="#h22-0-258" id="h22-0-258" class="d">-}
+</a><a href="#h22-0-259" id="h22-0-259" class="d">-
+</a><a href="#h22-0-260" id="h22-0-260" class="d">-// WithTimeout returns WithDeadline(parent, time.Now().Add(timeout)).
+</a><a href="#h22-0-261" id="h22-0-261" class="d">-//
+</a><a href="#h22-0-262" id="h22-0-262" class="d">-// Canceling this context releases resources associated with it, so code should
+</a><a href="#h22-0-263" id="h22-0-263" class="d">-// call cancel as soon as the operations running in this Context complete:
+</a><a href="#h22-0-264" id="h22-0-264" class="d">-//
+</a><a href="#h22-0-265" id="h22-0-265" class="d">-// 	func slowOperationWithTimeout(ctx context.Context) (Result, error) {
+</a><a href="#h22-0-266" id="h22-0-266" class="d">-// 		ctx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
+</a><a href="#h22-0-267" id="h22-0-267" class="d">-// 		defer cancel()  // releases resources if slowOperation completes before timeout elapses
+</a><a href="#h22-0-268" id="h22-0-268" class="d">-// 		return slowOperation(ctx)
+</a><a href="#h22-0-269" id="h22-0-269" class="d">-// 	}
+</a><a href="#h22-0-270" id="h22-0-270" class="d">-func WithTimeout(parent Context, timeout time.Duration) (Context, CancelFunc) {
+</a><a href="#h22-0-271" id="h22-0-271" class="d">-	return WithDeadline(parent, time.Now().Add(timeout))
+</a><a href="#h22-0-272" id="h22-0-272" class="d">-}
+</a><a href="#h22-0-273" id="h22-0-273" class="d">-
+</a><a href="#h22-0-274" id="h22-0-274" class="d">-// WithValue returns a copy of parent in which the value associated with key is
+</a><a href="#h22-0-275" id="h22-0-275" class="d">-// val.
+</a><a href="#h22-0-276" id="h22-0-276" class="d">-//
+</a><a href="#h22-0-277" id="h22-0-277" class="d">-// Use context Values only for request-scoped data that transits processes and
+</a><a href="#h22-0-278" id="h22-0-278" class="d">-// APIs, not for passing optional parameters to functions.
+</a><a href="#h22-0-279" id="h22-0-279" class="d">-func WithValue(parent Context, key interface{}, val interface{}) Context {
+</a><a href="#h22-0-280" id="h22-0-280" class="d">-	return &amp;valueCtx{parent, key, val}
+</a><a href="#h22-0-281" id="h22-0-281" class="d">-}
+</a><a href="#h22-0-282" id="h22-0-282" class="d">-
+</a><a href="#h22-0-283" id="h22-0-283" class="d">-// A valueCtx carries a key-value pair.  It implements Value for that key and
+</a><a href="#h22-0-284" id="h22-0-284" class="d">-// delegates all other calls to the embedded Context.
+</a><a href="#h22-0-285" id="h22-0-285" class="d">-type valueCtx struct {
+</a><a href="#h22-0-286" id="h22-0-286" class="d">-	Context
+</a><a href="#h22-0-287" id="h22-0-287" class="d">-	key, val interface{}
+</a><a href="#h22-0-288" id="h22-0-288" class="d">-}
+</a><a href="#h22-0-289" id="h22-0-289" class="d">-
+</a><a href="#h22-0-290" id="h22-0-290" class="d">-func (c *valueCtx) String() string {
+</a><a href="#h22-0-291" id="h22-0-291" class="d">-	return fmt.Sprintf(&quot;%v.WithValue(%#v, %#v)&quot;, c.Context, c.key, c.val)
+</a><a href="#h22-0-292" id="h22-0-292" class="d">-}
+</a><a href="#h22-0-293" id="h22-0-293" class="d">-
+</a><a href="#h22-0-294" id="h22-0-294" class="d">-func (c *valueCtx) Value(key interface{}) interface{} {
+</a><a href="#h22-0-295" id="h22-0-295" class="d">-	if c.key == key {
+</a><a href="#h22-0-296" id="h22-0-296" class="d">-		return c.val
+</a><a href="#h22-0-297" id="h22-0-297" class="d">-	}
+</a><a href="#h22-0-298" id="h22-0-298" class="d">-	return c.Context.Value(key)
+</a><a href="#h22-0-299" id="h22-0-299" class="d">-}
+</a><b>diff --git a/<a id="h23" href="../file/vendor/golang.org/x/oauth2/BUILD">vendor/golang.org/x/oauth2/BUILD</a> b/<a href="../file/vendor/golang.org/x/oauth2/BUILD">vendor/golang.org/x/oauth2/BUILD</a></b>
+<a href="#h23-0" id="h23-0" class="h">@@ -13,10 +13,8 @@ name = &quot;go_default_library&quot;,
+</a>     &quot;transport.go&quot;,
+   ],
+   deps = [
+<a href="#h23-0-3" id="h23-0-3" class="d">-    &quot;//vendor/golang.org/x/net/context:go_default_library&quot;,
+</a><a href="#h23-0-4" id="h23-0-4" class="i">+    &quot;@org_golang_x_net//:context&quot;,
+</a>     &quot;//vendor/golang.org/x/oauth2/internal:go_default_library&quot;,
+   ],
+   visibility = [&quot;//visibility:public&quot;],
+ )
+<a href="#h23-0-9" id="h23-0-9" class="d">-
+</a><a href="#h23-0-10" id="h23-0-10" class="d">-
+</a><b>diff --git a/<a id="h24" href="../file/vendor/golang.org/x/oauth2/internal/BUILD">vendor/golang.org/x/oauth2/internal/BUILD</a> b/<a href="../file/vendor/golang.org/x/oauth2/internal/BUILD">vendor/golang.org/x/oauth2/internal/BUILD</a></b>
+<a href="#h24-0" id="h24-0" class="h">@@ -13,9 +13,7 @@ name = &quot;go_default_library&quot;,
+</a>     &quot;transport.go&quot;,
+   ],
+   deps = [
+<a href="#h24-0-3" id="h24-0-3" class="d">-    &quot;//vendor/golang.org/x/net/context:go_default_library&quot;,
+</a><a href="#h24-0-4" id="h24-0-4" class="i">+    &quot;@org_golang_x_net//:context&quot;,
+</a>   ],
+   visibility = [&quot;//visibility:public&quot;],
+ )
+<a href="#h24-0-8" id="h24-0-8" class="d">-
+</a><a href="#h24-0-9" id="h24-0-9" class="d">-
+</a><b>diff --git a/<a id="h25" href="../file/vendor/google.golang.org/appengine/internal/BUILD">vendor/google.golang.org/appengine/internal/BUILD</a> b/<a href="../file/vendor/google.golang.org/appengine/internal/BUILD">vendor/google.golang.org/appengine/internal/BUILD</a></b>
+<a href="#h25-0" id="h25-0" class="h">@@ -20,8 +20,9 @@ name = &quot;go_default_library&quot;,
+</a>     &quot;transaction.go&quot;,
+   ],
+   deps = [
+<a href="#h25-0-3" id="h25-0-3" class="i">+    &quot;@org_golang_x_net//:context&quot;,
+</a><a href="#h25-0-4" id="h25-0-4" class="i">+
+</a>     &quot;//vendor/github.com/golang/protobuf/proto:go_default_library&quot;,
+<a href="#h25-0-6" id="h25-0-6" class="d">-    &quot;//vendor/golang.org/x/net/context:go_default_library&quot;,
+</a>     &quot;//vendor/google.golang.org/appengine/internal/base:go_default_library&quot;,
+     &quot;//vendor/google.golang.org/appengine/internal/datastore:go_default_library&quot;,
+     &quot;//vendor/google.golang.org/appengine/internal/log:go_default_library&quot;,
+<a href="#h25-1" id="h25-1" class="h">@@ -29,5 +30,3 @@ name = &quot;go_default_library&quot;,
+</a>   ],
+   visibility = [&quot;//visibility:public&quot;],
+ )
+<a href="#h25-1-3" id="h25-1-3" class="d">-
+</a><a href="#h25-1-4" id="h25-1-4" class="d">-
+</a><b>diff --git a/<a id="h26" href="../file/vendor/google.golang.org/appengine/urlfetch/BUILD">vendor/google.golang.org/appengine/urlfetch/BUILD</a> b/<a href="../file/vendor/google.golang.org/appengine/urlfetch/BUILD">vendor/google.golang.org/appengine/urlfetch/BUILD</a></b>
+<a href="#h26-0" id="h26-0" class="h">@@ -11,12 +11,11 @@ name = &quot;go_default_library&quot;,
+</a>     &quot;urlfetch.go&quot;,
+   ],
+   deps = [
+<a href="#h26-0-3" id="h26-0-3" class="i">+    &quot;@org_golang_x_net//:context&quot;,
+</a><a href="#h26-0-4" id="h26-0-4" class="i">+
+</a>     &quot;//vendor/github.com/golang/protobuf/proto:go_default_library&quot;,
+<a href="#h26-0-6" id="h26-0-6" class="d">-    &quot;//vendor/golang.org/x/net/context:go_default_library&quot;,
+</a>     &quot;//vendor/google.golang.org/appengine/internal/urlfetch:go_default_library&quot;,
+     &quot;//vendor/google.golang.org/appengine/internal:go_default_library&quot;,
+   ],
+   visibility = [&quot;//visibility:public&quot;],
+ )
+<a href="#h26-0-12" id="h26-0-12" class="d">-
+</a><a href="#h26-0-13" id="h26-0-13" class="d">-
+</a></pre>
+</div>
+</body>
+</html>

@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Use GRPC better - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/063891da9d5cb85dd59c4c0107ea80a6d3f8e669">063891da9d5cb85dd59c4c0107ea80a6d3f8e669</a>
+<b>parent</b> <a href="../commit/3a6d5fcb223c2d1138d6f314d8e8d7d0e1204bf0">3a6d5fcb223c2d1138d6f314d8e8d7d0e1204bf0</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Thu, 25 Aug 2016 20:53:59 -0700
+
+Use GRPC better
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">server/BUILD</a></td><td> | </td><td class="num">1</td><td><span class="i"></span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">server/api.go</a></td><td> | </td><td class="num">12</td><td><span class="i">++++++</span><span class="d">------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">server/backend.go</a></td><td> | </td><td class="num">28</td><td><span class="i">+++++++++++++</span><span class="d">---------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">server/server.go</a></td><td> | </td><td class="num">6</td><td><span class="i">+++</span><span class="d">---</span></td></tr>
+</table></pre><pre>4 files changed, 22 insertions(+), 25 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/server/BUILD">server/BUILD</a> b/<a href="../file/server/BUILD">server/BUILD</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -12,7 +12,6 @@ name = &quot;go_default_library&quot;,
+</a>     &quot;backend.go&quot;,
+     &quot;json.go&quot;,
+     &quot;query.go&quot;,
+<a href="#h0-0-3" id="h0-0-3" class="d">-    &quot;request_log.go&quot;,
+</a>     &quot;server.go&quot;,
+     &quot;templates.go&quot;,
+   ],
+<b>diff --git a/<a id="h1" href="../file/server/api.go">server/api.go</a> b/<a href="../file/server/api.go">server/api.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -5,6 +5,9 @@ import (
+</a> 	&quot;errors&quot;
+ 	&quot;fmt&quot;
+ 	&quot;net/http&quot;
+<a href="#h1-0-3" id="h1-0-3" class="i">+	&quot;time&quot;
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+	&quot;google.golang.org/grpc&quot;
+</a> 
+ 	&quot;golang.org/x/net/context&quot;
+ 
+<a href="#h1-1" id="h1-1" class="h">@@ -81,13 +84,10 @@ func (s *server) doSearch(ctx context.Context, backend *Backend, q *pb.Query) (*
+</a> 	var search *pb.CodeSearchResult
+ 	var err error
+ 
+<a href="#h1-1-3" id="h1-1-3" class="d">-	select {
+</a><a href="#h1-1-4" id="h1-1-4" class="d">-	case &lt;-backend.Ready:
+</a><a href="#h1-1-5" id="h1-1-5" class="d">-	case &lt;-ctx.Done():
+</a><a href="#h1-1-6" id="h1-1-6" class="d">-		return nil, ErrTimedOut
+</a><a href="#h1-1-7" id="h1-1-7" class="d">-	}
+</a><a href="#h1-1-8" id="h1-1-8" class="i">+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+</a><a href="#h1-1-9" id="h1-1-9" class="i">+	defer cancel()
+</a> 
+<a href="#h1-1-11" id="h1-1-11" class="d">-	search, err = backend.Codesearch.Search(ctx, q)
+</a><a href="#h1-1-12" id="h1-1-12" class="i">+	search, err = backend.Codesearch.Search(ctx, q, grpc.FailFast(false))
+</a> 	if err != nil {
+ 		log.Printf(ctx, &quot;error talking to backend err=%s&quot;, err)
+ 		return nil, err
+<b>diff --git a/<a id="h2" href="../file/server/backend.go">server/backend.go</a> b/<a href="../file/server/backend.go">server/backend.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -28,33 +28,31 @@ type Backend struct {
+</a> 	Addr       string
+ 	I          *I
+ 	Codesearch pb.CodeSearchClient
+<a href="#h2-0-3" id="h2-0-3" class="d">-	Ready      chan struct{}
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+}
+</a> 
+<a href="#h2-0-6" id="h2-0-6" class="d">-	client *grpc.ClientConn
+</a><a href="#h2-0-7" id="h2-0-7" class="i">+func NewBackend(id string, addr string) (*Backend, error) {
+</a><a href="#h2-0-8" id="h2-0-8" class="i">+	client, err := grpc.Dial(addr, grpc.WithInsecure())
+</a><a href="#h2-0-9" id="h2-0-9" class="i">+	if err != nil {
+</a><a href="#h2-0-10" id="h2-0-10" class="i">+		return nil, err
+</a><a href="#h2-0-11" id="h2-0-11" class="i">+	}
+</a><a href="#h2-0-12" id="h2-0-12" class="i">+	bk := &amp;Backend{
+</a><a href="#h2-0-13" id="h2-0-13" class="i">+		Id:         id,
+</a><a href="#h2-0-14" id="h2-0-14" class="i">+		I:          &amp;I{Name: id},
+</a><a href="#h2-0-15" id="h2-0-15" class="i">+		Codesearch: pb.NewCodeSearchClient(client),
+</a><a href="#h2-0-16" id="h2-0-16" class="i">+	}
+</a><a href="#h2-0-17" id="h2-0-17" class="i">+	return bk, nil
+</a> }
+ 
+ func (bk *Backend) Start() {
+ 	if bk.I == nil {
+ 		bk.I = &amp;I{Name: bk.Id}
+ 	}
+<a href="#h2-0-24" id="h2-0-24" class="d">-	bk.Ready = make(chan struct{})
+</a> 	go bk.poll()
+ }
+ 
+ func (bk *Backend) poll() {
+ 	for {
+<a href="#h2-0-30" id="h2-0-30" class="d">-		if bk.Codesearch == nil {
+</a><a href="#h2-0-31" id="h2-0-31" class="d">-			conn, err := grpc.Dial(bk.Addr, grpc.WithInsecure())
+</a><a href="#h2-0-32" id="h2-0-32" class="d">-			if err != nil {
+</a><a href="#h2-0-33" id="h2-0-33" class="d">-				log.Printf(&quot;Dial: %s: %v&quot;, bk.Addr, err)
+</a><a href="#h2-0-34" id="h2-0-34" class="d">-				time.Sleep(30 * time.Second)
+</a><a href="#h2-0-35" id="h2-0-35" class="d">-				continue
+</a><a href="#h2-0-36" id="h2-0-36" class="d">-			}
+</a><a href="#h2-0-37" id="h2-0-37" class="d">-			bk.Codesearch = pb.NewCodeSearchClient(conn)
+</a><a href="#h2-0-38" id="h2-0-38" class="d">-			close(bk.Ready)
+</a><a href="#h2-0-39" id="h2-0-39" class="d">-
+</a><a href="#h2-0-40" id="h2-0-40" class="d">-		}
+</a><a href="#h2-0-41" id="h2-0-41" class="d">-		info, e := bk.Codesearch.Info(context.Background(), &amp;pb.InfoRequest{})
+</a><a href="#h2-0-42" id="h2-0-42" class="i">+		info, e := bk.Codesearch.Info(context.Background(), &amp;pb.InfoRequest{}, grpc.FailFast(false))
+</a> 		if e == nil {
+ 			bk.refresh(info)
+ 		} else {
+<b>diff --git a/<a id="h3" href="../file/server/server.go">server/server.go</a> b/<a href="../file/server/server.go">server/server.go</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -181,9 +181,9 @@ func New(cfg *config.Config) (http.Handler, error) {
+</a> 	}
+ 
+ 	for _, bk := range srv.config.Backends {
+<a href="#h3-0-3" id="h3-0-3" class="d">-		be := &amp;Backend{
+</a><a href="#h3-0-4" id="h3-0-4" class="d">-			Id:   bk.Id,
+</a><a href="#h3-0-5" id="h3-0-5" class="d">-			Addr: bk.Addr,
+</a><a href="#h3-0-6" id="h3-0-6" class="i">+		be, e := NewBackend(bk.Id, bk.Addr)
+</a><a href="#h3-0-7" id="h3-0-7" class="i">+		if e != nil {
+</a><a href="#h3-0-8" id="h3-0-8" class="i">+			return nil, e
+</a> 		}
+ 		be.Start()
+ 		srv.bk[be.Id] = be
+</pre>
+</div>
+</body>
+</html>

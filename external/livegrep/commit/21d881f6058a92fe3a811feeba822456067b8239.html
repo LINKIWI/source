@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>[wip] proto server - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a>
+<b>parent</b> <a href="../commit/56d9ad0737baad70b0aaaa496657e17b3e9091a2">56d9ad0737baad70b0aaaa496657e17b3e9091a2</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Mon, 22 Aug 2016 23:50:52 -0700
+
+[wip] proto server
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">src/proto/BUILD</a></td><td> | </td><td class="num">11</td><td><span class="i">++++++++++</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">src/proto/livegrep.proto</a></td><td> | </td><td class="num">53</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">src/tools/BUILD</a></td><td> | </td><td class="num">6</td><td><span class="i">++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">src/tools/codesearch.cc</a></td><td> | </td><td class="num">24</td><td><span class="i">++++++++++++++++++++++</span><span class="d">--</span></td></tr>
+<tr><td class="A">A</td><td><a href="#h4">src/tools/grpc_server.cc</a></td><td> | </td><td class="num">158</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="A">A</td><td><a href="#h5">src/tools/grpc_server.h</a></td><td> | </td><td class="num">20</td><td><span class="i">++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="A">A</td><td><a href="#h6">src/tools/limits.h</a></td><td> | </td><td class="num">7</td><td><span class="i">+++++++</span><span class="d"></span></td></tr>
+</table></pre><pre>7 files changed, 276 insertions(+), 3 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/src/proto/BUILD">src/proto/BUILD</a> b/<a href="../file/src/proto/BUILD">src/proto/BUILD</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -1,7 +1,16 @@
+</a><a href="#h0-0-0" id="h0-0-0" class="i">+package(default_visibility = [&quot;//visibility:public&quot;])
+</a><a href="#h0-0-1" id="h0-0-1" class="i">+
+</a> load(&quot;@org_pubref_rules_protobuf//bzl:go/rules.bzl&quot;, &quot;go_proto_library&quot;)
+<a href="#h0-0-3" id="h0-0-3" class="i">+load(&quot;@org_pubref_rules_protobuf//bzl:cpp/rules.bzl&quot;, &quot;cc_proto_library&quot;)
+</a> 
+ go_proto_library(
+<a href="#h0-0-6" id="h0-0-6" class="d">-  name = &quot;protos&quot;,
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+  name = &quot;go_proto&quot;,
+</a><a href="#h0-0-8" id="h0-0-8" class="i">+  protos = [&quot;livegrep.proto&quot;],
+</a><a href="#h0-0-9" id="h0-0-9" class="i">+  with_grpc = True,
+</a><a href="#h0-0-10" id="h0-0-10" class="i">+)
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+
+</a><a href="#h0-0-12" id="h0-0-12" class="i">+cc_proto_library(
+</a><a href="#h0-0-13" id="h0-0-13" class="i">+  name = &quot;cc_proto&quot;,
+</a>   protos = [&quot;livegrep.proto&quot;],
+   with_grpc = True,
+ )
+<b>diff --git a/<a id="h1" href="../file/src/proto/livegrep.proto">src/proto/livegrep.proto</a> b/<a href="../file/src/proto/livegrep.proto">src/proto/livegrep.proto</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -10,3 +10,56 @@ message Query {
+</a>     string not_repo = 7;
+     string not_tags = 8;
+ }
+<a href="#h1-0-3" id="h1-0-3" class="i">+
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+message Bounds {
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+    int32 left = 1;
+</a><a href="#h1-0-6" id="h1-0-6" class="i">+    int32 right = 2;
+</a><a href="#h1-0-7" id="h1-0-7" class="i">+}
+</a><a href="#h1-0-8" id="h1-0-8" class="i">+
+</a><a href="#h1-0-9" id="h1-0-9" class="i">+message SearchResult {
+</a><a href="#h1-0-10" id="h1-0-10" class="i">+    string tree = 1;
+</a><a href="#h1-0-11" id="h1-0-11" class="i">+    string version = 2;
+</a><a href="#h1-0-12" id="h1-0-12" class="i">+    string path = 3;
+</a><a href="#h1-0-13" id="h1-0-13" class="i">+    int64 line_number = 4;
+</a><a href="#h1-0-14" id="h1-0-14" class="i">+    repeated string context_before = 5;
+</a><a href="#h1-0-15" id="h1-0-15" class="i">+    repeated string context_after = 6;
+</a><a href="#h1-0-16" id="h1-0-16" class="i">+    Bounds bounds = 7;
+</a><a href="#h1-0-17" id="h1-0-17" class="i">+    string line = 8;
+</a><a href="#h1-0-18" id="h1-0-18" class="i">+}
+</a><a href="#h1-0-19" id="h1-0-19" class="i">+
+</a><a href="#h1-0-20" id="h1-0-20" class="i">+message SearchStats {
+</a><a href="#h1-0-21" id="h1-0-21" class="i">+    int64 re2_time = 1;
+</a><a href="#h1-0-22" id="h1-0-22" class="i">+    int64 git_time = 2;
+</a><a href="#h1-0-23" id="h1-0-23" class="i">+    int64 sort_time = 3;
+</a><a href="#h1-0-24" id="h1-0-24" class="i">+    int64 index_time = 4;
+</a><a href="#h1-0-25" id="h1-0-25" class="i">+    int64 analyze_time = 5;
+</a><a href="#h1-0-26" id="h1-0-26" class="i">+    enum ExitReason {
+</a><a href="#h1-0-27" id="h1-0-27" class="i">+        NONE = 0;
+</a><a href="#h1-0-28" id="h1-0-28" class="i">+        TIMEOUT = 1;
+</a><a href="#h1-0-29" id="h1-0-29" class="i">+        MATCH_LIMIT = 2;
+</a><a href="#h1-0-30" id="h1-0-30" class="i">+    }
+</a><a href="#h1-0-31" id="h1-0-31" class="i">+    ExitReason exit_reason = 6;
+</a><a href="#h1-0-32" id="h1-0-32" class="i">+}
+</a><a href="#h1-0-33" id="h1-0-33" class="i">+
+</a><a href="#h1-0-34" id="h1-0-34" class="i">+message ServerInfo {
+</a><a href="#h1-0-35" id="h1-0-35" class="i">+    string name = 1;
+</a><a href="#h1-0-36" id="h1-0-36" class="i">+    message Tree {
+</a><a href="#h1-0-37" id="h1-0-37" class="i">+        string name = 1;
+</a><a href="#h1-0-38" id="h1-0-38" class="i">+        string version = 2;
+</a><a href="#h1-0-39" id="h1-0-39" class="i">+        map&lt;string, string&gt; metadata = 3;
+</a><a href="#h1-0-40" id="h1-0-40" class="i">+    }
+</a><a href="#h1-0-41" id="h1-0-41" class="i">+    repeated Tree trees = 2;
+</a><a href="#h1-0-42" id="h1-0-42" class="i">+}
+</a><a href="#h1-0-43" id="h1-0-43" class="i">+
+</a><a href="#h1-0-44" id="h1-0-44" class="i">+message CodeSearchResult {
+</a><a href="#h1-0-45" id="h1-0-45" class="i">+    SearchStats stats = 1;
+</a><a href="#h1-0-46" id="h1-0-46" class="i">+    repeated SearchResult results = 2;
+</a><a href="#h1-0-47" id="h1-0-47" class="i">+}
+</a><a href="#h1-0-48" id="h1-0-48" class="i">+
+</a><a href="#h1-0-49" id="h1-0-49" class="i">+message InfoRequest {
+</a><a href="#h1-0-50" id="h1-0-50" class="i">+}
+</a><a href="#h1-0-51" id="h1-0-51" class="i">+
+</a><a href="#h1-0-52" id="h1-0-52" class="i">+service CodeSearch {
+</a><a href="#h1-0-53" id="h1-0-53" class="i">+    rpc Info(InfoRequest) returns (ServerInfo);
+</a><a href="#h1-0-54" id="h1-0-54" class="i">+    rpc Search(Query) returns (CodeSearchResult);
+</a><a href="#h1-0-55" id="h1-0-55" class="i">+}
+</a><b>diff --git a/<a id="h2" href="../file/src/tools/BUILD">src/tools/BUILD</a> b/<a href="../file/src/tools/BUILD">src/tools/BUILD</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -2,13 +2,19 @@ cc_binary(
+</a>   name = &quot;codesearch&quot;,
+   srcs = [
+     &quot;codesearch.cc&quot;,
+<a href="#h2-0-3" id="h2-0-3" class="i">+    &quot;grpc_server.cc&quot;,
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+    &quot;grpc_server.h&quot;,
+</a>     &quot;transport.cc&quot;,
+     &quot;transport.h&quot;,
+<a href="#h2-0-7" id="h2-0-7" class="i">+    &quot;limits.h&quot;,
+</a>   ],
+   deps = [
+     &quot;//src:codesearch&quot;,
+<a href="#h2-0-11" id="h2-0-11" class="i">+    &quot;//src/proto:cc_proto&quot;,
+</a><a href="#h2-0-12" id="h2-0-12" class="i">+
+</a>     &quot;@boost//:bind&quot;,
+     &quot;@com_github_libgit2//:libgit2&quot;,
+<a href="#h2-0-15" id="h2-0-15" class="i">+    &quot;@com_github_grpc_grpc//:grpc&quot;,
+</a>   ],
+   copts = [
+     &quot;-Wno-deprecated-declarations&quot;,
+<b>diff --git a/<a id="h3" href="../file/src/tools/codesearch.cc">src/tools/codesearch.cc</a> b/<a href="../file/src/tools/codesearch.cc">src/tools/codesearch.cc</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -16,6 +16,8 @@
+</a> #include &quot;src/fs_indexer.h&quot;
+ 
+ #include &quot;src/tools/transport.h&quot;
+<a href="#h3-0-3" id="h3-0-3" class="i">+#include &quot;src/tools/limits.h&quot;
+</a><a href="#h3-0-4" id="h3-0-4" class="i">+#include &quot;src/tools/grpc_server.h&quot;
+</a> 
+ #include &lt;stdio.h&gt;
+ #include &lt;sys/socket.h&gt;
+<a href="#h3-1" id="h3-1" class="h">@@ -38,19 +40,23 @@
+</a> 
+ #include &lt;json-c/json.h&gt;
+ 
+<a href="#h3-1-3" id="h3-1-3" class="i">+#include &lt;grpc++/server.h&gt;
+</a><a href="#h3-1-4" id="h3-1-4" class="i">+#include &lt;grpc++/server_builder.h&gt;
+</a><a href="#h3-1-5" id="h3-1-5" class="i">+
+</a> DEFINE_int32(concurrency, 16, &quot;Number of concurrent queries to allow.&quot;);
+ DEFINE_string(dump_index, &quot;&quot;, &quot;Dump the produced index to a specified file&quot;);
+ DEFINE_string(load_index, &quot;&quot;, &quot;Load the index from a file instead of walking the repository&quot;);
+ DEFINE_string(load_tags, &quot;&quot;, &quot;Load the index built from a tags file.&quot;);
+ DEFINE_bool(quiet, false, &quot;Do the search, but don&#39;t print results.&quot;);
+ DEFINE_string(listen, &quot;&quot;, &quot;Listen on a socket for connections. example: -listen tcp://localhost:9999&quot;);
+<a href="#h3-1-12" id="h3-1-12" class="i">+DEFINE_string(grpc, &quot;&quot;, &quot;Listen for GRPC clients. example: -grpc localhost:9999&quot;);
+</a> DEFINE_string(listen_tags, &quot;&quot;, &quot;Listen on a socket for connections to tag search. example: -listen_tags tcp://localhost:9998&quot;);
+ 
+ using namespace std;
+ using namespace re2;
+ 
+<a href="#h3-1-18" id="h3-1-18" class="d">-const int kMaxProgramSize = 4000;
+</a><a href="#h3-1-19" id="h3-1-19" class="d">-const int kMaxWidth       = 200;
+</a><a href="#h3-1-20" id="h3-1-20" class="i">+using grpc::Server;
+</a><a href="#h3-1-21" id="h3-1-21" class="i">+using grpc::ServerBuilder;
+</a> 
+ sem_t interact_sem;
+ 
+<a href="#h3-2" id="h3-2" class="h">@@ -369,6 +375,16 @@ void listen(code_searcher *search, const string&amp; path, const match_func&amp; match) 
+</a>     }
+ }
+ 
+<a href="#h3-2-3" id="h3-2-3" class="i">+void listen_grpc(code_searcher *search, const string&amp; addr) {
+</a><a href="#h3-2-4" id="h3-2-4" class="i">+    CodeSearchImpl service(search);
+</a><a href="#h3-2-5" id="h3-2-5" class="i">+
+</a><a href="#h3-2-6" id="h3-2-6" class="i">+    ServerBuilder builder;
+</a><a href="#h3-2-7" id="h3-2-7" class="i">+    builder.AddListeningPort(addr, grpc::InsecureServerCredentials());
+</a><a href="#h3-2-8" id="h3-2-8" class="i">+    builder.RegisterService(&amp;service);
+</a><a href="#h3-2-9" id="h3-2-9" class="i">+    std::unique_ptr&lt;Server&gt; server(builder.BuildAndStart());
+</a><a href="#h3-2-10" id="h3-2-10" class="i">+    server-&gt;Wait();
+</a><a href="#h3-2-11" id="h3-2-11" class="i">+}
+</a><a href="#h3-2-12" id="h3-2-12" class="i">+
+</a> int main(int argc, char **argv) {
+     gflags::SetUsageMessage(&quot;Usage: &quot; + string(argv[0]) + &quot; &lt;options&gt; REFS&quot;);
+     gflags::ParseCommandLineFlags(&amp;argc, &amp;argv, true);
+<a href="#h3-3" id="h3-3" class="h">@@ -386,6 +402,10 @@ int main(int argc, char **argv) {
+</a>         die_errno(&quot;sem_init&quot;);
+ 
+     std::vector&lt;std::thread&gt; listeners;
+<a href="#h3-3-3" id="h3-3-3" class="i">+    if (FLAGS_grpc.size()) {
+</a><a href="#h3-3-4" id="h3-3-4" class="i">+        listeners.emplace_back(
+</a><a href="#h3-3-5" id="h3-3-5" class="i">+            std::thread(boost::bind(&amp;listen_grpc, &amp;search, FLAGS_grpc)));
+</a><a href="#h3-3-6" id="h3-3-6" class="i">+    }
+</a>     if (FLAGS_listen.size()) {
+         codesearch_matcher matcher;
+         listeners.emplace_back(
+<b>diff --git a/<a id="h4" href="../file/src/tools/grpc_server.cc">src/tools/grpc_server.cc</a> b/<a href="../file/src/tools/grpc_server.cc">src/tools/grpc_server.cc</a></b>
+<a href="#h4-0" id="h4-0" class="h">@@ -0,0 +1,158 @@
+</a><a href="#h4-0-0" id="h4-0-0" class="i">+#include &quot;src/lib/debug.h&quot;
+</a><a href="#h4-0-1" id="h4-0-1" class="i">+
+</a><a href="#h4-0-2" id="h4-0-2" class="i">+#include &quot;src/codesearch.h&quot;
+</a><a href="#h4-0-3" id="h4-0-3" class="i">+#include &quot;src/re_width.h&quot;
+</a><a href="#h4-0-4" id="h4-0-4" class="i">+
+</a><a href="#h4-0-5" id="h4-0-5" class="i">+#include &quot;src/tools/limits.h&quot;
+</a><a href="#h4-0-6" id="h4-0-6" class="i">+#include &quot;src/tools/grpc_server.h&quot;
+</a><a href="#h4-0-7" id="h4-0-7" class="i">+
+</a><a href="#h4-0-8" id="h4-0-8" class="i">+#include &lt;json-c/json.h&gt;
+</a><a href="#h4-0-9" id="h4-0-9" class="i">+
+</a><a href="#h4-0-10" id="h4-0-10" class="i">+#include &lt;string&gt;
+</a><a href="#h4-0-11" id="h4-0-11" class="i">+#include &lt;algorithm&gt;
+</a><a href="#h4-0-12" id="h4-0-12" class="i">+#include &lt;functional&gt;
+</a><a href="#h4-0-13" id="h4-0-13" class="i">+
+</a><a href="#h4-0-14" id="h4-0-14" class="i">+using grpc::ServerContext;
+</a><a href="#h4-0-15" id="h4-0-15" class="i">+using grpc::Status;
+</a><a href="#h4-0-16" id="h4-0-16" class="i">+using grpc::StatusCode;
+</a><a href="#h4-0-17" id="h4-0-17" class="i">+
+</a><a href="#h4-0-18" id="h4-0-18" class="i">+using std::string;
+</a><a href="#h4-0-19" id="h4-0-19" class="i">+
+</a><a href="#h4-0-20" id="h4-0-20" class="i">+Status CodeSearchImpl::Info(ServerContext* context, const ::InfoRequest* request, ::ServerInfo* response) {
+</a><a href="#h4-0-21" id="h4-0-21" class="i">+    response-&gt;set_name(cs_-&gt;name());
+</a><a href="#h4-0-22" id="h4-0-22" class="i">+    std::vector&lt;indexed_tree&gt; trees = cs_-&gt;trees();
+</a><a href="#h4-0-23" id="h4-0-23" class="i">+    for (auto it = trees.begin(); it != trees.end(); ++it) {
+</a><a href="#h4-0-24" id="h4-0-24" class="i">+        auto insert = response-&gt;add_trees();
+</a><a href="#h4-0-25" id="h4-0-25" class="i">+        insert-&gt;set_name(it-&gt;name);
+</a><a href="#h4-0-26" id="h4-0-26" class="i">+        insert-&gt;set_version(it-&gt;version);
+</a><a href="#h4-0-27" id="h4-0-27" class="i">+        if (it-&gt;metadata == NULL)
+</a><a href="#h4-0-28" id="h4-0-28" class="i">+            continue;
+</a><a href="#h4-0-29" id="h4-0-29" class="i">+        auto metadata = insert-&gt;mutable_metadata();
+</a><a href="#h4-0-30" id="h4-0-30" class="i">+        json_object_object_foreach(it-&gt;metadata, key, val) {
+</a><a href="#h4-0-31" id="h4-0-31" class="i">+            switch (json_object_get_type(val)) {
+</a><a href="#h4-0-32" id="h4-0-32" class="i">+            case json_type_null:
+</a><a href="#h4-0-33" id="h4-0-33" class="i">+            case json_type_array:
+</a><a href="#h4-0-34" id="h4-0-34" class="i">+            case json_type_object:
+</a><a href="#h4-0-35" id="h4-0-35" class="i">+                break;
+</a><a href="#h4-0-36" id="h4-0-36" class="i">+            case json_type_boolean:
+</a><a href="#h4-0-37" id="h4-0-37" class="i">+            case json_type_double:
+</a><a href="#h4-0-38" id="h4-0-38" class="i">+            case json_type_int:
+</a><a href="#h4-0-39" id="h4-0-39" class="i">+                (*metadata)[string(key)] = string(json_object_to_json_string(val));
+</a><a href="#h4-0-40" id="h4-0-40" class="i">+                break;
+</a><a href="#h4-0-41" id="h4-0-41" class="i">+            case json_type_string:
+</a><a href="#h4-0-42" id="h4-0-42" class="i">+                (*metadata)[string(key)] = string(json_object_get_string(val));
+</a><a href="#h4-0-43" id="h4-0-43" class="i">+                break;
+</a><a href="#h4-0-44" id="h4-0-44" class="i">+            }
+</a><a href="#h4-0-45" id="h4-0-45" class="i">+        }
+</a><a href="#h4-0-46" id="h4-0-46" class="i">+    }
+</a><a href="#h4-0-47" id="h4-0-47" class="i">+    return Status::OK;
+</a><a href="#h4-0-48" id="h4-0-48" class="i">+}
+</a><a href="#h4-0-49" id="h4-0-49" class="i">+
+</a><a href="#h4-0-50" id="h4-0-50" class="i">+Status extract_regex(std::unique_ptr&lt;RE2&gt; *out,
+</a><a href="#h4-0-51" id="h4-0-51" class="i">+                     const std::string &amp;label,
+</a><a href="#h4-0-52" id="h4-0-52" class="i">+                     const std::string &amp;input,
+</a><a href="#h4-0-53" id="h4-0-53" class="i">+                     RE2::Options &amp;opts) {
+</a><a href="#h4-0-54" id="h4-0-54" class="i">+
+</a><a href="#h4-0-55" id="h4-0-55" class="i">+    if (input.empty()) {
+</a><a href="#h4-0-56" id="h4-0-56" class="i">+        out-&gt;reset(nullptr);
+</a><a href="#h4-0-57" id="h4-0-57" class="i">+        return Status::OK;
+</a><a href="#h4-0-58" id="h4-0-58" class="i">+    }
+</a><a href="#h4-0-59" id="h4-0-59" class="i">+    std::unique_ptr&lt;RE2&gt; re(new RE2(input, opts));
+</a><a href="#h4-0-60" id="h4-0-60" class="i">+    if (!re-&gt;ok()) {
+</a><a href="#h4-0-61" id="h4-0-61" class="i">+        return Status(StatusCode::INVALID_ARGUMENT, label + &quot;: &quot; + re-&gt;error());
+</a><a href="#h4-0-62" id="h4-0-62" class="i">+    }
+</a><a href="#h4-0-63" id="h4-0-63" class="i">+    *out = std::move(re);
+</a><a href="#h4-0-64" id="h4-0-64" class="i">+    return Status::OK;
+</a><a href="#h4-0-65" id="h4-0-65" class="i">+}
+</a><a href="#h4-0-66" id="h4-0-66" class="i">+
+</a><a href="#h4-0-67" id="h4-0-67" class="i">+Status parse_query(query *q, const ::Query* request, ::CodeSearchResult* response) {
+</a><a href="#h4-0-68" id="h4-0-68" class="i">+    RE2::Options opts;
+</a><a href="#h4-0-69" id="h4-0-69" class="i">+    default_re2_options(opts);
+</a><a href="#h4-0-70" id="h4-0-70" class="i">+    opts.set_case_sensitive(!request-&gt;fold_case());
+</a><a href="#h4-0-71" id="h4-0-71" class="i">+
+</a><a href="#h4-0-72" id="h4-0-72" class="i">+    Status status = Status::OK;
+</a><a href="#h4-0-73" id="h4-0-73" class="i">+    status = extract_regex(&amp;q-&gt;line_pat, &quot;line&quot;, request-&gt;line(), opts);
+</a><a href="#h4-0-74" id="h4-0-74" class="i">+    if (status.ok())
+</a><a href="#h4-0-75" id="h4-0-75" class="i">+        status = extract_regex(&amp;q-&gt;file_pat, &quot;file&quot;, request-&gt;file(), opts);
+</a><a href="#h4-0-76" id="h4-0-76" class="i">+    if (status.ok())
+</a><a href="#h4-0-77" id="h4-0-77" class="i">+        status = extract_regex(&amp;q-&gt;tree_pat, &quot;repo&quot;, request-&gt;repo(), opts);
+</a><a href="#h4-0-78" id="h4-0-78" class="i">+    if (status.ok())
+</a><a href="#h4-0-79" id="h4-0-79" class="i">+        status = extract_regex(&amp;q-&gt;negate.file_pat, &quot;-file&quot;, request-&gt;not_file(), opts);
+</a><a href="#h4-0-80" id="h4-0-80" class="i">+    if (status.ok())
+</a><a href="#h4-0-81" id="h4-0-81" class="i">+        status = extract_regex(&amp;q-&gt;negate.tree_pat, &quot;-repo&quot;, request-&gt;not_repo(), opts);
+</a><a href="#h4-0-82" id="h4-0-82" class="i">+    return Status::OK;
+</a><a href="#h4-0-83" id="h4-0-83" class="i">+}
+</a><a href="#h4-0-84" id="h4-0-84" class="i">+
+</a><a href="#h4-0-85" id="h4-0-85" class="i">+class add_match {
+</a><a href="#h4-0-86" id="h4-0-86" class="i">+public:
+</a><a href="#h4-0-87" id="h4-0-87" class="i">+    add_match(CodeSearchResult* response) : response_(response) {}
+</a><a href="#h4-0-88" id="h4-0-88" class="i">+
+</a><a href="#h4-0-89" id="h4-0-89" class="i">+    void operator()(const match_result *m) const {
+</a><a href="#h4-0-90" id="h4-0-90" class="i">+        auto result = response_-&gt;add_results();
+</a><a href="#h4-0-91" id="h4-0-91" class="i">+        result-&gt;set_tree(m-&gt;file-&gt;tree-&gt;name);
+</a><a href="#h4-0-92" id="h4-0-92" class="i">+        result-&gt;set_version(m-&gt;file-&gt;tree-&gt;version);
+</a><a href="#h4-0-93" id="h4-0-93" class="i">+        result-&gt;set_path(m-&gt;file-&gt;path);
+</a><a href="#h4-0-94" id="h4-0-94" class="i">+        result-&gt;set_line_number(m-&gt;lno);
+</a><a href="#h4-0-95" id="h4-0-95" class="i">+        std::transform(m-&gt;context_before.begin(), m-&gt;context_before.end(),
+</a><a href="#h4-0-96" id="h4-0-96" class="i">+                       RepeatedPtrFieldBackInserter(result-&gt;mutable_context_before()),
+</a><a href="#h4-0-97" id="h4-0-97" class="i">+                       mem_fun_ref(&amp;re2::StringPiece::ToString));
+</a><a href="#h4-0-98" id="h4-0-98" class="i">+
+</a><a href="#h4-0-99" id="h4-0-99" class="i">+        std::transform(m-&gt;context_after.begin(), m-&gt;context_after.end(),
+</a><a href="#h4-0-100" id="h4-0-100" class="i">+                       RepeatedPtrFieldBackInserter(result-&gt;mutable_context_after()),
+</a><a href="#h4-0-101" id="h4-0-101" class="i">+                       mem_fun_ref(&amp;re2::StringPiece::ToString));
+</a><a href="#h4-0-102" id="h4-0-102" class="i">+        result-&gt;mutable_bounds()-&gt;set_left(m-&gt;matchleft);
+</a><a href="#h4-0-103" id="h4-0-103" class="i">+        result-&gt;mutable_bounds()-&gt;set_right(m-&gt;matchright);
+</a><a href="#h4-0-104" id="h4-0-104" class="i">+        result-&gt;set_line(m-&gt;line.ToString());
+</a><a href="#h4-0-105" id="h4-0-105" class="i">+    }
+</a><a href="#h4-0-106" id="h4-0-106" class="i">+
+</a><a href="#h4-0-107" id="h4-0-107" class="i">+private:
+</a><a href="#h4-0-108" id="h4-0-108" class="i">+    CodeSearchResult* response_;
+</a><a href="#h4-0-109" id="h4-0-109" class="i">+};
+</a><a href="#h4-0-110" id="h4-0-110" class="i">+
+</a><a href="#h4-0-111" id="h4-0-111" class="i">+extern long timeval_ms(struct timeval tv);
+</a><a href="#h4-0-112" id="h4-0-112" class="i">+
+</a><a href="#h4-0-113" id="h4-0-113" class="i">+Status CodeSearchImpl::Search(ServerContext* context, const ::Query* request, ::CodeSearchResult* response) {
+</a><a href="#h4-0-114" id="h4-0-114" class="i">+    code_searcher::search_thread search(cs_);
+</a><a href="#h4-0-115" id="h4-0-115" class="i">+    WidthWalker width;
+</a><a href="#h4-0-116" id="h4-0-116" class="i">+
+</a><a href="#h4-0-117" id="h4-0-117" class="i">+    /* todo: trace ID */
+</a><a href="#h4-0-118" id="h4-0-118" class="i">+    /* todo: log request */
+</a><a href="#h4-0-119" id="h4-0-119" class="i">+    query q;
+</a><a href="#h4-0-120" id="h4-0-120" class="i">+    Status st;
+</a><a href="#h4-0-121" id="h4-0-121" class="i">+    st = parse_query(&amp;q, request, response);
+</a><a href="#h4-0-122" id="h4-0-122" class="i">+    if (!st.ok())
+</a><a href="#h4-0-123" id="h4-0-123" class="i">+        return st;
+</a><a href="#h4-0-124" id="h4-0-124" class="i">+
+</a><a href="#h4-0-125" id="h4-0-125" class="i">+    if (q.line_pat-&gt;ProgramSize() &gt; kMaxProgramSize) {
+</a><a href="#h4-0-126" id="h4-0-126" class="i">+        log(&quot;program too large size=%d&quot;, q.line_pat-&gt;ProgramSize());
+</a><a href="#h4-0-127" id="h4-0-127" class="i">+        return Status(StatusCode::INVALID_ARGUMENT, &quot;Parse error&quot;);
+</a><a href="#h4-0-128" id="h4-0-128" class="i">+    }
+</a><a href="#h4-0-129" id="h4-0-129" class="i">+
+</a><a href="#h4-0-130" id="h4-0-130" class="i">+    int w = width.Walk(q.line_pat-&gt;Regexp(), 0);
+</a><a href="#h4-0-131" id="h4-0-131" class="i">+    if (w &gt; kMaxWidth) {
+</a><a href="#h4-0-132" id="h4-0-132" class="i">+        log(&quot;program too wide width=%d&quot;, w);
+</a><a href="#h4-0-133" id="h4-0-133" class="i">+        return Status(StatusCode::INVALID_ARGUMENT, &quot;Parse error&quot;);
+</a><a href="#h4-0-134" id="h4-0-134" class="i">+    }
+</a><a href="#h4-0-135" id="h4-0-135" class="i">+
+</a><a href="#h4-0-136" id="h4-0-136" class="i">+    match_stats stats;
+</a><a href="#h4-0-137" id="h4-0-137" class="i">+    search.match(q, add_match(response), &amp;stats);
+</a><a href="#h4-0-138" id="h4-0-138" class="i">+    auto out_stats = response-&gt;mutable_stats();
+</a><a href="#h4-0-139" id="h4-0-139" class="i">+    out_stats-&gt;set_re2_time(timeval_ms(stats.re2_time));
+</a><a href="#h4-0-140" id="h4-0-140" class="i">+    out_stats-&gt;set_git_time(timeval_ms(stats.git_time));
+</a><a href="#h4-0-141" id="h4-0-141" class="i">+    out_stats-&gt;set_sort_time(timeval_ms(stats.sort_time));
+</a><a href="#h4-0-142" id="h4-0-142" class="i">+    out_stats-&gt;set_index_time(timeval_ms(stats.index_time));
+</a><a href="#h4-0-143" id="h4-0-143" class="i">+    out_stats-&gt;set_analyze_time(timeval_ms(stats.analyze_time));
+</a><a href="#h4-0-144" id="h4-0-144" class="i">+    switch (stats.why) {
+</a><a href="#h4-0-145" id="h4-0-145" class="i">+    case kExitNone:
+</a><a href="#h4-0-146" id="h4-0-146" class="i">+        out_stats-&gt;set_exit_reason(SearchStats::NONE);
+</a><a href="#h4-0-147" id="h4-0-147" class="i">+        break;
+</a><a href="#h4-0-148" id="h4-0-148" class="i">+    case kExitMatchLimit:
+</a><a href="#h4-0-149" id="h4-0-149" class="i">+        out_stats-&gt;set_exit_reason(SearchStats::MATCH_LIMIT);
+</a><a href="#h4-0-150" id="h4-0-150" class="i">+        break;
+</a><a href="#h4-0-151" id="h4-0-151" class="i">+    case kExitTimeout:
+</a><a href="#h4-0-152" id="h4-0-152" class="i">+        out_stats-&gt;set_exit_reason(SearchStats::TIMEOUT);
+</a><a href="#h4-0-153" id="h4-0-153" class="i">+        break;
+</a><a href="#h4-0-154" id="h4-0-154" class="i">+    }
+</a><a href="#h4-0-155" id="h4-0-155" class="i">+
+</a><a href="#h4-0-156" id="h4-0-156" class="i">+    return Status::OK;
+</a><a href="#h4-0-157" id="h4-0-157" class="i">+}
+</a><b>diff --git a/<a id="h5" href="../file/src/tools/grpc_server.h">src/tools/grpc_server.h</a> b/<a href="../file/src/tools/grpc_server.h">src/tools/grpc_server.h</a></b>
+<a href="#h5-0" id="h5-0" class="h">@@ -0,0 +1,20 @@
+</a><a href="#h5-0-0" id="h5-0-0" class="i">+#ifndef CODESEARCH_GRPC_SERVER_H
+</a><a href="#h5-0-1" id="h5-0-1" class="i">+#define CODESEARCH_GRPC_SERVER_H
+</a><a href="#h5-0-2" id="h5-0-2" class="i">+
+</a><a href="#h5-0-3" id="h5-0-3" class="i">+#include &quot;src/proto/livegrep.grpc.pb.h&quot;
+</a><a href="#h5-0-4" id="h5-0-4" class="i">+
+</a><a href="#h5-0-5" id="h5-0-5" class="i">+class code_searcher;
+</a><a href="#h5-0-6" id="h5-0-6" class="i">+
+</a><a href="#h5-0-7" id="h5-0-7" class="i">+class CodeSearchImpl final : public CodeSearch::Service {
+</a><a href="#h5-0-8" id="h5-0-8" class="i">+ public:
+</a><a href="#h5-0-9" id="h5-0-9" class="i">+    explicit CodeSearchImpl(code_searcher *cs) : cs_(cs) {
+</a><a href="#h5-0-10" id="h5-0-10" class="i">+    }
+</a><a href="#h5-0-11" id="h5-0-11" class="i">+
+</a><a href="#h5-0-12" id="h5-0-12" class="i">+    virtual grpc::Status Info(grpc::ServerContext* context, const ::InfoRequest* request, ::ServerInfo* response);
+</a><a href="#h5-0-13" id="h5-0-13" class="i">+    virtual grpc::Status Search(grpc::ServerContext* context, const ::Query* request, ::CodeSearchResult* response);
+</a><a href="#h5-0-14" id="h5-0-14" class="i">+
+</a><a href="#h5-0-15" id="h5-0-15" class="i">+ private:
+</a><a href="#h5-0-16" id="h5-0-16" class="i">+    code_searcher *cs_;
+</a><a href="#h5-0-17" id="h5-0-17" class="i">+};
+</a><a href="#h5-0-18" id="h5-0-18" class="i">+
+</a><a href="#h5-0-19" id="h5-0-19" class="i">+#endif /* CODESEARCH_GRPC_SERVER_H */
+</a><b>diff --git a/<a id="h6" href="../file/src/tools/limits.h">src/tools/limits.h</a> b/<a href="../file/src/tools/limits.h">src/tools/limits.h</a></b>
+<a href="#h6-0" id="h6-0" class="h">@@ -0,0 +1,7 @@
+</a><a href="#h6-0-0" id="h6-0-0" class="i">+#ifndef CODESEARCH_LIMITS_H
+</a><a href="#h6-0-1" id="h6-0-1" class="i">+#define CODESEARCH_LIMITS_H
+</a><a href="#h6-0-2" id="h6-0-2" class="i">+
+</a><a href="#h6-0-3" id="h6-0-3" class="i">+const int kMaxProgramSize = 4000;
+</a><a href="#h6-0-4" id="h6-0-4" class="i">+const int kMaxWidth       = 200;
+</a><a href="#h6-0-5" id="h6-0-5" class="i">+
+</a><a href="#h6-0-6" id="h6-0-6" class="i">+#endif
+</a></pre>
+</div>
+</body>
+</html>

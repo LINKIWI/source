@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Move the chunk_map into chunk_allocator. - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/be409a8df39067461da55d866bcdf5092c363be2">be409a8df39067461da55d866bcdf5092c363be2</a>
+<b>parent</b> <a href="../commit/852ae8f5a1519ad355c1bd27373163fdad13b5f1">852ae8f5a1519ad355c1bd27373163fdad13b5f1</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Sat,  2 Jun 2012 15:55:24 -0400
+
+Move the chunk_map into chunk_allocator.
+
+This makes much more conceptual sense, and will make even more once
+the chunk_allocator becomes the ultimate owner of -&gt;data.
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">chunk.cc</a></td><td> | </td><td class="num">1</td><td><span class="i"></span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">chunk.h</a></td><td> | </td><td class="num">13</td><td><span class="i"></span><span class="d">-------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">chunk_allocator.cc</a></td><td> | </td><td class="num">19</td><td><span class="i">+++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">chunk_allocator.h</a></td><td> | </td><td class="num">5</td><td><span class="i">+++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h4">codesearch.cc</a></td><td> | </td><td class="num">3</td><td><span class="i">++</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h5">dump_load.cc</a></td><td> | </td><td class="num">12</td><td><span class="i">+++++</span><span class="d">-------</span></td></tr>
+</table></pre><pre>6 files changed, 31 insertions(+), 22 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/chunk.cc">chunk.cc</a> b/<a href="../file/chunk.cc">chunk.cc</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -126,7 +126,6 @@ void chunk::finish_file() {
+</a> }
+ 
+ int chunk::chunk_files = 0;
+<a href="#h0-0-3" id="h0-0-3" class="d">-map&lt;const unsigned char *, chunk *&gt; chunk::chunk_map;
+</a> 
+ void radix_sorter::sort() {
+     cmp_suffix cmp(*this);
+<b>diff --git a/<a id="h1" href="../file/chunk.h">chunk.h</a> b/<a href="../file/chunk.h">chunk.h</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -43,7 +43,6 @@ struct chunk_file_node {
+</a> 
+ struct chunk {
+     static int chunk_files;
+<a href="#h1-0-3" id="h1-0-3" class="d">-    static map&lt;const unsigned char *, chunk *&gt; chunk_map;
+</a> 
+     int size;
+     vector&lt;chunk_file&gt; files;
+<a href="#h1-1" id="h1-1" class="h">@@ -54,11 +53,9 @@ struct chunk {
+</a> 
+     chunk(unsigned char *data = 0)
+         : size(0), files(), suffixes(0), data(data ?: new unsigned char[kChunkSize]) {
+<a href="#h1-1-3" id="h1-1-3" class="d">-        chunk_map[this-&gt;data] = this;
+</a>     }
+ 
+     ~chunk() {
+<a href="#h1-1-7" id="h1-1-7" class="d">-        chunk_map.erase(data);
+</a>     }
+ 
+     void add_chunk_file(search_file *sf, const StringPiece&amp; line);
+<a href="#h1-2" id="h1-2" class="h">@@ -67,16 +64,6 @@ struct chunk {
+</a>     void finalize_files();
+     void build_tree();
+ 
+<a href="#h1-2-3" id="h1-2-3" class="d">-    static chunk *from_str(const unsigned char *p) {
+</a><a href="#h1-2-4" id="h1-2-4" class="d">-        auto it = chunk_map.lower_bound(p);
+</a><a href="#h1-2-5" id="h1-2-5" class="d">-        if (it == chunk_map.end() || it-&gt;first != p) {
+</a><a href="#h1-2-6" id="h1-2-6" class="d">-            assert(it != chunk_map.begin());
+</a><a href="#h1-2-7" id="h1-2-7" class="d">-            --it;
+</a><a href="#h1-2-8" id="h1-2-8" class="d">-        }
+</a><a href="#h1-2-9" id="h1-2-9" class="d">-        assert(it-&gt;first &lt;= p &amp;&amp; p &lt;= it-&gt;first + it-&gt;second-&gt;size);
+</a><a href="#h1-2-10" id="h1-2-10" class="d">-        return it-&gt;second;
+</a><a href="#h1-2-11" id="h1-2-11" class="d">-    }
+</a><a href="#h1-2-12" id="h1-2-12" class="d">-
+</a>     struct lt_suffix {
+         const chunk *chunk_;
+         lt_suffix(const chunk *chunk) : chunk_(chunk) { }
+<b>diff --git a/<a id="h2" href="../file/chunk_allocator.cc">chunk_allocator.cc</a> b/<a href="../file/chunk_allocator.cc">chunk_allocator.cc</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -38,6 +38,7 @@ void chunk_allocator::new_chunk()  {
+</a>         finalize_pool_-&gt;queue(current_);
+     }
+     current_ = alloc_chunk();
+<a href="#h2-0-3" id="h2-0-3" class="i">+    by_data_[current_-&gt;data] = current_;
+</a>     chunks_.push_back(current_);
+ }
+ 
+<a href="#h2-1" id="h2-1" class="h">@@ -57,3 +58,21 @@ void chunk_allocator::skip_chunk() {
+</a>     current_ = 0;
+     new_chunk();
+ }
+<a href="#h2-1-3" id="h2-1-3" class="i">+
+</a><a href="#h2-1-4" id="h2-1-4" class="i">+chunk *chunk_allocator::chunk_from_string(const unsigned char *p) {
+</a><a href="#h2-1-5" id="h2-1-5" class="i">+    auto it = by_data_.lower_bound(p);
+</a><a href="#h2-1-6" id="h2-1-6" class="i">+    if (it == by_data_.end() || it-&gt;first != p) {
+</a><a href="#h2-1-7" id="h2-1-7" class="i">+        assert(it != by_data_.begin());
+</a><a href="#h2-1-8" id="h2-1-8" class="i">+        --it;
+</a><a href="#h2-1-9" id="h2-1-9" class="i">+    }
+</a><a href="#h2-1-10" id="h2-1-10" class="i">+    assert(it-&gt;first &lt;= p &amp;&amp; p &lt;= it-&gt;first + it-&gt;second-&gt;size);
+</a><a href="#h2-1-11" id="h2-1-11" class="i">+    return it-&gt;second;
+</a><a href="#h2-1-12" id="h2-1-12" class="i">+}
+</a><a href="#h2-1-13" id="h2-1-13" class="i">+
+</a><a href="#h2-1-14" id="h2-1-14" class="i">+void chunk_allocator::replace_data(chunk *chunk, unsigned char *new_data) {
+</a><a href="#h2-1-15" id="h2-1-15" class="i">+    by_data_.erase(chunk-&gt;data);
+</a><a href="#h2-1-16" id="h2-1-16" class="i">+    delete[] chunk-&gt;data;
+</a><a href="#h2-1-17" id="h2-1-17" class="i">+    chunk-&gt;data = new_data;
+</a><a href="#h2-1-18" id="h2-1-18" class="i">+    by_data_[new_data] = chunk;
+</a><a href="#h2-1-19" id="h2-1-19" class="i">+}
+</a><a href="#h2-1-20" id="h2-1-20" class="i">+
+</a><b>diff --git a/<a id="h3" href="../file/chunk_allocator.h">chunk_allocator.h</a> b/<a href="../file/chunk_allocator.h">chunk_allocator.h</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -1,4 +1,5 @@
+</a> #include &lt;list&gt;
+<a href="#h3-0-1" id="h3-0-1" class="i">+#include &lt;map&gt;
+</a> #include &quot;thread_pool.h&quot;
+ 
+ using namespace std;
+<a href="#h3-1" id="h3-1" class="h">@@ -28,6 +29,9 @@ public:
+</a>     void skip_chunk();
+     void finalize();
+ 
+<a href="#h3-1-3" id="h3-1-3" class="i">+    chunk *chunk_from_string(const unsigned char *p);
+</a><a href="#h3-1-4" id="h3-1-4" class="i">+    void replace_data(chunk *chunk, unsigned char *new_data);
+</a><a href="#h3-1-5" id="h3-1-5" class="i">+
+</a> protected:
+ 
+     struct finalizer {
+<a href="#h3-2" id="h3-2" class="h">@@ -40,4 +44,5 @@ protected:
+</a>     chunk *current_;
+     finalizer finalizer_;
+     thread_pool&lt;chunk*, finalizer&gt; *finalize_pool_;
+<a href="#h3-2-3" id="h3-2-3" class="i">+    map&lt;const unsigned char*, chunk*&gt; by_data_;
+</a> };
+<b>diff --git a/<a id="h4" href="../file/codesearch.cc">codesearch.cc</a> b/<a href="../file/codesearch.cc">codesearch.cc</a></b>
+<a href="#h4-0" id="h4-0" class="h">@@ -568,7 +568,8 @@ void code_searcher::update_stats(const char *ref, const string&amp; path, git_blob *
+</a>             c = alloc_-&gt;current_chunk();
+         } else {
+             line = *it;
+<a href="#h4-0-3" id="h4-0-3" class="d">-            c = chunk::from_str(reinterpret_cast&lt;const unsigned char*&gt;(line.data()));
+</a><a href="#h4-0-4" id="h4-0-4" class="i">+            c = alloc_-&gt;chunk_from_string
+</a><a href="#h4-0-5" id="h4-0-5" class="i">+                (reinterpret_cast&lt;const unsigned char*&gt;(line.data()));
+</a>         }
+         c-&gt;add_chunk_file(sf, line);
+         if (sf-&gt;content.size() &amp;&amp;
+<b>diff --git a/<a id="h5" href="../file/dump_load.cc">dump_load.cc</a> b/<a href="../file/dump_load.cc">dump_load.cc</a></b>
+<a href="#h5-0" id="h5-0" class="h">@@ -155,7 +155,8 @@ void codesearch_index::dump_file_contents(search_file *sf) {
+</a>     dump_int32(sf-&gt;content.size());
+     for (vector&lt;StringPiece&gt;::iterator it = sf-&gt;content.begin();
+              it != sf-&gt;content.end(); ++it) {
+<a href="#h5-0-3" id="h5-0-3" class="d">-        chunk *chunk = chunk::from_str(reinterpret_cast&lt;const unsigned char*&gt;(it-&gt;data()));
+</a><a href="#h5-0-4" id="h5-0-4" class="i">+        chunk *chunk = cs_-&gt;alloc_-&gt;chunk_from_string
+</a><a href="#h5-0-5" id="h5-0-5" class="i">+            (reinterpret_cast&lt;const unsigned char*&gt;(it-&gt;data()));
+</a>         dump_int32(chunk_ids_[chunk]);
+         dump_int32(reinterpret_cast&lt;const unsigned char*&gt;(it-&gt;data()) - chunk-&gt;data);
+         dump_int32(it-&gt;size());
+<a href="#h5-1" id="h5-1" class="h">@@ -256,13 +257,10 @@ void codesearch_index::load_chunk(chunk *chunk) {
+</a> 
+ void codesearch_index::load_chunk_data(chunk *chunk) {
+     aligng(kPageSize);
+<a href="#h5-1-3" id="h5-1-3" class="d">-    chunk::chunk_map.erase(chunk-&gt;data);
+</a><a href="#h5-1-4" id="h5-1-4" class="d">-    delete[] chunk-&gt;data;
+</a><a href="#h5-1-5" id="h5-1-5" class="d">-    chunk-&gt;data = static_cast&lt;unsigned char*&gt;
+</a><a href="#h5-1-6" id="h5-1-6" class="d">-        (mmap(NULL, chunk-&gt;size, PROT_READ, MAP_SHARED,
+</a><a href="#h5-1-7" id="h5-1-7" class="d">-              fd_, stream_.tellg()));
+</a><a href="#h5-1-8" id="h5-1-8" class="i">+    cs_-&gt;alloc_-&gt;replace_data(chunk, static_cast&lt;unsigned char*&gt;
+</a><a href="#h5-1-9" id="h5-1-9" class="i">+                              (mmap(NULL, chunk-&gt;size, PROT_READ, MAP_SHARED,
+</a><a href="#h5-1-10" id="h5-1-10" class="i">+                                    fd_, stream_.tellg())));
+</a>     assert(chunk-&gt;data != MAP_FAILED);
+<a href="#h5-1-12" id="h5-1-12" class="d">-    chunk::chunk_map[chunk-&gt;data] = chunk;
+</a> 
+     stream_.seekg(chunk-&gt;size, ios_base::cur);
+     aligng(kPageSize);
+</pre>
+</div>
+</body>
+</html>

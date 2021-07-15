@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Use a separate git_repository per search thread. - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/4f6697ac09a0e741808ea46763bf46889829ba99">4f6697ac09a0e741808ea46763bf46889829ba99</a>
+<b>parent</b> <a href="../commit/eb8b82ea963d2f9350009f041b7681dfed7c56ea">eb8b82ea963d2f9350009f041b7681dfed7c56ea</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Sun, 30 Oct 2011 15:48:32 -0700
+
+Use a separate git_repository per search thread.
+
+This unfortunately means we don&#39;t get to share the object cache
+between them, but it&#39;s still a huge win over serializing all access to
+the repository. Maybe some day libgit2 will actually be threadsafe and
+we can have the best of both worlds.
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">codesearch.cc</a></td><td> | </td><td class="num">40</td><td><span class="i">+++++++++++++++++++++++++++++++</span><span class="d">---------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">codesearch.h</a></td><td> | </td><td class="num">1</td><td><span class="i"></span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">thread_pool.h</a></td><td> | </td><td class="num">16</td><td><span class="i">+++++</span><span class="d">-----------</span></td></tr>
+</table></pre><pre>3 files changed, 36 insertions(+), 21 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/codesearch.cc">codesearch.cc</a> b/<a href="../file/codesearch.cc">codesearch.cc</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -208,7 +208,25 @@ public:
+</a>                     int(our_time_.elapsed().tv_usec));
+     }
+ 
+<a href="#h0-0-3" id="h0-0-3" class="d">-    bool operator()(const chunk *chunk) {
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+    class thread_state {
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+    public:
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+        thread_state(const searcher&amp; search) {
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+            git_repository_open(&amp;repo_,
+</a><a href="#h0-0-8" id="h0-0-8" class="i">+                                git_repository_path(search.cc_-&gt;repo_,
+</a><a href="#h0-0-9" id="h0-0-9" class="i">+                                                    GIT_REPO_PATH));
+</a><a href="#h0-0-10" id="h0-0-10" class="i">+            assert(repo_);
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+        }
+</a><a href="#h0-0-12" id="h0-0-12" class="i">+        ~thread_state() {
+</a><a href="#h0-0-13" id="h0-0-13" class="i">+            git_repository_free(repo_);
+</a><a href="#h0-0-14" id="h0-0-14" class="i">+        }
+</a><a href="#h0-0-15" id="h0-0-15" class="i">+    protected:
+</a><a href="#h0-0-16" id="h0-0-16" class="i">+        thread_state(const thread_state&amp;);
+</a><a href="#h0-0-17" id="h0-0-17" class="i">+        thread_state operator=(const thread_state&amp;);
+</a><a href="#h0-0-18" id="h0-0-18" class="i">+        git_repository *repo_;
+</a><a href="#h0-0-19" id="h0-0-19" class="i">+        friend class searcher;
+</a><a href="#h0-0-20" id="h0-0-20" class="i">+    };
+</a><a href="#h0-0-21" id="h0-0-21" class="i">+
+</a><a href="#h0-0-22" id="h0-0-22" class="i">+    bool operator()(const thread_state &amp;ts, const chunk *chunk) {
+</a>         if (chunk == NULL) {
+             queue_.push(NULL);
+             return true;
+<a href="#h0-1" id="h0-1" class="h">@@ -228,7 +246,7 @@ public:
+</a>                 assert(memchr(match.data(), &#39;\n&#39;, match.size()) == NULL);
+                 StringPiece line = find_line(str, match);
+                 if (utf8::is_valid(line.data(), line.data() + line.size()))
+<a href="#h0-1-3" id="h0-1-3" class="d">-                    find_match(chunk, match, line);
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+                    find_match(chunk, match, line, ts);
+</a>                 new_pos = line.size() + line.data() - str.data() + 1;
+                 assert(new_pos &gt; pos);
+                 pos = new_pos;
+<a href="#h0-2" id="h0-2" class="h">@@ -249,7 +267,10 @@ public:
+</a>     }
+ 
+ protected:
+<a href="#h0-2-3" id="h0-2-3" class="d">-    void find_match (const chunk *chunk, const StringPiece &amp;match, const StringPiece&amp; line) {
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+    void find_match (const chunk *chunk,
+</a><a href="#h0-2-5" id="h0-2-5" class="i">+                     const StringPiece &amp;match,
+</a><a href="#h0-2-6" id="h0-2-6" class="i">+                     const StringPiece&amp; line,
+</a><a href="#h0-2-7" id="h0-2-7" class="i">+                     const thread_state &amp;ts) {
+</a>         timer tm;
+         int off = line.data() - chunk-&gt;data;
+         int lno;
+<a href="#h0-3" id="h0-3" class="h">@@ -261,7 +282,7 @@ protected:
+</a>                 searched++;
+                 if (matches_.load() &gt;= MAX_MATCHES)
+                     break;
+<a href="#h0-3-3" id="h0-3-3" class="d">-                lno = try_match(line, it-&gt;file);
+</a><a href="#h0-3-4" id="h0-3-4" class="i">+                lno = try_match(line, it-&gt;file, ts.repo_);
+</a>                 if (lno &gt; 0) {
+                     found = true;
+                     match_result *m = new match_result({
+<a href="#h0-4" id="h0-4" class="h">@@ -279,7 +300,7 @@ protected:
+</a>                     searched, int(elapsed.tv_sec), int(elapsed.tv_usec));
+     }
+ 
+<a href="#h0-4-3" id="h0-4-3" class="d">-    int try_match(const StringPiece &amp;line, search_file *sf);
+</a><a href="#h0-4-4" id="h0-4-4" class="i">+    int try_match(const StringPiece&amp;, search_file *, git_repository *);
+</a> 
+     static StringPiece find_line(const StringPiece&amp; chunk, const StringPiece&amp; match) {
+         const char *start, *end;
+<a href="#h0-5" id="h0-5" class="h">@@ -347,7 +368,7 @@ int code_searcher::match(RE2&amp; pat) {
+</a> 
+     thread_queue&lt;match_result*&gt; results;
+     searcher search(this, results, pat);
+<a href="#h0-5-3" id="h0-5-3" class="d">-    thread_pool&lt;chunk*, searcher&amp;&gt; pool(threads, search);
+</a><a href="#h0-5-4" id="h0-5-4" class="i">+    thread_pool&lt;chunk*, searcher, searcher::thread_state&gt; pool(threads, search);
+</a> 
+     for (it = alloc_-&gt;begin(); it != alloc_-&gt;end(); it++) {
+         pool.queue(*it);
+<a href="#h0-6" id="h0-6" class="h">@@ -454,10 +475,11 @@ void code_searcher::resolve_ref(smart_object&lt;git_commit&gt; &amp;out, const char *refna
+</a>     }
+ }
+ 
+<a href="#h0-6-3" id="h0-6-3" class="d">-int searcher::try_match(const StringPiece &amp;line, search_file *sf) {
+</a><a href="#h0-6-4" id="h0-6-4" class="i">+int searcher::try_match(const StringPiece &amp;line,
+</a><a href="#h0-6-5" id="h0-6-5" class="i">+                        search_file *sf,
+</a><a href="#h0-6-6" id="h0-6-6" class="i">+                        git_repository *repo) {
+</a>     smart_object&lt;git_blob&gt; blob;
+<a href="#h0-6-8" id="h0-6-8" class="d">-    mutex_locker locked(cc_-&gt;repo_lock_);
+</a><a href="#h0-6-9" id="h0-6-9" class="d">-    git_blob_lookup(blob, cc_-&gt;repo_, &amp;sf-&gt;oid);
+</a><a href="#h0-6-10" id="h0-6-10" class="i">+    git_blob_lookup(blob, repo, &amp;sf-&gt;oid);
+</a>     StringPiece search(static_cast&lt;const char*&gt;(git_blob_rawcontent(blob)),
+                        git_blob_rawsize(blob));
+     StringPiece match;
+<b>diff --git a/<a id="h1" href="../file/codesearch.h">codesearch.h</a> b/<a href="../file/codesearch.h">codesearch.h</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -62,7 +62,6 @@ protected:
+</a>     void update_stats(const char *ref, const string&amp; path, git_blob *blob);
+     void resolve_ref(smart_object&lt;git_commit&gt; &amp;out, const char *refname);
+ 
+<a href="#h1-0-3" id="h1-0-3" class="d">-    mutex repo_lock_;
+</a>     git_repository *repo_;
+     string_hash lines_;
+     struct {
+<b>diff --git a/<a id="h2" href="../file/thread_pool.h">thread_pool.h</a> b/<a href="../file/thread_pool.h">thread_pool.h</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -1,14 +1,7 @@
+</a><a href="#h2-0-0" id="h2-0-0" class="d">-template &lt;class J&gt;
+</a><a href="#h2-0-1" id="h2-0-1" class="d">-struct Apply {
+</a><a href="#h2-0-2" id="h2-0-2" class="d">-    bool operator()(const J&amp; obj)  {
+</a><a href="#h2-0-3" id="h2-0-3" class="d">-        return obj();
+</a><a href="#h2-0-4" id="h2-0-4" class="d">-    }
+</a><a href="#h2-0-5" id="h2-0-5" class="d">-};
+</a><a href="#h2-0-6" id="h2-0-6" class="d">-
+</a><a href="#h2-0-7" id="h2-0-7" class="d">-template &lt;class J, class DoIt = Apply&lt;J&gt; &gt;
+</a><a href="#h2-0-8" id="h2-0-8" class="i">+template &lt;class J, class DoIt, class ThreadState&gt;
+</a> class thread_pool {
+ public:
+<a href="#h2-0-11" id="h2-0-11" class="d">-    thread_pool (int nthreads = 4, const DoIt&amp; fn = DoIt())
+</a><a href="#h2-0-12" id="h2-0-12" class="i">+    thread_pool (int nthreads, DoIt&amp; fn)
+</a>         : nthreads_(nthreads), fn_(fn) {
+         threads_ = new pthread_t[nthreads_];
+         for (int i = 0; i &lt; nthreads; i++) {
+<a href="#h2-1" id="h2-1" class="h">@@ -32,12 +25,13 @@ protected:
+</a>     int nthreads_;
+     pthread_t *threads_;
+     thread_queue&lt;J&gt; queue_;
+<a href="#h2-1-3" id="h2-1-3" class="d">-    const DoIt&amp; fn_;
+</a><a href="#h2-1-4" id="h2-1-4" class="i">+    DoIt&amp; fn_;
+</a> 
+     void worker() {
+<a href="#h2-1-7" id="h2-1-7" class="i">+        ThreadState ts(fn_);
+</a>         while (true) {
+             J job = queue_.pop();
+<a href="#h2-1-10" id="h2-1-10" class="d">-            if (fn_(job))
+</a><a href="#h2-1-11" id="h2-1-11" class="i">+            if (fn_(ts, job))
+</a>                 break;
+         }
+     }
+</pre>
+</div>
+</body>
+</html>

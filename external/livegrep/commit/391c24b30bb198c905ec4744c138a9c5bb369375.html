@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Merge pull request #1 from ternus/fs-scan - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/391c24b30bb198c905ec4744c138a9c5bb369375">391c24b30bb198c905ec4744c138a9c5bb369375</a>
+<b>parent</b> <a href="../commit/c7dcc829ce0919c36a26fa4a14b12030c704c4f4">c7dcc829ce0919c36a26fa4a14b12030c704c4f4</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Thu, 24 Apr 2014 15:47:58 -0600
+
+Merge pull request #1 from ternus/fs-scan
+
+Add option to search filesystem paths as well as git.
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">Makefile</a></td><td> | </td><td class="num">2</td><td><span class="i">+</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">src/Makefrag</a></td><td> | </td><td class="num">2</td><td><span class="i">+</span><span class="d">-</span></td></tr>
+<tr><td class="A">A</td><td><a href="#h2">src/fs_indexer.cc</a></td><td> | </td><td class="num">53</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="A">A</td><td><a href="#h3">src/fs_indexer.h</a></td><td> | </td><td class="num">27</td><td><span class="i">+++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h4">src/tools/interface.cc</a></td><td> | </td><td class="num">34</td><td><span class="i">+++++++++++++++++++++++</span><span class="d">-----------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h5">src/tools/json_interface.cc</a></td><td> | </td><td class="num">42</td><td><span class="i">+++++++++++++++++++++++++++++++</span><span class="d">-----------</span></td></tr>
+</table></pre><pre>6 files changed, 136 insertions(+), 24 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/Makefile">Makefile</a> b/<a href="../file/Makefile">Makefile</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -12,7 +12,7 @@ override LDFLAGS += $(patsubst %, -Wl$(comma)-R%/lib, $(extradirs))
+</a> 
+ override CXXFLAGS+=-g -std=c++0x -Wall -Werror -Wno-sign-compare -pthread
+ override LDFLAGS+=-pthread
+<a href="#h0-0-3" id="h0-0-3" class="d">-LDLIBS=-lgit2 -ljson -lgflags $(libre2)/lib/libre2.a -lz -lssl -lcrypto -ldl
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+LDLIBS=-lgit2 -ljson -lgflags $(libre2)/lib/libre2.a -lz -lssl -lcrypto -ldl -lboost_system -lboost_filesystem
+</a> 
+ ifeq ($(noopt),)
+ override CXXFLAGS+=-O2
+<b>diff --git a/<a id="h1" href="../file/src/Makefrag">src/Makefrag</a> b/<a href="../file/src/Makefrag">src/Makefrag</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -1,3 +1,3 @@
+</a> SRC += src/chunk_allocator.cc src/chunk.cc src/codesearch.cc \
+            src/content.cc src/dump_load.cc src/indexer.cc \
+<a href="#h1-0-2" id="h1-0-2" class="d">-           src/re_width.cc src/git_indexer.cc
+</a><a href="#h1-0-3" id="h1-0-3" class="i">+           src/re_width.cc src/git_indexer.cc src/fs_indexer.cc
+</a><b>diff --git a/<a id="h2" href="../file/src/fs_indexer.cc">src/fs_indexer.cc</a> b/<a href="../file/src/fs_indexer.cc">src/fs_indexer.cc</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -0,0 +1,53 @@
+</a><a href="#h2-0-0" id="h2-0-0" class="i">+#include &lt;gflags/gflags.h&gt;
+</a><a href="#h2-0-1" id="h2-0-1" class="i">+#include &lt;sstream&gt;
+</a><a href="#h2-0-2" id="h2-0-2" class="i">+#include &lt;iostream&gt;
+</a><a href="#h2-0-3" id="h2-0-3" class="i">+
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+#include &quot;codesearch.h&quot;
+</a><a href="#h2-0-5" id="h2-0-5" class="i">+#include &quot;fs_indexer.h&quot;
+</a><a href="#h2-0-6" id="h2-0-6" class="i">+#include &quot;recursion.h&quot;
+</a><a href="#h2-0-7" id="h2-0-7" class="i">+#include &lt;boost/filesystem.hpp&gt;
+</a><a href="#h2-0-8" id="h2-0-8" class="i">+
+</a><a href="#h2-0-9" id="h2-0-9" class="i">+static int kMaxRecursion = 100;
+</a><a href="#h2-0-10" id="h2-0-10" class="i">+
+</a><a href="#h2-0-11" id="h2-0-11" class="i">+using namespace std;
+</a><a href="#h2-0-12" id="h2-0-12" class="i">+namespace fs = boost::filesystem;
+</a><a href="#h2-0-13" id="h2-0-13" class="i">+
+</a><a href="#h2-0-14" id="h2-0-14" class="i">+fs_indexer::fs_indexer(code_searcher *cs,
+</a><a href="#h2-0-15" id="h2-0-15" class="i">+                         const string&amp; name)
+</a><a href="#h2-0-16" id="h2-0-16" class="i">+    : cs_(cs), name_(name) {
+</a><a href="#h2-0-17" id="h2-0-17" class="i">+}
+</a><a href="#h2-0-18" id="h2-0-18" class="i">+
+</a><a href="#h2-0-19" id="h2-0-19" class="i">+fs_indexer::~fs_indexer() {
+</a><a href="#h2-0-20" id="h2-0-20" class="i">+}
+</a><a href="#h2-0-21" id="h2-0-21" class="i">+
+</a><a href="#h2-0-22" id="h2-0-22" class="i">+void fs_indexer::read_file(const string&amp; path) {
+</a><a href="#h2-0-23" id="h2-0-23" class="i">+    // XXX This is a hack.
+</a><a href="#h2-0-24" id="h2-0-24" class="i">+    const string nullref = &quot;None&quot;;
+</a><a href="#h2-0-25" id="h2-0-25" class="i">+    const indexed_repo *dummy_repo = cs_-&gt;open_repo(name_, NULL);
+</a><a href="#h2-0-26" id="h2-0-26" class="i">+    const indexed_tree *dummy_tree = cs_-&gt;open_revision(dummy_repo, nullref);
+</a><a href="#h2-0-27" id="h2-0-27" class="i">+
+</a><a href="#h2-0-28" id="h2-0-28" class="i">+    ifstream in(path.c_str(), ios::in);
+</a><a href="#h2-0-29" id="h2-0-29" class="i">+    cs_-&gt;index_file(dummy_tree, path, StringPiece(static_cast&lt;stringstream const&amp;&gt;(stringstream() &lt;&lt; in.rdbuf()).str().c_str(), fs::file_size(path)));
+</a><a href="#h2-0-30" id="h2-0-30" class="i">+}
+</a><a href="#h2-0-31" id="h2-0-31" class="i">+
+</a><a href="#h2-0-32" id="h2-0-32" class="i">+void fs_indexer::walk(const string&amp; path) {
+</a><a href="#h2-0-33" id="h2-0-33" class="i">+    static int recursion_depth = 0;
+</a><a href="#h2-0-34" id="h2-0-34" class="i">+    RecursionCounter guard(recursion_depth);
+</a><a href="#h2-0-35" id="h2-0-35" class="i">+    if (recursion_depth &gt; kMaxRecursion)
+</a><a href="#h2-0-36" id="h2-0-36" class="i">+        return;
+</a><a href="#h2-0-37" id="h2-0-37" class="i">+    if (!fs::exists(path)) return;
+</a><a href="#h2-0-38" id="h2-0-38" class="i">+    fs::directory_iterator end_itr;
+</a><a href="#h2-0-39" id="h2-0-39" class="i">+    if (fs::is_directory(path)) {
+</a><a href="#h2-0-40" id="h2-0-40" class="i">+        for (fs::directory_iterator itr(path);
+</a><a href="#h2-0-41" id="h2-0-41" class="i">+                itr != end_itr;
+</a><a href="#h2-0-42" id="h2-0-42" class="i">+                ++itr) {
+</a><a href="#h2-0-43" id="h2-0-43" class="i">+            if (fs::is_directory(itr-&gt;status()) ) {
+</a><a href="#h2-0-44" id="h2-0-44" class="i">+                fs_indexer::walk(itr-&gt;path().c_str());
+</a><a href="#h2-0-45" id="h2-0-45" class="i">+            } else if (fs::is_regular_file(itr-&gt;status()) ) {
+</a><a href="#h2-0-46" id="h2-0-46" class="i">+                fs_indexer::read_file(itr-&gt;path().c_str());
+</a><a href="#h2-0-47" id="h2-0-47" class="i">+            }
+</a><a href="#h2-0-48" id="h2-0-48" class="i">+        }
+</a><a href="#h2-0-49" id="h2-0-49" class="i">+    } else if (fs::is_regular_file(path)) {
+</a><a href="#h2-0-50" id="h2-0-50" class="i">+        fs_indexer::read_file(path);
+</a><a href="#h2-0-51" id="h2-0-51" class="i">+    }
+</a><a href="#h2-0-52" id="h2-0-52" class="i">+}
+</a><b>diff --git a/<a id="h3" href="../file/src/fs_indexer.h">src/fs_indexer.h</a> b/<a href="../file/src/fs_indexer.h">src/fs_indexer.h</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -0,0 +1,27 @@
+</a><a href="#h3-0-0" id="h3-0-0" class="i">+/********************************************************************
+</a><a href="#h3-0-1" id="h3-0-1" class="i">+ * livegrep -- fs_indexer.h
+</a><a href="#h3-0-2" id="h3-0-2" class="i">+ * Copyright (c) 2011-2013 Nelson Elhage
+</a><a href="#h3-0-3" id="h3-0-3" class="i">+ *
+</a><a href="#h3-0-4" id="h3-0-4" class="i">+ * This program is free software. You may use, redistribute, and/or
+</a><a href="#h3-0-5" id="h3-0-5" class="i">+ * modify it under the terms listed in the COPYING file.
+</a><a href="#h3-0-6" id="h3-0-6" class="i">+ ********************************************************************/
+</a><a href="#h3-0-7" id="h3-0-7" class="i">+#ifndef CODESEARCH_FS_INDEXER_H
+</a><a href="#h3-0-8" id="h3-0-8" class="i">+#define CODESEARCH_FS_INDEXER_H
+</a><a href="#h3-0-9" id="h3-0-9" class="i">+
+</a><a href="#h3-0-10" id="h3-0-10" class="i">+#include &lt;string&gt;
+</a><a href="#h3-0-11" id="h3-0-11" class="i">+
+</a><a href="#h3-0-12" id="h3-0-12" class="i">+class code_searcher;
+</a><a href="#h3-0-13" id="h3-0-13" class="i">+
+</a><a href="#h3-0-14" id="h3-0-14" class="i">+class fs_indexer {
+</a><a href="#h3-0-15" id="h3-0-15" class="i">+public:
+</a><a href="#h3-0-16" id="h3-0-16" class="i">+    fs_indexer(code_searcher *cs,
+</a><a href="#h3-0-17" id="h3-0-17" class="i">+                             const string&amp; name);
+</a><a href="#h3-0-18" id="h3-0-18" class="i">+    ~fs_indexer();
+</a><a href="#h3-0-19" id="h3-0-19" class="i">+    void read_file(const std::string&amp; path);
+</a><a href="#h3-0-20" id="h3-0-20" class="i">+    void walk(const std::string&amp; path);
+</a><a href="#h3-0-21" id="h3-0-21" class="i">+protected:
+</a><a href="#h3-0-22" id="h3-0-22" class="i">+    code_searcher *cs_;
+</a><a href="#h3-0-23" id="h3-0-23" class="i">+    std::string name_;
+</a><a href="#h3-0-24" id="h3-0-24" class="i">+};
+</a><a href="#h3-0-25" id="h3-0-25" class="i">+
+</a><a href="#h3-0-26" id="h3-0-26" class="i">+#endif
+</a><b>diff --git a/<a id="h4" href="../file/src/tools/interface.cc">src/tools/interface.cc</a> b/<a href="../file/src/tools/interface.cc">src/tools/interface.cc</a></b>
+<a href="#h4-0" id="h4-0" class="h">@@ -1,9 +1,13 @@
+</a> #include &quot;codesearch.h&quot;
+ #include &quot;git_indexer.h&quot;
+<a href="#h4-0-2" id="h4-0-2" class="i">+#include &quot;fs_indexer.h&quot;
+</a> #include &quot;interface.h&quot;
+ #include &quot;interface-impl.h&quot;
+ 
+ #include &lt;stdarg.h&gt;
+<a href="#h4-0-7" id="h4-0-7" class="i">+#include &lt;gflags/gflags.h&gt;
+</a><a href="#h4-0-8" id="h4-0-8" class="i">+
+</a><a href="#h4-0-9" id="h4-0-9" class="i">+DEFINE_bool(filesystem, false, &quot;Analyze a filesystem tree instead of a git repo.&quot;);
+</a> 
+ bool getline(std::string &amp;out, FILE *in) {
+     char *line = 0;
+<a href="#h4-1" id="h4-1" class="h">@@ -59,21 +63,29 @@ public:
+</a> 
+     virtual void build_index(code_searcher *cs, const vector&lt;std::string&gt; &amp;argv) {
+         if (argv.size() &lt; 2) {
+<a href="#h4-1-3" id="h4-1-3" class="d">-            print_error(&quot;Usage: &quot; + argv[0] + &quot; [OPTIONS] REPOSPEC...&quot;);
+</a><a href="#h4-1-4" id="h4-1-4" class="i">+            print_error(&quot;Usage: &quot; + argv[0] + &quot; [OPTIONS] &lt;REPOSPEC [...] | -filesystem PATH [...]&gt;&quot;);
+</a>             exit(1);
+         }
+<a href="#h4-1-7" id="h4-1-7" class="d">-        for (auto it = argv.begin(); it != argv.end(); ++it) {
+</a><a href="#h4-1-8" id="h4-1-8" class="i">+        for (auto it = ++argv.begin(); it != argv.end(); ++it) {
+</a>             const std::string &amp;arg = *it;
+<a href="#h4-1-10" id="h4-1-10" class="d">-            parse_spec parsed = parse_walk_spec(arg);
+</a><a href="#h4-1-11" id="h4-1-11" class="d">-            this-&gt;info(&quot;Walking `%s&#39; (name: %s, path: %s)...\n&quot;,
+</a><a href="#h4-1-12" id="h4-1-12" class="d">-                       arg.c_str(),
+</a><a href="#h4-1-13" id="h4-1-13" class="d">-                       parsed.name.c_str(),
+</a><a href="#h4-1-14" id="h4-1-14" class="d">-                       parsed.path.c_str());
+</a><a href="#h4-1-15" id="h4-1-15" class="d">-            git_indexer indexer(cs, parsed.path, parsed.name);
+</a><a href="#h4-1-16" id="h4-1-16" class="d">-            for (auto it = parsed.revs.begin(); it != parsed.revs.end(); ++it) {
+</a><a href="#h4-1-17" id="h4-1-17" class="d">-                this-&gt;info(&quot;  %s...&quot;, it-&gt;c_str());
+</a><a href="#h4-1-18" id="h4-1-18" class="d">-                indexer.walk(*it);
+</a><a href="#h4-1-19" id="h4-1-19" class="i">+            if (FLAGS_filesystem) {
+</a><a href="#h4-1-20" id="h4-1-20" class="i">+                this-&gt;info(&quot;Walking `%s&#39;...\n&quot;,
+</a><a href="#h4-1-21" id="h4-1-21" class="i">+                           arg.c_str());
+</a><a href="#h4-1-22" id="h4-1-22" class="i">+                fs_indexer indexer(cs, arg.c_str());
+</a><a href="#h4-1-23" id="h4-1-23" class="i">+                indexer.walk(arg);
+</a>                 this-&gt;info(&quot;done\n&quot;);
+<a href="#h4-1-25" id="h4-1-25" class="i">+            } else {
+</a><a href="#h4-1-26" id="h4-1-26" class="i">+                parse_spec parsed = parse_walk_spec(arg);
+</a><a href="#h4-1-27" id="h4-1-27" class="i">+                this-&gt;info(&quot;Walking `%s&#39; (name: %s, path: %s)...\n&quot;,
+</a><a href="#h4-1-28" id="h4-1-28" class="i">+                           arg.c_str(),
+</a><a href="#h4-1-29" id="h4-1-29" class="i">+                           parsed.name.c_str(),
+</a><a href="#h4-1-30" id="h4-1-30" class="i">+                           parsed.path.c_str());
+</a><a href="#h4-1-31" id="h4-1-31" class="i">+                git_indexer indexer(cs, parsed.path, parsed.name);
+</a><a href="#h4-1-32" id="h4-1-32" class="i">+                for (auto it = parsed.revs.begin(); it != parsed.revs.end(); ++it) {
+</a><a href="#h4-1-33" id="h4-1-33" class="i">+                    this-&gt;info(&quot;  %s...&quot;, it-&gt;c_str());
+</a><a href="#h4-1-34" id="h4-1-34" class="i">+                    indexer.walk(*it);
+</a><a href="#h4-1-35" id="h4-1-35" class="i">+                    this-&gt;info(&quot;done\n&quot;);
+</a><a href="#h4-1-36" id="h4-1-36" class="i">+                }
+</a>             }
+         }
+     }
+<b>diff --git a/<a id="h5" href="../file/src/tools/json_interface.cc">src/tools/json_interface.cc</a> b/<a href="../file/src/tools/json_interface.cc">src/tools/json_interface.cc</a></b>
+<a href="#h5-0" id="h5-0" class="h">@@ -2,6 +2,7 @@
+</a> #include &quot;interface.h&quot;
+ #include &quot;debug.h&quot;
+ #include &quot;git_indexer.h&quot;
+<a href="#h5-0-3" id="h5-0-3" class="i">+#include &quot;fs_indexer.h&quot;
+</a> #include &quot;interface-impl.h&quot;
+ 
+ #include &lt;json/json.h&gt;
+<a href="#h5-1" id="h5-1" class="h">@@ -245,18 +246,37 @@ public:
+</a>         if (json_object_is_type(name, json_type_string))
+             cs-&gt;set_name(json_object_get_string(name));
+ 
+<a href="#h5-1-3" id="h5-1-3" class="i">+        string path;
+</a><a href="#h5-1-4" id="h5-1-4" class="i">+        json_object *js_paths = json_object_object_get(obj, &quot;fs_paths&quot;);
+</a><a href="#h5-1-5" id="h5-1-5" class="i">+        if (js_paths &amp;&amp; json_object_is_type(js_paths, json_type_array)) {
+</a><a href="#h5-1-6" id="h5-1-6" class="i">+            for (int i = 0; i &lt; json_object_array_length(js_paths); ++i) {
+</a><a href="#h5-1-7" id="h5-1-7" class="i">+                json_object *elt = json_object_array_get_idx(js_paths, i);
+</a><a href="#h5-1-8" id="h5-1-8" class="i">+                if (json_object_is_type(elt, json_type_string)) {
+</a><a href="#h5-1-9" id="h5-1-9" class="i">+                    path = json_object_get_string(elt);
+</a><a href="#h5-1-10" id="h5-1-10" class="i">+                    debug(kDebugUI, &quot;Walking `%s&#39;...\n&quot;,
+</a><a href="#h5-1-11" id="h5-1-11" class="i">+                        path.c_str());
+</a><a href="#h5-1-12" id="h5-1-12" class="i">+                    fs_indexer indexer(cs, path);
+</a><a href="#h5-1-13" id="h5-1-13" class="i">+                    indexer.walk(path);
+</a><a href="#h5-1-14" id="h5-1-14" class="i">+                    debug(kDebugUI, &quot;done\n&quot;);
+</a><a href="#h5-1-15" id="h5-1-15" class="i">+                }
+</a><a href="#h5-1-16" id="h5-1-16" class="i">+            }
+</a><a href="#h5-1-17" id="h5-1-17" class="i">+        }
+</a><a href="#h5-1-18" id="h5-1-18" class="i">+
+</a>         vector&lt;repo_spec&gt; repos;
+<a href="#h5-1-20" id="h5-1-20" class="d">-        extract_repo_specs(repos, json_object_object_get(obj, &quot;repositories&quot;));
+</a><a href="#h5-1-21" id="h5-1-21" class="d">-        json_object_put(obj);
+</a><a href="#h5-1-22" id="h5-1-22" class="d">-
+</a><a href="#h5-1-23" id="h5-1-23" class="d">-        for (auto it = repos.begin(); it != repos.end(); ++it) {
+</a><a href="#h5-1-24" id="h5-1-24" class="d">-            debug(kDebugUI, &quot;Walking name=%s, path=%s&quot;,
+</a><a href="#h5-1-25" id="h5-1-25" class="d">-                  it-&gt;name.c_str(), it-&gt;path.c_str());
+</a><a href="#h5-1-26" id="h5-1-26" class="d">-            git_indexer indexer(cs, it-&gt;path, it-&gt;name, it-&gt;metadata);
+</a><a href="#h5-1-27" id="h5-1-27" class="d">-            for (auto rev = it-&gt;revisions.begin();
+</a><a href="#h5-1-28" id="h5-1-28" class="d">-                 rev != it-&gt;revisions.end(); ++rev) {
+</a><a href="#h5-1-29" id="h5-1-29" class="d">-                debug(kDebugUI, &quot;  walking %s..&quot;, rev-&gt;c_str());
+</a><a href="#h5-1-30" id="h5-1-30" class="d">-                indexer.walk(*rev);
+</a><a href="#h5-1-31" id="h5-1-31" class="i">+        json_object *repo_spec = json_object_object_get(obj, &quot;repositories&quot;);
+</a><a href="#h5-1-32" id="h5-1-32" class="i">+        if (repo_spec) {
+</a><a href="#h5-1-33" id="h5-1-33" class="i">+            extract_repo_specs(repos, repo_spec);
+</a><a href="#h5-1-34" id="h5-1-34" class="i">+            json_object_put(obj);
+</a><a href="#h5-1-35" id="h5-1-35" class="i">+
+</a><a href="#h5-1-36" id="h5-1-36" class="i">+            for (auto it = repos.begin(); it != repos.end(); ++it) {
+</a><a href="#h5-1-37" id="h5-1-37" class="i">+                debug(kDebugUI, &quot;Walking name=%s, path=%s&quot;,
+</a><a href="#h5-1-38" id="h5-1-38" class="i">+                      it-&gt;name.c_str(), it-&gt;path.c_str());
+</a><a href="#h5-1-39" id="h5-1-39" class="i">+                git_indexer indexer(cs, it-&gt;path, it-&gt;name, it-&gt;metadata);
+</a><a href="#h5-1-40" id="h5-1-40" class="i">+                for (auto rev = it-&gt;revisions.begin();
+</a><a href="#h5-1-41" id="h5-1-41" class="i">+                     rev != it-&gt;revisions.end(); ++rev) {
+</a><a href="#h5-1-42" id="h5-1-42" class="i">+                    debug(kDebugUI, &quot;  walking %s..&quot;, rev-&gt;c_str());
+</a><a href="#h5-1-43" id="h5-1-43" class="i">+                    indexer.walk(*rev);
+</a><a href="#h5-1-44" id="h5-1-44" class="i">+                }
+</a>             }
+         }
+     }
+</pre>
+</div>
+</body>
+</html>

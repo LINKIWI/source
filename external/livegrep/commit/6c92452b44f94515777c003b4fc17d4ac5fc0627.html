@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Port trees_ and files_ to unique_ptr - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/6c92452b44f94515777c003b4fc17d4ac5fc0627">6c92452b44f94515777c003b4fc17d4ac5fc0627</a>
+<b>parent</b> <a href="../commit/f7d4a02e79975e858e3df8452e527f7608a5eadb">f7d4a02e79975e858e3df8452e527f7608a5eadb</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Tue,  7 Aug 2018 15:32:02 +0000
+
+Port trees_ and files_ to unique_ptr
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">src/codesearch.cc</a></td><td> | </td><td class="num">31</td><td><span class="i">++++++++++++++</span><span class="d">-----------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">src/codesearch.h</a></td><td> | </td><td class="num">8</td><td><span class="i">++++</span><span class="d">----</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">src/dump_load.cc</a></td><td> | </td><td class="num">20</td><td><span class="i">++++++++++</span><span class="d">----------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">src/tagsearch.cc</a></td><td> | </td><td class="num">2</td><td><span class="i">+</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h4">src/tools/dump-file.cc</a></td><td> | </td><td class="num">2</td><td><span class="i">+</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h5">test/codesearch_test.cc</a></td><td> | </td><td class="num">4</td><td><span class="i">++</span><span class="d">--</span></td></tr>
+</table></pre><pre>6 files changed, 32 insertions(+), 35 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/src/codesearch.cc">src/codesearch.cc</a> b/<a href="../file/src/codesearch.cc">src/codesearch.cc</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -273,7 +273,7 @@ protected:
+</a>         int hits = 0;
+         int sample = min(1000, int(cc_-&gt;files_.size()));
+         for (int i = 0; i &lt; sample; i++) {
+<a href="#h0-0-3" id="h0-0-3" class="d">-            if (accept(query_, cc_-&gt;files_[rand() % cc_-&gt;files_.size()]))
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+            if (accept(query_, cc_-&gt;files_[rand() % cc_-&gt;files_.size()].get()))
+</a>                 hits++;
+         }
+         return (files_density_ = double(hits) / sample);
+<a href="#h0-1" id="h0-1" class="h">@@ -411,7 +411,7 @@ void filename_searcher::operator()()
+</a>             if (limiter_.exit_early()) {
+                 return;
+             }
+<a href="#h0-1-3" id="h0-1-3" class="d">-            match_filename(*it);
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+            match_filename(it-&gt;get());
+</a>         }
+         return;
+     }
+<a href="#h0-2" id="h0-2" class="h">@@ -484,15 +484,12 @@ code_searcher::~code_searcher() {
+</a>     if (alloc_)
+         alloc_-&gt;cleanup();
+ 
+<a href="#h0-2-3" id="h0-2-3" class="d">-    for (auto tree : trees_) {
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+    for (auto &amp;tree : trees_) {
+</a>         if (tree-&gt;metadata != NULL) {
+             json_object_put(tree-&gt;metadata);
+         }
+<a href="#h0-2-8" id="h0-2-8" class="d">-        delete tree;
+</a><a href="#h0-2-9" id="h0-2-9" class="d">-    }
+</a><a href="#h0-2-10" id="h0-2-10" class="d">-    for (auto file : files_) {
+</a><a href="#h0-2-11" id="h0-2-11" class="d">-        delete file;
+</a>     }
+<a href="#h0-2-13" id="h0-2-13" class="i">+
+</a>     if (filename_data_ != NULL) {
+         delete[] filename_data_;
+     }
+<a href="#h0-3" id="h0-3" class="h">@@ -515,7 +512,7 @@ void code_searcher::index_filenames() {
+</a>     for (auto it = files_.begin(); it != files_.end(); ++it) {
+         memcpy(filename_data_ + offset, (*it)-&gt;path.data(), (*it)-&gt;path.size());
+         filename_data_[offset + (*it)-&gt;path.size()] = &#39;\0&#39;;
+<a href="#h0-3-3" id="h0-3-3" class="d">-        filename_positions_.emplace_back(offset, *it);
+</a><a href="#h0-3-4" id="h0-3-4" class="i">+        filename_positions_.emplace_back(offset, it-&gt;get());
+</a>         offset += (*it)-&gt;path.size() + 1;
+     }
+ 
+<a href="#h0-4" id="h0-4" class="h">@@ -549,7 +546,7 @@ vector&lt;indexed_tree&gt; code_searcher::trees() const {
+</a> const indexed_tree* code_searcher::open_tree(const string &amp;name,
+                                              json_object *metadata,
+                                              const string &amp;version) {
+<a href="#h0-4-3" id="h0-4-3" class="d">-    indexed_tree *tree = new indexed_tree;
+</a><a href="#h0-4-4" id="h0-4-4" class="i">+    auto tree = std::make_unique&lt;indexed_tree&gt;();
+</a>     tree-&gt;name = name;
+     tree-&gt;version = version;
+     if (metadata) {
+<a href="#h0-5" id="h0-5" class="h">@@ -557,8 +554,8 @@ const indexed_tree* code_searcher::open_tree(const string &amp;name,
+</a>     } else {
+         tree-&gt;metadata = NULL;
+     }
+<a href="#h0-5-3" id="h0-5-3" class="d">-    trees_.push_back(tree);
+</a><a href="#h0-5-4" id="h0-5-4" class="d">-    return tree;
+</a><a href="#h0-5-5" id="h0-5-5" class="i">+    trees_.push_back(move(tree));
+</a><a href="#h0-5-6" id="h0-5-6" class="i">+    return trees_.back().get();
+</a> }
+ 
+ void code_searcher::index_file(const indexed_tree *tree,
+<a href="#h0-6" id="h0-6" class="h">@@ -581,15 +578,15 @@ void code_searcher::index_file(const indexed_tree *tree,
+</a>     idx_bytes.inc(len);
+     idx_files.inc();
+ 
+<a href="#h0-6-3" id="h0-6-3" class="d">-    indexed_file *sf = new indexed_file;
+</a><a href="#h0-6-4" id="h0-6-4" class="d">-    sf-&gt;tree = tree;
+</a><a href="#h0-6-5" id="h0-6-5" class="d">-    sf-&gt;path = path;
+</a><a href="#h0-6-6" id="h0-6-6" class="d">-    sf-&gt;no  = files_.size();
+</a><a href="#h0-6-7" id="h0-6-7" class="d">-    files_.push_back(sf);
+</a><a href="#h0-6-8" id="h0-6-8" class="i">+    auto file = std::make_unique&lt;indexed_file&gt;();
+</a><a href="#h0-6-9" id="h0-6-9" class="i">+    file-&gt;tree = tree;
+</a><a href="#h0-6-10" id="h0-6-10" class="i">+    file-&gt;path = path;
+</a><a href="#h0-6-11" id="h0-6-11" class="i">+    file-&gt;no  = files_.size();
+</a><a href="#h0-6-12" id="h0-6-12" class="i">+    auto *sf = file.get();
+</a><a href="#h0-6-13" id="h0-6-13" class="i">+    files_.push_back(move(file));
+</a> 
+     uint32_t lines = count(p, end, &#39;\n&#39;);
+ 
+<a href="#h0-6-17" id="h0-6-17" class="d">-    // sf-&gt;content = new(new uint32_t[3*lines+1]) file_contents(0);
+</a>     file_contents_builder content;
+ 
+     while ((f = static_cast&lt;const char*&gt;(memchr(p, &#39;\n&#39;, end - p))) != 0) {
+<b>diff --git a/<a id="h1" href="../file/src/codesearch.h">src/codesearch.h</a> b/<a href="../file/src/codesearch.h">src/codesearch.h</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -173,10 +173,10 @@ public:
+</a>         name_ = name;
+     }
+ 
+<a href="#h1-0-3" id="h1-0-3" class="d">-    vector&lt;indexed_file*&gt;::const_iterator begin_files() {
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+    vector&lt;std::unique_ptr&lt;indexed_file&gt;&gt;::const_iterator begin_files() {
+</a>         return files_.begin();
+     }
+<a href="#h1-0-7" id="h1-0-7" class="d">-    vector&lt;indexed_file*&gt;::const_iterator end_files() {
+</a><a href="#h1-0-8" id="h1-0-8" class="i">+    vector&lt;std::unique_ptr&lt;indexed_file&gt;&gt;::const_iterator end_files() {
+</a>         return files_.end();
+     }
+ 
+<a href="#h1-1" id="h1-1" class="h">@@ -256,8 +256,8 @@ protected:
+</a>     // pairs (i, file), where file-&gt;path starts at filename_data_[i]
+     vector&lt;pair&lt;int, indexed_file*&gt;&gt; filename_positions_;
+ 
+<a href="#h1-1-3" id="h1-1-3" class="d">-    vector&lt;indexed_tree*&gt; trees_;
+</a><a href="#h1-1-4" id="h1-1-4" class="d">-    vector&lt;indexed_file*&gt; files_;
+</a><a href="#h1-1-5" id="h1-1-5" class="i">+    vector&lt;std::unique_ptr&lt;indexed_tree&gt;&gt; trees_;
+</a><a href="#h1-1-6" id="h1-1-6" class="i">+    vector&lt;std::unique_ptr&lt;indexed_file&gt;&gt; files_;
+</a> 
+ private:
+     void index_filenames();
+<b>diff --git a/<a id="h2" href="../file/src/dump_load.cc">src/dump_load.cc</a> b/<a href="../file/src/dump_load.cc">src/dump_load.cc</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -214,7 +214,7 @@ protected:
+</a>         p_ = static_cast&lt;uint8_t*&gt;(map_) + off;
+     }
+ 
+<a href="#h2-0-3" id="h2-0-3" class="d">-    indexed_file *load_file(code_searcher *cs);
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+    std::unique_ptr&lt;indexed_file&gt; load_file(code_searcher *cs);
+</a>     void load_chunk(code_searcher *);
+ 
+     uint32_t load_int32() {
+<a href="#h2-1" id="h2-1" class="h">@@ -303,12 +303,12 @@ void codesearch_index::dump_metadata() {
+</a>             dump_string(json_object_to_json_string((*it)-&gt;metadata));
+         else
+             dump_string(&quot;&quot;);
+<a href="#h2-1-3" id="h2-1-3" class="d">-        tree_ids[*it] = it - cs_-&gt;trees_.begin();
+</a><a href="#h2-1-4" id="h2-1-4" class="i">+        tree_ids[it-&gt;get()] = it - cs_-&gt;trees_.begin();
+</a>     }
+     hdr_.files_off = stream_.tellp();
+<a href="#h2-1-7" id="h2-1-7" class="d">-    for (vector&lt;indexed_file*&gt;::iterator it = cs_-&gt;files_.begin();
+</a><a href="#h2-1-8" id="h2-1-8" class="i">+    for (auto it = cs_-&gt;files_.begin();
+</a>          it != cs_-&gt;files_.end(); ++it)
+<a href="#h2-1-10" id="h2-1-10" class="d">-        dump_file(tree_ids, *it);
+</a><a href="#h2-1-11" id="h2-1-11" class="i">+        dump_file(tree_ids, it-&gt;get());
+</a> 
+     auto hdr = chunks_.begin();
+     for (auto it = cs_-&gt;alloc_-&gt;begin();
+<a href="#h2-2" id="h2-2" class="h">@@ -391,9 +391,9 @@ chunk *load_allocator::alloc_chunk() {
+</a>     return new chunk(data, indexes);
+ }
+ 
+<a href="#h2-2-3" id="h2-2-3" class="d">-indexed_file *load_allocator::load_file(code_searcher *cs) {
+</a><a href="#h2-2-4" id="h2-2-4" class="d">-    indexed_file *sf = new indexed_file;
+</a><a href="#h2-2-5" id="h2-2-5" class="d">-    sf-&gt;tree = cs-&gt;trees_[load_int32()];
+</a><a href="#h2-2-6" id="h2-2-6" class="i">+unique_ptr&lt;indexed_file&gt; load_allocator::load_file(code_searcher *cs) {
+</a><a href="#h2-2-7" id="h2-2-7" class="i">+    auto sf = std::make_unique&lt;indexed_file&gt;();
+</a><a href="#h2-2-8" id="h2-2-8" class="i">+    sf-&gt;tree = cs-&gt;trees_[load_int32()].get();
+</a>     sf-&gt;path = load_string();
+     sf-&gt;no = cs-&gt;files_.size();
+     return sf;
+<a href="#h2-3" id="h2-3" class="h">@@ -413,7 +413,7 @@ void load_allocator::load_chunk(code_searcher *cs) {
+</a>         chunk_file &amp;cf = chunk-&gt;files.back();
+         uint32_t nfiles = load_int32();
+         for (int j = 0; j &lt; nfiles; j++)
+<a href="#h2-3-3" id="h2-3-3" class="d">-            cf.files.push_back(cs-&gt;files_[load_int32()]);
+</a><a href="#h2-3-4" id="h2-3-4" class="i">+            cf.files.push_back(cs-&gt;files_[load_int32()].get());
+</a>         cf.left  = load_int32();
+         cf.right = load_int32();
+     }
+<a href="#h2-4" id="h2-4" class="h">@@ -434,7 +434,7 @@ void load_allocator::load(code_searcher *cs) {
+</a> 
+     p_ = ptr&lt;uint8_t&gt;(hdr_-&gt;refs_off);
+     for (int i = 0; i &lt; hdr_-&gt;ntrees; i++) {
+<a href="#h2-4-3" id="h2-4-3" class="d">-        indexed_tree *tree = new indexed_tree;
+</a><a href="#h2-4-4" id="h2-4-4" class="i">+        auto tree = std::make_unique&lt;indexed_tree&gt;();
+</a>         tree-&gt;name = load_string();
+         tree-&gt;version = load_string();
+         string metadata = load_string();
+<a href="#h2-5" id="h2-5" class="h">@@ -446,7 +446,7 @@ void load_allocator::load(code_searcher *cs) {
+</a>             tree-&gt;metadata = js;
+         }
+ 
+<a href="#h2-5-3" id="h2-5-3" class="d">-        cs-&gt;trees_.push_back(tree);
+</a><a href="#h2-5-4" id="h2-5-4" class="i">+        cs-&gt;trees_.push_back(move(tree));
+</a>     }
+ 
+     p_ = ptr&lt;uint8_t&gt;(hdr_-&gt;files_off);
+<b>diff --git a/<a id="h3" href="../file/src/tagsearch.cc">src/tagsearch.cc</a> b/<a href="../file/src/tagsearch.cc">src/tagsearch.cc</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -52,7 +52,7 @@ std::string create_tag_line_regex(
+</a> void tag_searcher::cache_indexed_files(code_searcher* cs) {
+     file_alloc_ = cs-&gt;alloc_.get();
+     for (auto it = cs-&gt;begin_files(); it != cs-&gt;end_files(); ++it) {
+<a href="#h3-0-3" id="h3-0-3" class="d">-        auto file = *it;
+</a><a href="#h3-0-4" id="h3-0-4" class="i">+        auto file = it-&gt;get();
+</a>         auto key = path(file-&gt;tree-&gt;name) / path(file-&gt;path);
+         path_to_file_map_.insert(std::make_pair(key.string(), file));
+     }
+<b>diff --git a/<a id="h4" href="../file/src/tools/dump-file.cc">src/tools/dump-file.cc</a> b/<a href="../file/src/tools/dump-file.cc">src/tools/dump-file.cc</a></b>
+<a href="#h4-0" id="h4-0" class="h">@@ -34,7 +34,7 @@ int dump_file(int argc, char **argv) {
+</a> 
+     for (auto it = cs.begin_files(); it != cs.end_files(); ++it) {
+         if ((*it)-&gt;path == path) {
+<a href="#h4-0-3" id="h4-0-3" class="d">-            dump_file(&amp;cs, *it);
+</a><a href="#h4-0-4" id="h4-0-4" class="i">+            dump_file(&amp;cs, it-&gt;get());
+</a>             return 0;
+         }
+     }
+<b>diff --git a/<a id="h5" href="../file/test/codesearch_test.cc">test/codesearch_test.cc</a> b/<a href="../file/test/codesearch_test.cc">test/codesearch_test.cc</a></b>
+<a href="#h5-0" id="h5-0" class="h">@@ -26,7 +26,7 @@ TEST_F(codesearch_test, IndexTest) {
+</a> 
+     EXPECT_EQ(1, cs_.end_files() - cs_.begin_files());
+ 
+<a href="#h5-0-3" id="h5-0-3" class="d">-    indexed_file *f = *cs_.begin_files();
+</a><a href="#h5-0-4" id="h5-0-4" class="i">+    indexed_file *f = cs_.begin_files()-&gt;get();
+</a>     EXPECT_EQ(&quot;/data/file1&quot;, f-&gt;path);
+     EXPECT_EQ(tree_, f-&gt;tree);
+ 
+<a href="#h5-1" id="h5-1" class="h">@@ -61,7 +61,7 @@ TEST_F(codesearch_test, NoTrailingNewLine) {
+</a> 
+     EXPECT_EQ(1, cs_.end_files() - cs_.begin_files());
+ 
+<a href="#h5-1-3" id="h5-1-3" class="d">-    indexed_file *f = *cs_.begin_files();
+</a><a href="#h5-1-4" id="h5-1-4" class="i">+    indexed_file *f = cs_.begin_files()-&gt;get();
+</a>     EXPECT_EQ(&quot;/data/file1&quot;, f-&gt;path);
+     EXPECT_EQ(tree_, f-&gt;tree);
+ 
+</pre>
+</div>
+</body>
+</html>

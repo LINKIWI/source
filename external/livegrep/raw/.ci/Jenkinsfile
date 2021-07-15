@@ -1,0 +1,49 @@
+pipeline {
+    agent {
+        docker {
+            image 'docker.internal.kevinlin.info/infra/ci-base:0.3.4'
+            label 'docker-executor'
+        }
+    }
+
+    options {
+        withAWS(
+            endpointUrl: 'https://storage.kevinlin.info',
+            credentials: 'storage-internal',
+        )
+    }
+
+    stages {
+        stage('Build') {
+            steps {
+                sh 'bazel build //...'
+            }
+        }
+        stage('Test') {
+            steps {
+                sh 'bazel test //...'
+            }
+        }
+        stage('Release') {
+            steps {
+                sh 'mkdir -p release/bin/'
+                sh 'cp bazel-bin/src/tools/codesearch release/bin/'
+                sh 'cp bazel-bin/src/tools/codesearchtool release/bin/'
+                sh 'cp bazel-bin/cmd/lg/lg_/lg release/bin/'
+                sh 'cp bazel-bin/cmd/livegrep/livegrep_/livegrep release/bin/'
+                sh 'cp -r bazel-bin/cmd/livegrep/livegrep_/livegrep.runfiles/ release/bin/'
+                sh 'cp bazel-bin/cmd/livegrep-fetch-reindex/livegrep-fetch-reindex_/livegrep-fetch-reindex release/bin/'
+                sh 'cp bazel-bin/cmd/livegrep-github-reindex/livegrep-github-reindex_/livegrep-github-reindex release/bin/'
+                sh 'cp bazel-bin/cmd/livegrep-index-builder/livegrep-index-builder_/livegrep-index-builder release/bin/'
+                sh 'cp bazel-bin/cmd/livegrep-metrics-exporter/livegrep-metrics-exporter_/livegrep-metrics-exporter release/bin/'
+                sh 'cp bazel-bin/cmd/livegrep-reload/livegrep-reload_/livegrep-reload release/bin/'
+                sh 'tar -C release -hcvzf release.tar.gz ./'
+                s3Upload(
+                    bucket: 'internal',
+                    path: "deploy/external/livegrep/${env.GIT_COMMIT}/",
+                    file: 'release.tar.gz',
+                )
+            }
+        }
+    }
+}

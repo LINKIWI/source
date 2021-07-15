@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Redirect /help to main search page - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/f3bbdb40eec65c06ed3154b1f0d1cf189d2d7b2e">f3bbdb40eec65c06ed3154b1f0d1cf189d2d7b2e</a>
+<b>parent</b> <a href="../commit/a563ec2eb2eab07fc1d951794a1adbac34418618">a563ec2eb2eab07fc1d951794a1adbac34418618</a>
+<b>Author:</b> Josiah Boning &lt;<a href="mailto:josiah@dropbox.com">josiah@dropbox.com</a>&gt;
+<b>Date:</b>   Thu, 24 Aug 2017 19:54:49 +0000
+
+Redirect /help to main search page
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">server/server.go</a></td><td> | </td><td class="num">29</td><td><span class="i">+++++++++</span><span class="d">--------------------</span></td></tr>
+<tr><td class="D">D</td><td><a href="#h1">web/templates/help.html</a></td><td> | </td><td class="num">139</td><td><span class="i"></span><span class="d">-------------------------------------------------------------------------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">web/templates/index.html</a></td><td> | </td><td class="num">4</td><td><span class="i">++</span><span class="d">--</span></td></tr>
+</table></pre><pre>3 files changed, 11 insertions(+), 161 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/server/server.go">server/server.go</a> b/<a href="../file/server/server.go">server/server.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -24,8 +24,7 @@ type Templates struct {
+</a> 	Layout,
+ 	Index,
+ 	FileView,
+<a href="#h0-0-3" id="h0-0-3" class="d">-	About,
+</a><a href="#h0-0-4" id="h0-0-4" class="d">-	Help *template.Template
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+	About *template.Template
+</a> 	OpenSearch *texttemplate.Template `template:&quot;opensearch.xml&quot;`
+ }
+ 
+<a href="#h0-1" id="h0-1" class="h">@@ -58,6 +57,7 @@ func (s *server) ServeRoot(ctx context.Context, w http.ResponseWriter, r *http.R
+</a> func (s *server) ServeSearch(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+ 	urls := make(map[string]map[string]string, len(s.bk))
+ 	backends := make([]*Backend, 0, len(s.bk))
+<a href="#h0-1-3" id="h0-1-3" class="i">+	sampleRepo := &quot;&quot;
+</a> 	for _, bkId := range s.bkOrder {
+ 		bk := s.bk[bkId]
+ 		backends = append(backends, bk)
+<a href="#h0-2" id="h0-2" class="h">@@ -65,6 +65,9 @@ func (s *server) ServeSearch(ctx context.Context, w http.ResponseWriter, r *http
+</a> 		m := make(map[string]string, len(bk.I.Trees))
+ 		urls[bk.Id] = m
+ 		for _, r := range bk.I.Trees {
+<a href="#h0-2-3" id="h0-2-3" class="i">+			if sampleRepo == &quot;&quot; {
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+				sampleRepo = r.Name
+</a><a href="#h0-2-5" id="h0-2-5" class="i">+			}
+</a> 			m[r.Name] = r.Url
+ 		}
+ 		bk.I.Unlock()
+<a href="#h0-3" id="h0-3" class="h">@@ -73,7 +76,8 @@ func (s *server) ServeSearch(ctx context.Context, w http.ResponseWriter, r *http
+</a> 		RepoUrls          map[string]map[string]string
+ 		InternalViewRepos map[string]config.RepoConfig
+ 		Backends          []*Backend
+<a href="#h0-3-3" id="h0-3-3" class="d">-	}{urls, s.repos, backends}
+</a><a href="#h0-3-4" id="h0-3-4" class="i">+		SampleRepo        string
+</a><a href="#h0-3-5" id="h0-3-5" class="i">+	}{urls, s.repos, backends, sampleRepo}
+</a> 
+ 	body, err := executeTemplate(s.T.Index, data)
+ 	if err != nil {
+<a href="#h0-4" id="h0-4" class="h">@@ -138,23 +142,8 @@ func (s *server) ServeAbout(ctx context.Context, w http.ResponseWriter, r *http.
+</a> }
+ 
+ func (s *server) ServeHelp(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+<a href="#h0-4-3" id="h0-4-3" class="d">-	d := struct{ SampleRepo string }{}
+</a><a href="#h0-4-4" id="h0-4-4" class="d">-	for _, bk := range s.bk {
+</a><a href="#h0-4-5" id="h0-4-5" class="d">-		if len(bk.I.Trees) &gt; 1 {
+</a><a href="#h0-4-6" id="h0-4-6" class="d">-			d.SampleRepo = bk.I.Trees[0].Name
+</a><a href="#h0-4-7" id="h0-4-7" class="d">-		}
+</a><a href="#h0-4-8" id="h0-4-8" class="d">-	}
+</a><a href="#h0-4-9" id="h0-4-9" class="d">-
+</a><a href="#h0-4-10" id="h0-4-10" class="d">-	body, err := executeTemplate(s.T.Help, d)
+</a><a href="#h0-4-11" id="h0-4-11" class="d">-	if err != nil {
+</a><a href="#h0-4-12" id="h0-4-12" class="d">-		http.Error(w, err.Error(), 500)
+</a><a href="#h0-4-13" id="h0-4-13" class="d">-		return
+</a><a href="#h0-4-14" id="h0-4-14" class="d">-	}
+</a><a href="#h0-4-15" id="h0-4-15" class="d">-	s.renderPage(w, &amp;page{
+</a><a href="#h0-4-16" id="h0-4-16" class="d">-		Title:         &quot;query syntax&quot;,
+</a><a href="#h0-4-17" id="h0-4-17" class="d">-		IncludeHeader: true,
+</a><a href="#h0-4-18" id="h0-4-18" class="d">-		Body:          template.HTML(body),
+</a><a href="#h0-4-19" id="h0-4-19" class="d">-	})
+</a><a href="#h0-4-20" id="h0-4-20" class="i">+	// Help is now shown in the main search page when no search has been entered.
+</a><a href="#h0-4-21" id="h0-4-21" class="i">+	http.Redirect(w, r, &quot;/search&quot;, 303)
+</a> }
+ 
+ func (s *server) ServeHealthcheck(w http.ResponseWriter, r *http.Request) {
+<b>diff --git a/<a id="h1" href="../file/web/templates/help.html">web/templates/help.html</a> b/<a href="../file/web/templates/help.html">web/templates/help.html</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -1,139 +0,0 @@
+</a><a href="#h1-0-0" id="h1-0-0" class="d">-&lt;div class=&#39;textarea&#39;&gt;
+</a><a href="#h1-0-1" id="h1-0-1" class="d">-  &lt;p&gt;
+</a><a href="#h1-0-2" id="h1-0-2" class="d">-    Search over source code by typing a regular expression into the
+</a><a href="#h1-0-3" id="h1-0-3" class="d">-    query box. Searches are case-insensitive by default:
+</a><a href="#h1-0-4" id="h1-0-4" class="d">-  &lt;/p&gt;
+</a><a href="#h1-0-5" id="h1-0-5" class="d">-  &lt;div class=&#39;example&#39;&gt;
+</a><a href="#h1-0-6" id="h1-0-6" class="d">-    &lt;span class=&#39;query&#39;&gt;
+</a><a href="#h1-0-7" id="h1-0-7" class="d">-      hello,?\sworld
+</a><a href="#h1-0-8" id="h1-0-8" class="d">-    &lt;/span&gt;
+</a><a href="#h1-0-9" id="h1-0-9" class="d">-    &lt;span class=&#39;link&#39;&gt;
+</a><a href="#h1-0-10" id="h1-0-10" class="d">-      &lt;a href=&quot;/search/?q=hello,?\sworld&quot;&gt;
+</a><a href="#h1-0-11" id="h1-0-11" class="d">-        try it
+</a><a href="#h1-0-12" id="h1-0-12" class="d">-      &lt;/a&gt;
+</a><a href="#h1-0-13" id="h1-0-13" class="d">-    &lt;/span&gt;
+</a><a href="#h1-0-14" id="h1-0-14" class="d">-  &lt;/div&gt;
+</a><a href="#h1-0-15" id="h1-0-15" class="d">-
+</a><a href="#h1-0-16" id="h1-0-16" class="d">-  &lt;p&gt;
+</a><a href="#h1-0-17" id="h1-0-17" class="d">-    Queries containing capital letters are matched case-sensitively:
+</a><a href="#h1-0-18" id="h1-0-18" class="d">-  &lt;/p&gt;
+</a><a href="#h1-0-19" id="h1-0-19" class="d">-
+</a><a href="#h1-0-20" id="h1-0-20" class="d">-  &lt;div class=&#39;example&#39;&gt;
+</a><a href="#h1-0-21" id="h1-0-21" class="d">-    &lt;span class=&#39;query&#39;&gt;
+</a><a href="#h1-0-22" id="h1-0-22" class="d">-      Hello
+</a><a href="#h1-0-23" id="h1-0-23" class="d">-    &lt;/span&gt;
+</a><a href="#h1-0-24" id="h1-0-24" class="d">-    &lt;span class=&#39;link&#39;&gt;
+</a><a href="#h1-0-25" id="h1-0-25" class="d">-      &lt;a href=&quot;/search/?q=Hello&quot;&gt;
+</a><a href="#h1-0-26" id="h1-0-26" class="d">-        try it
+</a><a href="#h1-0-27" id="h1-0-27" class="d">-      &lt;/a&gt;
+</a><a href="#h1-0-28" id="h1-0-28" class="d">-    &lt;/span&gt;
+</a><a href="#h1-0-29" id="h1-0-29" class="d">-  &lt;/div&gt;
+</a><a href="#h1-0-30" id="h1-0-30" class="d">-
+</a><a href="#h1-0-31" id="h1-0-31" class="d">-  &lt;p&gt;
+</a><a href="#h1-0-32" id="h1-0-32" class="d">-    Use &lt;span class=&#39;query&#39;&gt;case:&lt;/span&gt; to force a lower-case match:
+</a><a href="#h1-0-33" id="h1-0-33" class="d">-  &lt;/p&gt;
+</a><a href="#h1-0-34" id="h1-0-34" class="d">-
+</a><a href="#h1-0-35" id="h1-0-35" class="d">-  &lt;div class=&#39;example&#39;&gt;
+</a><a href="#h1-0-36" id="h1-0-36" class="d">-    &lt;span class=&#39;query&#39;&gt;
+</a><a href="#h1-0-37" id="h1-0-37" class="d">-      case:hello
+</a><a href="#h1-0-38" id="h1-0-38" class="d">-    &lt;/span&gt;
+</a><a href="#h1-0-39" id="h1-0-39" class="d">-    &lt;span class=&#39;link&#39;&gt;
+</a><a href="#h1-0-40" id="h1-0-40" class="d">-      &lt;a href=&quot;/search/?q=case:hello&quot;&gt;
+</a><a href="#h1-0-41" id="h1-0-41" class="d">-        try it
+</a><a href="#h1-0-42" id="h1-0-42" class="d">-      &lt;/a&gt;
+</a><a href="#h1-0-43" id="h1-0-43" class="d">-    &lt;/span&gt;
+</a><a href="#h1-0-44" id="h1-0-44" class="d">-  &lt;/div&gt;
+</a><a href="#h1-0-45" id="h1-0-45" class="d">-
+</a><a href="#h1-0-46" id="h1-0-46" class="d">-  &lt;p&gt;
+</a><a href="#h1-0-47" id="h1-0-47" class="d">-    Use &lt;span class=&#39;query&#39;&gt;lit:&lt;/span&gt; to match a literal string. At
+</a><a href="#h1-0-48" id="h1-0-48" class="d">-    present you can&#39;t mix and match a literal string and a regular
+</a><a href="#h1-0-49" id="h1-0-49" class="d">-    expression.
+</a><a href="#h1-0-50" id="h1-0-50" class="d">-  &lt;/p&gt;
+</a><a href="#h1-0-51" id="h1-0-51" class="d">-
+</a><a href="#h1-0-52" id="h1-0-52" class="d">-  &lt;div class=&#39;example&#39;&gt;
+</a><a href="#h1-0-53" id="h1-0-53" class="d">-    &lt;span class=&#39;query&#39;&gt;
+</a><a href="#h1-0-54" id="h1-0-54" class="d">-      lit:()()
+</a><a href="#h1-0-55" id="h1-0-55" class="d">-    &lt;/span&gt;
+</a><a href="#h1-0-56" id="h1-0-56" class="d">-    &lt;span class=&#39;link&#39;&gt;
+</a><a href="#h1-0-57" id="h1-0-57" class="d">-      &lt;a href=&quot;/search/?q=lit:()()&quot;&gt;
+</a><a href="#h1-0-58" id="h1-0-58" class="d">-        try it
+</a><a href="#h1-0-59" id="h1-0-59" class="d">-      &lt;/a&gt;
+</a><a href="#h1-0-60" id="h1-0-60" class="d">-    &lt;/span&gt;
+</a><a href="#h1-0-61" id="h1-0-61" class="d">-  &lt;/div&gt;
+</a><a href="#h1-0-62" id="h1-0-62" class="d">-
+</a><a href="#h1-0-63" id="h1-0-63" class="d">-  &lt;p&gt;
+</a><a href="#h1-0-64" id="h1-0-64" class="d">-    Restrict matches to specific files using a &lt;span
+</a><a href="#h1-0-65" id="h1-0-65" class="d">-    class=&#39;query&#39;&gt;file:&lt;/span&gt; modifier:
+</a><a href="#h1-0-66" id="h1-0-66" class="d">-  &lt;/p&gt;
+</a><a href="#h1-0-67" id="h1-0-67" class="d">-
+</a><a href="#h1-0-68" id="h1-0-68" class="d">-  &lt;div class=&#39;example&#39;&gt;
+</a><a href="#h1-0-69" id="h1-0-69" class="d">-    &lt;span class=&#39;query&#39;&gt;
+</a><a href="#h1-0-70" id="h1-0-70" class="d">-      exit file:\.c$
+</a><a href="#h1-0-71" id="h1-0-71" class="d">-    &lt;/span&gt;
+</a><a href="#h1-0-72" id="h1-0-72" class="d">-    &lt;span class=&#39;link&#39;&gt;
+</a><a href="#h1-0-73" id="h1-0-73" class="d">-      &lt;a href=&quot;/search/?q=exit+file:[.]c$&quot;&gt;
+</a><a href="#h1-0-74" id="h1-0-74" class="d">-        try it
+</a><a href="#h1-0-75" id="h1-0-75" class="d">-      &lt;/a&gt;
+</a><a href="#h1-0-76" id="h1-0-76" class="d">-    &lt;/span&gt;
+</a><a href="#h1-0-77" id="h1-0-77" class="d">-  &lt;/div&gt;
+</a><a href="#h1-0-78" id="h1-0-78" class="d">-
+</a><a href="#h1-0-79" id="h1-0-79" class="d">-  &lt;p&gt;
+</a><a href="#h1-0-80" id="h1-0-80" class="d">-    Wrap a clause in parentheses to stop interpretation of spaces or
+</a><a href="#h1-0-81" id="h1-0-81" class="d">-    query modifiers:
+</a><a href="#h1-0-82" id="h1-0-82" class="d">-  &lt;/p&gt;
+</a><a href="#h1-0-83" id="h1-0-83" class="d">-
+</a><a href="#h1-0-84" id="h1-0-84" class="d">-  &lt;div class=&#39;example&#39;&gt;
+</a><a href="#h1-0-85" id="h1-0-85" class="d">-    &lt;span class=&#39;query&#39;&gt;
+</a><a href="#h1-0-86" id="h1-0-86" class="d">-      (file:)
+</a><a href="#h1-0-87" id="h1-0-87" class="d">-    &lt;/span&gt;
+</a><a href="#h1-0-88" id="h1-0-88" class="d">-    &lt;span class=&#39;link&#39;&gt;
+</a><a href="#h1-0-89" id="h1-0-89" class="d">-      &lt;a href=&quot;/search/?q=(file:)&quot;&gt;
+</a><a href="#h1-0-90" id="h1-0-90" class="d">-        try it
+</a><a href="#h1-0-91" id="h1-0-91" class="d">-      &lt;/a&gt;
+</a><a href="#h1-0-92" id="h1-0-92" class="d">-    &lt;/span&gt;
+</a><a href="#h1-0-93" id="h1-0-93" class="d">-  &lt;/div&gt;
+</a><a href="#h1-0-94" id="h1-0-94" class="d">-
+</a><a href="#h1-0-95" id="h1-0-95" class="d">-  &lt;p&gt;
+</a><a href="#h1-0-96" id="h1-0-96" class="d">-    Exclude files from matches using &lt;span class=&#39;query&#39;&gt;-file:&lt;/span&gt;:
+</a><a href="#h1-0-97" id="h1-0-97" class="d">-  &lt;/p&gt;
+</a><a href="#h1-0-98" id="h1-0-98" class="d">-
+</a><a href="#h1-0-99" id="h1-0-99" class="d">-  &lt;div class=&#39;example&#39;&gt;
+</a><a href="#h1-0-100" id="h1-0-100" class="d">-    &lt;span class=&#39;query&#39;&gt;
+</a><a href="#h1-0-101" id="h1-0-101" class="d">-      exit -file:\.c
+</a><a href="#h1-0-102" id="h1-0-102" class="d">-    &lt;/span&gt;
+</a><a href="#h1-0-103" id="h1-0-103" class="d">-    &lt;span class=&#39;link&#39;&gt;
+</a><a href="#h1-0-104" id="h1-0-104" class="d">-      &lt;a href=&quot;/search/?q=exit -file:\.c&quot;&gt;
+</a><a href="#h1-0-105" id="h1-0-105" class="d">-        try it
+</a><a href="#h1-0-106" id="h1-0-106" class="d">-      &lt;/a&gt;
+</a><a href="#h1-0-107" id="h1-0-107" class="d">-    &lt;/span&gt;
+</a><a href="#h1-0-108" id="h1-0-108" class="d">-  &lt;/div&gt;
+</a><a href="#h1-0-109" id="h1-0-109" class="d">-
+</a><a href="#h1-0-110" id="h1-0-110" class="d">-
+</a><a href="#h1-0-111" id="h1-0-111" class="d">-  {{ if .SampleRepo }}
+</a><a href="#h1-0-112" id="h1-0-112" class="d">-  &lt;p&gt;
+</a><a href="#h1-0-113" id="h1-0-113" class="d">-    Restrict matches to specific repositories via &lt;span
+</a><a href="#h1-0-114" id="h1-0-114" class="d">-    class=&#39;query&#39;&gt;repo:&lt;/span&gt;
+</a><a href="#h1-0-115" id="h1-0-115" class="d">-  &lt;/p&gt;
+</a><a href="#h1-0-116" id="h1-0-116" class="d">-
+</a><a href="#h1-0-117" id="h1-0-117" class="d">-  &lt;div class=&#39;example&#39;&gt;
+</a><a href="#h1-0-118" id="h1-0-118" class="d">-    &lt;span class=&#39;query&#39;&gt;
+</a><a href="#h1-0-119" id="h1-0-119" class="d">-      fail repo:{{.SampleRepo}}
+</a><a href="#h1-0-120" id="h1-0-120" class="d">-    &lt;/span&gt;
+</a><a href="#h1-0-121" id="h1-0-121" class="d">-    &lt;span class=&#39;link&#39;&gt;
+</a><a href="#h1-0-122" id="h1-0-122" class="d">-      &lt;a href=&quot;/search/?q=exit+repo:{{.SampleRepo}}&quot;&gt;
+</a><a href="#h1-0-123" id="h1-0-123" class="d">-        try it
+</a><a href="#h1-0-124" id="h1-0-124" class="d">-      &lt;/a&gt;
+</a><a href="#h1-0-125" id="h1-0-125" class="d">-    &lt;/span&gt;
+</a><a href="#h1-0-126" id="h1-0-126" class="d">-  &lt;/div&gt;
+</a><a href="#h1-0-127" id="h1-0-127" class="d">-  {{ end }}
+</a><a href="#h1-0-128" id="h1-0-128" class="d">-
+</a><a href="#h1-0-129" id="h1-0-129" class="d">-  &lt;p&gt;
+</a><a href="#h1-0-130" id="h1-0-130" class="d">-    The complete RE2 Syntax reference is available on their wiki page:
+</a><a href="#h1-0-131" id="h1-0-131" class="d">-    &lt;a href=&quot;https://github.com/google/re2/wiki/Syntax&quot;&gt;
+</a><a href="#h1-0-132" id="h1-0-132" class="d">-      https://github.com/google/re2/wiki/Syntax
+</a><a href="#h1-0-133" id="h1-0-133" class="d">-    &lt;/a&gt;
+</a><a href="#h1-0-134" id="h1-0-134" class="d">-  &lt;/p&gt;
+</a><a href="#h1-0-135" id="h1-0-135" class="d">-
+</a><a href="#h1-0-136" id="h1-0-136" class="d">-  &lt;p&gt;
+</a><a href="#h1-0-137" id="h1-0-137" class="d">-  &lt;/p&gt;
+</a><a href="#h1-0-138" id="h1-0-138" class="d">-&lt;/div&gt;
+</a><b>diff --git a/<a id="h2" href="../file/web/templates/index.html">web/templates/index.html</a> b/<a href="../file/web/templates/index.html">web/templates/index.html</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -83,12 +83,12 @@
+</a>     &lt;tr&gt;
+       &lt;td&gt;&lt;code&gt;repo:&lt;/code&gt;&lt;/td&gt;
+       &lt;td&gt;Only include results from matching repositories.&lt;/td&gt;
+<a href="#h2-0-3" id="h2-0-3" class="d">-      &lt;td&gt;&lt;/td&gt;
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+      &lt;td&gt;&lt;a href=&quot;/search?q=hello+repo:{{.SampleRepo}}&quot;&gt;example&lt;/a&gt;&lt;/td&gt;
+</a>     &lt;/tr&gt;
+     &lt;tr&gt;
+       &lt;td&gt;&lt;code&gt;-repo:&lt;/code&gt;&lt;/td&gt;
+       &lt;td&gt;Exclude results from matching repositories.&lt;/td&gt;
+<a href="#h2-0-9" id="h2-0-9" class="d">-      &lt;td&gt;&lt;/td&gt;
+</a><a href="#h2-0-10" id="h2-0-10" class="i">+      &lt;td&gt;&lt;a href=&quot;/search?q=hello+-repo:{{.SampleRepo}}&quot;&gt;example&lt;/a&gt;&lt;/td&gt;
+</a>     &lt;/tr&gt;
+     &lt;tr&gt;
+       &lt;td&gt;&lt;code&gt;(&lt;em&gt;special-term&lt;/em&gt;:)&lt;/code&gt;&lt;/td&gt;
+</pre>
+</div>
+</body>
+</html>

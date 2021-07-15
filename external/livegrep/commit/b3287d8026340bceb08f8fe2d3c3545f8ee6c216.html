@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Support using a json config file to index. - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/b3287d8026340bceb08f8fe2d3c3545f8ee6c216">b3287d8026340bceb08f8fe2d3c3545f8ee6c216</a>
+<b>parent</b> <a href="../commit/6f1f1f72e5af3328579426b41e7d8550a69cd245">6f1f1f72e5af3328579426b41e7d8550a69cd245</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Fri,  7 Mar 2014 09:27:32 -0800
+
+Support using a json config file to index.
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">src/git_indexer.cc</a></td><td> | </td><td class="num">7</td><td><span class="i">++++</span><span class="d">---</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">src/git_indexer.h</a></td><td> | </td><td class="num">5</td><td><span class="i">++++</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">src/lib/debug.cc</a></td><td> | </td><td class="num">2</td><td><span class="i">++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">src/lib/debug.h</a></td><td> | </td><td class="num">1</td><td><span class="i">+</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h4">src/tools/codesearch.cc</a></td><td> | </td><td class="num">56</td><td><span class="i">+++++</span><span class="d">---------------------------------------------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h5">src/tools/interface.cc</a></td><td> | </td><td class="num">54</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h6">src/tools/interface.h</a></td><td> | </td><td class="num">2</td><td><span class="i">++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h7">src/tools/json_interface.cc</a></td><td> | </td><td class="num">83</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+</table></pre><pre>8 files changed, 155 insertions(+), 55 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/src/git_indexer.cc">src/git_indexer.cc</a> b/<a href="../file/src/git_indexer.cc">src/git_indexer.cc</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -12,11 +12,12 @@ DEFINE_bool(revparse, false, &quot;Display parsed revisions, rather than as-provided&quot;
+</a> 
+ git_indexer::git_indexer(code_searcher *cs,
+                          const string&amp; repopath,
+<a href="#h0-0-3" id="h0-0-3" class="d">-                         const string&amp; name)
+</a><a href="#h0-0-4" id="h0-0-4" class="d">-    : cs_(cs), repo_(0), name_(name) {
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+                         const string&amp; name,
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+                         json_object *metadata)
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+    : cs_(cs), repo_(0), name_(name), metadata_(metadata) {
+</a>     git_repository_open(&amp;repo_, repopath.c_str());
+     assert(repo_);
+<a href="#h0-0-10" id="h0-0-10" class="d">-    idx_repo_ = cs_-&gt;open_repo(name, 0);
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+    idx_repo_ = cs_-&gt;open_repo(name, metadata);
+</a> }
+ 
+ git_indexer::~git_indexer() {
+<b>diff --git a/<a id="h1" href="../file/src/git_indexer.h">src/git_indexer.h</a> b/<a href="../file/src/git_indexer.h">src/git_indexer.h</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -15,12 +15,14 @@ class git_repository;
+</a> class git_tree;
+ struct indexed_repo;
+ struct indexed_tree;
+<a href="#h1-0-3" id="h1-0-3" class="i">+struct json_object;
+</a> 
+ class git_indexer {
+ public:
+     git_indexer(code_searcher *cs,
+                 const std::string&amp; repopath,
+<a href="#h1-0-9" id="h1-0-9" class="d">-                const std::string&amp; name);
+</a><a href="#h1-0-10" id="h1-0-10" class="i">+                const std::string&amp; name,
+</a><a href="#h1-0-11" id="h1-0-11" class="i">+                json_object *metadata = 0);
+</a>     ~git_indexer();
+     void walk(const std::string&amp; ref);
+ protected:
+<a href="#h1-1" id="h1-1" class="h">@@ -33,6 +35,7 @@ protected:
+</a>     const indexed_repo *idx_repo_;
+     const indexed_tree *idx_tree_;
+     std::string name_;
+<a href="#h1-1-3" id="h1-1-3" class="i">+    json_object *metadata_;
+</a> };
+ 
+ #endif
+<b>diff --git a/<a id="h2" href="../file/src/lib/debug.cc">src/lib/debug.cc</a> b/<a href="../file/src/lib/debug.cc">src/lib/debug.cc</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -29,6 +29,8 @@ struct debug_flag {
+</a>     {&quot;profile&quot;,   kDebugProfile},
+     {&quot;index&quot;,     kDebugIndex},
+     {&quot;indexall&quot;,  kDebugIndexAll},
+<a href="#h2-0-3" id="h2-0-3" class="i">+    {&quot;indexall&quot;,  kDebugIndexAll},
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+    {&quot;ui&quot;,        kDebugUI},
+</a>     {&quot;all&quot;,       (debug_mode)-1}
+ };
+ 
+<b>diff --git a/<a id="h3" href="../file/src/lib/debug.h">src/lib/debug.h</a> b/<a href="../file/src/lib/debug.h">src/lib/debug.h</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -15,6 +15,7 @@ enum debug_mode {
+</a>     kDebugProfile       = 0x0002,
+     kDebugIndex         = 0x0004,
+     kDebugIndexAll      = 0x0008,
+<a href="#h3-0-3" id="h3-0-3" class="i">+    kDebugUI            = 0x0010,
+</a> };
+ 
+ extern debug_mode debug_enabled;
+<b>diff --git a/<a id="h4" href="../file/src/tools/codesearch.cc">src/tools/codesearch.cc</a> b/<a href="../file/src/tools/codesearch.cc">src/tools/codesearch.cc</a></b>
+<a href="#h4-0" id="h4-0" class="h">@@ -6,7 +6,6 @@
+</a>  * modify it under the terms listed in the COPYING file.
+  ********************************************************************/
+ #include &quot;codesearch.h&quot;
+<a href="#h4-0-3" id="h4-0-3" class="d">-#include &quot;git_indexer.h&quot;
+</a> #include &quot;timer.h&quot;
+ #include &quot;re_width.h&quot;
+ 
+<a href="#h4-1" id="h4-1" class="h">@@ -121,53 +120,6 @@ void interact(code_searcher *cs, codesearch_interface *ui) {
+</a>     }
+ }
+ 
+<a href="#h4-1-3" id="h4-1-3" class="d">-struct parse_spec {
+</a><a href="#h4-1-4" id="h4-1-4" class="d">-    string path;
+</a><a href="#h4-1-5" id="h4-1-5" class="d">-    string name;
+</a><a href="#h4-1-6" id="h4-1-6" class="d">-    vector&lt;string&gt; revs;
+</a><a href="#h4-1-7" id="h4-1-7" class="d">-};
+</a><a href="#h4-1-8" id="h4-1-8" class="d">-
+</a><a href="#h4-1-9" id="h4-1-9" class="d">-parse_spec parse_walk_spec(string spec) {
+</a><a href="#h4-1-10" id="h4-1-10" class="d">-    /* [name@]path[:rev1,rev2,rev3] */
+</a><a href="#h4-1-11" id="h4-1-11" class="d">-    parse_spec out;
+</a><a href="#h4-1-12" id="h4-1-12" class="d">-    int idx;
+</a><a href="#h4-1-13" id="h4-1-13" class="d">-    if ((idx = spec.find(&#39;@&#39;)) != -1) {
+</a><a href="#h4-1-14" id="h4-1-14" class="d">-        out.name = spec.substr(0, idx);
+</a><a href="#h4-1-15" id="h4-1-15" class="d">-        spec = spec.substr(idx + 1);
+</a><a href="#h4-1-16" id="h4-1-16" class="d">-    }
+</a><a href="#h4-1-17" id="h4-1-17" class="d">-    if ((idx = spec.find(&#39;:&#39;)) != -1) {
+</a><a href="#h4-1-18" id="h4-1-18" class="d">-        string revs = spec.substr(idx + 1);
+</a><a href="#h4-1-19" id="h4-1-19" class="d">-        spec = spec.substr(0, idx);
+</a><a href="#h4-1-20" id="h4-1-20" class="d">-        while ((idx = revs.find(&#39;,&#39;)) != -1) {
+</a><a href="#h4-1-21" id="h4-1-21" class="d">-            out.revs.push_back(revs.substr(0, idx));
+</a><a href="#h4-1-22" id="h4-1-22" class="d">-            revs = revs.substr(idx + 1);
+</a><a href="#h4-1-23" id="h4-1-23" class="d">-        }
+</a><a href="#h4-1-24" id="h4-1-24" class="d">-        if (revs.size())
+</a><a href="#h4-1-25" id="h4-1-25" class="d">-            out.revs.push_back(revs);
+</a><a href="#h4-1-26" id="h4-1-26" class="d">-    }
+</a><a href="#h4-1-27" id="h4-1-27" class="d">-    if (out.revs.empty()) {
+</a><a href="#h4-1-28" id="h4-1-28" class="d">-        out.revs.push_back(&quot;HEAD&quot;);
+</a><a href="#h4-1-29" id="h4-1-29" class="d">-    }
+</a><a href="#h4-1-30" id="h4-1-30" class="d">-    out.path = spec;
+</a><a href="#h4-1-31" id="h4-1-31" class="d">-    return out;
+</a><a href="#h4-1-32" id="h4-1-32" class="d">-}
+</a><a href="#h4-1-33" id="h4-1-33" class="d">-
+</a><a href="#h4-1-34" id="h4-1-34" class="d">-void walk_one(code_searcher *search,
+</a><a href="#h4-1-35" id="h4-1-35" class="d">-              codesearch_interface *ui,
+</a><a href="#h4-1-36" id="h4-1-36" class="d">-              string spec) {
+</a><a href="#h4-1-37" id="h4-1-37" class="d">-    parse_spec parsed = parse_walk_spec(spec);
+</a><a href="#h4-1-38" id="h4-1-38" class="d">-    ui-&gt;info(&quot;Walking `%s&#39; (name: %s, path: %s)...\n&quot;,
+</a><a href="#h4-1-39" id="h4-1-39" class="d">-             spec.c_str(),
+</a><a href="#h4-1-40" id="h4-1-40" class="d">-             parsed.name.c_str(),
+</a><a href="#h4-1-41" id="h4-1-41" class="d">-             parsed.path.c_str());
+</a><a href="#h4-1-42" id="h4-1-42" class="d">-    git_indexer indexer(search, parsed.path, parsed.name);
+</a><a href="#h4-1-43" id="h4-1-43" class="d">-    for (auto it = parsed.revs.begin(); it != parsed.revs.end(); ++it) {
+</a><a href="#h4-1-44" id="h4-1-44" class="d">-        ui-&gt;info(&quot;  %s...&quot;, it-&gt;c_str());
+</a><a href="#h4-1-45" id="h4-1-45" class="d">-        indexer.walk(*it);
+</a><a href="#h4-1-46" id="h4-1-46" class="d">-        ui-&gt;info(&quot;done\n&quot;);
+</a><a href="#h4-1-47" id="h4-1-47" class="d">-    }
+</a><a href="#h4-1-48" id="h4-1-48" class="d">-}
+</a><a href="#h4-1-49" id="h4-1-49" class="d">-
+</a> void initialize_search(code_searcher *search,
+                        codesearch_interface *ui,
+                        int argc, char **argv) {
+<a href="#h4-2" id="h4-2" class="h">@@ -177,11 +129,13 @@ void initialize_search(code_searcher *search,
+</a>         else
+             search-&gt;set_alloc(make_mem_allocator());
+ 
+<a href="#h4-2-3" id="h4-2-3" class="i">+        vector&lt;std::string&gt; args;
+</a><a href="#h4-2-4" id="h4-2-4" class="i">+        for (int i = 0; i &lt; argc; ++i)
+</a><a href="#h4-2-5" id="h4-2-5" class="i">+            args.push_back(argv[i]);
+</a><a href="#h4-2-6" id="h4-2-6" class="i">+
+</a>         timer tm;
+         struct timeval elapsed;
+<a href="#h4-2-9" id="h4-2-9" class="d">-        for (int i = 1; i &lt; argc; i++) {
+</a><a href="#h4-2-10" id="h4-2-10" class="d">-            walk_one(search, ui, argv[i]);
+</a><a href="#h4-2-11" id="h4-2-11" class="d">-        }
+</a><a href="#h4-2-12" id="h4-2-12" class="i">+        ui-&gt;build_index(search, args);
+</a>         ui-&gt;info(&quot;Finalizing...\n&quot;);
+         search-&gt;finalize();
+         elapsed = tm.elapsed();
+<b>diff --git a/<a id="h5" href="../file/src/tools/interface.cc">src/tools/interface.cc</a> b/<a href="../file/src/tools/interface.cc">src/tools/interface.cc</a></b>
+<a href="#h5-0" id="h5-0" class="h">@@ -1,4 +1,5 @@
+</a> #include &quot;codesearch.h&quot;
+<a href="#h5-0-1" id="h5-0-1" class="i">+#include &quot;git_indexer.h&quot;
+</a> #include &quot;interface.h&quot;
+ #include &quot;interface-impl.h&quot;
+ 
+<a href="#h5-1" id="h5-1" class="h">@@ -21,9 +22,62 @@ codesearch_interface::~codesearch_interface() {}
+</a> 
+ namespace {
+ 
+<a href="#h5-1-3" id="h5-1-3" class="i">+struct parse_spec {
+</a><a href="#h5-1-4" id="h5-1-4" class="i">+    string path;
+</a><a href="#h5-1-5" id="h5-1-5" class="i">+    string name;
+</a><a href="#h5-1-6" id="h5-1-6" class="i">+    vector&lt;string&gt; revs;
+</a><a href="#h5-1-7" id="h5-1-7" class="i">+};
+</a><a href="#h5-1-8" id="h5-1-8" class="i">+
+</a><a href="#h5-1-9" id="h5-1-9" class="i">+parse_spec parse_walk_spec(string spec) {
+</a><a href="#h5-1-10" id="h5-1-10" class="i">+    /* [name@]path[:rev1,rev2,rev3] */
+</a><a href="#h5-1-11" id="h5-1-11" class="i">+    parse_spec out;
+</a><a href="#h5-1-12" id="h5-1-12" class="i">+    int idx;
+</a><a href="#h5-1-13" id="h5-1-13" class="i">+    if ((idx = spec.find(&#39;@&#39;)) != -1) {
+</a><a href="#h5-1-14" id="h5-1-14" class="i">+        out.name = spec.substr(0, idx);
+</a><a href="#h5-1-15" id="h5-1-15" class="i">+        spec = spec.substr(idx + 1);
+</a><a href="#h5-1-16" id="h5-1-16" class="i">+    }
+</a><a href="#h5-1-17" id="h5-1-17" class="i">+    if ((idx = spec.find(&#39;:&#39;)) != -1) {
+</a><a href="#h5-1-18" id="h5-1-18" class="i">+        string revs = spec.substr(idx + 1);
+</a><a href="#h5-1-19" id="h5-1-19" class="i">+        spec = spec.substr(0, idx);
+</a><a href="#h5-1-20" id="h5-1-20" class="i">+        while ((idx = revs.find(&#39;,&#39;)) != -1) {
+</a><a href="#h5-1-21" id="h5-1-21" class="i">+            out.revs.push_back(revs.substr(0, idx));
+</a><a href="#h5-1-22" id="h5-1-22" class="i">+            revs = revs.substr(idx + 1);
+</a><a href="#h5-1-23" id="h5-1-23" class="i">+        }
+</a><a href="#h5-1-24" id="h5-1-24" class="i">+        if (revs.size())
+</a><a href="#h5-1-25" id="h5-1-25" class="i">+            out.revs.push_back(revs);
+</a><a href="#h5-1-26" id="h5-1-26" class="i">+    }
+</a><a href="#h5-1-27" id="h5-1-27" class="i">+    if (out.revs.empty()) {
+</a><a href="#h5-1-28" id="h5-1-28" class="i">+        out.revs.push_back(&quot;HEAD&quot;);
+</a><a href="#h5-1-29" id="h5-1-29" class="i">+    }
+</a><a href="#h5-1-30" id="h5-1-30" class="i">+    out.path = spec;
+</a><a href="#h5-1-31" id="h5-1-31" class="i">+    return out;
+</a><a href="#h5-1-32" id="h5-1-32" class="i">+}
+</a><a href="#h5-1-33" id="h5-1-33" class="i">+
+</a> class cli_interface : public codesearch_interface {
+ public:
+     cli_interface(FILE *in, FILE *out) : in_(in), out_(out) { }
+<a href="#h5-1-37" id="h5-1-37" class="i">+
+</a><a href="#h5-1-38" id="h5-1-38" class="i">+    virtual void build_index(code_searcher *cs, const vector&lt;std::string&gt; &amp;argv) {
+</a><a href="#h5-1-39" id="h5-1-39" class="i">+        if (argv.size() &lt; 2) {
+</a><a href="#h5-1-40" id="h5-1-40" class="i">+            print_error(&quot;Usage: &quot; + argv[0] + &quot; [OPTIONS] REPOSPEC...&quot;);
+</a><a href="#h5-1-41" id="h5-1-41" class="i">+            exit(1);
+</a><a href="#h5-1-42" id="h5-1-42" class="i">+        }
+</a><a href="#h5-1-43" id="h5-1-43" class="i">+        for (auto it = argv.begin(); it != argv.end(); ++it) {
+</a><a href="#h5-1-44" id="h5-1-44" class="i">+            const std::string &amp;arg = *it;
+</a><a href="#h5-1-45" id="h5-1-45" class="i">+            parse_spec parsed = parse_walk_spec(arg);
+</a><a href="#h5-1-46" id="h5-1-46" class="i">+            this-&gt;info(&quot;Walking `%s&#39; (name: %s, path: %s)...\n&quot;,
+</a><a href="#h5-1-47" id="h5-1-47" class="i">+                       arg.c_str(),
+</a><a href="#h5-1-48" id="h5-1-48" class="i">+                       parsed.name.c_str(),
+</a><a href="#h5-1-49" id="h5-1-49" class="i">+                       parsed.path.c_str());
+</a><a href="#h5-1-50" id="h5-1-50" class="i">+            git_indexer indexer(cs, parsed.path, parsed.name);
+</a><a href="#h5-1-51" id="h5-1-51" class="i">+            for (auto it = parsed.revs.begin(); it != parsed.revs.end(); ++it) {
+</a><a href="#h5-1-52" id="h5-1-52" class="i">+                this-&gt;info(&quot;  %s...&quot;, it-&gt;c_str());
+</a><a href="#h5-1-53" id="h5-1-53" class="i">+                indexer.walk(*it);
+</a><a href="#h5-1-54" id="h5-1-54" class="i">+                this-&gt;info(&quot;done\n&quot;);
+</a><a href="#h5-1-55" id="h5-1-55" class="i">+            }
+</a><a href="#h5-1-56" id="h5-1-56" class="i">+        }
+</a><a href="#h5-1-57" id="h5-1-57" class="i">+    }
+</a><a href="#h5-1-58" id="h5-1-58" class="i">+
+</a>     virtual void print_match(const match_result *m) {
+         for (auto ctx = m-&gt;context.begin();
+              ctx != m-&gt;context.end(); ++ctx) {
+<b>diff --git a/<a id="h6" href="../file/src/tools/interface.h">src/tools/interface.h</a> b/<a href="../file/src/tools/interface.h">src/tools/interface.h</a></b>
+<a href="#h6-0" id="h6-0" class="h">@@ -9,6 +9,7 @@
+</a> #define CODESEARCH_INTERFACE_H
+ 
+ #include &lt;string&gt;
+<a href="#h6-0-3" id="h6-0-3" class="i">+#include &lt;vector&gt;
+</a> #include &lt;stdlib.h&gt;
+ #include &lt;sys/time.h&gt;
+ 
+<a href="#h6-1" id="h6-1" class="h">@@ -18,6 +19,7 @@ class code_searcher;
+</a> 
+ class codesearch_interface {
+ public:
+<a href="#h6-1-3" id="h6-1-3" class="i">+    virtual void build_index(code_searcher *cs, const std::vector&lt;std::string&gt; &amp;argv) = 0;
+</a>     virtual void print_match(const match_result *m) = 0;
+     virtual void print_error(const std::string &amp;err) = 0;
+     virtual void print_prompt(const code_searcher *cs) = 0;
+<b>diff --git a/<a id="h7" href="../file/src/tools/json_interface.cc">src/tools/json_interface.cc</a> b/<a href="../file/src/tools/json_interface.cc">src/tools/json_interface.cc</a></b>
+<a href="#h7-0" id="h7-0" class="h">@@ -1,5 +1,7 @@
+</a> #include &quot;codesearch.h&quot;
+ #include &quot;interface.h&quot;
+<a href="#h7-0-2" id="h7-0-2" class="i">+#include &quot;debug.h&quot;
+</a><a href="#h7-0-3" id="h7-0-3" class="i">+#include &quot;git_indexer.h&quot;
+</a> #include &quot;interface-impl.h&quot;
+ 
+ #include &lt;json/json.h&gt;
+<a href="#h7-1" id="h7-1" class="h">@@ -55,6 +57,60 @@ long timeval_ms (struct timeval tv) {
+</a>     return tv.tv_sec * 1000 + tv.tv_usec / 1000;
+ }
+ 
+<a href="#h7-1-3" id="h7-1-3" class="i">+struct repo_spec {
+</a><a href="#h7-1-4" id="h7-1-4" class="i">+    string path;
+</a><a href="#h7-1-5" id="h7-1-5" class="i">+    string name;
+</a><a href="#h7-1-6" id="h7-1-6" class="i">+    vector&lt;string&gt; revisions;
+</a><a href="#h7-1-7" id="h7-1-7" class="i">+    json_object *metadata;
+</a><a href="#h7-1-8" id="h7-1-8" class="i">+};
+</a><a href="#h7-1-9" id="h7-1-9" class="i">+
+</a><a href="#h7-1-10" id="h7-1-10" class="i">+repo_spec parse_repo_spec(json_object *js) {
+</a><a href="#h7-1-11" id="h7-1-11" class="i">+    debug(kDebugUI, &quot;Parsing: %s&quot;, json_object_to_json_string(js));
+</a><a href="#h7-1-12" id="h7-1-12" class="i">+    if (!json_object_is_type(js, json_type_object)) {
+</a><a href="#h7-1-13" id="h7-1-13" class="i">+        fprintf(stderr, &quot;Repo spec is not an object!\n&quot;);
+</a><a href="#h7-1-14" id="h7-1-14" class="i">+        exit(1);
+</a><a href="#h7-1-15" id="h7-1-15" class="i">+    }
+</a><a href="#h7-1-16" id="h7-1-16" class="i">+
+</a><a href="#h7-1-17" id="h7-1-17" class="i">+    repo_spec spec;
+</a><a href="#h7-1-18" id="h7-1-18" class="i">+    json_object *js_path = json_object_object_get(js, &quot;path&quot;);
+</a><a href="#h7-1-19" id="h7-1-19" class="i">+    if (json_object_is_type(js_path, json_type_string))
+</a><a href="#h7-1-20" id="h7-1-20" class="i">+        spec.path = json_object_get_string(js_path);
+</a><a href="#h7-1-21" id="h7-1-21" class="i">+    json_object *js_name = json_object_object_get(js, &quot;name&quot;);
+</a><a href="#h7-1-22" id="h7-1-22" class="i">+    if (json_object_is_type(js_name, json_type_string))
+</a><a href="#h7-1-23" id="h7-1-23" class="i">+        spec.name = json_object_get_string(js_name);
+</a><a href="#h7-1-24" id="h7-1-24" class="i">+    spec.metadata = json_object_get(json_object_object_get(js, &quot;metadata&quot;));
+</a><a href="#h7-1-25" id="h7-1-25" class="i">+
+</a><a href="#h7-1-26" id="h7-1-26" class="i">+    json_object *js_revs = json_object_object_get(js, &quot;revisions&quot;);
+</a><a href="#h7-1-27" id="h7-1-27" class="i">+    if (json_object_is_type(js_revs, json_type_array)) {
+</a><a href="#h7-1-28" id="h7-1-28" class="i">+        for (int i = 0; i &lt; json_object_array_length(js_revs); ++i) {
+</a><a href="#h7-1-29" id="h7-1-29" class="i">+            json_object *elt = json_object_array_get_idx(js_revs, i);
+</a><a href="#h7-1-30" id="h7-1-30" class="i">+            if (json_object_is_type(elt, json_type_string))
+</a><a href="#h7-1-31" id="h7-1-31" class="i">+                spec.revisions.push_back(json_object_get_string(elt));
+</a><a href="#h7-1-32" id="h7-1-32" class="i">+        }
+</a><a href="#h7-1-33" id="h7-1-33" class="i">+    }
+</a><a href="#h7-1-34" id="h7-1-34" class="i">+
+</a><a href="#h7-1-35" id="h7-1-35" class="i">+    return spec;
+</a><a href="#h7-1-36" id="h7-1-36" class="i">+}
+</a><a href="#h7-1-37" id="h7-1-37" class="i">+
+</a><a href="#h7-1-38" id="h7-1-38" class="i">+void extract_repo_specs(vector&lt;repo_spec&gt; &amp;out, json_object *js) {
+</a><a href="#h7-1-39" id="h7-1-39" class="i">+    switch(json_object_get_type(js)) {
+</a><a href="#h7-1-40" id="h7-1-40" class="i">+    case json_type_object:
+</a><a href="#h7-1-41" id="h7-1-41" class="i">+        debug(kDebugUI, &quot;Parsing a single repo&quot;);
+</a><a href="#h7-1-42" id="h7-1-42" class="i">+        out.push_back(parse_repo_spec(js));
+</a><a href="#h7-1-43" id="h7-1-43" class="i">+        break;
+</a><a href="#h7-1-44" id="h7-1-44" class="i">+    case json_type_array:
+</a><a href="#h7-1-45" id="h7-1-45" class="i">+        debug(kDebugUI, &quot;Parsing an array of repos...&quot;);
+</a><a href="#h7-1-46" id="h7-1-46" class="i">+        for (int i = 0; i &lt; json_object_array_length(js); ++i) {
+</a><a href="#h7-1-47" id="h7-1-47" class="i">+            out.push_back(parse_repo_spec(json_object_array_get_idx(js, i)));
+</a><a href="#h7-1-48" id="h7-1-48" class="i">+        }
+</a><a href="#h7-1-49" id="h7-1-49" class="i">+        break;
+</a><a href="#h7-1-50" id="h7-1-50" class="i">+    default:
+</a><a href="#h7-1-51" id="h7-1-51" class="i">+        fprintf(stderr, &quot;Error: unrecognized object type: %s\n&quot;,
+</a><a href="#h7-1-52" id="h7-1-52" class="i">+                json_type_to_name(json_object_get_type(js)));
+</a><a href="#h7-1-53" id="h7-1-53" class="i">+        exit(1);
+</a><a href="#h7-1-54" id="h7-1-54" class="i">+    }
+</a><a href="#h7-1-55" id="h7-1-55" class="i">+}
+</a><a href="#h7-1-56" id="h7-1-56" class="i">+
+</a> class json_interface : public codesearch_interface {
+ public:
+     json_interface(FILE *in, FILE *out) : in_(in), out_(out) { }
+<a href="#h7-2" id="h7-2" class="h">@@ -157,6 +213,33 @@ public:
+</a>         json_object_put(obj);
+     }
+ 
+<a href="#h7-2-3" id="h7-2-3" class="i">+    virtual void build_index(code_searcher *cs, const vector&lt;std::string&gt; &amp;argv) {
+</a><a href="#h7-2-4" id="h7-2-4" class="i">+        if (argv.size() != 2) {
+</a><a href="#h7-2-5" id="h7-2-5" class="i">+            print_error(&quot;Usage: &quot; + argv[0] + &quot; --json [OPTIONS] config.json&quot;);
+</a><a href="#h7-2-6" id="h7-2-6" class="i">+            exit(1);
+</a><a href="#h7-2-7" id="h7-2-7" class="i">+        }
+</a><a href="#h7-2-8" id="h7-2-8" class="i">+        json_object *obj = json_object_from_file(argv[1].c_str());
+</a><a href="#h7-2-9" id="h7-2-9" class="i">+        if (is_error(obj)) {
+</a><a href="#h7-2-10" id="h7-2-10" class="i">+            print_error(string(&quot;Error parsing `&quot;) + argv[1] + string(&quot;&#39;: &quot;) +
+</a><a href="#h7-2-11" id="h7-2-11" class="i">+                        string(json_tokener_errors[-(unsigned long)obj]));
+</a><a href="#h7-2-12" id="h7-2-12" class="i">+            exit(1);
+</a><a href="#h7-2-13" id="h7-2-13" class="i">+        }
+</a><a href="#h7-2-14" id="h7-2-14" class="i">+        vector&lt;repo_spec&gt; repos;
+</a><a href="#h7-2-15" id="h7-2-15" class="i">+        extract_repo_specs(repos, json_object_object_get(obj, &quot;repositories&quot;));
+</a><a href="#h7-2-16" id="h7-2-16" class="i">+        json_object_put(obj);
+</a><a href="#h7-2-17" id="h7-2-17" class="i">+
+</a><a href="#h7-2-18" id="h7-2-18" class="i">+        for (auto it = repos.begin(); it != repos.end(); ++it) {
+</a><a href="#h7-2-19" id="h7-2-19" class="i">+            debug(kDebugUI, &quot;Walking name=%s, path=%s&quot;,
+</a><a href="#h7-2-20" id="h7-2-20" class="i">+                  it-&gt;name.c_str(), it-&gt;path.c_str());
+</a><a href="#h7-2-21" id="h7-2-21" class="i">+            git_indexer indexer(cs, it-&gt;path, it-&gt;name);
+</a><a href="#h7-2-22" id="h7-2-22" class="i">+            for (auto rev = it-&gt;revisions.begin();
+</a><a href="#h7-2-23" id="h7-2-23" class="i">+                 rev != it-&gt;revisions.end(); ++rev) {
+</a><a href="#h7-2-24" id="h7-2-24" class="i">+                debug(kDebugUI, &quot;  walking %s..&quot;, rev-&gt;c_str());
+</a><a href="#h7-2-25" id="h7-2-25" class="i">+                indexer.walk(*rev);
+</a><a href="#h7-2-26" id="h7-2-26" class="i">+            }
+</a><a href="#h7-2-27" id="h7-2-27" class="i">+        }
+</a><a href="#h7-2-28" id="h7-2-28" class="i">+    }
+</a><a href="#h7-2-29" id="h7-2-29" class="i">+
+</a>     virtual void info(const char *msg, ...) {}
+     virtual ~json_interface() {}
+ 
+</pre>
+</div>
+</body>
+</html>

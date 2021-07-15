@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>First pass at a standalone tool to analyze REs. - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/98d885381baa21474828697e94dbde782b8a177e">98d885381baa21474828697e94dbde782b8a177e</a>
+<b>parent</b> <a href="../commit/fb59d3bc53426ff9d2172f2106cbd12177fdc050">fb59d3bc53426ff9d2172f2106cbd12177fdc050</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Sat, 16 Mar 2013 19:31:53 -0700
+
+First pass at a standalone tool to analyze REs.
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">.gitignore</a></td><td> | </td><td class="num">1</td><td><span class="i">+</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">src/codesearch.cc</a></td><td> | </td><td class="num">10</td><td><span class="i">++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">src/codesearch.h</a></td><td> | </td><td class="num">2</td><td><span class="i">++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">src/tools/Makefrag</a></td><td> | </td><td class="num">2</td><td><span class="i">+</span><span class="d">-</span></td></tr>
+<tr><td class="A">A</td><td><a href="#h4">src/tools/analyze-re.cc</a></td><td> | </td><td class="num">55</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h5">src/tools/codesearch.cc</a></td><td> | </td><td class="num">8</td><td><span class="i">+</span><span class="d">-------</span></td></tr>
+</table></pre><pre>6 files changed, 70 insertions(+), 8 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/.gitignore">.gitignore</a> b/<a href="../file/.gitignore">.gitignore</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -1,5 +1,6 @@
+</a> /codesearch
+ /inspect-index
+<a href="#h0-0-2" id="h0-0-2" class="i">+/analyze-re
+</a> /Makefile.config
+ *.o
+ .*.d
+<b>diff --git a/<a id="h1" href="../file/src/codesearch.cc">src/codesearch.cc</a> b/<a href="../file/src/codesearch.cc">src/codesearch.cc</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -1006,3 +1006,13 @@ bool code_searcher::search_thread::search_one(const pair&lt;searcher*, chunk*&gt;&amp; pai
+</a>     pair.first-&gt;queue_.push(NULL);
+     return false;
+ }
+<a href="#h1-0-3" id="h1-0-3" class="i">+
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+void default_re2_options(RE2::Options &amp;opts) {
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+    opts.set_never_nl(true);
+</a><a href="#h1-0-6" id="h1-0-6" class="i">+    opts.set_one_line(false);
+</a><a href="#h1-0-7" id="h1-0-7" class="i">+    opts.set_perl_classes(true);
+</a><a href="#h1-0-8" id="h1-0-8" class="i">+    opts.set_word_boundary(true);
+</a><a href="#h1-0-9" id="h1-0-9" class="i">+    opts.set_posix_syntax(true);
+</a><a href="#h1-0-10" id="h1-0-10" class="i">+    opts.set_word_boundary(true);
+</a><a href="#h1-0-11" id="h1-0-11" class="i">+    opts.set_log_errors(false);
+</a><a href="#h1-0-12" id="h1-0-12" class="i">+}
+</a><b>diff --git a/<a id="h2" href="../file/src/codesearch.h">src/codesearch.h</a> b/<a href="../file/src/codesearch.h">src/codesearch.h</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -206,4 +206,6 @@ chunk_allocator *make_dump_allocator(code_searcher *search, const string&amp; path);
+</a> // chunk_allocator.cc
+ chunk_allocator *make_mem_allocator();
+ 
+<a href="#h2-0-3" id="h2-0-3" class="i">+void default_re2_options(RE2::Options&amp;);
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+
+</a> #endif /* CODESEARCH_H */
+<b>diff --git a/<a id="h3" href="../file/src/tools/Makefrag">src/tools/Makefrag</a> b/<a href="../file/src/tools/Makefrag">src/tools/Makefrag</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -1 +1 @@
+</a><a href="#h3-0-0" id="h3-0-0" class="d">-TOOLS := codesearch inspect-index
+</a><a href="#h3-0-1" id="h3-0-1" class="i">+TOOLS := codesearch inspect-index analyze-re
+</a><b>diff --git a/<a id="h4" href="../file/src/tools/analyze-re.cc">src/tools/analyze-re.cc</a> b/<a href="../file/src/tools/analyze-re.cc">src/tools/analyze-re.cc</a></b>
+<a href="#h4-0" id="h4-0" class="h">@@ -0,0 +1,55 @@
+</a><a href="#h4-0-0" id="h4-0-0" class="i">+#include &lt;gflags/gflags.h&gt;
+</a><a href="#h4-0-1" id="h4-0-1" class="i">+#include &lt;stdint.h&gt;
+</a><a href="#h4-0-2" id="h4-0-2" class="i">+#include &lt;fcntl.h&gt;
+</a><a href="#h4-0-3" id="h4-0-3" class="i">+#include &lt;sys/unistd.h&gt;
+</a><a href="#h4-0-4" id="h4-0-4" class="i">+#include &lt;sys/stat.h&gt;
+</a><a href="#h4-0-5" id="h4-0-5" class="i">+#include &lt;sys/mman.h&gt;
+</a><a href="#h4-0-6" id="h4-0-6" class="i">+#include &lt;stdlib.h&gt;
+</a><a href="#h4-0-7" id="h4-0-7" class="i">+#include &lt;assert.h&gt;
+</a><a href="#h4-0-8" id="h4-0-8" class="i">+#include &lt;string.h&gt;
+</a><a href="#h4-0-9" id="h4-0-9" class="i">+#include &lt;algorithm&gt;
+</a><a href="#h4-0-10" id="h4-0-10" class="i">+
+</a><a href="#h4-0-11" id="h4-0-11" class="i">+#include &lt;string&gt;
+</a><a href="#h4-0-12" id="h4-0-12" class="i">+
+</a><a href="#h4-0-13" id="h4-0-13" class="i">+#include &quot;dump_load.h&quot;
+</a><a href="#h4-0-14" id="h4-0-14" class="i">+#include &quot;codesearch.h&quot;
+</a><a href="#h4-0-15" id="h4-0-15" class="i">+#include &quot;debug.h&quot;
+</a><a href="#h4-0-16" id="h4-0-16" class="i">+#include &quot;indexer.h&quot;
+</a><a href="#h4-0-17" id="h4-0-17" class="i">+#include &quot;re_width.h&quot;
+</a><a href="#h4-0-18" id="h4-0-18" class="i">+
+</a><a href="#h4-0-19" id="h4-0-19" class="i">+int main(int argc, char **argv) {
+</a><a href="#h4-0-20" id="h4-0-20" class="i">+    google::SetUsageMessage(&quot;Usage: &quot; + string(argv[0]) + &quot; &lt;options&gt; REGEX&quot;);
+</a><a href="#h4-0-21" id="h4-0-21" class="i">+    google::ParseCommandLineFlags(&amp;argc, &amp;argv, true);
+</a><a href="#h4-0-22" id="h4-0-22" class="i">+
+</a><a href="#h4-0-23" id="h4-0-23" class="i">+    if (argc != 2) {
+</a><a href="#h4-0-24" id="h4-0-24" class="i">+        fprintf(stderr, &quot;Usage: %s &lt;options&gt; REGEX\n&quot;, argv[0]);
+</a><a href="#h4-0-25" id="h4-0-25" class="i">+        return 1;
+</a><a href="#h4-0-26" id="h4-0-26" class="i">+    }
+</a><a href="#h4-0-27" id="h4-0-27" class="i">+
+</a><a href="#h4-0-28" id="h4-0-28" class="i">+    RE2::Options opts;
+</a><a href="#h4-0-29" id="h4-0-29" class="i">+    default_re2_options(opts);
+</a><a href="#h4-0-30" id="h4-0-30" class="i">+
+</a><a href="#h4-0-31" id="h4-0-31" class="i">+    RE2 re(argv[1], opts);
+</a><a href="#h4-0-32" id="h4-0-32" class="i">+    if (!re.ok()) {
+</a><a href="#h4-0-33" id="h4-0-33" class="i">+        fprintf(stderr, &quot;Error: %s\n&quot;, re.error().c_str());
+</a><a href="#h4-0-34" id="h4-0-34" class="i">+        return 1;
+</a><a href="#h4-0-35" id="h4-0-35" class="i">+    }
+</a><a href="#h4-0-36" id="h4-0-36" class="i">+
+</a><a href="#h4-0-37" id="h4-0-37" class="i">+    WidthWalker width;
+</a><a href="#h4-0-38" id="h4-0-38" class="i">+    printf(&quot;== RE [%s] ==\n&quot;, argv[1]);
+</a><a href="#h4-0-39" id="h4-0-39" class="i">+    printf(&quot;width: %d\n&quot;, width.Walk(re.Regexp(), 0));
+</a><a href="#h4-0-40" id="h4-0-40" class="i">+    printf(&quot;Program size: %d\n&quot;, re.ProgramSize());
+</a><a href="#h4-0-41" id="h4-0-41" class="i">+
+</a><a href="#h4-0-42" id="h4-0-42" class="i">+    intrusive_ptr&lt;IndexKey&gt; key = indexRE(re);
+</a><a href="#h4-0-43" id="h4-0-43" class="i">+    if (key) {
+</a><a href="#h4-0-44" id="h4-0-44" class="i">+        IndexKey::Stats stats = key-&gt;stats();
+</a><a href="#h4-0-45" id="h4-0-45" class="i">+        printf(&quot;Index key:\n&quot;);
+</a><a href="#h4-0-46" id="h4-0-46" class="i">+        printf(&quot;  log10(selectivity): %f\n&quot;, log(stats.selectivity_)/log(10));
+</a><a href="#h4-0-47" id="h4-0-47" class="i">+        printf(&quot;  depth: %d\n&quot;, stats.depth_);
+</a><a href="#h4-0-48" id="h4-0-48" class="i">+        printf(&quot;  nodes: %ld\n&quot;, stats.nodes_);
+</a><a href="#h4-0-49" id="h4-0-49" class="i">+    } else {
+</a><a href="#h4-0-50" id="h4-0-50" class="i">+        printf(&quot;(Unindexable)\n&quot;);
+</a><a href="#h4-0-51" id="h4-0-51" class="i">+    }
+</a><a href="#h4-0-52" id="h4-0-52" class="i">+
+</a><a href="#h4-0-53" id="h4-0-53" class="i">+    return 0;
+</a><a href="#h4-0-54" id="h4-0-54" class="i">+}
+</a><b>diff --git a/<a id="h5" href="../file/src/tools/codesearch.cc">src/tools/codesearch.cc</a> b/<a href="../file/src/tools/codesearch.cc">src/tools/codesearch.cc</a></b>
+<a href="#h5-0" id="h5-0" class="h">@@ -238,13 +238,7 @@ void interact(code_searcher *cs, FILE *in, FILE *out) {
+</a>     assert(!setvbuf(out, NULL, _IONBF, 0));
+ 
+     RE2::Options opts;
+<a href="#h5-0-3" id="h5-0-3" class="d">-    opts.set_never_nl(true);
+</a><a href="#h5-0-4" id="h5-0-4" class="d">-    opts.set_one_line(false);
+</a><a href="#h5-0-5" id="h5-0-5" class="d">-    opts.set_perl_classes(true);
+</a><a href="#h5-0-6" id="h5-0-6" class="d">-    opts.set_word_boundary(true);
+</a><a href="#h5-0-7" id="h5-0-7" class="d">-    opts.set_posix_syntax(true);
+</a><a href="#h5-0-8" id="h5-0-8" class="d">-    opts.set_word_boundary(true);
+</a><a href="#h5-0-9" id="h5-0-9" class="d">-    opts.set_log_errors(false);
+</a><a href="#h5-0-10" id="h5-0-10" class="i">+    default_re2_options(opts);
+</a> 
+     while (true) {
+         if (FLAGS_json)
+</pre>
+</div>
+</body>
+</html>

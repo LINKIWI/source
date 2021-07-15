@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Replace FilteredRE2 with our own index-generation class. - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/5ed6735419ca4df37575f67cbcce8a118235ae71">5ed6735419ca4df37575f67cbcce8a118235ae71</a>
+<b>parent</b> <a href="../commit/9401a1fb5983885372a84050936fa2547761de5c">9401a1fb5983885372a84050936fa2547761de5c</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Wed, 30 Nov 2011 19:12:42 -0500
+
+Replace FilteredRE2 with our own index-generation class.
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">Makefile</a></td><td> | </td><td class="num">5</td><td><span class="i">+++</span><span class="d">--</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">codesearch.cc</a></td><td> | </td><td class="num">51</td><td><span class="i">++++++++++++++++++++</span><span class="d">-------------------------------</span></td></tr>
+<tr><td class="A">A</td><td><a href="#h2">indexer.cc</a></td><td> | </td><td class="num">271</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="A">A</td><td><a href="#h3">indexer.h</a></td><td> | </td><td class="num">57</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+</table></pre><pre>4 files changed, 351 insertions(+), 33 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/Makefile">Makefile</a> b/<a href="../file/Makefile">Makefile</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -24,8 +24,9 @@ ifneq ($(profile),)
+</a> override CXXFLAGS+=-DPROFILE_CODESEARCH
+ endif
+ 
+<a href="#h0-0-3" id="h0-0-3" class="d">-HEADERS = smart_git.h timer.h thread_queue.h mutex.h thread_pool.h codesearch.h chunk.h chunk_allocator.h
+</a><a href="#h0-0-4" id="h0-0-4" class="d">-OBJECTS = codesearch.o main.o chunk.o chunk_allocator.o radix_sort.o dump_load.o
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+OBJECTS = codesearch.o main.o chunk.o \
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+          chunk_allocator.o radix_sort.o \
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+          dump_load.o indexer.o
+</a> DEPFILES = $(OBJECTS:%.o=.%.d)
+ 
+ all: codesearch $(DEPFILES)
+<b>diff --git a/<a id="h1" href="../file/codesearch.cc">codesearch.cc</a> b/<a href="../file/codesearch.cc">codesearch.cc</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -9,7 +9,6 @@
+</a> #include &lt;fstream&gt;
+ 
+ #include &lt;re2/re2.h&gt;
+<a href="#h1-0-3" id="h1-0-3" class="d">-#include &lt;re2/filtered_re2.h&gt;
+</a> 
+ #include &lt;json/json.h&gt;
+ 
+<a href="#h1-1" id="h1-1" class="h">@@ -23,6 +22,7 @@
+</a> #include &quot;chunk_allocator.h&quot;
+ #include &quot;radix_sort.h&quot;
+ #include &quot;atomic.h&quot;
+<a href="#h1-1-3" id="h1-1-3" class="i">+#include &quot;indexer.h&quot;
+</a> 
+ #include &quot;utf8.h&quot;
+ 
+<a href="#h1-2" id="h1-2" class="h">@@ -43,12 +43,6 @@ DEFINE_bool(index, true, &quot;Create a suffix-array index to speed searches.&quot;);
+</a> DEFINE_int32(timeout, 1, &quot;The number of seconds a single search may run for.&quot;);
+ DECLARE_int32(threads);
+ 
+<a href="#h1-2-3" id="h1-2-3" class="d">-namespace re2 {
+</a><a href="#h1-2-4" id="h1-2-4" class="d">-    extern int32_t FLAGS_filtered_re2_min_atom_len;
+</a><a href="#h1-2-5" id="h1-2-5" class="d">-};
+</a><a href="#h1-2-6" id="h1-2-6" class="d">-
+</a><a href="#h1-2-7" id="h1-2-7" class="d">-const int kMaxFilters = 4;
+</a><a href="#h1-2-8" id="h1-2-8" class="d">-
+</a> struct match_result {
+     search_file *file;
+     int lno;
+<a href="#h1-3" id="h1-3" class="h">@@ -82,21 +76,13 @@ public:
+</a>         matches_(0), re2_time_(false), git_time_(false),
+         index_time_(false), sort_time_(false)
+     {
+<a href="#h1-3-3" id="h1-3-3" class="d">-        int id;
+</a><a href="#h1-3-4" id="h1-3-4" class="d">-        re2::FLAGS_filtered_re2_min_atom_len = 5;
+</a><a href="#h1-3-5" id="h1-3-5" class="d">-        while(re2::FLAGS_filtered_re2_min_atom_len &gt; 0) {
+</a><a href="#h1-3-6" id="h1-3-6" class="d">-            re2::FilteredRE2 fre2;
+</a><a href="#h1-3-7" id="h1-3-7" class="d">-            assert(!fre2.Add(pat.pattern(), pat.options(), &amp;id));
+</a><a href="#h1-3-8" id="h1-3-8" class="d">-            fre2.Compile(&amp;filter_, false);
+</a><a href="#h1-3-9" id="h1-3-9" class="d">-            log_profile(&quot;Filter size %d: %d hits.\n&quot;,
+</a><a href="#h1-3-10" id="h1-3-10" class="d">-                        re2::FLAGS_filtered_re2_min_atom_len,
+</a><a href="#h1-3-11" id="h1-3-11" class="d">-                        int(filter_.size()));
+</a><a href="#h1-3-12" id="h1-3-12" class="d">-            for (int i = 0; i &lt; filter_.size(); i++)
+</a><a href="#h1-3-13" id="h1-3-13" class="d">-                log_profile(&quot; -&gt; %s\n&quot;, filter_[i].c_str());
+</a><a href="#h1-3-14" id="h1-3-14" class="d">-            if (filter_.size() &gt; 0 &amp;&amp; filter_.size() &lt;= kMaxFilters)
+</a><a href="#h1-3-15" id="h1-3-15" class="d">-                break;
+</a><a href="#h1-3-16" id="h1-3-16" class="d">-            re2::FLAGS_filtered_re2_min_atom_len--;
+</a><a href="#h1-3-17" id="h1-3-17" class="i">+        index_ = indexRE(pat);
+</a><a href="#h1-3-18" id="h1-3-18" class="i">+        log_profile(&quot;Index(%d): \n&quot;, int(index_-&gt;keys.size()));
+</a><a href="#h1-3-19" id="h1-3-19" class="i">+        for (vector&lt;string&gt;::const_iterator it = index_-&gt;keys.begin();
+</a><a href="#h1-3-20" id="h1-3-20" class="i">+             it != index_-&gt;keys.end(); it++) {
+</a><a href="#h1-3-21" id="h1-3-21" class="i">+            log_profile(&quot;  %s\n&quot;, it-&gt;c_str());
+</a>         }
+<a href="#h1-3-23" id="h1-3-23" class="i">+
+</a>         if (FLAGS_timeout &lt;= 0) {
+             limit_.tv_sec = numeric_limits&lt;time_t&gt;::max();
+         } else {
+<a href="#h1-4" id="h1-4" class="h">@@ -217,7 +203,7 @@ protected:
+</a>     RE2&amp; pat_;
+     thread_queue&lt;match_result*&gt;&amp; queue_;
+     atomic_int matches_;
+<a href="#h1-4-3" id="h1-4-3" class="d">-    vector&lt;string&gt; filter_;
+</a><a href="#h1-4-4" id="h1-4-4" class="i">+    unique_ptr&lt;IndexKey&gt; index_;
+</a>     timer re2_time_;
+     timer git_time_;
+     timer index_time_;
+<a href="#h1-5" id="h1-5" class="h">@@ -434,7 +420,7 @@ bool searcher::operator()(const chunk *chunk)
+</a>         return true;
+     }
+ 
+<a href="#h1-5-3" id="h1-5-3" class="d">-    if (FLAGS_index &amp;&amp; filter_.size() &gt; 0 &amp;&amp; filter_.size() &lt;= kMaxFilters)
+</a><a href="#h1-5-4" id="h1-5-4" class="i">+    if (FLAGS_index &amp;&amp; index_-&gt;keys.size())
+</a>         filtered_search(chunk);
+     else
+         full_search(chunk);
+<a href="#h1-6" id="h1-6" class="h">@@ -448,23 +434,26 @@ bool searcher::operator()(const chunk *chunk)
+</a> 
+ void searcher::filtered_search(const chunk *chunk)
+ {
+<a href="#h1-6-3" id="h1-6-3" class="d">-    log_profile(&quot;Attempting filtered search with %d filters\n&quot;, int(filter_.size()));
+</a><a href="#h1-6-4" id="h1-6-4" class="i">+    log_profile(&quot;Attempting filtered search with %d filters\n&quot;,
+</a><a href="#h1-6-5" id="h1-6-5" class="i">+                int(index_-&gt;keys.size()));
+</a>     chunk::lt_suffix lt(chunk);
+ 
+<a href="#h1-6-8" id="h1-6-8" class="d">-    pair&lt;uint32_t*, uint32_t*&gt; ranges[kMaxFilters + 1];
+</a><a href="#h1-6-9" id="h1-6-9" class="i">+    vector&lt;pair&lt;uint32_t*, uint32_t*&gt; &gt; ranges;
+</a><a href="#h1-6-10" id="h1-6-10" class="i">+    ranges.reserve(index_-&gt;keys.size());
+</a>     uint32_t *indexes;
+     int count = 0, off = 0;
+ 
+     {
+         run_timer run(index_time_);
+<a href="#h1-6-16" id="h1-6-16" class="d">-        for (int i = 0; i &lt; filter_.size(); i++) {
+</a><a href="#h1-6-17" id="h1-6-17" class="d">-            ranges[i] = equal_range(chunk-&gt;suffixes,
+</a><a href="#h1-6-18" id="h1-6-18" class="d">-                                    chunk-&gt;suffixes + chunk-&gt;size,
+</a><a href="#h1-6-19" id="h1-6-19" class="d">-                                    filter_[i], lt);
+</a><a href="#h1-6-20" id="h1-6-20" class="d">-            count += ranges[i].second - ranges[i].first;
+</a><a href="#h1-6-21" id="h1-6-21" class="i">+        for (vector&lt;string&gt;::iterator it = index_-&gt;keys.begin();
+</a><a href="#h1-6-22" id="h1-6-22" class="i">+             it != index_-&gt;keys.end(); ++it) {
+</a><a href="#h1-6-23" id="h1-6-23" class="i">+            ranges.push_back(equal_range(chunk-&gt;suffixes,
+</a><a href="#h1-6-24" id="h1-6-24" class="i">+                                         chunk-&gt;suffixes + chunk-&gt;size,
+</a><a href="#h1-6-25" id="h1-6-25" class="i">+                                         *it, lt));
+</a><a href="#h1-6-26" id="h1-6-26" class="i">+            count += ranges.back().second - ranges.back().first;
+</a>         }
+         indexes = new uint32_t[count];
+<a href="#h1-6-29" id="h1-6-29" class="d">-        for (int i = 0; i &lt; filter_.size(); i++) {
+</a><a href="#h1-6-30" id="h1-6-30" class="i">+        for (int i = 0; i &lt; index_-&gt;keys.size(); i++) {
+</a>             int width = ranges[i].second - ranges[i].first;
+             memcpy(&amp;indexes[off], ranges[i].first, width * sizeof(uint32_t));
+             off += width;
+<b>diff --git a/<a id="h2" href="../file/indexer.cc">indexer.cc</a> b/<a href="../file/indexer.cc">indexer.cc</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -0,0 +1,271 @@
+</a><a href="#h2-0-0" id="h2-0-0" class="i">+#include &quot;indexer.h&quot;
+</a><a href="#h2-0-1" id="h2-0-1" class="i">+
+</a><a href="#h2-0-2" id="h2-0-2" class="i">+#include &lt;gflags/gflags.h&gt;
+</a><a href="#h2-0-3" id="h2-0-3" class="i">+
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+#include &lt;stdarg.h&gt;
+</a><a href="#h2-0-5" id="h2-0-5" class="i">+
+</a><a href="#h2-0-6" id="h2-0-6" class="i">+DEFINE_bool(debug_index, false, &quot;Debug the index query generator.&quot;);
+</a><a href="#h2-0-7" id="h2-0-7" class="i">+
+</a><a href="#h2-0-8" id="h2-0-8" class="i">+static void debug(const char *format, ...) {
+</a><a href="#h2-0-9" id="h2-0-9" class="i">+    if (!FLAGS_debug_index)
+</a><a href="#h2-0-10" id="h2-0-10" class="i">+        return;
+</a><a href="#h2-0-11" id="h2-0-11" class="i">+    va_list ap;
+</a><a href="#h2-0-12" id="h2-0-12" class="i">+
+</a><a href="#h2-0-13" id="h2-0-13" class="i">+    va_start(ap, format);
+</a><a href="#h2-0-14" id="h2-0-14" class="i">+    vprintf(format, ap);
+</a><a href="#h2-0-15" id="h2-0-15" class="i">+    va_end(ap);
+</a><a href="#h2-0-16" id="h2-0-16" class="i">+}
+</a><a href="#h2-0-17" id="h2-0-17" class="i">+
+</a><a href="#h2-0-18" id="h2-0-18" class="i">+using namespace re2;
+</a><a href="#h2-0-19" id="h2-0-19" class="i">+using namespace std;
+</a><a href="#h2-0-20" id="h2-0-20" class="i">+
+</a><a href="#h2-0-21" id="h2-0-21" class="i">+const unsigned kMinWeight = 16;
+</a><a href="#h2-0-22" id="h2-0-22" class="i">+const int kMaxFilters     = 32;
+</a><a href="#h2-0-23" id="h2-0-23" class="i">+
+</a><a href="#h2-0-24" id="h2-0-24" class="i">+double IndexKey::selectivity() {
+</a><a href="#h2-0-25" id="h2-0-25" class="i">+    if (keys.size() == 0)
+</a><a href="#h2-0-26" id="h2-0-26" class="i">+        return 1.0;
+</a><a href="#h2-0-27" id="h2-0-27" class="i">+
+</a><a href="#h2-0-28" id="h2-0-28" class="i">+    double s = 0.0;
+</a><a href="#h2-0-29" id="h2-0-29" class="i">+    for (vector&lt;string&gt;::const_iterator it = keys.begin();
+</a><a href="#h2-0-30" id="h2-0-30" class="i">+         it != keys.end(); ++it)
+</a><a href="#h2-0-31" id="h2-0-31" class="i">+        s += pow(1./64, min(it-&gt;size(), size_t(4)));
+</a><a href="#h2-0-32" id="h2-0-32" class="i">+
+</a><a href="#h2-0-33" id="h2-0-33" class="i">+    return s;
+</a><a href="#h2-0-34" id="h2-0-34" class="i">+}
+</a><a href="#h2-0-35" id="h2-0-35" class="i">+
+</a><a href="#h2-0-36" id="h2-0-36" class="i">+unsigned IndexKey::weight() {
+</a><a href="#h2-0-37" id="h2-0-37" class="i">+    return 1/selectivity();
+</a><a href="#h2-0-38" id="h2-0-38" class="i">+}
+</a><a href="#h2-0-39" id="h2-0-39" class="i">+
+</a><a href="#h2-0-40" id="h2-0-40" class="i">+string IndexKey::ToString() {
+</a><a href="#h2-0-41" id="h2-0-41" class="i">+    string out;
+</a><a href="#h2-0-42" id="h2-0-42" class="i">+    for (vector&lt;string&gt;::const_iterator it = keys.begin();
+</a><a href="#h2-0-43" id="h2-0-43" class="i">+         it != keys.end(); ++it) {
+</a><a href="#h2-0-44" id="h2-0-44" class="i">+        out += *it;
+</a><a href="#h2-0-45" id="h2-0-45" class="i">+        out += &quot;,&quot;;
+</a><a href="#h2-0-46" id="h2-0-46" class="i">+    }
+</a><a href="#h2-0-47" id="h2-0-47" class="i">+    out += &quot;|&quot;;
+</a><a href="#h2-0-48" id="h2-0-48" class="i">+    if (anchor &amp; kAnchorLeft)
+</a><a href="#h2-0-49" id="h2-0-49" class="i">+        out += &quot;&lt;&quot;;
+</a><a href="#h2-0-50" id="h2-0-50" class="i">+    if (anchor &amp; kAnchorRight)
+</a><a href="#h2-0-51" id="h2-0-51" class="i">+        out += &quot;&gt;&quot;;
+</a><a href="#h2-0-52" id="h2-0-52" class="i">+    return out;
+</a><a href="#h2-0-53" id="h2-0-53" class="i">+}
+</a><a href="#h2-0-54" id="h2-0-54" class="i">+
+</a><a href="#h2-0-55" id="h2-0-55" class="i">+class IndexWalker : public Regexp::Walker&lt;IndexKey*&gt; {
+</a><a href="#h2-0-56" id="h2-0-56" class="i">+public:
+</a><a href="#h2-0-57" id="h2-0-57" class="i">+    IndexWalker() { }
+</a><a href="#h2-0-58" id="h2-0-58" class="i">+    virtual IndexKey *
+</a><a href="#h2-0-59" id="h2-0-59" class="i">+    PostVisit(Regexp* re, IndexKey *parent_arg,
+</a><a href="#h2-0-60" id="h2-0-60" class="i">+              IndexKey *pre_arg,
+</a><a href="#h2-0-61" id="h2-0-61" class="i">+              IndexKey **child_args, int nchild_args);
+</a><a href="#h2-0-62" id="h2-0-62" class="i">+
+</a><a href="#h2-0-63" id="h2-0-63" class="i">+    virtual IndexKey *
+</a><a href="#h2-0-64" id="h2-0-64" class="i">+    ShortVisit(Regexp* re,
+</a><a href="#h2-0-65" id="h2-0-65" class="i">+               IndexKey *parent_arg);
+</a><a href="#h2-0-66" id="h2-0-66" class="i">+
+</a><a href="#h2-0-67" id="h2-0-67" class="i">+private:
+</a><a href="#h2-0-68" id="h2-0-68" class="i">+    IndexWalker(const IndexWalker&amp;);
+</a><a href="#h2-0-69" id="h2-0-69" class="i">+    void operator=(const IndexWalker&amp;);
+</a><a href="#h2-0-70" id="h2-0-70" class="i">+};
+</a><a href="#h2-0-71" id="h2-0-71" class="i">+
+</a><a href="#h2-0-72" id="h2-0-72" class="i">+namespace {
+</a><a href="#h2-0-73" id="h2-0-73" class="i">+    string RuneToString(Rune r) {
+</a><a href="#h2-0-74" id="h2-0-74" class="i">+        char buf[UTFmax];
+</a><a href="#h2-0-75" id="h2-0-75" class="i">+        int n = runetochar(buf, &amp;r);
+</a><a href="#h2-0-76" id="h2-0-76" class="i">+        return string(buf, n);
+</a><a href="#h2-0-77" id="h2-0-77" class="i">+    }
+</a><a href="#h2-0-78" id="h2-0-78" class="i">+
+</a><a href="#h2-0-79" id="h2-0-79" class="i">+    IndexKey *Any() {
+</a><a href="#h2-0-80" id="h2-0-80" class="i">+        return new IndexKey(kAnchorNone);
+</a><a href="#h2-0-81" id="h2-0-81" class="i">+    }
+</a><a href="#h2-0-82" id="h2-0-82" class="i">+
+</a><a href="#h2-0-83" id="h2-0-83" class="i">+    IndexKey *Empty() {
+</a><a href="#h2-0-84" id="h2-0-84" class="i">+        return new IndexKey(kAnchorBoth);
+</a><a href="#h2-0-85" id="h2-0-85" class="i">+    }
+</a><a href="#h2-0-86" id="h2-0-86" class="i">+
+</a><a href="#h2-0-87" id="h2-0-87" class="i">+
+</a><a href="#h2-0-88" id="h2-0-88" class="i">+    IndexKey *Literal(Rune r) {
+</a><a href="#h2-0-89" id="h2-0-89" class="i">+        IndexKey *k = new IndexKey;
+</a><a href="#h2-0-90" id="h2-0-90" class="i">+        k-&gt;keys.push_back(RuneToString(r));
+</a><a href="#h2-0-91" id="h2-0-91" class="i">+        k-&gt;anchor = kAnchorBoth;
+</a><a href="#h2-0-92" id="h2-0-92" class="i">+        return k;
+</a><a href="#h2-0-93" id="h2-0-93" class="i">+    }
+</a><a href="#h2-0-94" id="h2-0-94" class="i">+
+</a><a href="#h2-0-95" id="h2-0-95" class="i">+    IndexKey *Literal(Rune *runes, int nrunes) {
+</a><a href="#h2-0-96" id="h2-0-96" class="i">+        IndexKey *k = new IndexKey;
+</a><a href="#h2-0-97" id="h2-0-97" class="i">+        string lit;
+</a><a href="#h2-0-98" id="h2-0-98" class="i">+
+</a><a href="#h2-0-99" id="h2-0-99" class="i">+        for (int i = 0; i &lt; nrunes; i++) {
+</a><a href="#h2-0-100" id="h2-0-100" class="i">+            lit.append(RuneToString(runes[i]));
+</a><a href="#h2-0-101" id="h2-0-101" class="i">+        }
+</a><a href="#h2-0-102" id="h2-0-102" class="i">+
+</a><a href="#h2-0-103" id="h2-0-103" class="i">+        k-&gt;keys.push_back(lit);
+</a><a href="#h2-0-104" id="h2-0-104" class="i">+        k-&gt;anchor = kAnchorBoth;
+</a><a href="#h2-0-105" id="h2-0-105" class="i">+
+</a><a href="#h2-0-106" id="h2-0-106" class="i">+        return k;
+</a><a href="#h2-0-107" id="h2-0-107" class="i">+    }
+</a><a href="#h2-0-108" id="h2-0-108" class="i">+
+</a><a href="#h2-0-109" id="h2-0-109" class="i">+    IndexKey *CClass(CharClass *cc) {
+</a><a href="#h2-0-110" id="h2-0-110" class="i">+        if (cc-&gt;size() &gt; kMaxFilters)
+</a><a href="#h2-0-111" id="h2-0-111" class="i">+            return Any();
+</a><a href="#h2-0-112" id="h2-0-112" class="i">+
+</a><a href="#h2-0-113" id="h2-0-113" class="i">+        IndexKey *k = new IndexKey();
+</a><a href="#h2-0-114" id="h2-0-114" class="i">+
+</a><a href="#h2-0-115" id="h2-0-115" class="i">+        for (CharClass::iterator i = cc-&gt;begin(); i != cc-&gt;end(); ++i)
+</a><a href="#h2-0-116" id="h2-0-116" class="i">+            for (Rune r = i-&gt;lo; r &lt;= i-&gt;hi; r++)
+</a><a href="#h2-0-117" id="h2-0-117" class="i">+                k-&gt;keys.push_back(RuneToString(r));
+</a><a href="#h2-0-118" id="h2-0-118" class="i">+
+</a><a href="#h2-0-119" id="h2-0-119" class="i">+        k-&gt;anchor = kAnchorBoth;
+</a><a href="#h2-0-120" id="h2-0-120" class="i">+
+</a><a href="#h2-0-121" id="h2-0-121" class="i">+        return k;
+</a><a href="#h2-0-122" id="h2-0-122" class="i">+    }
+</a><a href="#h2-0-123" id="h2-0-123" class="i">+
+</a><a href="#h2-0-124" id="h2-0-124" class="i">+    IndexKey *Concat(IndexKey *lhs, IndexKey *rhs) {
+</a><a href="#h2-0-125" id="h2-0-125" class="i">+        IndexKey *out = 0;
+</a><a href="#h2-0-126" id="h2-0-126" class="i">+
+</a><a href="#h2-0-127" id="h2-0-127" class="i">+        debug(&quot;Concat([%s](%d), [%s](%d)) = &quot;,
+</a><a href="#h2-0-128" id="h2-0-128" class="i">+               lhs-&gt;ToString().c_str(),
+</a><a href="#h2-0-129" id="h2-0-129" class="i">+               lhs-&gt;weight(),
+</a><a href="#h2-0-130" id="h2-0-130" class="i">+               rhs-&gt;ToString().c_str(),
+</a><a href="#h2-0-131" id="h2-0-131" class="i">+               rhs-&gt;weight());
+</a><a href="#h2-0-132" id="h2-0-132" class="i">+
+</a><a href="#h2-0-133" id="h2-0-133" class="i">+        if ((lhs-&gt;anchor &amp; kAnchorRight) &amp;&amp;
+</a><a href="#h2-0-134" id="h2-0-134" class="i">+            (rhs-&gt;anchor &amp; kAnchorLeft) &amp;&amp;
+</a><a href="#h2-0-135" id="h2-0-135" class="i">+            lhs-&gt;keys.size() &amp;&amp; rhs-&gt;keys.size() &amp;&amp;
+</a><a href="#h2-0-136" id="h2-0-136" class="i">+            lhs-&gt;keys.size() * rhs-&gt;keys.size() &lt;= kMaxFilters) {
+</a><a href="#h2-0-137" id="h2-0-137" class="i">+            out = new IndexKey;
+</a><a href="#h2-0-138" id="h2-0-138" class="i">+            for (vector&lt;string&gt;::iterator lit = lhs-&gt;keys.begin();
+</a><a href="#h2-0-139" id="h2-0-139" class="i">+                 lit != lhs-&gt;keys.end(); ++lit)
+</a><a href="#h2-0-140" id="h2-0-140" class="i">+                for (vector&lt;string&gt;::iterator rit = rhs-&gt;keys.begin();
+</a><a href="#h2-0-141" id="h2-0-141" class="i">+                     rit != rhs-&gt;keys.end(); ++rit)
+</a><a href="#h2-0-142" id="h2-0-142" class="i">+                    out-&gt;keys.push_back(*lit + *rit);
+</a><a href="#h2-0-143" id="h2-0-143" class="i">+            out-&gt;anchor = (lhs-&gt;anchor &amp; kAnchorLeft) | (rhs-&gt;anchor &amp; kAnchorRight);
+</a><a href="#h2-0-144" id="h2-0-144" class="i">+        }
+</a><a href="#h2-0-145" id="h2-0-145" class="i">+
+</a><a href="#h2-0-146" id="h2-0-146" class="i">+        if (!out || lhs-&gt;weight() &gt; out-&gt;weight()) {
+</a><a href="#h2-0-147" id="h2-0-147" class="i">+            delete out;
+</a><a href="#h2-0-148" id="h2-0-148" class="i">+            out = lhs;
+</a><a href="#h2-0-149" id="h2-0-149" class="i">+            out-&gt;anchor &amp;= ~kAnchorRight;
+</a><a href="#h2-0-150" id="h2-0-150" class="i">+        } else {
+</a><a href="#h2-0-151" id="h2-0-151" class="i">+            delete lhs;
+</a><a href="#h2-0-152" id="h2-0-152" class="i">+        }
+</a><a href="#h2-0-153" id="h2-0-153" class="i">+
+</a><a href="#h2-0-154" id="h2-0-154" class="i">+        if (rhs-&gt;weight() &gt; out-&gt;weight()) {
+</a><a href="#h2-0-155" id="h2-0-155" class="i">+            delete out;
+</a><a href="#h2-0-156" id="h2-0-156" class="i">+            out = rhs;
+</a><a href="#h2-0-157" id="h2-0-157" class="i">+            out-&gt;anchor &amp;= ~kAnchorLeft;
+</a><a href="#h2-0-158" id="h2-0-158" class="i">+        } else {
+</a><a href="#h2-0-159" id="h2-0-159" class="i">+            delete rhs;
+</a><a href="#h2-0-160" id="h2-0-160" class="i">+        }
+</a><a href="#h2-0-161" id="h2-0-161" class="i">+
+</a><a href="#h2-0-162" id="h2-0-162" class="i">+        debug(&quot;[%s]\n&quot;, out-&gt;ToString().c_str());
+</a><a href="#h2-0-163" id="h2-0-163" class="i">+
+</a><a href="#h2-0-164" id="h2-0-164" class="i">+        return out;
+</a><a href="#h2-0-165" id="h2-0-165" class="i">+    }
+</a><a href="#h2-0-166" id="h2-0-166" class="i">+
+</a><a href="#h2-0-167" id="h2-0-167" class="i">+    IndexKey *Alternate(IndexKey *lhs, IndexKey *rhs) {
+</a><a href="#h2-0-168" id="h2-0-168" class="i">+        if (lhs-&gt;keys.size() + rhs-&gt;keys.size() &lt; kMaxFilters) {
+</a><a href="#h2-0-169" id="h2-0-169" class="i">+            lhs-&gt;keys.insert(lhs-&gt;keys.end(), rhs-&gt;keys.begin(), rhs-&gt;keys.end());
+</a><a href="#h2-0-170" id="h2-0-170" class="i">+            lhs-&gt;anchor &amp;= rhs-&gt;anchor;
+</a><a href="#h2-0-171" id="h2-0-171" class="i">+
+</a><a href="#h2-0-172" id="h2-0-172" class="i">+            delete rhs;
+</a><a href="#h2-0-173" id="h2-0-173" class="i">+            return lhs;
+</a><a href="#h2-0-174" id="h2-0-174" class="i">+        }
+</a><a href="#h2-0-175" id="h2-0-175" class="i">+        delete lhs;
+</a><a href="#h2-0-176" id="h2-0-176" class="i">+        delete rhs;
+</a><a href="#h2-0-177" id="h2-0-177" class="i">+
+</a><a href="#h2-0-178" id="h2-0-178" class="i">+        return Any();
+</a><a href="#h2-0-179" id="h2-0-179" class="i">+    }
+</a><a href="#h2-0-180" id="h2-0-180" class="i">+
+</a><a href="#h2-0-181" id="h2-0-181" class="i">+};
+</a><a href="#h2-0-182" id="h2-0-182" class="i">+
+</a><a href="#h2-0-183" id="h2-0-183" class="i">+unique_ptr&lt;IndexKey&gt; indexRE(const re2::RE2 &amp;re) {
+</a><a href="#h2-0-184" id="h2-0-184" class="i">+    IndexWalker walk;
+</a><a href="#h2-0-185" id="h2-0-185" class="i">+
+</a><a href="#h2-0-186" id="h2-0-186" class="i">+    unique_ptr&lt;IndexKey&gt; key(walk.Walk(re.Regexp(), 0));
+</a><a href="#h2-0-187" id="h2-0-187" class="i">+
+</a><a href="#h2-0-188" id="h2-0-188" class="i">+    if (key-&gt;weight() &lt; kMinWeight)
+</a><a href="#h2-0-189" id="h2-0-189" class="i">+        key-&gt;keys.clear();
+</a><a href="#h2-0-190" id="h2-0-190" class="i">+    return key;
+</a><a href="#h2-0-191" id="h2-0-191" class="i">+}
+</a><a href="#h2-0-192" id="h2-0-192" class="i">+
+</a><a href="#h2-0-193" id="h2-0-193" class="i">+IndexKey *IndexWalker::PostVisit(Regexp* re, IndexKey *parent_arg,
+</a><a href="#h2-0-194" id="h2-0-194" class="i">+                                 IndexKey *pre_arg,
+</a><a href="#h2-0-195" id="h2-0-195" class="i">+                                 IndexKey **child_args, int nchild_args) {
+</a><a href="#h2-0-196" id="h2-0-196" class="i">+    IndexKey *key;
+</a><a href="#h2-0-197" id="h2-0-197" class="i">+
+</a><a href="#h2-0-198" id="h2-0-198" class="i">+    switch (re-&gt;op()) {
+</a><a href="#h2-0-199" id="h2-0-199" class="i">+    case kRegexpNoMatch:
+</a><a href="#h2-0-200" id="h2-0-200" class="i">+    case kRegexpEmptyMatch:      // anywhere
+</a><a href="#h2-0-201" id="h2-0-201" class="i">+    case kRegexpBeginLine:       // at beginning of line
+</a><a href="#h2-0-202" id="h2-0-202" class="i">+    case kRegexpEndLine:         // at end of line
+</a><a href="#h2-0-203" id="h2-0-203" class="i">+    case kRegexpBeginText:       // at beginning of text
+</a><a href="#h2-0-204" id="h2-0-204" class="i">+    case kRegexpEndText:         // at end of text
+</a><a href="#h2-0-205" id="h2-0-205" class="i">+    case kRegexpWordBoundary:    // at word boundary
+</a><a href="#h2-0-206" id="h2-0-206" class="i">+    case kRegexpNoWordBoundary:  // not at word boundary
+</a><a href="#h2-0-207" id="h2-0-207" class="i">+        key = Empty();
+</a><a href="#h2-0-208" id="h2-0-208" class="i">+        break;
+</a><a href="#h2-0-209" id="h2-0-209" class="i">+
+</a><a href="#h2-0-210" id="h2-0-210" class="i">+    case kRegexpAnyChar:
+</a><a href="#h2-0-211" id="h2-0-211" class="i">+    case kRegexpAnyByte:
+</a><a href="#h2-0-212" id="h2-0-212" class="i">+        key = Any();
+</a><a href="#h2-0-213" id="h2-0-213" class="i">+        break;
+</a><a href="#h2-0-214" id="h2-0-214" class="i">+
+</a><a href="#h2-0-215" id="h2-0-215" class="i">+    case kRegexpLiteral:
+</a><a href="#h2-0-216" id="h2-0-216" class="i">+        key = Literal(re-&gt;rune());
+</a><a href="#h2-0-217" id="h2-0-217" class="i">+        break;
+</a><a href="#h2-0-218" id="h2-0-218" class="i">+
+</a><a href="#h2-0-219" id="h2-0-219" class="i">+    case kRegexpCharClass:
+</a><a href="#h2-0-220" id="h2-0-220" class="i">+        key = CClass(re-&gt;cc());
+</a><a href="#h2-0-221" id="h2-0-221" class="i">+        break;
+</a><a href="#h2-0-222" id="h2-0-222" class="i">+
+</a><a href="#h2-0-223" id="h2-0-223" class="i">+    case kRegexpLiteralString:
+</a><a href="#h2-0-224" id="h2-0-224" class="i">+        key = Literal(re-&gt;runes(), re-&gt;nrunes());
+</a><a href="#h2-0-225" id="h2-0-225" class="i">+        break;
+</a><a href="#h2-0-226" id="h2-0-226" class="i">+
+</a><a href="#h2-0-227" id="h2-0-227" class="i">+    case kRegexpConcat:
+</a><a href="#h2-0-228" id="h2-0-228" class="i">+        key = Empty();
+</a><a href="#h2-0-229" id="h2-0-229" class="i">+        for (int i = 0; i &lt; nchild_args; i++)
+</a><a href="#h2-0-230" id="h2-0-230" class="i">+            key = Concat(key, child_args[i]);
+</a><a href="#h2-0-231" id="h2-0-231" class="i">+        break;
+</a><a href="#h2-0-232" id="h2-0-232" class="i">+
+</a><a href="#h2-0-233" id="h2-0-233" class="i">+    case kRegexpAlternate:
+</a><a href="#h2-0-234" id="h2-0-234" class="i">+        key = child_args[0];
+</a><a href="#h2-0-235" id="h2-0-235" class="i">+        for (int i = 1; i &lt; nchild_args; i++)
+</a><a href="#h2-0-236" id="h2-0-236" class="i">+            key = Alternate(key, child_args[i]);
+</a><a href="#h2-0-237" id="h2-0-237" class="i">+        break;
+</a><a href="#h2-0-238" id="h2-0-238" class="i">+
+</a><a href="#h2-0-239" id="h2-0-239" class="i">+    case kRegexpStar:
+</a><a href="#h2-0-240" id="h2-0-240" class="i">+    case kRegexpQuest:
+</a><a href="#h2-0-241" id="h2-0-241" class="i">+        delete child_args[0];
+</a><a href="#h2-0-242" id="h2-0-242" class="i">+        key = Any();
+</a><a href="#h2-0-243" id="h2-0-243" class="i">+        break;
+</a><a href="#h2-0-244" id="h2-0-244" class="i">+
+</a><a href="#h2-0-245" id="h2-0-245" class="i">+    case kRegexpCapture:
+</a><a href="#h2-0-246" id="h2-0-246" class="i">+        key = child_args[0];
+</a><a href="#h2-0-247" id="h2-0-247" class="i">+        break;
+</a><a href="#h2-0-248" id="h2-0-248" class="i">+
+</a><a href="#h2-0-249" id="h2-0-249" class="i">+    case kRegexpRepeat:
+</a><a href="#h2-0-250" id="h2-0-250" class="i">+    case kRegexpPlus:
+</a><a href="#h2-0-251" id="h2-0-251" class="i">+        key = child_args[0];
+</a><a href="#h2-0-252" id="h2-0-252" class="i">+        if (key-&gt;anchor == kAnchorBoth)
+</a><a href="#h2-0-253" id="h2-0-253" class="i">+            key-&gt;anchor &amp;= ~kAnchorRight;
+</a><a href="#h2-0-254" id="h2-0-254" class="i">+        break;
+</a><a href="#h2-0-255" id="h2-0-255" class="i">+
+</a><a href="#h2-0-256" id="h2-0-256" class="i">+    default:
+</a><a href="#h2-0-257" id="h2-0-257" class="i">+        assert(false);
+</a><a href="#h2-0-258" id="h2-0-258" class="i">+    }
+</a><a href="#h2-0-259" id="h2-0-259" class="i">+
+</a><a href="#h2-0-260" id="h2-0-260" class="i">+    debug(&quot; %s -&gt; [%s](%d)\n&quot;,
+</a><a href="#h2-0-261" id="h2-0-261" class="i">+          re-&gt;ToString().c_str(),
+</a><a href="#h2-0-262" id="h2-0-262" class="i">+          key-&gt;ToString().c_str(),
+</a><a href="#h2-0-263" id="h2-0-263" class="i">+          key-&gt;weight());
+</a><a href="#h2-0-264" id="h2-0-264" class="i">+
+</a><a href="#h2-0-265" id="h2-0-265" class="i">+    return key;
+</a><a href="#h2-0-266" id="h2-0-266" class="i">+}
+</a><a href="#h2-0-267" id="h2-0-267" class="i">+
+</a><a href="#h2-0-268" id="h2-0-268" class="i">+IndexKey *IndexWalker::ShortVisit(Regexp* re, IndexKey *parent_arg) {
+</a><a href="#h2-0-269" id="h2-0-269" class="i">+    return Any();
+</a><a href="#h2-0-270" id="h2-0-270" class="i">+}
+</a><b>diff --git a/<a id="h3" href="../file/indexer.h">indexer.h</a> b/<a href="../file/indexer.h">indexer.h</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -0,0 +1,57 @@
+</a><a href="#h3-0-0" id="h3-0-0" class="i">+#ifndef CODESEARCH_INDEXER_H
+</a><a href="#h3-0-1" id="h3-0-1" class="i">+#define CODESEARCH_INDEXER_H
+</a><a href="#h3-0-2" id="h3-0-2" class="i">+
+</a><a href="#h3-0-3" id="h3-0-3" class="i">+#include &lt;vector&gt;
+</a><a href="#h3-0-4" id="h3-0-4" class="i">+#include &lt;string&gt;
+</a><a href="#h3-0-5" id="h3-0-5" class="i">+#include &lt;memory&gt;
+</a><a href="#h3-0-6" id="h3-0-6" class="i">+
+</a><a href="#h3-0-7" id="h3-0-7" class="i">+#include &quot;re2/re2.h&quot;
+</a><a href="#h3-0-8" id="h3-0-8" class="i">+#include &quot;re2/walker-inl.h&quot;
+</a><a href="#h3-0-9" id="h3-0-9" class="i">+
+</a><a href="#h3-0-10" id="h3-0-10" class="i">+using std::string;
+</a><a href="#h3-0-11" id="h3-0-11" class="i">+using std::vector;
+</a><a href="#h3-0-12" id="h3-0-12" class="i">+using std::unique_ptr;
+</a><a href="#h3-0-13" id="h3-0-13" class="i">+
+</a><a href="#h3-0-14" id="h3-0-14" class="i">+enum {
+</a><a href="#h3-0-15" id="h3-0-15" class="i">+    kAnchorNone  = 0x00,
+</a><a href="#h3-0-16" id="h3-0-16" class="i">+    kAnchorLeft  = 0x01,
+</a><a href="#h3-0-17" id="h3-0-17" class="i">+    kAnchorRight = 0x02,
+</a><a href="#h3-0-18" id="h3-0-18" class="i">+    kAnchorBoth  = 0x03
+</a><a href="#h3-0-19" id="h3-0-19" class="i">+};
+</a><a href="#h3-0-20" id="h3-0-20" class="i">+
+</a><a href="#h3-0-21" id="h3-0-21" class="i">+struct IndexKey {
+</a><a href="#h3-0-22" id="h3-0-22" class="i">+    vector&lt;string&gt; keys;
+</a><a href="#h3-0-23" id="h3-0-23" class="i">+    int anchor;
+</a><a href="#h3-0-24" id="h3-0-24" class="i">+
+</a><a href="#h3-0-25" id="h3-0-25" class="i">+    IndexKey(int anchor = kAnchorNone) : anchor(anchor) { }
+</a><a href="#h3-0-26" id="h3-0-26" class="i">+
+</a><a href="#h3-0-27" id="h3-0-27" class="i">+    /*
+</a><a href="#h3-0-28" id="h3-0-28" class="i">+     * Returns an approximation of the fraction of the input corpus
+</a><a href="#h3-0-29" id="h3-0-29" class="i">+     * that this index key will reduce the search space to.
+</a><a href="#h3-0-30" id="h3-0-30" class="i">+     *
+</a><a href="#h3-0-31" id="h3-0-31" class="i">+     * e.g. selectivity() == 1.0 implies that this index key includes
+</a><a href="#h3-0-32" id="h3-0-32" class="i">+     *      the entire input.
+</a><a href="#h3-0-33" id="h3-0-33" class="i">+     *
+</a><a href="#h3-0-34" id="h3-0-34" class="i">+     *      selectivity() == 0.1 means that using this index key will
+</a><a href="#h3-0-35" id="h3-0-35" class="i">+     *      only require searching 1/10th of the corpus.
+</a><a href="#h3-0-36" id="h3-0-36" class="i">+     *
+</a><a href="#h3-0-37" id="h3-0-37" class="i">+     * This value is computed without any reference to the actual
+</a><a href="#h3-0-38" id="h3-0-38" class="i">+     * characteristics of any particular corpus, and so is a rough
+</a><a href="#h3-0-39" id="h3-0-39" class="i">+     * approximation at best.
+</a><a href="#h3-0-40" id="h3-0-40" class="i">+     */
+</a><a href="#h3-0-41" id="h3-0-41" class="i">+    double selectivity();
+</a><a href="#h3-0-42" id="h3-0-42" class="i">+
+</a><a href="#h3-0-43" id="h3-0-43" class="i">+    /*
+</a><a href="#h3-0-44" id="h3-0-44" class="i">+     * Returns a value approximating the &quot;goodness&quot; of this index key,
+</a><a href="#h3-0-45" id="h3-0-45" class="i">+     * in arbitrary units. Higher is better. The weight incorporates
+</a><a href="#h3-0-46" id="h3-0-46" class="i">+     * both the selectivity, above, and the cost of using this index
+</a><a href="#h3-0-47" id="h3-0-47" class="i">+     * key.
+</a><a href="#h3-0-48" id="h3-0-48" class="i">+     */
+</a><a href="#h3-0-49" id="h3-0-49" class="i">+    unsigned weight();
+</a><a href="#h3-0-50" id="h3-0-50" class="i">+
+</a><a href="#h3-0-51" id="h3-0-51" class="i">+    string ToString();
+</a><a href="#h3-0-52" id="h3-0-52" class="i">+};
+</a><a href="#h3-0-53" id="h3-0-53" class="i">+
+</a><a href="#h3-0-54" id="h3-0-54" class="i">+unique_ptr&lt;IndexKey&gt; indexRE(const re2::RE2 &amp;pat);
+</a><a href="#h3-0-55" id="h3-0-55" class="i">+
+</a><a href="#h3-0-56" id="h3-0-56" class="i">+#endif /* CODESEARCH_INDEXER_H */
+</a></pre>
+</div>
+</body>
+</html>

@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Fix up client tests - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/3785f6c5db3cf81441c0c22e5eb1a8b8bd369068">3785f6c5db3cf81441c0c22e5eb1a8b8bd369068</a>
+<b>parent</b> <a href="../commit/4aa786f358adb100cd6b5136ce495f49f637e8e0">4aa786f358adb100cd6b5136ce495f49f637e8e0</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Wed, 24 Aug 2016 20:48:45 -0700
+
+Fix up client tests
+
+<b>Diffstat:</b>
+<table><tr><td class="A">A</td><td><a href="#h0">client/test/BUILD</a></td><td> | </td><td class="num">33</td><td><span class="i">+++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">client/test/bench_test.go</a></td><td> | </td><td class="num">41</td><td><span class="i">+++++++++++++++</span><span class="d">--------------------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">client/test/integration_test.go</a></td><td> | </td><td class="num">29</td><td><span class="i">++++++++++++++</span><span class="d">---------------</span></td></tr>
+<tr><td class="D">D</td><td><a href="#h3">client/test/mock_test.go</a></td><td> | </td><td class="num">75</td><td><span class="i"></span><span class="d">---------------------------------------------------------------------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h4">client/test/testutil.go</a></td><td> | </td><td class="num">153</td><td><span class="i">+++++++++++++++++++++</span><span class="d">----------------------------------------------------------</span></td></tr>
+</table></pre><pre>5 files changed, 103 insertions(+), 228 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/client/test/BUILD">client/test/BUILD</a> b/<a href="../file/client/test/BUILD">client/test/BUILD</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -0,0 +1,33 @@
+</a><a href="#h0-0-0" id="h0-0-0" class="i">+
+</a><a href="#h0-0-1" id="h0-0-1" class="i">+load(&quot;@io_bazel_rules_go//go:def.bzl&quot;,
+</a><a href="#h0-0-2" id="h0-0-2" class="i">+  &quot;go_binary&quot;,
+</a><a href="#h0-0-3" id="h0-0-3" class="i">+  &quot;go_library&quot;,
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+  &quot;go_test&quot;,
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+)
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+go_library(
+</a><a href="#h0-0-8" id="h0-0-8" class="i">+name = &quot;go_default_library&quot;,
+</a><a href="#h0-0-9" id="h0-0-9" class="i">+  srcs = [
+</a><a href="#h0-0-10" id="h0-0-10" class="i">+    &quot;testutil.go&quot;,
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+  ],
+</a><a href="#h0-0-12" id="h0-0-12" class="i">+  deps = [
+</a><a href="#h0-0-13" id="h0-0-13" class="i">+    &quot;//src/proto:go_proto&quot;,
+</a><a href="#h0-0-14" id="h0-0-14" class="i">+
+</a><a href="#h0-0-15" id="h0-0-15" class="i">+    &quot;@org_golang_x_net//:context&quot;,
+</a><a href="#h0-0-16" id="h0-0-16" class="i">+    &quot;@org_golang_google_grpc//:go_default_library&quot;,
+</a><a href="#h0-0-17" id="h0-0-17" class="i">+  ],
+</a><a href="#h0-0-18" id="h0-0-18" class="i">+  visibility = [&quot;//visibility:public&quot;],
+</a><a href="#h0-0-19" id="h0-0-19" class="i">+)
+</a><a href="#h0-0-20" id="h0-0-20" class="i">+
+</a><a href="#h0-0-21" id="h0-0-21" class="i">+
+</a><a href="#h0-0-22" id="h0-0-22" class="i">+go_test(
+</a><a href="#h0-0-23" id="h0-0-23" class="i">+  name = &quot;go_default_test&quot;,
+</a><a href="#h0-0-24" id="h0-0-24" class="i">+  srcs = [
+</a><a href="#h0-0-25" id="h0-0-25" class="i">+    &quot;bench_test.go&quot;,
+</a><a href="#h0-0-26" id="h0-0-26" class="i">+    &quot;integration_test.go&quot;,
+</a><a href="#h0-0-27" id="h0-0-27" class="i">+  ],
+</a><a href="#h0-0-28" id="h0-0-28" class="i">+  deps = [
+</a><a href="#h0-0-29" id="h0-0-29" class="i">+    &quot;//vendor/gopkg.in/check.v1:go_default_library&quot;,
+</a><a href="#h0-0-30" id="h0-0-30" class="i">+  ],
+</a><a href="#h0-0-31" id="h0-0-31" class="i">+  library = &quot;:go_default_library&quot;,
+</a><a href="#h0-0-32" id="h0-0-32" class="i">+)
+</a><b>diff --git a/<a id="h1" href="../file/client/test/bench_test.go">client/test/bench_test.go</a> b/<a href="../file/client/test/bench_test.go">client/test/bench_test.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -1,15 +1,16 @@
+</a> package test
+ 
+ import (
+<a href="#h1-0-3" id="h1-0-3" class="i">+	&quot;context&quot;
+</a> 	&quot;flag&quot;
+ 	&quot;testing&quot;
+ 
+<a href="#h1-0-7" id="h1-0-7" class="d">-	&quot;github.com/livegrep/livegrep/client&quot;
+</a><a href="#h1-0-8" id="h1-0-8" class="i">+	pb &quot;github.com/livegrep/livegrep/src/proto/go_proto&quot;
+</a> )
+ 
+ var index = flag.String(&quot;index&quot;, &quot;&quot;, &quot;Path to an index to run benchmarks against&quot;)
+ 
+<a href="#h1-0-13" id="h1-0-13" class="d">-func benchmarkQuery(b *testing.B, q *client.Query) {
+</a><a href="#h1-0-14" id="h1-0-14" class="i">+func benchmarkQuery(b *testing.B, q *pb.Query) {
+</a> 	if *index == &quot;&quot; {
+ 		b.SkipNow()
+ 	}
+<a href="#h1-1" id="h1-1" class="h">@@ -19,68 +20,56 @@ func benchmarkQuery(b *testing.B, q *client.Query) {
+</a> 		b.Fatal(e.Error())
+ 	}
+ 
+<a href="#h1-1-3" id="h1-1-3" class="i">+	b.ResetTimer()
+</a> 	for i := 0; i &lt; b.N+1; i++ {
+<a href="#h1-1-5" id="h1-1-5" class="d">-		if i == 1 {
+</a><a href="#h1-1-6" id="h1-1-6" class="d">-			// Don&#39;t count the first run+setup, to make
+</a><a href="#h1-1-7" id="h1-1-7" class="d">-			// sure everything is primed.
+</a><a href="#h1-1-8" id="h1-1-8" class="d">-			b.ResetTimer()
+</a><a href="#h1-1-9" id="h1-1-9" class="d">-		}
+</a><a href="#h1-1-10" id="h1-1-10" class="d">-		if e := c.Err(); e != nil {
+</a><a href="#h1-1-11" id="h1-1-11" class="d">-			b.Fatalf(&quot;err: %s&quot;, e.Error())
+</a><a href="#h1-1-12" id="h1-1-12" class="d">-		}
+</a><a href="#h1-1-13" id="h1-1-13" class="d">-		s, e := c.Query(q)
+</a><a href="#h1-1-14" id="h1-1-14" class="i">+		_, e := c.Search(context.Background(), q)
+</a> 		if e != nil {
+ 			b.Fatalf(&quot;query: %s&quot;, e.Error())
+ 		}
+<a href="#h1-1-18" id="h1-1-18" class="d">-		for _ = range s.Results() {
+</a><a href="#h1-1-19" id="h1-1-19" class="d">-		}
+</a><a href="#h1-1-20" id="h1-1-20" class="d">-		if _, e := s.Close(); e != nil {
+</a><a href="#h1-1-21" id="h1-1-21" class="d">-			b.Fatalf(&quot;close: %s&quot;, e.Error())
+</a><a href="#h1-1-22" id="h1-1-22" class="d">-		}
+</a> 	}
+ }
+ 
+ func BenchmarkDazed(b *testing.B) {
+<a href="#h1-1-27" id="h1-1-27" class="d">-	benchmarkQuery(b, &amp;client.Query{Line: `dazed`})
+</a><a href="#h1-1-28" id="h1-1-28" class="i">+	benchmarkQuery(b, &amp;pb.Query{Line: `dazed`})
+</a> }
+ 
+ func BenchmarkDazedCaseFold(b *testing.B) {
+<a href="#h1-1-32" id="h1-1-32" class="d">-	benchmarkQuery(b, &amp;client.Query{Line: `dazed`, FoldCase: true})
+</a><a href="#h1-1-33" id="h1-1-33" class="i">+	benchmarkQuery(b, &amp;pb.Query{Line: `dazed`, FoldCase: true})
+</a> }
+ 
+ func BenchmarkDefKmalloc(b *testing.B) {
+<a href="#h1-1-37" id="h1-1-37" class="d">-	benchmarkQuery(b, &amp;client.Query{Line: `^(\s.*\S)?kmalloc\s*\(`})
+</a><a href="#h1-1-38" id="h1-1-38" class="i">+	benchmarkQuery(b, &amp;pb.Query{Line: `^(\s.*\S)?kmalloc\s*\(`})
+</a> }
+ 
+ func BenchmarkSpaceEOL(b *testing.B) {
+<a href="#h1-1-42" id="h1-1-42" class="d">-	benchmarkQuery(b, &amp;client.Query{Line: `\s$`})
+</a><a href="#h1-1-43" id="h1-1-43" class="i">+	benchmarkQuery(b, &amp;pb.Query{Line: `\s$`})
+</a> }
+ 
+ func Benchmark10Space(b *testing.B) {
+<a href="#h1-1-47" id="h1-1-47" class="d">-	benchmarkQuery(b, &amp;client.Query{Line: `\s{10}$`})
+</a><a href="#h1-1-48" id="h1-1-48" class="i">+	benchmarkQuery(b, &amp;pb.Query{Line: `\s{10}$`})
+</a> }
+ 
+ func BenchmarkUUID(b *testing.B) {
+<a href="#h1-1-52" id="h1-1-52" class="d">-	benchmarkQuery(b, &amp;client.Query{
+</a><a href="#h1-1-53" id="h1-1-53" class="i">+	benchmarkQuery(b, &amp;pb.Query{
+</a> 		Line: `[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`,
+ 	})
+ }
+ 
+ func BenchmarkUUIDCaseFold(b *testing.B) {
+<a href="#h1-1-59" id="h1-1-59" class="d">-	benchmarkQuery(b, &amp;client.Query{
+</a><a href="#h1-1-60" id="h1-1-60" class="i">+	benchmarkQuery(b, &amp;pb.Query{
+</a> 		Line:     `[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`,
+ 		FoldCase: true,
+ 	})
+ }
+ 
+ func BenchmarkAlphanum20(b *testing.B) {
+<a href="#h1-1-67" id="h1-1-67" class="d">-	benchmarkQuery(b, &amp;client.Query{Line: `[0-9a-f]{20}`})
+</a><a href="#h1-1-68" id="h1-1-68" class="i">+	benchmarkQuery(b, &amp;pb.Query{Line: `[0-9a-f]{20}`})
+</a> }
+ 
+ func BenchmarkAlphanum50(b *testing.B) {
+<a href="#h1-1-72" id="h1-1-72" class="d">-	benchmarkQuery(b, &amp;client.Query{Line: `[0-9a-f]{50}`})
+</a><a href="#h1-1-73" id="h1-1-73" class="i">+	benchmarkQuery(b, &amp;pb.Query{Line: `[0-9a-f]{50}`})
+</a> }
+ 
+ func BenchmarkAlphanum100(b *testing.B) {
+<a href="#h1-1-77" id="h1-1-77" class="d">-	benchmarkQuery(b, &amp;client.Query{Line: `[0-9a-f]{50}`})
+</a><a href="#h1-1-78" id="h1-1-78" class="i">+	benchmarkQuery(b, &amp;pb.Query{Line: `[0-9a-f]{50}`})
+</a> }
+<b>diff --git a/<a id="h2" href="../file/client/test/integration_test.go">client/test/integration_test.go</a> b/<a href="../file/client/test/integration_test.go">client/test/integration_test.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -3,6 +3,7 @@ package test
+</a> import (
+ 	&quot;bufio&quot;
+ 	&quot;bytes&quot;
+<a href="#h2-0-3" id="h2-0-3" class="i">+	&quot;context&quot;
+</a> 	&quot;encoding/json&quot;
+ 	&quot;flag&quot;
+ 	&quot;fmt&quot;
+<a href="#h2-1" id="h2-1" class="h">@@ -16,8 +17,9 @@ import (
+</a> 	&quot;strconv&quot;
+ 	&quot;testing&quot;
+ 
+<a href="#h2-1-3" id="h2-1-3" class="d">-	&quot;github.com/livegrep/livegrep/client&quot;
+</a> 	&quot;gopkg.in/check.v1&quot;
+<a href="#h2-1-5" id="h2-1-5" class="i">+
+</a><a href="#h2-1-6" id="h2-1-6" class="i">+	pb &quot;github.com/livegrep/livegrep/src/proto/go_proto&quot;
+</a> )
+ 
+ const LineLimit = 1024
+<a href="#h2-2" id="h2-2" class="h">@@ -30,7 +32,7 @@ var patterns = flag.String(&quot;test.patterns&quot;, &quot;patterns&quot;, &quot;File containing pattern
+</a> type IntegrationSuite struct {
+ 	config   *os.File
+ 	index    *os.File
+<a href="#h2-2-3" id="h2-2-3" class="d">-	client   client.Client
+</a><a href="#h2-2-4" id="h2-2-4" class="i">+	client   *TestClient
+</a> 	patterns []string
+ }
+ 
+<a href="#h2-3" id="h2-3" class="h">@@ -58,7 +60,7 @@ func (i *IntegrationSuite) loadPatterns() error {
+</a> 
+ func (i *IntegrationSuite) SetUpSuite(c *check.C) {
+ 	if *repo == &quot;&quot; {
+<a href="#h2-3-3" id="h2-3-3" class="d">-		c.Skip(&quot;No test.root specified.&quot;)
+</a><a href="#h2-3-4" id="h2-3-4" class="i">+		c.Skip(&quot;No test.repo specified.&quot;)
+</a> 		return
+ 	}
+ 
+<a href="#h2-4" id="h2-4" class="h">@@ -118,14 +120,10 @@ func (i *IntegrationSuite) TearDownSuite(*check.C) {
+</a> }
+ 
+ func (i *IntegrationSuite) TestBasic(c *check.C) {
+<a href="#h2-4-3" id="h2-4-3" class="d">-	search, err := i.client.Query(&amp;client.Query{Line: &quot;.&quot;})
+</a><a href="#h2-4-4" id="h2-4-4" class="d">-	if err != nil {
+</a><a href="#h2-4-5" id="h2-4-5" class="d">-		c.Fatalf(&quot;Query: %s&quot;, err)
+</a><a href="#h2-4-6" id="h2-4-6" class="d">-	}
+</a><a href="#h2-4-7" id="h2-4-7" class="d">-	for _ = range search.Results() {
+</a><a href="#h2-4-8" id="h2-4-8" class="d">-	}
+</a><a href="#h2-4-9" id="h2-4-9" class="d">-	stats, err := search.Close()
+</a><a href="#h2-4-10" id="h2-4-10" class="d">-	c.Check(stats, check.Not(check.IsNil))
+</a><a href="#h2-4-11" id="h2-4-11" class="i">+	search, err := i.client.Search(
+</a><a href="#h2-4-12" id="h2-4-12" class="i">+		context.Background(),
+</a><a href="#h2-4-13" id="h2-4-13" class="i">+		&amp;pb.Query{Line: &quot;.&quot;})
+</a><a href="#h2-4-14" id="h2-4-14" class="i">+	c.Check(search, check.Not(check.IsNil))
+</a> 	c.Check(err, check.IsNil)
+ }
+ 
+<a href="#h2-5" id="h2-5" class="h">@@ -258,14 +256,15 @@ func (i *IntegrationSuite) crosscheck(c *check.C, regex string, casefold bool) {
+</a> 	}
+ 
+ 	var livegrepMatches []Match
+<a href="#h2-5-3" id="h2-5-3" class="d">-	search, err := i.client.Query(&amp;client.Query{Line: regex, FoldCase: casefold})
+</a><a href="#h2-5-4" id="h2-5-4" class="i">+	search, err := i.client.Search(
+</a><a href="#h2-5-5" id="h2-5-5" class="i">+		context.Background(),
+</a><a href="#h2-5-6" id="h2-5-6" class="i">+		&amp;pb.Query{Line: regex, FoldCase: casefold})
+</a> 	if err != nil {
+ 		c.Fatalf(&quot;Query: %s&quot;, err)
+ 	}
+<a href="#h2-5-10" id="h2-5-10" class="d">-	for m := range search.Results() {
+</a><a href="#h2-5-11" id="h2-5-11" class="d">-		livegrepMatches = append(livegrepMatches, Match{m.Path, m.LineNumber})
+</a><a href="#h2-5-12" id="h2-5-12" class="i">+	for _, m := range search.Results {
+</a><a href="#h2-5-13" id="h2-5-13" class="i">+		livegrepMatches = append(livegrepMatches, Match{m.Path, int(m.LineNumber)})
+</a> 	}
+<a href="#h2-5-15" id="h2-5-15" class="d">-	search.Close()
+</a> 
+ 	sort.Sort(SortMatches(gitMatches))
+ 	sort.Sort(SortMatches(livegrepMatches))
+<b>diff --git a/<a id="h3" href="../file/client/test/mock_test.go">client/test/mock_test.go</a> b/<a href="../file/client/test/mock_test.go">client/test/mock_test.go</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -1,75 +0,0 @@
+</a><a href="#h3-0-0" id="h3-0-0" class="d">-package test
+</a><a href="#h3-0-1" id="h3-0-1" class="d">-
+</a><a href="#h3-0-2" id="h3-0-2" class="d">-import (
+</a><a href="#h3-0-3" id="h3-0-3" class="d">-	&quot;errors&quot;
+</a><a href="#h3-0-4" id="h3-0-4" class="d">-	&quot;reflect&quot;
+</a><a href="#h3-0-5" id="h3-0-5" class="d">-	&quot;testing&quot;
+</a><a href="#h3-0-6" id="h3-0-6" class="d">-
+</a><a href="#h3-0-7" id="h3-0-7" class="d">-	&quot;github.com/livegrep/livegrep/client&quot;
+</a><a href="#h3-0-8" id="h3-0-8" class="d">-)
+</a><a href="#h3-0-9" id="h3-0-9" class="d">-
+</a><a href="#h3-0-10" id="h3-0-10" class="d">-func TestQueryError(t *testing.T) {
+</a><a href="#h3-0-11" id="h3-0-11" class="d">-	m := &amp;MockClient{QueryError: errors.New(&quot;query error&quot;)}
+</a><a href="#h3-0-12" id="h3-0-12" class="d">-	s, e := m.Query(&amp;client.Query{})
+</a><a href="#h3-0-13" id="h3-0-13" class="d">-	if e == nil || s != nil {
+</a><a href="#h3-0-14" id="h3-0-14" class="d">-		t.Fatalf(&quot;QueryError&quot;)
+</a><a href="#h3-0-15" id="h3-0-15" class="d">-	}
+</a><a href="#h3-0-16" id="h3-0-16" class="d">-	if e.Error() != &quot;query error&quot; {
+</a><a href="#h3-0-17" id="h3-0-17" class="d">-		t.Fatalf(&quot;QueryError %s&quot;, e)
+</a><a href="#h3-0-18" id="h3-0-18" class="d">-	}
+</a><a href="#h3-0-19" id="h3-0-19" class="d">-}
+</a><a href="#h3-0-20" id="h3-0-20" class="d">-
+</a><a href="#h3-0-21" id="h3-0-21" class="d">-func TestSearchError(t *testing.T) {
+</a><a href="#h3-0-22" id="h3-0-22" class="d">-	m := &amp;MockClient{SearchError: errors.New(&quot;search error&quot;)}
+</a><a href="#h3-0-23" id="h3-0-23" class="d">-	s, e := m.Query(&amp;client.Query{})
+</a><a href="#h3-0-24" id="h3-0-24" class="d">-	if e != nil || s == nil {
+</a><a href="#h3-0-25" id="h3-0-25" class="d">-		t.Fatal(&quot;SearchError&quot;)
+</a><a href="#h3-0-26" id="h3-0-26" class="d">-	}
+</a><a href="#h3-0-27" id="h3-0-27" class="d">-	r := s.Results()
+</a><a href="#h3-0-28" id="h3-0-28" class="d">-	if _, ok := &lt;-r; ok {
+</a><a href="#h3-0-29" id="h3-0-29" class="d">-		t.Fatal(&quot;SearchError results&quot;)
+</a><a href="#h3-0-30" id="h3-0-30" class="d">-	}
+</a><a href="#h3-0-31" id="h3-0-31" class="d">-	_, e = s.Close()
+</a><a href="#h3-0-32" id="h3-0-32" class="d">-	if e == nil {
+</a><a href="#h3-0-33" id="h3-0-33" class="d">-		t.Fatal(&quot;SearchError error&quot;)
+</a><a href="#h3-0-34" id="h3-0-34" class="d">-	}
+</a><a href="#h3-0-35" id="h3-0-35" class="d">-	if e.Error() != &quot;search error&quot; {
+</a><a href="#h3-0-36" id="h3-0-36" class="d">-		t.Fatal(&quot;SearchErrors&quot;, e)
+</a><a href="#h3-0-37" id="h3-0-37" class="d">-	}
+</a><a href="#h3-0-38" id="h3-0-38" class="d">-}
+</a><a href="#h3-0-39" id="h3-0-39" class="d">-
+</a><a href="#h3-0-40" id="h3-0-40" class="d">-func TestErr(t *testing.T) {
+</a><a href="#h3-0-41" id="h3-0-41" class="d">-	m := &amp;MockClient{Err_: errors.New(&quot;client error&quot;)}
+</a><a href="#h3-0-42" id="h3-0-42" class="d">-	e := m.Err()
+</a><a href="#h3-0-43" id="h3-0-43" class="d">-	if e == nil || e.Error() != &quot;client error&quot; {
+</a><a href="#h3-0-44" id="h3-0-44" class="d">-		t.Fatal(&quot;Err&quot;, e)
+</a><a href="#h3-0-45" id="h3-0-45" class="d">-	}
+</a><a href="#h3-0-46" id="h3-0-46" class="d">-}
+</a><a href="#h3-0-47" id="h3-0-47" class="d">-
+</a><a href="#h3-0-48" id="h3-0-48" class="d">-func TestResults(t *testing.T) {
+</a><a href="#h3-0-49" id="h3-0-49" class="d">-	rs := []*client.Result{
+</a><a href="#h3-0-50" id="h3-0-50" class="d">-		{Line: &quot;line 1&quot;},
+</a><a href="#h3-0-51" id="h3-0-51" class="d">-		{Line: &quot;line 2&quot;},
+</a><a href="#h3-0-52" id="h3-0-52" class="d">-	}
+</a><a href="#h3-0-53" id="h3-0-53" class="d">-	st := &amp;client.Stats{ExitReason: &quot;time&quot;}
+</a><a href="#h3-0-54" id="h3-0-54" class="d">-	m := &amp;MockClient{Results: rs, Stats: st}
+</a><a href="#h3-0-55" id="h3-0-55" class="d">-	s, e := m.Query(&amp;client.Query{})
+</a><a href="#h3-0-56" id="h3-0-56" class="d">-	if s == nil || e != nil {
+</a><a href="#h3-0-57" id="h3-0-57" class="d">-		t.Fatal(&quot;Results&quot;, s, e)
+</a><a href="#h3-0-58" id="h3-0-58" class="d">-	}
+</a><a href="#h3-0-59" id="h3-0-59" class="d">-	rc := s.Results()
+</a><a href="#h3-0-60" id="h3-0-60" class="d">-	i := 0
+</a><a href="#h3-0-61" id="h3-0-61" class="d">-	for r := range rc {
+</a><a href="#h3-0-62" id="h3-0-62" class="d">-		if !reflect.DeepEqual(r, rs[i]) {
+</a><a href="#h3-0-63" id="h3-0-63" class="d">-			t.Fatal(&quot;result&quot;, i, r)
+</a><a href="#h3-0-64" id="h3-0-64" class="d">-		}
+</a><a href="#h3-0-65" id="h3-0-65" class="d">-		i++
+</a><a href="#h3-0-66" id="h3-0-66" class="d">-	}
+</a><a href="#h3-0-67" id="h3-0-67" class="d">-	if i != len(rs) {
+</a><a href="#h3-0-68" id="h3-0-68" class="d">-		t.Fatalf(&quot;len %d!=%d&quot;, len(rs), i)
+</a><a href="#h3-0-69" id="h3-0-69" class="d">-	}
+</a><a href="#h3-0-70" id="h3-0-70" class="d">-	st_, e := s.Close()
+</a><a href="#h3-0-71" id="h3-0-71" class="d">-	if st_ != st || e != nil {
+</a><a href="#h3-0-72" id="h3-0-72" class="d">-		t.Fatal(&quot;Results&quot;)
+</a><a href="#h3-0-73" id="h3-0-73" class="d">-	}
+</a><a href="#h3-0-74" id="h3-0-74" class="d">-}
+</a><b>diff --git a/<a id="h4" href="../file/client/test/testutil.go">client/test/testutil.go</a> b/<a href="../file/client/test/testutil.go">client/test/testutil.go</a></b>
+<a href="#h4-0" id="h4-0" class="h">@@ -1,85 +1,59 @@
+</a> package test
+ 
+ import (
+<a href="#h4-0-3" id="h4-0-3" class="d">-	&quot;io&quot;
+</a><a href="#h4-0-4" id="h4-0-4" class="i">+	&quot;context&quot;
+</a><a href="#h4-0-5" id="h4-0-5" class="i">+	&quot;fmt&quot;
+</a> 	&quot;os&quot;
+ 	&quot;os/exec&quot;
+<a href="#h4-0-8" id="h4-0-8" class="i">+	&quot;time&quot;
+</a> 
+<a href="#h4-0-10" id="h4-0-10" class="d">-	&quot;github.com/livegrep/livegrep/client&quot;
+</a><a href="#h4-0-11" id="h4-0-11" class="d">-)
+</a><a href="#h4-0-12" id="h4-0-12" class="d">-
+</a><a href="#h4-0-13" id="h4-0-13" class="d">-type childClient struct {
+</a><a href="#h4-0-14" id="h4-0-14" class="d">-	client.Client
+</a><a href="#h4-0-15" id="h4-0-15" class="d">-	cmd  *exec.Cmd
+</a><a href="#h4-0-16" id="h4-0-16" class="d">-	wait chan error
+</a><a href="#h4-0-17" id="h4-0-17" class="d">-	err  error
+</a><a href="#h4-0-18" id="h4-0-18" class="d">-}
+</a><a href="#h4-0-19" id="h4-0-19" class="i">+	&quot;google.golang.org/grpc&quot;
+</a> 
+<a href="#h4-0-21" id="h4-0-21" class="d">-func (c *childClient) Close() {
+</a><a href="#h4-0-22" id="h4-0-22" class="d">-	c.Client.Close()
+</a><a href="#h4-0-23" id="h4-0-23" class="d">-	if c.err != nil {
+</a><a href="#h4-0-24" id="h4-0-24" class="d">-		return
+</a><a href="#h4-0-25" id="h4-0-25" class="d">-	}
+</a><a href="#h4-0-26" id="h4-0-26" class="d">-	&lt;-c.wait
+</a><a href="#h4-0-27" id="h4-0-27" class="d">-}
+</a><a href="#h4-0-28" id="h4-0-28" class="i">+	pb &quot;github.com/livegrep/livegrep/src/proto/go_proto&quot;
+</a><a href="#h4-0-29" id="h4-0-29" class="i">+)
+</a> 
+<a href="#h4-0-31" id="h4-0-31" class="d">-func (c *childClient) Err() error {
+</a><a href="#h4-0-32" id="h4-0-32" class="d">-	select {
+</a><a href="#h4-0-33" id="h4-0-33" class="d">-	case c.err = &lt;-c.wait:
+</a><a href="#h4-0-34" id="h4-0-34" class="d">-	default:
+</a><a href="#h4-0-35" id="h4-0-35" class="d">-	}
+</a><a href="#h4-0-36" id="h4-0-36" class="d">-	if c.err != nil {
+</a><a href="#h4-0-37" id="h4-0-37" class="d">-		return c.err
+</a><a href="#h4-0-38" id="h4-0-38" class="d">-	}
+</a><a href="#h4-0-39" id="h4-0-39" class="d">-	if e := c.Client.Err(); e != nil {
+</a><a href="#h4-0-40" id="h4-0-40" class="d">-		return e
+</a><a href="#h4-0-41" id="h4-0-41" class="d">-	}
+</a><a href="#h4-0-42" id="h4-0-42" class="d">-	return nil
+</a><a href="#h4-0-43" id="h4-0-43" class="i">+type TestClient struct {
+</a><a href="#h4-0-44" id="h4-0-44" class="i">+	client pb.CodeSearchClient
+</a><a href="#h4-0-45" id="h4-0-45" class="i">+	cmd    *exec.Cmd
+</a><a href="#h4-0-46" id="h4-0-46" class="i">+	wait   chan error
+</a> }
+ 
+<a href="#h4-0-49" id="h4-0-49" class="d">-type connection struct {
+</a><a href="#h4-0-50" id="h4-0-50" class="d">-	in  io.ReadCloser
+</a><a href="#h4-0-51" id="h4-0-51" class="d">-	out io.WriteCloser
+</a><a href="#h4-0-52" id="h4-0-52" class="i">+func (c *TestClient) Info(ctx context.Context, in *pb.InfoRequest, opts ...grpc.CallOption) (*pb.ServerInfo, error) {
+</a><a href="#h4-0-53" id="h4-0-53" class="i">+	return c.client.Info(ctx, in, opts...)
+</a> }
+ 
+<a href="#h4-0-56" id="h4-0-56" class="d">-func (c *connection) Read(b []byte) (int, error) {
+</a><a href="#h4-0-57" id="h4-0-57" class="d">-	return c.in.Read(b)
+</a><a href="#h4-0-58" id="h4-0-58" class="i">+func (c *TestClient) Search(ctx context.Context, in *pb.Query, opts ...grpc.CallOption) (*pb.CodeSearchResult, error) {
+</a><a href="#h4-0-59" id="h4-0-59" class="i">+	return c.client.Search(ctx, in, opts...)
+</a> }
+ 
+<a href="#h4-0-62" id="h4-0-62" class="d">-func (c *connection) Write(b []byte) (int, error) {
+</a><a href="#h4-0-63" id="h4-0-63" class="d">-	return c.out.Write(b)
+</a><a href="#h4-0-64" id="h4-0-64" class="i">+func (c *TestClient) Close() {
+</a><a href="#h4-0-65" id="h4-0-65" class="i">+	c.cmd.Process.Kill()
+</a><a href="#h4-0-66" id="h4-0-66" class="i">+	&lt;-c.wait
+</a> }
+ 
+<a href="#h4-0-69" id="h4-0-69" class="d">-func (c *connection) Close() error {
+</a><a href="#h4-0-70" id="h4-0-70" class="d">-	e1 := c.in.Close()
+</a><a href="#h4-0-71" id="h4-0-71" class="d">-	e2 := c.out.Close()
+</a><a href="#h4-0-72" id="h4-0-72" class="d">-	if e1 != nil {
+</a><a href="#h4-0-73" id="h4-0-73" class="d">-		return e1
+</a><a href="#h4-0-74" id="h4-0-74" class="d">-	}
+</a><a href="#h4-0-75" id="h4-0-75" class="d">-	if e2 != nil {
+</a><a href="#h4-0-76" id="h4-0-76" class="d">-		return e2
+</a><a href="#h4-0-77" id="h4-0-77" class="i">+const Codesearch = &quot;../../bazel-bin/src/tools/codesearch&quot;
+</a><a href="#h4-0-78" id="h4-0-78" class="i">+const Port = 9812
+</a><a href="#h4-0-79" id="h4-0-79" class="i">+
+</a><a href="#h4-0-80" id="h4-0-80" class="i">+func (c *TestClient) waitStartup() error {
+</a><a href="#h4-0-81" id="h4-0-81" class="i">+	for {
+</a><a href="#h4-0-82" id="h4-0-82" class="i">+		_, e := c.Info(context.Background(), &amp;pb.InfoRequest{})
+</a><a href="#h4-0-83" id="h4-0-83" class="i">+		if e == nil {
+</a><a href="#h4-0-84" id="h4-0-84" class="i">+			return nil
+</a><a href="#h4-0-85" id="h4-0-85" class="i">+		}
+</a><a href="#h4-0-86" id="h4-0-86" class="i">+		time.Sleep(time.Second)
+</a> 	}
+<a href="#h4-0-88" id="h4-0-88" class="d">-	return nil
+</a> }
+ 
+<a href="#h4-0-91" id="h4-0-91" class="d">-const Codesearch = &quot;../../bazel-bin/src/tools/codesearch&quot;
+</a><a href="#h4-0-92" id="h4-0-92" class="d">-
+</a><a href="#h4-0-93" id="h4-0-93" class="d">-func NewClient(args ...string) (client.Client, error) {
+</a><a href="#h4-0-94" id="h4-0-94" class="d">-	cl := &amp;childClient{wait: make(chan error)}
+</a><a href="#h4-0-95" id="h4-0-95" class="i">+func NewClient(args ...string) (*TestClient, error) {
+</a><a href="#h4-0-96" id="h4-0-96" class="i">+	addr := fmt.Sprintf(&quot;localhost:%d&quot;, Port)
+</a><a href="#h4-0-97" id="h4-0-97" class="i">+	args = append([]string{&quot;-grpc&quot;, addr},
+</a><a href="#h4-0-98" id="h4-0-98" class="i">+		args...)
+</a><a href="#h4-0-99" id="h4-0-99" class="i">+	cl := &amp;TestClient{wait: make(chan error)}
+</a> 	cl.cmd = exec.Command(Codesearch, args...)
+ 
+ 	cl.cmd.Stderr = os.Stderr
+<a href="#h4-0-103" id="h4-0-103" class="d">-	in, e := cl.cmd.StdinPipe()
+</a><a href="#h4-0-104" id="h4-0-104" class="d">-	if e != nil {
+</a><a href="#h4-0-105" id="h4-0-105" class="d">-		return nil, e
+</a><a href="#h4-0-106" id="h4-0-106" class="d">-	}
+</a><a href="#h4-0-107" id="h4-0-107" class="d">-	out, e := cl.cmd.StdoutPipe()
+</a><a href="#h4-0-108" id="h4-0-108" class="d">-	if e != nil {
+</a><a href="#h4-0-109" id="h4-0-109" class="d">-		in.Close()
+</a><a href="#h4-0-110" id="h4-0-110" class="d">-		return nil, e
+</a><a href="#h4-0-111" id="h4-0-111" class="d">-	}
+</a> 
+<a href="#h4-0-113" id="h4-0-113" class="d">-	if e = cl.cmd.Start(); e != nil {
+</a><a href="#h4-0-114" id="h4-0-114" class="i">+	if e := cl.cmd.Start(); e != nil {
+</a> 		return nil, e
+ 	}
+ 
+<a href="#h4-1" id="h4-1" class="h">@@ -87,61 +61,16 @@ func NewClient(args ...string) (client.Client, error) {
+</a> 		cl.wait &lt;- cl.cmd.Wait()
+ 	}()
+ 
+<a href="#h4-1-3" id="h4-1-3" class="d">-	cl.Client, e = client.New(&amp;connection{out, in})
+</a><a href="#h4-1-4" id="h4-1-4" class="d">-	if e != nil {
+</a><a href="#h4-1-5" id="h4-1-5" class="d">-		return nil, e
+</a><a href="#h4-1-6" id="h4-1-6" class="i">+	conn, err := grpc.Dial(addr, grpc.WithInsecure())
+</a><a href="#h4-1-7" id="h4-1-7" class="i">+	if err != nil {
+</a><a href="#h4-1-8" id="h4-1-8" class="i">+		cl.Close()
+</a><a href="#h4-1-9" id="h4-1-9" class="i">+		return nil, err
+</a> 	}
+ 
+<a href="#h4-1-12" id="h4-1-12" class="d">-	return cl, nil
+</a><a href="#h4-1-13" id="h4-1-13" class="d">-}
+</a><a href="#h4-1-14" id="h4-1-14" class="d">-
+</a><a href="#h4-1-15" id="h4-1-15" class="d">-// MockClient implements a fake Client that returns constant values
+</a><a href="#h4-1-16" id="h4-1-16" class="d">-// based on the provided fields.
+</a><a href="#h4-1-17" id="h4-1-17" class="d">-type MockClient struct {
+</a><a href="#h4-1-18" id="h4-1-18" class="d">-	QueryError  error
+</a><a href="#h4-1-19" id="h4-1-19" class="d">-	SearchError error
+</a><a href="#h4-1-20" id="h4-1-20" class="d">-	Err_        error
+</a><a href="#h4-1-21" id="h4-1-21" class="d">-	Info_       *client.ServerInfo
+</a><a href="#h4-1-22" id="h4-1-22" class="d">-	Stats       *client.Stats
+</a><a href="#h4-1-23" id="h4-1-23" class="d">-	Results     []*client.Result
+</a><a href="#h4-1-24" id="h4-1-24" class="d">-
+</a><a href="#h4-1-25" id="h4-1-25" class="d">-	Closed  bool
+</a><a href="#h4-1-26" id="h4-1-26" class="d">-	Queries []*client.Query
+</a><a href="#h4-1-27" id="h4-1-27" class="d">-}
+</a><a href="#h4-1-28" id="h4-1-28" class="d">-
+</a><a href="#h4-1-29" id="h4-1-29" class="d">-type mockSearch struct {
+</a><a href="#h4-1-30" id="h4-1-30" class="d">-	m *MockClient
+</a><a href="#h4-1-31" id="h4-1-31" class="d">-}
+</a><a href="#h4-1-32" id="h4-1-32" class="d">-
+</a><a href="#h4-1-33" id="h4-1-33" class="d">-func (m *MockClient) Query(q *client.Query) (client.Search, error) {
+</a><a href="#h4-1-34" id="h4-1-34" class="d">-	m.Queries = append(m.Queries, q)
+</a><a href="#h4-1-35" id="h4-1-35" class="d">-	if m.QueryError != nil {
+</a><a href="#h4-1-36" id="h4-1-36" class="d">-		return nil, m.QueryError
+</a><a href="#h4-1-37" id="h4-1-37" class="d">-	}
+</a><a href="#h4-1-38" id="h4-1-38" class="d">-	return &amp;mockSearch{m}, nil
+</a><a href="#h4-1-39" id="h4-1-39" class="d">-}
+</a><a href="#h4-1-40" id="h4-1-40" class="d">-
+</a><a href="#h4-1-41" id="h4-1-41" class="d">-func (m *MockClient) Close() {
+</a><a href="#h4-1-42" id="h4-1-42" class="d">-	m.Closed = true
+</a><a href="#h4-1-43" id="h4-1-43" class="d">-}
+</a><a href="#h4-1-44" id="h4-1-44" class="d">-
+</a><a href="#h4-1-45" id="h4-1-45" class="d">-func (m *MockClient) Info() *client.ServerInfo {
+</a><a href="#h4-1-46" id="h4-1-46" class="d">-	return m.Info_
+</a><a href="#h4-1-47" id="h4-1-47" class="d">-}
+</a><a href="#h4-1-48" id="h4-1-48" class="d">-
+</a><a href="#h4-1-49" id="h4-1-49" class="d">-func (m *MockClient) Err() error {
+</a><a href="#h4-1-50" id="h4-1-50" class="d">-	return m.Err_
+</a><a href="#h4-1-51" id="h4-1-51" class="d">-}
+</a><a href="#h4-1-52" id="h4-1-52" class="d">-
+</a><a href="#h4-1-53" id="h4-1-53" class="d">-func (s *mockSearch) Results() &lt;-chan *client.Result {
+</a><a href="#h4-1-54" id="h4-1-54" class="d">-	out := make(chan *client.Result, len(s.m.Results))
+</a><a href="#h4-1-55" id="h4-1-55" class="d">-	for _, r := range s.m.Results {
+</a><a href="#h4-1-56" id="h4-1-56" class="d">-		out &lt;- r
+</a><a href="#h4-1-57" id="h4-1-57" class="i">+	cl.client = pb.NewCodeSearchClient(conn)
+</a><a href="#h4-1-58" id="h4-1-58" class="i">+	if e := cl.waitStartup(); e != nil {
+</a><a href="#h4-1-59" id="h4-1-59" class="i">+		return nil, e
+</a> 	}
+<a href="#h4-1-61" id="h4-1-61" class="d">-	close(out)
+</a><a href="#h4-1-62" id="h4-1-62" class="d">-	return out
+</a><a href="#h4-1-63" id="h4-1-63" class="d">-}
+</a> 
+<a href="#h4-1-65" id="h4-1-65" class="d">-func (s *mockSearch) Close() (*client.Stats, error) {
+</a><a href="#h4-1-66" id="h4-1-66" class="d">-	return s.m.Stats, s.m.SearchError
+</a><a href="#h4-1-67" id="h4-1-67" class="i">+	return cl, nil
+</a> }
+</pre>
+</div>
+</body>
+</html>

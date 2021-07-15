@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tweak max_matches behaviour - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/df44a1028023939a4de5a8f8296427e3adf7c50c">df44a1028023939a4de5a8f8296427e3adf7c50c</a>
+<b>parent</b> <a href="../commit/1d33ef816ba65f7b813bffa15a6d868a7400d468">1d33ef816ba65f7b813bffa15a6d868a7400d468</a>
+<b>Author:</b> Josiah Boning &lt;<a href="mailto:josiah@dropbox.com">josiah@dropbox.com</a>&gt;
+<b>Date:</b>   Thu, 31 Aug 2017 03:25:35 +0000
+
+Tweak max_matches behaviour
+
+ - If `max_matches:` is provided in the query, use that as the limit,
+   regardless of a limit passed on the `codesearch` command line. This
+   is on the theory that, if the user provides a `max_matches` value
+   greater than the configured limit, it&#39;s because they want to see more
+   results. If they want to see a LOT of results and are willing to wait
+   for it, that&#39;s their choice.
+ - Any time the search completes early (without an exhaustive list of
+   results), indicate that the count in the UI is not exact. Included in
+   this change because we&#39;re making it easier to hit the time limit
+   (rather than the match limit).
+ - Mention `max_matches:` in the help section.
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">src/codesearch.cc</a></td><td> | </td><td class="num">4</td><td><span class="i">++</span><span class="d">--</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">web/htdocs/assets/js/codesearch_ui.js</a></td><td> | </td><td class="num">2</td><td><span class="i">+</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">web/templates/index.html</a></td><td> | </td><td class="num">5</td><td><span class="i">+++++</span><span class="d"></span></td></tr>
+</table></pre><pre>3 files changed, 8 insertions(+), 3 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/src/codesearch.cc">src/codesearch.cc</a> b/<a href="../file/src/codesearch.cc">src/codesearch.cc</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -52,7 +52,7 @@ DEFINE_bool(index, true, &quot;Create a suffix-array index to speed searches.&quot;);
+</a> DEFINE_bool(compress, true, &quot;Compress file contents linewise&quot;);
+ DEFINE_bool(drop_cache, false, &quot;Drop caches before each search&quot;);
+ DEFINE_bool(search, true, &quot;Actually do the search.&quot;);
+<a href="#h0-0-3" id="h0-0-3" class="d">-DEFINE_int32(max_matches, 50, &quot;The maximum number of results to return for a single query.&quot;);
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+DEFINE_int32(max_matches, 50, &quot;The default maximum number of results to return for a single query.&quot;);
+</a> DEFINE_int32(timeout, 1000, &quot;The number of milliseconds a single search may run for.&quot;);
+ DEFINE_int32(threads, 4, &quot;Number of threads to use.&quot;);
+ DEFINE_int32(line_limit, 1024, &quot;Maximum line length to index.&quot;);
+<a href="#h0-1" id="h0-1" class="h">@@ -116,7 +116,7 @@ public:
+</a>         if (FLAGS_max_matches &amp;&amp; !query_max_matches) {
+             max_matches_ = FLAGS_max_matches;
+         } else {
+<a href="#h0-1-3" id="h0-1-3" class="d">-            max_matches_ = std::min(FLAGS_max_matches, query_max_matches);
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+            max_matches_ = query_max_matches;
+</a>         }
+ 
+         if (FLAGS_timeout &lt;= 0) {
+<b>diff --git a/<a id="h1" href="../file/web/htdocs/assets/js/codesearch_ui.js">web/htdocs/assets/js/codesearch_ui.js</a> b/<a href="../file/web/htdocs/assets/js/codesearch_ui.js">web/htdocs/assets/js/codesearch_ui.js</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -543,7 +543,7 @@ var ResultView = Backbone.View.extend({
+</a>     }
+ 
+     var results = &#39;&#39; + this.model.search_results.num_matches();
+<a href="#h1-0-3" id="h1-0-3" class="d">-    if (this.model.get(&#39;why&#39;) === &#39;MATCH_LIMIT&#39;)
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+    if (this.model.get(&#39;why&#39;) !== &#39;NONE&#39;)
+</a>       results = results + &#39;+&#39;;
+     this.results.text(results);
+ 
+<b>diff --git a/<a id="h2" href="../file/web/templates/index.html">web/templates/index.html</a> b/<a href="../file/web/templates/index.html">web/templates/index.html</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -100,6 +100,11 @@
+</a>       &lt;td&gt;&lt;a href=&quot;/search?q=hello+-repo:{{.SampleRepo}}&quot;&gt;example&lt;/a&gt;&lt;/td&gt;
+     &lt;/tr&gt;
+     &lt;tr&gt;
+<a href="#h2-0-3" id="h2-0-3" class="i">+      &lt;td&gt;&lt;code&gt;max_matches:&lt;/code&gt;&lt;/td&gt;
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+      &lt;td&gt;Adjust the limit on number of matching lines returned.&lt;/td&gt;
+</a><a href="#h2-0-5" id="h2-0-5" class="i">+      &lt;td&gt;&lt;a href=&quot;/search?q=hello+max_matches:5&quot;&gt;example&lt;/a&gt;&lt;/td&gt;
+</a><a href="#h2-0-6" id="h2-0-6" class="i">+    &lt;/tr&gt;
+</a><a href="#h2-0-7" id="h2-0-7" class="i">+    &lt;tr&gt;
+</a>       &lt;td&gt;&lt;code&gt;(&lt;em&gt;special-term&lt;/em&gt;:)&lt;/code&gt;&lt;/td&gt;
+       &lt;td&gt;Escape one of the above terms by wrapping it in parentheses (with regex enabled).&lt;/td&gt;
+       &lt;td&gt;&lt;a href=&quot;/search?q=(file:)&amp;regex=true&quot;&gt;example&lt;/a&gt;&lt;/td&gt;
+</pre>
+</div>
+</body>
+</html>

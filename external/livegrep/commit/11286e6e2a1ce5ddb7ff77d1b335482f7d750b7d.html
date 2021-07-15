@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Use mmap-backed content chunks on index creation. - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/11286e6e2a1ce5ddb7ff77d1b335482f7d750b7d">11286e6e2a1ce5ddb7ff77d1b335482f7d750b7d</a>
+<b>parent</b> <a href="../commit/9f5568346739347e114b13a9b91b3a752b5f0741">9f5568346739347e114b13a9b91b3a752b5f0741</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Sun, 23 Dec 2012 22:13:20 -0500
+
+Use mmap-backed content chunks on index creation.
+
+Store content data in multiple chunks, and allocate using mmap as we
+go. Build contents per-file into a temporary buffer, and then convert
+to in-memory format.
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">chunk_allocator.cc</a></td><td> | </td><td class="num">24</td><td><span class="i">+++++++++++++++++++++++</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">chunk_allocator.h</a></td><td> | </td><td class="num">22</td><td><span class="i">++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">codesearch.cc</a></td><td> | </td><td class="num">6</td><td><span class="i">++++</span><span class="d">--</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">content.cc</a></td><td> | </td><td class="num">33</td><td><span class="i">++++++++++++++++++++</span><span class="d">-------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h4">content.h</a></td><td> | </td><td class="num">11</td><td><span class="i">+++++++++</span><span class="d">--</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h5">dump_load.cc</a></td><td> | </td><td class="num">105</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">---------------------------</span></td></tr>
+</table></pre><pre>6 files changed, 148 insertions(+), 53 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/chunk_allocator.cc">chunk_allocator.cc</a> b/<a href="../file/chunk_allocator.cc">chunk_allocator.cc</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -34,7 +34,8 @@ bool chunk_allocator::finalizer::operator()(chunk *chunk) {
+</a> }
+ 
+ chunk_allocator::chunk_allocator()  :
+<a href="#h0-0-3" id="h0-0-3" class="d">-    chunk_size_(kChunkSize), current_(0), finalizer_(), finalize_pool_(0) {
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+    chunk_size_(kChunkSize), content_finger_(0), current_(0),
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+    finalizer_(), finalize_pool_(0) {
+</a>     //    new_chunk();
+ }
+ 
+<a href="#h0-1" id="h0-1" class="h">@@ -61,6 +62,20 @@ unsigned char *chunk_allocator::alloc(size_t len) {
+</a>     return out;
+ }
+ 
+<a href="#h0-1-3" id="h0-1-3" class="i">+uint8_t *chunk_allocator::alloc_content_data(size_t len) {
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+    if (content_finger_ == 0 || (content_finger_ + len &gt; content_chunks_.back().end)) {
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+        if (content_finger_)
+</a><a href="#h0-1-6" id="h0-1-6" class="i">+            content_chunks_.back().end = content_finger_;
+</a><a href="#h0-1-7" id="h0-1-7" class="i">+        content_chunks_.push_back(alloc_content_chunk());
+</a><a href="#h0-1-8" id="h0-1-8" class="i">+        content_finger_ = content_chunks_.back().data;
+</a><a href="#h0-1-9" id="h0-1-9" class="i">+    }
+</a><a href="#h0-1-10" id="h0-1-10" class="i">+    uint8_t *out = content_finger_;
+</a><a href="#h0-1-11" id="h0-1-11" class="i">+    content_finger_ += len;
+</a><a href="#h0-1-12" id="h0-1-12" class="i">+    assert(content_finger_ &gt; content_chunks_.back().data &amp;&amp;
+</a><a href="#h0-1-13" id="h0-1-13" class="i">+           content_finger_ &lt;= content_chunks_.back().end);
+</a><a href="#h0-1-14" id="h0-1-14" class="i">+    return out;
+</a><a href="#h0-1-15" id="h0-1-15" class="i">+}
+</a><a href="#h0-1-16" id="h0-1-16" class="i">+
+</a> void chunk_allocator::finish_chunk()  {
+     if (current_) {
+         if (!finalize_pool_) {
+<a href="#h0-2" id="h0-2" class="h">@@ -90,6 +105,8 @@ void chunk_allocator::finalize()  {
+</a>     finalize_pool_ = NULL;
+     for (auto it = begin(); it != end(); ++it)
+         (*it)-&gt;finalize_files();
+<a href="#h0-2-3" id="h0-2-3" class="i">+    if (content_finger_)
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+        content_chunks_.back().end = content_finger_;
+</a> }
+ 
+ void chunk_allocator::skip_chunk() {
+<a href="#h0-3" id="h0-3" class="h">@@ -118,6 +135,11 @@ public:
+</a>         return new chunk(buf, idx);
+     }
+ 
+<a href="#h0-3-3" id="h0-3-3" class="i">+    virtual buffer alloc_content_chunk() {
+</a><a href="#h0-3-4" id="h0-3-4" class="i">+        uint8_t *buf = new uint8_t[kContentChunkSize];
+</a><a href="#h0-3-5" id="h0-3-5" class="i">+        return (buffer){ buf, buf + kContentChunkSize };
+</a><a href="#h0-3-6" id="h0-3-6" class="i">+    }
+</a><a href="#h0-3-7" id="h0-3-7" class="i">+
+</a>     virtual void free_chunk(chunk *chunk) {
+         delete[] chunk-&gt;data;
+         delete[] chunk-&gt;suffixes;
+<b>diff --git a/<a id="h1" href="../file/chunk_allocator.h">chunk_allocator.h</a> b/<a href="../file/chunk_allocator.h">chunk_allocator.h</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -9,12 +9,19 @@
+</a> #include &lt;vector&gt;
+ #include &lt;map&gt;
+ #include &lt;string&gt;
+<a href="#h1-0-3" id="h1-0-3" class="i">+#include &lt;assert.h&gt;
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+
+</a> #include &quot;thread_pool.h&quot;
+ 
+ using namespace std;
+ struct chunk;
+ class code_searcher;
+ 
+<a href="#h1-0-11" id="h1-0-11" class="i">+struct buffer {
+</a><a href="#h1-0-12" id="h1-0-12" class="i">+    uint8_t *data;
+</a><a href="#h1-0-13" id="h1-0-13" class="i">+    uint8_t *end;
+</a><a href="#h1-0-14" id="h1-0-14" class="i">+};
+</a><a href="#h1-0-15" id="h1-0-15" class="i">+
+</a> class chunk_allocator {
+ public:
+     chunk_allocator();
+<a href="#h1-1" id="h1-1" class="h">@@ -27,6 +34,7 @@ public:
+</a>     }
+ 
+     unsigned char *alloc(size_t len);
+<a href="#h1-1-3" id="h1-1-3" class="i">+    uint8_t *alloc_content_data(size_t len);
+</a> 
+     vector&lt;chunk*&gt;::iterator begin () {
+         return chunks_.begin();
+<a href="#h1-2" id="h1-2" class="h">@@ -36,7 +44,16 @@ public:
+</a>         return chunks_.end();
+     }
+ 
+<a href="#h1-2-3" id="h1-2-3" class="i">+    vector&lt;buffer&gt;::const_iterator begin_content() {
+</a><a href="#h1-2-4" id="h1-2-4" class="i">+        return content_chunks_.begin();
+</a><a href="#h1-2-5" id="h1-2-5" class="i">+    }
+</a><a href="#h1-2-6" id="h1-2-6" class="i">+
+</a><a href="#h1-2-7" id="h1-2-7" class="i">+    vector&lt;buffer&gt;::const_iterator end_content() {
+</a><a href="#h1-2-8" id="h1-2-8" class="i">+        return content_chunks_.end();
+</a><a href="#h1-2-9" id="h1-2-9" class="i">+    }
+</a><a href="#h1-2-10" id="h1-2-10" class="i">+
+</a>     chunk *at(size_t i) {
+<a href="#h1-2-12" id="h1-2-12" class="i">+        assert(i &lt; chunks_.size());
+</a>         return chunks_[i];
+     }
+ 
+<a href="#h1-3" id="h1-3" class="h">@@ -62,15 +79,20 @@ protected:
+</a> 
+     virtual chunk *alloc_chunk() = 0;
+     virtual void free_chunk(chunk *chunk) = 0;
+<a href="#h1-3-3" id="h1-3-3" class="i">+    virtual buffer alloc_content_chunk() = 0;
+</a>     void finish_chunk();
+     void new_chunk();
+ 
+     size_t chunk_size_;
+     vector&lt;chunk*&gt; chunks_;
+<a href="#h1-3-9" id="h1-3-9" class="i">+    vector&lt;buffer&gt; content_chunks_;
+</a><a href="#h1-3-10" id="h1-3-10" class="i">+    uint8_t *content_finger_;
+</a>     chunk *current_;
+     finalizer finalizer_;
+     thread_pool&lt;chunk*, finalizer&gt; *finalize_pool_;
+     map&lt;const unsigned char*, chunk*&gt; by_data_;
+ };
+ 
+<a href="#h1-3-17" id="h1-3-17" class="i">+const size_t kContentChunkSize = (1UL &lt;&lt; 22);
+</a><a href="#h1-3-18" id="h1-3-18" class="i">+
+</a> #endif
+<b>diff --git a/<a id="h2" href="../file/codesearch.cc">codesearch.cc</a> b/<a href="../file/codesearch.cc">codesearch.cc</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -465,7 +465,8 @@ void code_searcher::update_stats(const char *ref, const string&amp; path, git_blob *
+</a> 
+     uint32_t lines = count(p, end, &#39;\n&#39;);
+ 
+<a href="#h2-0-3" id="h2-0-3" class="d">-    sf-&gt;content = new(new uint32_t[3*lines+1]) file_contents(0);
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+    // sf-&gt;content = new(new uint32_t[3*lines+1]) file_contents(0);
+</a><a href="#h2-0-5" id="h2-0-5" class="i">+    file_contents_builder content;
+</a> 
+     while ((f = static_cast&lt;const char*&gt;(memchr(p, &#39;\n&#39;, end - p))) != 0) {
+         stats_.lines++;
+<a href="#h2-1" id="h2-1" class="h">@@ -490,10 +491,11 @@ void code_searcher::update_stats(const char *ref, const string&amp; path, git_blob *
+</a>                 (reinterpret_cast&lt;const unsigned char*&gt;(line.data()));
+         }
+         c-&gt;add_chunk_file(sf, line);
+<a href="#h2-1-3" id="h2-1-3" class="d">-        sf-&gt;content-&gt;extend(c, line);
+</a><a href="#h2-1-4" id="h2-1-4" class="i">+        content.extend(c, line);
+</a>         p = f + 1;
+     }
+ 
+<a href="#h2-1-8" id="h2-1-8" class="i">+    sf-&gt;content = content.build(alloc_);
+</a>     assert(sf-&gt;content-&gt;end() - sf-&gt;content-&gt;begin() &lt;= 3*lines);
+ 
+     for (auto it = alloc_-&gt;begin();
+<b>diff --git a/<a id="h3" href="../file/content.cc">content.cc</a> b/<a href="../file/content.cc">content.cc</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -6,21 +6,28 @@
+</a> #include &quot;content.h&quot;
+ #include &quot;chunk.h&quot;
+ 
+<a href="#h3-0-3" id="h3-0-3" class="d">-void file_contents::extend(chunk *c, const StringPiece &amp;piece) {
+</a><a href="#h3-0-4" id="h3-0-4" class="d">-    uint32_t off = reinterpret_cast&lt;const unsigned char*&gt;(piece.data()) - c-&gt;data;
+</a><a href="#h3-0-5" id="h3-0-5" class="d">-    uint32_t *end = buf_ + 3*npieces_;
+</a><a href="#h3-0-6" id="h3-0-6" class="d">-    if (npieces_) {
+</a><a href="#h3-0-7" id="h3-0-7" class="d">-        uint32_t id = *(end - 3);
+</a><a href="#h3-0-8" id="h3-0-8" class="d">-        uint32_t tailoff = *(end - 2) + *(end - 2);
+</a><a href="#h3-0-9" id="h3-0-9" class="d">-        if (id == c-&gt;id &amp;&amp;
+</a><a href="#h3-0-10" id="h3-0-10" class="d">-            tailoff == off) {
+</a><a href="#h3-0-11" id="h3-0-11" class="d">-            *(end - 1) += piece.size();
+</a><a href="#h3-0-12" id="h3-0-12" class="i">+void file_contents_builder::extend(chunk *c, const StringPiece &amp;piece) {
+</a><a href="#h3-0-13" id="h3-0-13" class="i">+    if (pieces_.size()) {
+</a><a href="#h3-0-14" id="h3-0-14" class="i">+        if (pieces_.back().data() + pieces_.back().size() == piece.data()) {
+</a><a href="#h3-0-15" id="h3-0-15" class="i">+            pieces_.back().set(pieces_.back().data(),
+</a><a href="#h3-0-16" id="h3-0-16" class="i">+                               piece.size() + pieces_.back().size());
+</a>             return;
+         }
+     }
+ 
+<a href="#h3-0-21" id="h3-0-21" class="d">-    *(end++) = c-&gt;id;
+</a><a href="#h3-0-22" id="h3-0-22" class="d">-    *(end++) = off;
+</a><a href="#h3-0-23" id="h3-0-23" class="d">-    *(end++) = piece.size();
+</a><a href="#h3-0-24" id="h3-0-24" class="d">-    ++npieces_;
+</a><a href="#h3-0-25" id="h3-0-25" class="i">+    pieces_.push_back(piece);
+</a><a href="#h3-0-26" id="h3-0-26" class="i">+}
+</a><a href="#h3-0-27" id="h3-0-27" class="i">+
+</a><a href="#h3-0-28" id="h3-0-28" class="i">+file_contents *file_contents_builder::build(chunk_allocator *alloc) {
+</a><a href="#h3-0-29" id="h3-0-29" class="i">+    size_t len = sizeof(uint32_t) * (1 + 3*pieces_.size());
+</a><a href="#h3-0-30" id="h3-0-30" class="i">+    file_contents *out = new(alloc-&gt;alloc_content_data(len)) file_contents(pieces_.size());
+</a><a href="#h3-0-31" id="h3-0-31" class="i">+    for (int i = 0; i &lt; pieces_.size(); i++) {
+</a><a href="#h3-0-32" id="h3-0-32" class="i">+        const unsigned char *p = reinterpret_cast&lt;const unsigned char*&gt;
+</a><a href="#h3-0-33" id="h3-0-33" class="i">+            (pieces_[i].data());
+</a><a href="#h3-0-34" id="h3-0-34" class="i">+        chunk *chunk = alloc-&gt;chunk_from_string(p);
+</a><a href="#h3-0-35" id="h3-0-35" class="i">+        out-&gt;buf_[3*i]     = chunk-&gt;id;
+</a><a href="#h3-0-36" id="h3-0-36" class="i">+        out-&gt;buf_[3*i + 1] = p - chunk-&gt;data;
+</a><a href="#h3-0-37" id="h3-0-37" class="i">+        out-&gt;buf_[3*i + 2] = pieces_[i].size();
+</a><a href="#h3-0-38" id="h3-0-38" class="i">+    }
+</a><a href="#h3-0-39" id="h3-0-39" class="i">+    return out;
+</a> }
+<b>diff --git a/<a id="h4" href="../file/content.h">content.h</a> b/<a href="../file/content.h">content.h</a></b>
+<a href="#h4-0" id="h4-0" class="h">@@ -81,10 +81,9 @@ public:
+</a>         return buf_ + 3*npieces_;
+     }
+ 
+<a href="#h4-0-3" id="h4-0-3" class="d">-    void extend(chunk *chunk, const StringPiece &amp;piece);
+</a><a href="#h4-0-4" id="h4-0-4" class="d">-
+</a>     friend class codesearch_index;
+     friend class load_allocator;
+<a href="#h4-0-7" id="h4-0-7" class="i">+    friend class file_contents_builder;
+</a> 
+ protected:
+     file_contents() {}
+<a href="#h4-1" id="h4-1" class="h">@@ -93,4 +92,12 @@ protected:
+</a>     uint32_t buf_[];
+ };
+ 
+<a href="#h4-1-3" id="h4-1-3" class="i">+class file_contents_builder {
+</a><a href="#h4-1-4" id="h4-1-4" class="i">+public:
+</a><a href="#h4-1-5" id="h4-1-5" class="i">+    void extend(chunk *chunk, const StringPiece &amp;piece);
+</a><a href="#h4-1-6" id="h4-1-6" class="i">+    file_contents *build(chunk_allocator *alloc);
+</a><a href="#h4-1-7" id="h4-1-7" class="i">+protected:
+</a><a href="#h4-1-8" id="h4-1-8" class="i">+    vector &lt;StringPiece&gt; pieces_;
+</a><a href="#h4-1-9" id="h4-1-9" class="i">+};
+</a><a href="#h4-1-10" id="h4-1-10" class="i">+
+</a> #endif
+<b>diff --git a/<a id="h5" href="../file/dump_load.cc">dump_load.cc</a> b/<a href="../file/dump_load.cc">dump_load.cc</a></b>
+<a href="#h5-0" id="h5-0" class="h">@@ -74,10 +74,10 @@ protected:
+</a>     void dump_chunk_data();
+     void dump_metadata();
+     void dump_file(search_file *);
+<a href="#h5-0-3" id="h5-0-3" class="d">-    void dump_file_contents(search_file *);
+</a>     void dump_chunk_file(chunk_file *cf);
+     void dump_chunk_files(chunk *, chunk_header *);
+     void dump_chunk_data(chunk *);
+<a href="#h5-0-7" id="h5-0-7" class="i">+    void dump_content_data();
+</a> 
+     void alignp(uint32_t align) {
+         streampos pos = stream_.tellp();
+<a href="#h5-1" id="h5-1" class="h">@@ -113,12 +113,8 @@ protected:
+</a> };
+ 
+ class dump_allocator : public chunk_allocator {
+<a href="#h5-1-3" id="h5-1-3" class="d">-public:
+</a><a href="#h5-1-4" id="h5-1-4" class="d">-    dump_allocator(code_searcher *cs, const char *path)
+</a><a href="#h5-1-5" id="h5-1-5" class="d">-        : cs_(cs), path_(path), index_() {
+</a><a href="#h5-1-6" id="h5-1-6" class="d">-    }
+</a><a href="#h5-1-7" id="h5-1-7" class="d">-
+</a><a href="#h5-1-8" id="h5-1-8" class="d">-    virtual chunk *alloc_chunk() {
+</a><a href="#h5-1-9" id="h5-1-9" class="i">+private:
+</a><a href="#h5-1-10" id="h5-1-10" class="i">+    pair&lt;off_t, uint8_t *&gt; alloc_mmap(size_t len) {
+</a>         void *buf;
+ 
+         if (!index_.get()) {
+<a href="#h5-2" id="h5-2" class="h">@@ -127,24 +123,53 @@ public:
+</a>             index_-&gt;alignp(kPageSize);
+         }
+ 
+<a href="#h5-2-3" id="h5-2-3" class="d">-        size_t off = index_-&gt;stream_.tellp();
+</a><a href="#h5-2-4" id="h5-2-4" class="d">-        assert(ftruncate(index_-&gt;fd_, off + 5*chunk_size_) == 0);
+</a><a href="#h5-2-5" id="h5-2-5" class="d">-        buf = mmap(NULL, 5*chunk_size_, PROT_READ|PROT_WRITE, MAP_SHARED,
+</a><a href="#h5-2-6" id="h5-2-6" class="i">+        off_t off = index_-&gt;stream_.tellp();
+</a><a href="#h5-2-7" id="h5-2-7" class="i">+        assert(ftruncate(index_-&gt;fd_, off + len) == 0);
+</a><a href="#h5-2-8" id="h5-2-8" class="i">+        buf = mmap(NULL, len, PROT_READ|PROT_WRITE, MAP_SHARED,
+</a>                    index_-&gt;fd_, off);
+         assert(buf != MAP_FAILED);
+<a href="#h5-2-11" id="h5-2-11" class="d">-        index_-&gt;stream_.seekp(5*chunk_size_, ios::cur);
+</a><a href="#h5-2-12" id="h5-2-12" class="i">+        index_-&gt;stream_.seekp(len, ios::cur);
+</a><a href="#h5-2-13" id="h5-2-13" class="i">+        return make_pair(off, static_cast&lt;uint8_t*&gt;(buf));
+</a><a href="#h5-2-14" id="h5-2-14" class="i">+    }
+</a><a href="#h5-2-15" id="h5-2-15" class="i">+
+</a><a href="#h5-2-16" id="h5-2-16" class="i">+public:
+</a><a href="#h5-2-17" id="h5-2-17" class="i">+    dump_allocator(code_searcher *cs, const char *path)
+</a><a href="#h5-2-18" id="h5-2-18" class="i">+        : cs_(cs), path_(path), index_() {
+</a><a href="#h5-2-19" id="h5-2-19" class="i">+    }
+</a><a href="#h5-2-20" id="h5-2-20" class="i">+
+</a><a href="#h5-2-21" id="h5-2-21" class="i">+    virtual chunk *alloc_chunk() {
+</a><a href="#h5-2-22" id="h5-2-22" class="i">+        auto alloc = alloc_mmap((1 + sizeof(uint32_t)) * chunk_size_);
+</a> 
+<a href="#h5-2-24" id="h5-2-24" class="d">-        chunk_header chdr;
+</a><a href="#h5-2-25" id="h5-2-25" class="d">-        chdr.data_off = off;
+</a><a href="#h5-2-26" id="h5-2-26" class="i">+        chunk_header chdr = {
+</a><a href="#h5-2-27" id="h5-2-27" class="i">+            .data_off = uint64_t(alloc.first)
+</a><a href="#h5-2-28" id="h5-2-28" class="i">+        };
+</a>         index_-&gt;chunks_.push_back(chdr);
+ 
+<a href="#h5-2-31" id="h5-2-31" class="d">-        return new chunk(static_cast&lt;unsigned char*&gt;(buf),
+</a><a href="#h5-2-32" id="h5-2-32" class="i">+        return new chunk(static_cast&lt;unsigned char*&gt;(alloc.second),
+</a>                          reinterpret_cast&lt;uint32_t*&gt;
+<a href="#h5-2-34" id="h5-2-34" class="d">-                         (static_cast&lt;unsigned char*&gt;(buf) + chunk_size_));
+</a><a href="#h5-2-35" id="h5-2-35" class="i">+                         (static_cast&lt;unsigned char*&gt;(alloc.second) + chunk_size_));
+</a><a href="#h5-2-36" id="h5-2-36" class="i">+    }
+</a><a href="#h5-2-37" id="h5-2-37" class="i">+
+</a><a href="#h5-2-38" id="h5-2-38" class="i">+    virtual buffer alloc_content_chunk() {
+</a><a href="#h5-2-39" id="h5-2-39" class="i">+        auto alloc = alloc_mmap(kContentChunkSize);
+</a><a href="#h5-2-40" id="h5-2-40" class="i">+        buffer b = {
+</a><a href="#h5-2-41" id="h5-2-41" class="i">+            alloc.second, alloc.second + kContentChunkSize
+</a><a href="#h5-2-42" id="h5-2-42" class="i">+        };
+</a><a href="#h5-2-43" id="h5-2-43" class="i">+        content_chunk_header hdr = {
+</a><a href="#h5-2-44" id="h5-2-44" class="i">+            .file_off = uint64_t(alloc.first),
+</a><a href="#h5-2-45" id="h5-2-45" class="i">+            /* .size will be calculated in finalize */
+</a><a href="#h5-2-46" id="h5-2-46" class="i">+        };
+</a><a href="#h5-2-47" id="h5-2-47" class="i">+        index_-&gt;content_.push_back(hdr);
+</a><a href="#h5-2-48" id="h5-2-48" class="i">+        return b;
+</a>     }
+ 
+     virtual void finalize() {
+         chunk_allocator::finalize();
+<a href="#h5-2-53" id="h5-2-53" class="i">+        auto cit = index_-&gt;content_.begin();
+</a><a href="#h5-2-54" id="h5-2-54" class="i">+        for (auto ait = begin_content();
+</a><a href="#h5-2-55" id="h5-2-55" class="i">+             ait != end_content(); ++ait, ++cit) {
+</a><a href="#h5-2-56" id="h5-2-56" class="i">+            cit-&gt;size = ait-&gt;end - ait-&gt;data;
+</a><a href="#h5-2-57" id="h5-2-57" class="i">+        }
+</a>         index_-&gt;dump_metadata();
+         index_-&gt;stream_.seekp(0);
+         index_-&gt;dump(&amp;index_-&gt;hdr_);
+<a href="#h5-3" id="h5-3" class="h">@@ -159,6 +184,9 @@ protected:
+</a>     code_searcher *cs_;
+     std::string path_;
+     unique_ptr&lt;codesearch_index&gt; index_;
+<a href="#h5-3-3" id="h5-3-3" class="i">+    map&lt;void *, off_t&gt; alloc_map_;
+</a><a href="#h5-3-4" id="h5-3-4" class="i">+    vector&lt;off_t&gt; content_;
+</a><a href="#h5-3-5" id="h5-3-5" class="i">+
+</a> };
+ 
+ class load_allocator : public chunk_allocator {
+<a href="#h5-4" id="h5-4" class="h">@@ -171,6 +199,9 @@ public:
+</a>     }
+ 
+     virtual chunk *alloc_chunk();
+<a href="#h5-4-3" id="h5-4-3" class="i">+    virtual buffer alloc_content_chunk() {
+</a><a href="#h5-4-4" id="h5-4-4" class="i">+        assert(0);
+</a><a href="#h5-4-5" id="h5-4-5" class="i">+    }
+</a> 
+     virtual void free_chunk(chunk *chunk) {
+         delete chunk;
+<a href="#h5-5" id="h5-5" class="h">@@ -277,20 +308,13 @@ void codesearch_index::dump_chunk_data(chunk *chunk) {
+</a>     stream_.write(reinterpret_cast&lt;char*&gt;(chunk-&gt;suffixes),
+                   sizeof(uint32_t) * chunk-&gt;size);
+     stream_.seekp(off + 5 * hdr_.chunk_size);
+<a href="#h5-5-3" id="h5-5-3" class="d">- }
+</a><a href="#h5-5-4" id="h5-5-4" class="d">-
+</a><a href="#h5-5-5" id="h5-5-5" class="d">-
+</a><a href="#h5-5-6" id="h5-5-6" class="d">-void codesearch_index::dump_file_contents(search_file *sf) {
+</a><a href="#h5-5-7" id="h5-5-7" class="d">-    /* (int num, [chunkid, offset, len]) */
+</a><a href="#h5-5-8" id="h5-5-8" class="d">-    dump_int32(sf-&gt;content-&gt;npieces_);
+</a><a href="#h5-5-9" id="h5-5-9" class="d">-    stream_.write(reinterpret_cast&lt;char*&gt;(sf-&gt;content-&gt;buf_),
+</a><a href="#h5-5-10" id="h5-5-10" class="d">-                  sizeof(uint32_t) * sf-&gt;content-&gt;npieces_ * 3);
+</a> }
+ 
+ void codesearch_index::dump_metadata() {
+     hdr_.nrefs   = cs_-&gt;refs_.size();
+     hdr_.nfiles  = cs_-&gt;files_.size();
+     hdr_.nchunks = cs_-&gt;alloc_-&gt;size();
+<a href="#h5-5-17" id="h5-5-17" class="i">+    hdr_.ncontent = content_.size();
+</a> 
+     hdr_.refs_off = stream_.tellp();
+     for (auto it = cs_-&gt;refs_.begin();
+<a href="#h5-6" id="h5-6" class="h">@@ -309,20 +333,13 @@ void codesearch_index::dump_metadata() {
+</a>         dump_chunk_files(*it, &amp;(*hdr));
+     }
+ 
+<a href="#h5-6-3" id="h5-6-3" class="d">-    uint64_t content_start = stream_.tellp();
+</a><a href="#h5-6-4" id="h5-6-4" class="d">-    for (vector&lt;search_file*&gt;::iterator it = cs_-&gt;files_.begin();
+</a><a href="#h5-6-5" id="h5-6-5" class="d">-         it != cs_-&gt;files_.end(); ++it)
+</a><a href="#h5-6-6" id="h5-6-6" class="d">-        dump_file_contents(*it);
+</a><a href="#h5-6-7" id="h5-6-7" class="d">-    content_.push_back({content_start,
+</a><a href="#h5-6-8" id="h5-6-8" class="d">-                uint32_t(uint64_t(stream_.tellp()) - content_start)});
+</a><a href="#h5-6-9" id="h5-6-9" class="d">-    hdr_.content_off = stream_.tellp();
+</a><a href="#h5-6-10" id="h5-6-10" class="d">-    hdr_.ncontent = 1;
+</a><a href="#h5-6-11" id="h5-6-11" class="d">-    for (auto it = content_.begin(); it != content_.end(); ++it)
+</a><a href="#h5-6-12" id="h5-6-12" class="d">-        dump(&amp;*it);
+</a><a href="#h5-6-13" id="h5-6-13" class="d">-
+</a>     hdr_.chunks_off = stream_.tellp();
+     for (auto it = chunks_.begin(); it != chunks_.end(); ++it)
+         dump(&amp;*it);
+<a href="#h5-6-17" id="h5-6-17" class="i">+
+</a><a href="#h5-6-18" id="h5-6-18" class="i">+    hdr_.content_off = stream_.tellp();
+</a><a href="#h5-6-19" id="h5-6-19" class="i">+    for (auto it = content_.begin(); it != content_.end(); ++it)
+</a><a href="#h5-6-20" id="h5-6-20" class="i">+        dump(&amp;*it);
+</a> }
+ 
+ void codesearch_index::dump_chunk_data() {
+<a href="#h5-7" id="h5-7" class="h">@@ -333,12 +350,26 @@ void codesearch_index::dump_chunk_data() {
+</a>     }
+ }
+ 
+<a href="#h5-7-3" id="h5-7-3" class="i">+void codesearch_index::dump_content_data() {
+</a><a href="#h5-7-4" id="h5-7-4" class="i">+    alignp(kPageSize);
+</a><a href="#h5-7-5" id="h5-7-5" class="i">+    for (auto it = cs_-&gt;alloc_-&gt;begin_content();
+</a><a href="#h5-7-6" id="h5-7-6" class="i">+         it != cs_-&gt;alloc_-&gt;end_content(); ++it) {
+</a><a href="#h5-7-7" id="h5-7-7" class="i">+        off_t off = stream_.tellp();
+</a><a href="#h5-7-8" id="h5-7-8" class="i">+        stream_.write(reinterpret_cast&lt;char*&gt;(it-&gt;data), it-&gt;end - it-&gt;data);
+</a><a href="#h5-7-9" id="h5-7-9" class="i">+        content_.push_back((content_chunk_header) {
+</a><a href="#h5-7-10" id="h5-7-10" class="i">+                uint64_t(off),
+</a><a href="#h5-7-11" id="h5-7-11" class="i">+                uint32_t(it-&gt;end - it-&gt;data)
+</a><a href="#h5-7-12" id="h5-7-12" class="i">+            });
+</a><a href="#h5-7-13" id="h5-7-13" class="i">+    }
+</a><a href="#h5-7-14" id="h5-7-14" class="i">+}
+</a><a href="#h5-7-15" id="h5-7-15" class="i">+
+</a> void codesearch_index::dump() {
+     assert(cs_-&gt;finalized_);
+ 
+     dump(&amp;hdr_);
+ 
+     dump_chunk_data();
+<a href="#h5-7-22" id="h5-7-22" class="i">+    dump_content_data();
+</a>     dump_metadata();
+ 
+     stream_.seekp(0);
+<a href="#h5-8" id="h5-8" class="h">@@ -431,12 +462,16 @@ void load_allocator::load(code_searcher *cs) {
+</a>     content_chunk_header *chdr = ptr&lt;content_chunk_header&gt;(hdr_-&gt;content_off);
+     auto it = cs-&gt;files_.begin();
+     for (int i = 0; i &lt; hdr_-&gt;ncontent; i++) {
+<a href="#h5-8-3" id="h5-8-3" class="i">+        buffer b;
+</a>         p_ = ptr&lt;uint8_t&gt;(chdr-&gt;file_off);
+<a href="#h5-8-5" id="h5-8-5" class="d">-        while (p_ != ptr&lt;uint8_t&gt;(chdr-&gt;file_off + chdr-&gt;size)) {
+</a><a href="#h5-8-6" id="h5-8-6" class="i">+        b.data = p_;
+</a><a href="#h5-8-7" id="h5-8-7" class="i">+        while (p_ &lt; ptr&lt;uint8_t&gt;(chdr-&gt;file_off + chdr-&gt;size)) {
+</a>             (*it)-&gt;content = new(p_) file_contents;
+             p_ = reinterpret_cast&lt;uint8_t*&gt;((*it)-&gt;content-&gt;end());
+             ++it;
+         }
+<a href="#h5-8-12" id="h5-8-12" class="i">+        b.end = p_;
+</a><a href="#h5-8-13" id="h5-8-13" class="i">+        content_chunks_.push_back(b);
+</a>         ++chdr;
+     }
+     assert(it == cs-&gt;files_.end());
+</pre>
+</div>
+</body>
+</html>

@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Make frontend smarter about filename-only searches - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/a3fd0339adbc367687cbfb2a9a834ecfbda5ca56">a3fd0339adbc367687cbfb2a9a834ecfbda5ca56</a>
+<b>parent</b> <a href="../commit/fc8df68b981dd4ec87cc083357d5aff84f1b6e1a">fc8df68b981dd4ec87cc083357d5aff84f1b6e1a</a>
+<b>Author:</b> Josiah Boning &lt;<a href="mailto:josiah@dropbox.com">josiah@dropbox.com</a>&gt;
+<b>Date:</b>   Wed,  6 Sep 2017 22:15:51 +0000
+
+Make frontend smarter about filename-only searches
+
+Tell the frontend explicitly whether a search was filename-only or not;
+if it was, render more results, and show the number of file results in
+the UI.
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">server/api.go</a></td><td> | </td><td class="num">5</td><td><span class="i">+++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">server/api/types.go</a></td><td> | </td><td class="num">1</td><td><span class="i">+</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">web/htdocs/assets/js/codesearch.js</a></td><td> | </td><td class="num">2</td><td><span class="i">+</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">web/htdocs/assets/js/codesearch_ui.js</a></td><td> | </td><td class="num">27</td><td><span class="i">++++++++++++++++</span><span class="d">-----------</span></td></tr>
+</table></pre><pre>4 files changed, 23 insertions(+), 12 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/server/api.go">server/api.go</a> b/<a href="../file/server/api.go">server/api.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -123,6 +123,11 @@ func (s *server) doSearch(ctx context.Context, backend *Backend, q *pb.Query) (*
+</a> 	reply := &amp;api.ReplySearch{
+ 		Results:     make([]*api.Result, 0),
+ 		FileResults: make([]*api.FileResult, 0),
+<a href="#h0-0-3" id="h0-0-3" class="i">+		SearchType:  &quot;normal&quot;,
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+	}
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+	if q.FilenameOnly {
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+		reply.SearchType = &quot;filename_only&quot;
+</a> 	}
+ 
+ 	for _, r := range search.Results {
+<b>diff --git a/<a id="h1" href="../file/server/api/types.go">server/api/types.go</a> b/<a href="../file/server/api/types.go">server/api/types.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -15,6 +15,7 @@ type ReplySearch struct {
+</a> 	Info        *Stats        `json:&quot;info&quot;`
+ 	Results     []*Result     `json:&quot;results&quot;`
+ 	FileResults []*FileResult `json:&quot;file_results&quot;`
+<a href="#h1-0-3" id="h1-0-3" class="i">+	SearchType  string        `json:&quot;search_type&quot;`
+</a> }
+ 
+ type Stats struct {
+<b>diff --git a/<a id="h2" href="../file/web/htdocs/assets/js/codesearch.js">web/htdocs/assets/js/codesearch.js</a> b/<a href="../file/web/htdocs/assets/js/codesearch.js">web/htdocs/assets/js/codesearch.js</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -46,7 +46,7 @@ var Codesearch = function() {
+</a>         data.file_results.forEach(function (r) {
+           Codesearch.delegate.file_match(opts.id, r);
+         });
+<a href="#h2-0-3" id="h2-0-3" class="d">-        Codesearch.delegate.search_done(opts.id, elapsed, data.info.why);
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+        Codesearch.delegate.search_done(opts.id, elapsed, data.search_type, data.info.why);
+</a>       });
+       xhr.error(function(data) {
+         window._err = data;
+<b>diff --git a/<a id="h3" href="../file/web/htdocs/assets/js/codesearch_ui.js">web/htdocs/assets/js/codesearch_ui.js</a> b/<a href="../file/web/htdocs/assets/js/codesearch_ui.js">web/htdocs/assets/js/codesearch_ui.js</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -317,6 +317,7 @@ var SearchState = Backbone.Model.extend({
+</a>       context: true,
+       displaying: null,
+       error: null,
+<a href="#h3-0-3" id="h3-0-3" class="i">+      search_type: &quot;&quot;,
+</a>       time: null,
+       why: null
+     };
+<a href="#h3-1" id="h3-1" class="h">@@ -416,18 +417,13 @@ var SearchState = Backbone.Model.extend({
+</a>     this.set(&#39;displaying&#39;, search);
+     var fm = _.clone(file_match);
+     fm.backend = this.search_map[search].backend;
+<a href="#h3-1-3" id="h3-1-3" class="d">-    // TODO: Currently we hackily limit the display to 10 file-path results.
+</a><a href="#h3-1-4" id="h3-1-4" class="d">-    // We should do something nicer, like a &quot;...&quot; the user can click to extend
+</a><a href="#h3-1-5" id="h3-1-5" class="d">-    // the list.
+</a><a href="#h3-1-6" id="h3-1-6" class="d">-    if (this.file_search_results.length &lt; 10) {
+</a><a href="#h3-1-7" id="h3-1-7" class="d">-        this.file_search_results.add(new FileMatch(fm));
+</a><a href="#h3-1-8" id="h3-1-8" class="d">-    }
+</a><a href="#h3-1-9" id="h3-1-9" class="i">+    this.file_search_results.add(new FileMatch(fm));
+</a>   },
+<a href="#h3-1-11" id="h3-1-11" class="d">-  handle_done: function (search, time, why) {
+</a><a href="#h3-1-12" id="h3-1-12" class="i">+  handle_done: function (search, time, search_type, why) {
+</a>     if (search &lt; this.get(&#39;displaying&#39;))
+       return false;
+     this.set(&#39;displaying&#39;, search);
+<a href="#h3-1-16" id="h3-1-16" class="d">-    this.set({time: time, why: why});
+</a><a href="#h3-1-17" id="h3-1-17" class="i">+    this.set({time: time, search_type: search_type, why: why});
+</a>     this.search_results.trigger(&#39;search-complete&#39;);
+   }
+ });
+<a href="#h3-2" id="h3-2" class="h">@@ -481,9 +477,13 @@ var MatchesView = Backbone.View.extend({
+</a>     this.$el.empty();
+ 
+     var pathResults = h.div({&#39;cls&#39;: &#39;path-results&#39;});
+<a href="#h3-2-3" id="h3-2-3" class="i">+    var count = 0;
+</a>     this.model.file_search_results.each(function(file) {
+<a href="#h3-2-5" id="h3-2-5" class="i">+      if (this.model.get(&#39;search_type&#39;) == &#39;filename_only&#39; || count &lt; 10) {
+</a>         var view = new FileMatchView({model: file});
+         pathResults.append(view.render().el);
+<a href="#h3-2-8" id="h3-2-8" class="i">+      }
+</a><a href="#h3-2-9" id="h3-2-9" class="i">+      count += 1;
+</a>     }, this);
+     this.$el.append(pathResults);
+ 
+<a href="#h3-3" id="h3-3" class="h">@@ -547,7 +547,12 @@ var ResultView = Backbone.View.extend({
+</a>       this.$(&#39;#searchtimebox&#39;).hide();
+     }
+ 
+<a href="#h3-3-3" id="h3-3-3" class="d">-    var results = &#39;&#39; + this.model.search_results.num_matches();
+</a><a href="#h3-3-4" id="h3-3-4" class="i">+    var results;
+</a><a href="#h3-3-5" id="h3-3-5" class="i">+    if (this.model.get(&#39;search_type&#39;) == &#39;filename_only&#39;) {
+</a><a href="#h3-3-6" id="h3-3-6" class="i">+      results = &#39;&#39; + this.model.file_search_results.length;
+</a><a href="#h3-3-7" id="h3-3-7" class="i">+    } else {
+</a><a href="#h3-3-8" id="h3-3-8" class="i">+      results = &#39;&#39; + this.model.search_results.num_matches();
+</a><a href="#h3-3-9" id="h3-3-9" class="i">+    }
+</a>     if (this.model.get(&#39;why&#39;) !== &#39;NONE&#39;)
+       results = results + &#39;+&#39;;
+     this.results.text(results);
+<a href="#h3-4" id="h3-4" class="h">@@ -681,8 +686,8 @@ var CodesearchUI = function() {
+</a>     file_match: function(search, file_match) {
+       CodesearchUI.state.handle_file_match(search, file_match);
+     },
+<a href="#h3-4-3" id="h3-4-3" class="d">-    search_done: function(search, time, why) {
+</a><a href="#h3-4-4" id="h3-4-4" class="d">-      CodesearchUI.state.handle_done(search, time, why);
+</a><a href="#h3-4-5" id="h3-4-5" class="i">+    search_done: function(search, time, search_type, why) {
+</a><a href="#h3-4-6" id="h3-4-6" class="i">+      CodesearchUI.state.handle_done(search, time, search_type, why);
+</a>     },
+     repo_urls: {}
+   };
+</pre>
+</div>
+</body>
+</html>

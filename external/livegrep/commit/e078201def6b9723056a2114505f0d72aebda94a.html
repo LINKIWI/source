@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Rework the rendering to use a modified version of gschmidt&#39;s html.js - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/e078201def6b9723056a2114505f0d72aebda94a">e078201def6b9723056a2114505f0d72aebda94a</a>
+<b>parent</b> <a href="../commit/dde298ba9e841f4306a011072fcdf384875d56e8">dde298ba9e841f4306a011072fcdf384875d56e8</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Fri,  4 Nov 2011 22:21:44 -0400
+
+Rework the rendering to use a modified version of gschmidt&#39;s html.js
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">web/static/codesearch.js</a></td><td> | </td><td class="num">32</td><td><span class="i">++++++++++++</span><span class="d">--------------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">web/static/index.html</a></td><td> | </td><td class="num">3</td><td><span class="i">++</span><span class="d">-</span></td></tr>
+<tr><td class="A">A</td><td><a href="#h2">web/static/js/html.js</a></td><td> | </td><td class="num">111</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+</table></pre><pre>3 files changed, 125 insertions(+), 21 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/web/static/codesearch.js">web/static/codesearch.js</a> b/<a href="../file/web/static/codesearch.js">web/static/codesearch.js</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -1,30 +1,22 @@
+</a> &quot;use strict&quot;;
+ var Codesearch = function() {
+   var MAX_RECONNECT_INTERVAL = 1000*60*1;
+<a href="#h0-0-3" id="h0-0-3" class="d">-  function elt(name) {
+</a><a href="#h0-0-4" id="h0-0-4" class="d">-    return document.createElement(name);
+</a><a href="#h0-0-5" id="h0-0-5" class="d">-  }
+</a><a href="#h0-0-6" id="h0-0-6" class="d">-  function text(name) {
+</a><a href="#h0-0-7" id="h0-0-7" class="d">-    return document.createTextNode(name);
+</a><a href="#h0-0-8" id="h0-0-8" class="d">-  }
+</a>   function render_match(match) {
+     var pieces = [match.line.substring(0, match.bounds[0]),
+                   match.line.substring(match.bounds[0], match.bounds[1]),
+                   match.line.substring(match.bounds[1])];
+<a href="#h0-0-13" id="h0-0-13" class="d">-    return $(elt(&#39;div&#39;)).addClass(&#39;match&#39;).append(
+</a><a href="#h0-0-14" id="h0-0-14" class="d">-      $(elt(&#39;div&#39;)).addClass(&#39;label&#39;).text(
+</a><a href="#h0-0-15" id="h0-0-15" class="d">-        match.file
+</a><a href="#h0-0-16" id="h0-0-16" class="d">-      )).append(
+</a><a href="#h0-0-17" id="h0-0-17" class="d">-        $(elt(&#39;div&#39;)).addClass(&#39;contents&#39;).append(
+</a><a href="#h0-0-18" id="h0-0-18" class="d">-          $(elt(&#39;span&#39;)).addClass(&#39;lno&#39;).text(match.lno + &quot;:&quot;)
+</a><a href="#h0-0-19" id="h0-0-19" class="d">-        ).append(
+</a><a href="#h0-0-20" id="h0-0-20" class="d">-          text(pieces[0])
+</a><a href="#h0-0-21" id="h0-0-21" class="d">-        ).append(
+</a><a href="#h0-0-22" id="h0-0-22" class="d">-          $(elt(&#39;span&#39;)).addClass(&#39;matchstr&#39;).text(pieces[1])
+</a><a href="#h0-0-23" id="h0-0-23" class="d">-        ).append(
+</a><a href="#h0-0-24" id="h0-0-24" class="d">-          text(pieces[2])
+</a><a href="#h0-0-25" id="h0-0-25" class="d">-        ));
+</a><a href="#h0-0-26" id="h0-0-26" class="d">-      }
+</a><a href="#h0-0-27" id="h0-0-27" class="i">+    var h = new HTMLFactory();
+</a><a href="#h0-0-28" id="h0-0-28" class="i">+    return h.div({cls: &#39;match&#39;},
+</a><a href="#h0-0-29" id="h0-0-29" class="i">+                 [
+</a><a href="#h0-0-30" id="h0-0-30" class="i">+                   h.div({cls: &#39;label&#39;}, [match.file]),
+</a><a href="#h0-0-31" id="h0-0-31" class="i">+                   h.div({cls: &#39;contents&#39;},
+</a><a href="#h0-0-32" id="h0-0-32" class="i">+                         [
+</a><a href="#h0-0-33" id="h0-0-33" class="i">+                           h.span({cls: &#39;lno&#39;}, [match.lno + &quot;:&quot;]),
+</a><a href="#h0-0-34" id="h0-0-34" class="i">+                           pieces[0],
+</a><a href="#h0-0-35" id="h0-0-35" class="i">+                           h.span({cls: &#39;matchstr&#39;}, [pieces[1]]),
+</a><a href="#h0-0-36" id="h0-0-36" class="i">+                           pieces[2]
+</a><a href="#h0-0-37" id="h0-0-37" class="i">+                         ])]);
+</a><a href="#h0-0-38" id="h0-0-38" class="i">+  }
+</a>   function connectFailedMiddleware(cb) {
+     return function (remote, client) {
+       var timer = setTimeout(function() {
+<b>diff --git a/<a id="h1" href="../file/web/static/index.html">web/static/index.html</a> b/<a href="../file/web/static/index.html">web/static/index.html</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -2,7 +2,8 @@
+</a>   &lt;head&gt;
+     &lt;title&gt;code search&lt;/title&gt;
+     &lt;script language=&quot;javascript&quot; type=&quot;text/javascript&quot; src=&quot;js/jquery.js&quot;&gt;&lt;/script&gt;
+<a href="#h1-0-3" id="h1-0-3" class="d">-    &lt;script language=&quot;javascript&quot; type=&quot;text/javascript&quot; src=&quot;js/dnode.js&quot;&gt;&lt;/script&gt;    
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+    &lt;script language=&quot;javascript&quot; type=&quot;text/javascript&quot; src=&quot;js/dnode.js&quot;&gt;&lt;/script&gt;
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+    &lt;script language=&quot;javascript&quot; type=&quot;text/javascript&quot; src=&quot;js/html.js&quot;&gt;&lt;/script&gt;
+</a>     &lt;script language=&quot;javascript&quot; type=&quot;text/javascript&quot; src=&quot;codesearch.js&quot;&gt;&lt;/script&gt;
+     &lt;link rel=&quot;stylesheet&quot; href=&#39;static/codesearch.css&#39; /&gt;
+   &lt;/head&gt;
+<b>diff --git a/<a id="h2" href="../file/web/static/js/html.js">web/static/js/html.js</a> b/<a href="../file/web/static/js/html.js">web/static/js/html.js</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -0,0 +1,111 @@
+</a><a href="#h2-0-0" id="h2-0-0" class="i">+function HTMLFactory() {}
+</a><a href="#h2-0-1" id="h2-0-1" class="i">+(function() {
+</a><a href="#h2-0-2" id="h2-0-2" class="i">+/***
+</a><a href="#h2-0-3" id="h2-0-3" class="i">+ * A convenient way to create DOM elements. (&#39;cls&#39; will be
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+ * automatically expanded to &#39;class&#39;, since &#39;class&#39; may not appear as
+</a><a href="#h2-0-5" id="h2-0-5" class="i">+ * a key of an object, even in quotes, in Safari.)
+</a><a href="#h2-0-6" id="h2-0-6" class="i">+ *
+</a><a href="#h2-0-7" id="h2-0-7" class="i">+ * DIV({cls: &quot;mydiv&quot;, style: &quot;color: blue;&quot;}, [
+</a><a href="#h2-0-8" id="h2-0-8" class="i">+ *   &quot;Some text&quot;,
+</a><a href="#h2-0-9" id="h2-0-9" class="i">+ *   A({href: &quot;/some/location&quot;}, [&quot;A link&quot;]),
+</a><a href="#h2-0-10" id="h2-0-10" class="i">+ *   DIV({cls: &quot;emptydiv&quot;}),
+</a><a href="#h2-0-11" id="h2-0-11" class="i">+ *   // if an object is inserted, the value of its &#39;element&#39;
+</a><a href="#h2-0-12" id="h2-0-12" class="i">+ *   // attribute will be used
+</a><a href="#h2-0-13" id="h2-0-13" class="i">+ *   myView,
+</a><a href="#h2-0-14" id="h2-0-14" class="i">+ *   DIV([
+</a><a href="#h2-0-15" id="h2-0-15" class="i">+ *     &quot;Both the attributes and the contents are optional&quot;,
+</a><a href="#h2-0-16" id="h2-0-16" class="i">+ *     [&quot;Lists&quot;, &quot;are&quot;, &quot;flattened&quot;]
+</a><a href="#h2-0-17" id="h2-0-17" class="i">+ *   })
+</a><a href="#h2-0-18" id="h2-0-18" class="i">+ * ]);
+</a><a href="#h2-0-19" id="h2-0-19" class="i">+ */
+</a><a href="#h2-0-20" id="h2-0-20" class="i">+
+</a><a href="#h2-0-21" id="h2-0-21" class="i">+// XXX find a place to document the contract for *View classes -- they
+</a><a href="#h2-0-22" id="h2-0-22" class="i">+// should have an attribute named &#39;element&#39;
+</a><a href="#h2-0-23" id="h2-0-23" class="i">+
+</a><a href="#h2-0-24" id="h2-0-24" class="i">+// XXX consider not requiring the contents to be wrapped in an
+</a><a href="#h2-0-25" id="h2-0-25" class="i">+// array. eg: DIV({stuff: 12}, &quot;thing1&quot;, &quot;thing2&quot;). backwards
+</a><a href="#h2-0-26" id="h2-0-26" class="i">+// compatible with current behavior due to array flattening. could
+</a><a href="#h2-0-27" id="h2-0-27" class="i">+// eliminate spurious wrapper div inserted by Layout.TwoColumnsFixedRight
+</a><a href="#h2-0-28" id="h2-0-28" class="i">+
+</a><a href="#h2-0-29" id="h2-0-29" class="i">+// XXX allow style to be set as an object
+</a><a href="#h2-0-30" id="h2-0-30" class="i">+var event_names = {
+</a><a href="#h2-0-31" id="h2-0-31" class="i">+  blur: true,
+</a><a href="#h2-0-32" id="h2-0-32" class="i">+  change: true,
+</a><a href="#h2-0-33" id="h2-0-33" class="i">+  click: true,
+</a><a href="#h2-0-34" id="h2-0-34" class="i">+  dblclick: true,
+</a><a href="#h2-0-35" id="h2-0-35" class="i">+  error: true,
+</a><a href="#h2-0-36" id="h2-0-36" class="i">+  focus: true,
+</a><a href="#h2-0-37" id="h2-0-37" class="i">+  focusin: true,
+</a><a href="#h2-0-38" id="h2-0-38" class="i">+  focusout: true,
+</a><a href="#h2-0-39" id="h2-0-39" class="i">+  keydown: true,
+</a><a href="#h2-0-40" id="h2-0-40" class="i">+  keypress: true,
+</a><a href="#h2-0-41" id="h2-0-41" class="i">+  keyup: true,
+</a><a href="#h2-0-42" id="h2-0-42" class="i">+  load: true,
+</a><a href="#h2-0-43" id="h2-0-43" class="i">+  mousedown: true,
+</a><a href="#h2-0-44" id="h2-0-44" class="i">+  mouseenter: true,
+</a><a href="#h2-0-45" id="h2-0-45" class="i">+  mouseleave: true,
+</a><a href="#h2-0-46" id="h2-0-46" class="i">+  mousemove: true,
+</a><a href="#h2-0-47" id="h2-0-47" class="i">+  mouseout: true,
+</a><a href="#h2-0-48" id="h2-0-48" class="i">+  mouseover: true,
+</a><a href="#h2-0-49" id="h2-0-49" class="i">+  mouseup: true,
+</a><a href="#h2-0-50" id="h2-0-50" class="i">+  resize: true,
+</a><a href="#h2-0-51" id="h2-0-51" class="i">+  scroll: true,
+</a><a href="#h2-0-52" id="h2-0-52" class="i">+  select: true,
+</a><a href="#h2-0-53" id="h2-0-53" class="i">+  submit: true
+</a><a href="#h2-0-54" id="h2-0-54" class="i">+};
+</a><a href="#h2-0-55" id="h2-0-55" class="i">+
+</a><a href="#h2-0-56" id="h2-0-56" class="i">+// All HTML4 elements, excluding deprecated element
+</a><a href="#h2-0-57" id="h2-0-57" class="i">+// http://www.w3.org/TR/html4/index/elements.html
+</a><a href="#h2-0-58" id="h2-0-58" class="i">+// also excluding the following elements that seem unlikely to be used in the body:
+</a><a href="#h2-0-59" id="h2-0-59" class="i">+// HEAD, HTML, LINK, MAP, META, NOFRAMES, NOSCRIPT, STYLE, TITLE
+</a><a href="#h2-0-60" id="h2-0-60" class="i">+(&#39;A ABBR ACRONYM B BDO BIG BLOCKQUOTE BR BUTTON CAPTION CITE CODE COL &#39; +
+</a><a href="#h2-0-61" id="h2-0-61" class="i">+ &#39;COLGROUP DD DEL DFN DIV DL DT EM FIELDSET FORM H1 H2 H3 H4 H5 H6 HR &#39; +
+</a><a href="#h2-0-62" id="h2-0-62" class="i">+ &#39;I IFRAME IMG INPUT INS KBD LABEL LEGEND LI OBJECT OL OPTGROUP OPTION &#39; +
+</a><a href="#h2-0-63" id="h2-0-63" class="i">+ &#39;P PARAM PRE Q S SAMP SCRIPT SELECT SMALL SPAN STRIKE STRONG SUB SUP TABLE&#39; +
+</a><a href="#h2-0-64" id="h2-0-64" class="i">+ &#39;TBODY TD TEXTAREA TFOOT TH THEAD TR TT U UL VAR&#39;).split(&#39; &#39;).forEach(
+</a><a href="#h2-0-65" id="h2-0-65" class="i">+   function (tag) {
+</a><a href="#h2-0-66" id="h2-0-66" class="i">+     HTMLFactory.prototype[tag.toLowerCase()] = function (arg1, arg2) {
+</a><a href="#h2-0-67" id="h2-0-67" class="i">+       var attrs, contents;
+</a><a href="#h2-0-68" id="h2-0-68" class="i">+       if (arg2) {
+</a><a href="#h2-0-69" id="h2-0-69" class="i">+         attrs = arg1;
+</a><a href="#h2-0-70" id="h2-0-70" class="i">+         contents = arg2;
+</a><a href="#h2-0-71" id="h2-0-71" class="i">+       } else {
+</a><a href="#h2-0-72" id="h2-0-72" class="i">+         if (arg1 instanceof Array) {
+</a><a href="#h2-0-73" id="h2-0-73" class="i">+           attrs = {};
+</a><a href="#h2-0-74" id="h2-0-74" class="i">+           contents = arg1;
+</a><a href="#h2-0-75" id="h2-0-75" class="i">+         } else {
+</a><a href="#h2-0-76" id="h2-0-76" class="i">+           attrs = arg1;
+</a><a href="#h2-0-77" id="h2-0-77" class="i">+           contents = [];
+</a><a href="#h2-0-78" id="h2-0-78" class="i">+         }
+</a><a href="#h2-0-79" id="h2-0-79" class="i">+       }
+</a><a href="#h2-0-80" id="h2-0-80" class="i">+       var elt = document.createElement(tag);
+</a><a href="#h2-0-81" id="h2-0-81" class="i">+       for (var a in attrs) {
+</a><a href="#h2-0-82" id="h2-0-82" class="i">+         if (a === &#39;cls&#39;)
+</a><a href="#h2-0-83" id="h2-0-83" class="i">+           elt.setAttribute(&#39;class&#39;, attrs[a]);
+</a><a href="#h2-0-84" id="h2-0-84" class="i">+         else if (a === &#39;_for&#39;)
+</a><a href="#h2-0-85" id="h2-0-85" class="i">+           elt.setAttribute(&#39;for&#39;, attrs[a]);
+</a><a href="#h2-0-86" id="h2-0-86" class="i">+         else if (event_names[a])
+</a><a href="#h2-0-87" id="h2-0-87" class="i">+           // XXX creates a dependency on jQuery.. ick..
+</a><a href="#h2-0-88" id="h2-0-88" class="i">+           ($(elt)[a])(attrs[a]);
+</a><a href="#h2-0-89" id="h2-0-89" class="i">+         else
+</a><a href="#h2-0-90" id="h2-0-90" class="i">+           elt.setAttribute(a, attrs[a]);
+</a><a href="#h2-0-91" id="h2-0-91" class="i">+       }
+</a><a href="#h2-0-92" id="h2-0-92" class="i">+       var addChildren = function (children) {
+</a><a href="#h2-0-93" id="h2-0-93" class="i">+         children.forEach(function (c) {
+</a><a href="#h2-0-94" id="h2-0-94" class="i">+           if (!c &amp;&amp; c !== &#39;&#39;)
+</a><a href="#h2-0-95" id="h2-0-95" class="i">+             throw new Error(&quot;Bad value for element body: &quot; + c);
+</a><a href="#h2-0-96" id="h2-0-96" class="i">+           else if (c instanceof Array)
+</a><a href="#h2-0-97" id="h2-0-97" class="i">+             addChildren(c);
+</a><a href="#h2-0-98" id="h2-0-98" class="i">+           else if (typeof(c) === &quot;string&quot;)
+</a><a href="#h2-0-99" id="h2-0-99" class="i">+             elt.appendChild(document.createTextNode(c));
+</a><a href="#h2-0-100" id="h2-0-100" class="i">+           else if (&#39;element&#39; in c)
+</a><a href="#h2-0-101" id="h2-0-101" class="i">+             addChildren([c.element]);
+</a><a href="#h2-0-102" id="h2-0-102" class="i">+           else
+</a><a href="#h2-0-103" id="h2-0-103" class="i">+             elt.appendChild(c);
+</a><a href="#h2-0-104" id="h2-0-104" class="i">+         });
+</a><a href="#h2-0-105" id="h2-0-105" class="i">+       };
+</a><a href="#h2-0-106" id="h2-0-106" class="i">+       addChildren(contents);
+</a><a href="#h2-0-107" id="h2-0-107" class="i">+       return elt;
+</a><a href="#h2-0-108" id="h2-0-108" class="i">+     };
+</a><a href="#h2-0-109" id="h2-0-109" class="i">+   });
+</a><a href="#h2-0-110" id="h2-0-110" class="i">+})();
+</a></pre>
+</div>
+</body>
+</html>

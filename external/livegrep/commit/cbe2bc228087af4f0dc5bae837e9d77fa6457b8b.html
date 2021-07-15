@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Stop reading objects from git. - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/cbe2bc228087af4f0dc5bae837e9d77fa6457b8b">cbe2bc228087af4f0dc5bae837e9d77fa6457b8b</a>
+<b>parent</b> <a href="../commit/e3a1677e4172f098543ed3a463230137f6726c69">e3a1677e4172f098543ed3a463230137f6726c69</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Sun, 27 Nov 2011 13:11:25 -0500
+
+Stop reading objects from git.
+
+Instead, store object contents as a vector of StringPiece&#39;s
+referencing the chunk data we already have.
+
+This avoids ever having to go to disk, greatly speeding up the process
+of checking the validity of proposed matches and retrieving context.
+
+Still TODO: Update the serialization format.
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">codesearch.cc</a></td><td> | </td><td class="num">77</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">----------------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">codesearch.h</a></td><td> | </td><td class="num">3</td><td><span class="i">++</span><span class="d">-</span></td></tr>
+</table></pre><pre>2 files changed, 57 insertions(+), 23 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/codesearch.cc">codesearch.cc</a> b/<a href="../file/codesearch.cc">codesearch.cc</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -1,5 +1,5 @@
+</a><a href="#h0-0-0" id="h0-0-0" class="d">-#include &lt;stdio.h&gt;
+</a> #include &lt;assert.h&gt;
+<a href="#h0-0-2" id="h0-0-2" class="i">+#include &lt;stdio.h&gt;
+</a> #include &lt;string.h&gt;
+ 
+ #include &lt;locale&gt;
+<a href="#h0-1" id="h0-1" class="h">@@ -166,7 +166,7 @@ protected:
+</a>                 searched++;
+                 if (exit_early())
+                     break;
+<a href="#h0-1-3" id="h0-1-3" class="d">-                match_result *m = try_match(line, match, it-&gt;file, ts.repo_);
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+                match_result *m = try_match(line, match, it-&gt;file);
+</a>                 if (m) {
+                     found = true;
+                     queue_.push(m);
+<a href="#h0-2" id="h0-2" class="h">@@ -183,7 +183,7 @@ protected:
+</a>     }
+ 
+     match_result *try_match(const StringPiece&amp;, const StringPiece&amp;,
+<a href="#h0-2-3" id="h0-2-3" class="d">-                            search_file *, git_repository *);
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+                            search_file *);
+</a> 
+     static int line_start(const chunk *chunk, int pos) {
+         const unsigned char *start = static_cast&lt;const unsigned char*&gt;
+<a href="#h0-3" id="h0-3" class="h">@@ -402,6 +402,16 @@ void code_searcher::update_stats(const char *ref, const string&amp; path, git_blob *
+</a>             c = chunk::from_str(line.data());
+         }
+         c-&gt;add_chunk_file(sf, line);
+<a href="#h0-3-3" id="h0-3-3" class="i">+        if (sf-&gt;content.size() &amp;&amp;
+</a><a href="#h0-3-4" id="h0-3-4" class="i">+            sf-&gt;content.back().data() +
+</a><a href="#h0-3-5" id="h0-3-5" class="i">+            sf-&gt;content.back().size() == line.data()) {
+</a><a href="#h0-3-6" id="h0-3-6" class="i">+            StringPiece &amp;back = sf-&gt;content.back();
+</a><a href="#h0-3-7" id="h0-3-7" class="i">+            assert(back.data()[back.size()] == &#39;\n&#39;);
+</a><a href="#h0-3-8" id="h0-3-8" class="i">+            back = StringPiece(back.data(),
+</a><a href="#h0-3-9" id="h0-3-9" class="i">+                               (line.data() - back.data() + line.size()));
+</a><a href="#h0-3-10" id="h0-3-10" class="i">+        } else {
+</a><a href="#h0-3-11" id="h0-3-11" class="i">+            sf-&gt;content.push_back(StringPiece(line.data(), line.size()));
+</a><a href="#h0-3-12" id="h0-3-12" class="i">+        }
+</a>         p = f + 1;
+         stats_.lines++;
+     }
+<a href="#h0-4" id="h0-4" class="h">@@ -556,34 +566,57 @@ void searcher::full_search(const thread_state&amp; ts, const chunk *chunk,
+</a> 
+ match_result *searcher::try_match(const StringPiece&amp; line,
+                                   const StringPiece&amp; match,
+<a href="#h0-4-3" id="h0-4-3" class="d">-                                  search_file *sf,
+</a><a href="#h0-4-4" id="h0-4-4" class="d">-                                  git_repository *repo) {
+</a><a href="#h0-4-5" id="h0-4-5" class="d">-    smart_object&lt;git_blob&gt; blob;
+</a><a href="#h0-4-6" id="h0-4-6" class="d">-    git_blob_lookup(blob, repo, &amp;sf-&gt;oid);
+</a><a href="#h0-4-7" id="h0-4-7" class="d">-    StringPiece search(static_cast&lt;const char*&gt;(git_blob_rawcontent(blob)),
+</a><a href="#h0-4-8" id="h0-4-8" class="d">-                       git_blob_rawsize(blob));
+</a><a href="#h0-4-9" id="h0-4-9" class="d">-    StringPiece matchline;
+</a><a href="#h0-4-10" id="h0-4-10" class="d">-    RE2 pat(&quot;^&quot; + RE2::QuoteMeta(line) + &quot;$&quot;, pat_.options());
+</a><a href="#h0-4-11" id="h0-4-11" class="d">-    assert(pat.ok());
+</a><a href="#h0-4-12" id="h0-4-12" class="d">-    if (!pat.Match(search, 0, search.size(), RE2::UNANCHORED, &amp;matchline, 1))
+</a><a href="#h0-4-13" id="h0-4-13" class="i">+                                  search_file *sf) {
+</a><a href="#h0-4-14" id="h0-4-14" class="i">+
+</a><a href="#h0-4-15" id="h0-4-15" class="i">+    int lno = 1;
+</a><a href="#h0-4-16" id="h0-4-16" class="i">+    vector&lt;StringPiece&gt;::iterator it;
+</a><a href="#h0-4-17" id="h0-4-17" class="i">+    for (it = sf-&gt;content.begin();
+</a><a href="#h0-4-18" id="h0-4-18" class="i">+         it != sf-&gt;content.end(); ++it) {
+</a><a href="#h0-4-19" id="h0-4-19" class="i">+        if (line.data() &gt;= it-&gt;data() &amp;&amp;
+</a><a href="#h0-4-20" id="h0-4-20" class="i">+            line.data() &lt;= it-&gt;data() + it-&gt;size()) {
+</a><a href="#h0-4-21" id="h0-4-21" class="i">+            lno += count(it-&gt;data(), line.data(), &#39;\n&#39;);
+</a><a href="#h0-4-22" id="h0-4-22" class="i">+            break;
+</a><a href="#h0-4-23" id="h0-4-23" class="i">+        } else {
+</a><a href="#h0-4-24" id="h0-4-24" class="i">+            lno += count(it-&gt;data(), it-&gt;data() + it-&gt;size(), &#39;\n&#39;) + 1;
+</a><a href="#h0-4-25" id="h0-4-25" class="i">+        }
+</a><a href="#h0-4-26" id="h0-4-26" class="i">+    }
+</a><a href="#h0-4-27" id="h0-4-27" class="i">+
+</a><a href="#h0-4-28" id="h0-4-28" class="i">+    if (it == sf-&gt;content.end())
+</a>         return 0;
+<a href="#h0-4-30" id="h0-4-30" class="i">+
+</a>     match_result *m = new match_result;
+     m-&gt;file = sf;
+<a href="#h0-4-33" id="h0-4-33" class="d">-    m-&gt;lno  = 1 + count(search.data(), matchline.data(), &#39;\n&#39;);
+</a><a href="#h0-4-34" id="h0-4-34" class="i">+    m-&gt;lno  = lno;
+</a>     m-&gt;line = line;
+     m-&gt;matchleft = int(match.data() - line.data());
+     m-&gt;matchright = m-&gt;matchleft + match.size();
+<a href="#h0-4-38" id="h0-4-38" class="d">-    StringPiece l = matchline;
+</a><a href="#h0-4-39" id="h0-4-39" class="d">-    int i;
+</a><a href="#h0-4-40" id="h0-4-40" class="d">-    for (i = 0; i &lt; kContextLines &amp;&amp; l.data() &gt; search.data(); i++) {
+</a><a href="#h0-4-41" id="h0-4-41" class="d">-        l = find_line(search, StringPiece(l.data() - 1, 0));
+</a><a href="#h0-4-42" id="h0-4-42" class="i">+
+</a><a href="#h0-4-43" id="h0-4-43" class="i">+    vector&lt;StringPiece&gt;::iterator mit = it;
+</a><a href="#h0-4-44" id="h0-4-44" class="i">+    StringPiece l = line;
+</a><a href="#h0-4-45" id="h0-4-45" class="i">+    int i = 0;
+</a><a href="#h0-4-46" id="h0-4-46" class="i">+
+</a><a href="#h0-4-47" id="h0-4-47" class="i">+    for (i = 0; i &lt; kContextLines; i++) {
+</a><a href="#h0-4-48" id="h0-4-48" class="i">+        if (l.data() == it-&gt;data()) {
+</a><a href="#h0-4-49" id="h0-4-49" class="i">+            if (it == sf-&gt;content.begin())
+</a><a href="#h0-4-50" id="h0-4-50" class="i">+                break;
+</a><a href="#h0-4-51" id="h0-4-51" class="i">+            --it;
+</a><a href="#h0-4-52" id="h0-4-52" class="i">+            l = StringPiece(it-&gt;data() + it-&gt;size() + 1, 0);
+</a><a href="#h0-4-53" id="h0-4-53" class="i">+        }
+</a><a href="#h0-4-54" id="h0-4-54" class="i">+        l = find_line(*it, StringPiece(l.data() - 1, 0));
+</a>         m-&gt;context_before.push_back(l.as_string());
+     }
+<a href="#h0-4-57" id="h0-4-57" class="d">-    l = matchline;
+</a><a href="#h0-4-58" id="h0-4-58" class="d">-    for (i = 0; i &lt; kContextLines &amp;&amp;
+</a><a href="#h0-4-59" id="h0-4-59" class="d">-                    (l.data() + l.size()) &lt; (search.data() + search.size()); i++) {
+</a><a href="#h0-4-60" id="h0-4-60" class="d">-        l = find_line(search, StringPiece(l.data() + l.size() + 1, 0));
+</a><a href="#h0-4-61" id="h0-4-61" class="i">+
+</a><a href="#h0-4-62" id="h0-4-62" class="i">+    l = line;
+</a><a href="#h0-4-63" id="h0-4-63" class="i">+    it = mit;
+</a><a href="#h0-4-64" id="h0-4-64" class="i">+    for (i = 0; i &lt; kContextLines; i++) {
+</a><a href="#h0-4-65" id="h0-4-65" class="i">+        if (l.data() + l.size() == it-&gt;data() + it-&gt;size()) {
+</a><a href="#h0-4-66" id="h0-4-66" class="i">+            if (++it == sf-&gt;content.end())
+</a><a href="#h0-4-67" id="h0-4-67" class="i">+                break;
+</a><a href="#h0-4-68" id="h0-4-68" class="i">+            l = StringPiece(it-&gt;data() - 1, 0);
+</a><a href="#h0-4-69" id="h0-4-69" class="i">+        }
+</a><a href="#h0-4-70" id="h0-4-70" class="i">+        l = find_line(*it, StringPiece(l.data() + l.size() + 1, 0));
+</a>         m-&gt;context_after.push_back(l.as_string());
+     }
+<a href="#h0-4-73" id="h0-4-73" class="i">+
+</a>     return m;
+ }
+<b>diff --git a/<a id="h1" href="../file/codesearch.h">codesearch.h</a> b/<a href="../file/codesearch.h">codesearch.h</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -25,7 +25,7 @@ using re2::StringPiece;
+</a> 
+ using std::string;
+ using std::locale;
+<a href="#h1-0-3" id="h1-0-3" class="d">-
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+using std::vector;
+</a> 
+ /*
+  * We special-case data() == NULL to provide an &quot;empty&quot; element for
+<a href="#h1-1" id="h1-1" class="h">@@ -64,6 +64,7 @@ struct search_file {
+</a>     string path;
+     const char *ref;
+     git_oid oid;
+<a href="#h1-1-3" id="h1-1-3" class="i">+    vector&lt;StringPiece&gt; content;
+</a>     int no;
+ };
+ 
+</pre>
+</div>
+</body>
+</html>

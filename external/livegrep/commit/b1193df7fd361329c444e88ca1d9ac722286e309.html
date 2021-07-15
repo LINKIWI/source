@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Add index tests, and fix tail calculation. - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/b1193df7fd361329c444e88ca1d9ac722286e309">b1193df7fd361329c444e88ca1d9ac722286e309</a>
+<b>parent</b> <a href="../commit/90d31d62543cc5298173ba4126b66262c1a51597">90d31d62543cc5298173ba4126b66262c1a51597</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Wed, 15 Feb 2017 19:12:14 -0800
+
+Add index tests, and fix tail calculation.
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">src/indexer.cc</a></td><td> | </td><td class="num">40</td><td><span class="i">+++++++++++++++++++++++++++++</span><span class="d">-----------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">src/indexer.h</a></td><td> | </td><td class="num">7</td><td><span class="i">++++++</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">test/BUILD</a></td><td> | </td><td class="num">1</td><td><span class="i">+</span><span class="d"></span></td></tr>
+<tr><td class="A">A</td><td><a href="#h3">test/indexer_test.cc</a></td><td> | </td><td class="num">61</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+</table></pre><pre>4 files changed, 97 insertions(+), 12 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/src/indexer.cc">src/indexer.cc</a> b/<a href="../file/src/indexer.cc">src/indexer.cc</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -68,11 +68,9 @@ IndexKey::Stats IndexKey::Stats::concat(const IndexKey::Stats&amp; rhs) const {
+</a> void IndexKey::insert(const value_type&amp; val) {
+     stats_ = stats_.insert(val);
+ 
+<a href="#h0-0-3" id="h0-0-3" class="d">-    iterator it = edges_.insert(val).first;
+</a><a href="#h0-0-4" id="h0-0-4" class="d">-    if (val.second) {
+</a><a href="#h0-0-5" id="h0-0-5" class="d">-        tails_.splice(tails_.end(), val.second-&gt;tails_);
+</a><a href="#h0-0-6" id="h0-0-6" class="d">-    } else {
+</a><a href="#h0-0-7" id="h0-0-7" class="d">-        tails_.push_back(it);
+</a><a href="#h0-0-8" id="h0-0-8" class="i">+    edges_.insert(val).first;
+</a><a href="#h0-0-9" id="h0-0-9" class="i">+    if (val.second &amp;&amp; !(val.second-&gt;anchor &amp; kAnchorRight)) {
+</a><a href="#h0-0-10" id="h0-0-10" class="i">+        anchor &amp;= ~kAnchorRight;
+</a>     }
+ }
+ 
+<a href="#h0-1" id="h0-1" class="h">@@ -98,7 +96,28 @@ int IndexKey::depth() {
+</a> }
+ 
+ void IndexKey::collect_tails(list&lt;IndexKey::iterator&gt;&amp; tails) {
+<a href="#h0-1-3" id="h0-1-3" class="d">-    tails.splice(tails.end(), tails_);
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+    set&lt;IndexKey*&gt; seen;
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+    collect_tails(tails, seen);
+</a><a href="#h0-1-6" id="h0-1-6" class="i">+}
+</a><a href="#h0-1-7" id="h0-1-7" class="i">+
+</a><a href="#h0-1-8" id="h0-1-8" class="i">+void IndexKey::collect_tails(list&lt;IndexKey::const_iterator&gt;&amp; tails) {
+</a><a href="#h0-1-9" id="h0-1-9" class="i">+    list&lt;iterator&gt; tmp;
+</a><a href="#h0-1-10" id="h0-1-10" class="i">+    collect_tails(tmp);
+</a><a href="#h0-1-11" id="h0-1-11" class="i">+    tails.insert(tails.end(), tmp.begin(), tmp.end());
+</a><a href="#h0-1-12" id="h0-1-12" class="i">+}
+</a><a href="#h0-1-13" id="h0-1-13" class="i">+
+</a><a href="#h0-1-14" id="h0-1-14" class="i">+void IndexKey::collect_tails(list&lt;IndexKey::iterator&gt;&amp; tails,
+</a><a href="#h0-1-15" id="h0-1-15" class="i">+                             set&lt;IndexKey*&gt; &amp;seen) {
+</a><a href="#h0-1-16" id="h0-1-16" class="i">+    if (seen.find(this) != seen.end())
+</a><a href="#h0-1-17" id="h0-1-17" class="i">+        return;
+</a><a href="#h0-1-18" id="h0-1-18" class="i">+    seen.insert(this);
+</a><a href="#h0-1-19" id="h0-1-19" class="i">+
+</a><a href="#h0-1-20" id="h0-1-20" class="i">+    for (auto it = begin(); it != end(); ++it) {
+</a><a href="#h0-1-21" id="h0-1-21" class="i">+        if (it-&gt;second)
+</a><a href="#h0-1-22" id="h0-1-22" class="i">+            it-&gt;second-&gt;collect_tails(tails, seen);
+</a><a href="#h0-1-23" id="h0-1-23" class="i">+        else
+</a><a href="#h0-1-24" id="h0-1-24" class="i">+            tails.push_back(it);
+</a><a href="#h0-1-25" id="h0-1-25" class="i">+    }
+</a> }
+ 
+ void IndexKey::concat(intrusive_ptr&lt;IndexKey&gt; rhs) {
+<a href="#h0-2" id="h0-2" class="h">@@ -121,7 +140,6 @@ void IndexKey::concat(intrusive_ptr&lt;IndexKey&gt; rhs) {
+</a>         anchor &amp;= ~kAnchorRight;
+ 
+     stats_ = stats_.concat(rhs-&gt;stats());
+<a href="#h0-2-3" id="h0-2-3" class="d">-    rhs-&gt;collect_tails(tails_);
+</a> }
+ 
+ static string StrChar(uchar c) {
+<a href="#h0-3" id="h0-3" class="h">@@ -248,12 +266,12 @@ namespace {
+</a>     }
+ 
+     intrusive_ptr&lt;IndexKey&gt; LexRange(const string &amp;lo, const string&amp; hi) {
+<a href="#h0-3-3" id="h0-3-3" class="d">-        intrusive_ptr&lt;IndexKey&gt; out(new IndexKey(kAnchorBoth));
+</a><a href="#h0-3-4" id="h0-3-4" class="d">-
+</a>         if (lo.size() == 0 &amp;&amp; hi.size() == 0)
+<a href="#h0-3-6" id="h0-3-6" class="d">-            return out;
+</a><a href="#h0-3-7" id="h0-3-7" class="i">+            return intrusive_ptr&lt;IndexKey&gt;();
+</a>         if (lo.size() == 0)
+             return Literal(hi);
+<a href="#h0-3-10" id="h0-3-10" class="i">+
+</a><a href="#h0-3-11" id="h0-3-11" class="i">+        intrusive_ptr&lt;IndexKey&gt; out(new IndexKey(kAnchorBoth));
+</a>         assert(hi.size() != 0);
+         if (lo[0] &lt; hi[0])
+             out-&gt;insert(IndexKey::value_type
+<a href="#h0-4" id="h0-4" class="h">@@ -462,7 +480,7 @@ namespace {
+</a>         if (recursion_depth &gt; kMaxRecursion)
+             return Any();
+ 
+<a href="#h0-4-3" id="h0-4-3" class="d">-        intrusive_ptr&lt;IndexKey&gt; out(new IndexKey(lhs-&gt;anchor &amp; rhs-&gt;anchor &amp; kAnchorLeft));
+</a><a href="#h0-4-4" id="h0-4-4" class="i">+        intrusive_ptr&lt;IndexKey&gt; out(new IndexKey(lhs-&gt;anchor &amp; rhs-&gt;anchor &amp; (kAnchorLeft|kAnchorRight)));
+</a>         IndexKey::const_iterator lit, rit;
+         lit = lhs-&gt;begin();
+         rit = rhs-&gt;begin();
+<b>diff --git a/<a id="h1" href="../file/src/indexer.h">src/indexer.h</a> b/<a href="../file/src/indexer.h">src/indexer.h</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -10,6 +10,7 @@
+</a> 
+ #include &lt;vector&gt;
+ #include &lt;list&gt;
+<a href="#h1-0-3" id="h1-0-3" class="i">+#include &lt;set&gt;
+</a> #include &lt;string&gt;
+ #include &lt;atomic&gt;
+ #include &lt;map&gt;
+<a href="#h1-1" id="h1-1" class="h">@@ -23,6 +24,7 @@
+</a> using std::string;
+ using std::vector;
+ using std::list;
+<a href="#h1-1-3" id="h1-1-3" class="i">+using std::set;
+</a> using boost::intrusive_ptr;
+ 
+ enum {
+<a href="#h1-2" id="h1-2" class="h">@@ -115,13 +117,16 @@ public:
+</a>     void check_rep();
+ 
+     int anchor;
+<a href="#h1-2-3" id="h1-2-3" class="i">+
+</a><a href="#h1-2-4" id="h1-2-4" class="i">+    void collect_tails(list&lt;IndexKey::const_iterator&gt;&amp; tails);
+</a> protected:
+     std::map&lt;std::pair&lt;uchar, uchar&gt;, intrusive_ptr&lt;IndexKey&gt; &gt; edges_;
+     Stats stats_;
+<a href="#h1-2-8" id="h1-2-8" class="d">-    list&lt;iterator&gt; tails_;
+</a>     std::atomic_int refs_;
+ 
+     void collect_tails(list&lt;IndexKey::iterator&gt;&amp; tails);
+<a href="#h1-2-12" id="h1-2-12" class="i">+    void collect_tails(list&lt;IndexKey::iterator&gt;&amp; tails,
+</a><a href="#h1-2-13" id="h1-2-13" class="i">+                       set&lt;IndexKey*&gt; &amp;seen);
+</a> 
+ private:
+     IndexKey(const IndexKey&amp;);
+<b>diff --git a/<a id="h2" href="../file/test/BUILD">test/BUILD</a> b/<a href="../file/test/BUILD">test/BUILD</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -2,6 +2,7 @@ cc_test(
+</a>     name = &quot;codesearch_test&quot;,
+     srcs = [
+       &quot;codesearch_test.cc&quot;,
+<a href="#h2-0-3" id="h2-0-3" class="i">+      &quot;indexer_test.cc&quot;,
+</a>       &quot;main.cc&quot;,
+     ],
+     deps = [
+<b>diff --git a/<a id="h3" href="../file/test/indexer_test.cc">test/indexer_test.cc</a> b/<a href="../file/test/indexer_test.cc">test/indexer_test.cc</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -0,0 +1,61 @@
+</a><a href="#h3-0-0" id="h3-0-0" class="i">+#include &lt;string.h&gt;
+</a><a href="#h3-0-1" id="h3-0-1" class="i">+#include &quot;gtest/gtest.h&quot;
+</a><a href="#h3-0-2" id="h3-0-2" class="i">+
+</a><a href="#h3-0-3" id="h3-0-3" class="i">+#include &quot;re2/re2.h&quot;
+</a><a href="#h3-0-4" id="h3-0-4" class="i">+
+</a><a href="#h3-0-5" id="h3-0-5" class="i">+#include &quot;src/indexer.h&quot;
+</a><a href="#h3-0-6" id="h3-0-6" class="i">+#include &quot;src/lib/debug.h&quot;
+</a><a href="#h3-0-7" id="h3-0-7" class="i">+
+</a><a href="#h3-0-8" id="h3-0-8" class="i">+TEST(IndexKeyTest, BasicCaseFold) {
+</a><a href="#h3-0-9" id="h3-0-9" class="i">+    re2::RE2::Options opts;
+</a><a href="#h3-0-10" id="h3-0-10" class="i">+    opts.set_case_sensitive(false);
+</a><a href="#h3-0-11" id="h3-0-11" class="i">+
+</a><a href="#h3-0-12" id="h3-0-12" class="i">+    re2::RE2 re(&quot;k&quot;, opts);
+</a><a href="#h3-0-13" id="h3-0-13" class="i">+    intrusive_ptr&lt;IndexKey&gt; key = indexRE(re);
+</a><a href="#h3-0-14" id="h3-0-14" class="i">+
+</a><a href="#h3-0-15" id="h3-0-15" class="i">+    ASSERT_EQ(3, key-&gt;size());
+</a><a href="#h3-0-16" id="h3-0-16" class="i">+    IndexKey::iterator it = key-&gt;begin();
+</a><a href="#h3-0-17" id="h3-0-17" class="i">+    EXPECT_EQ(&#39;K&#39;, it-&gt;first.first);
+</a><a href="#h3-0-18" id="h3-0-18" class="i">+    EXPECT_EQ(&#39;K&#39;, it-&gt;first.second);
+</a><a href="#h3-0-19" id="h3-0-19" class="i">+    EXPECT_FALSE(it-&gt;second);
+</a><a href="#h3-0-20" id="h3-0-20" class="i">+    ++it;
+</a><a href="#h3-0-21" id="h3-0-21" class="i">+    EXPECT_EQ(&#39;k&#39;, it-&gt;first.first);
+</a><a href="#h3-0-22" id="h3-0-22" class="i">+    EXPECT_EQ(&#39;k&#39;, it-&gt;first.second);
+</a><a href="#h3-0-23" id="h3-0-23" class="i">+    EXPECT_FALSE(it-&gt;second);
+</a><a href="#h3-0-24" id="h3-0-24" class="i">+    ++it;
+</a><a href="#h3-0-25" id="h3-0-25" class="i">+    // U+212A KELVIN SIGN aka [e2 84 aa]
+</a><a href="#h3-0-26" id="h3-0-26" class="i">+    EXPECT_EQ(0xe2, it-&gt;first.first);
+</a><a href="#h3-0-27" id="h3-0-27" class="i">+    EXPECT_EQ(0xe2, it-&gt;first.second);
+</a><a href="#h3-0-28" id="h3-0-28" class="i">+    EXPECT_TRUE(it-&gt;second);
+</a><a href="#h3-0-29" id="h3-0-29" class="i">+}
+</a><a href="#h3-0-30" id="h3-0-30" class="i">+
+</a><a href="#h3-0-31" id="h3-0-31" class="i">+TEST(IndexKeyTest, Alternate) {
+</a><a href="#h3-0-32" id="h3-0-32" class="i">+    re2::RE2::Options opts;
+</a><a href="#h3-0-33" id="h3-0-33" class="i">+    opts.set_case_sensitive(false);
+</a><a href="#h3-0-34" id="h3-0-34" class="i">+
+</a><a href="#h3-0-35" id="h3-0-35" class="i">+    re2::RE2 re(&quot;(se|in)_&quot;, opts);
+</a><a href="#h3-0-36" id="h3-0-36" class="i">+    intrusive_ptr&lt;IndexKey&gt; key = indexRE(re);
+</a><a href="#h3-0-37" id="h3-0-37" class="i">+    EXPECT_TRUE(key-&gt;anchor &amp; kAnchorRight);
+</a><a href="#h3-0-38" id="h3-0-38" class="i">+    list&lt;IndexKey::const_iterator&gt; tails;
+</a><a href="#h3-0-39" id="h3-0-39" class="i">+    key-&gt;collect_tails(tails);
+</a><a href="#h3-0-40" id="h3-0-40" class="i">+    EXPECT_EQ(1, tails.size());
+</a><a href="#h3-0-41" id="h3-0-41" class="i">+}
+</a><a href="#h3-0-42" id="h3-0-42" class="i">+
+</a><a href="#h3-0-43" id="h3-0-43" class="i">+TEST(IndexKeyTest, AlternateIndef) {
+</a><a href="#h3-0-44" id="h3-0-44" class="i">+    re2::RE2::Options opts;
+</a><a href="#h3-0-45" id="h3-0-45" class="i">+    opts.set_case_sensitive(false);
+</a><a href="#h3-0-46" id="h3-0-46" class="i">+
+</a><a href="#h3-0-47" id="h3-0-47" class="i">+    re2::RE2 re(&quot;(se|in).&quot;, opts);
+</a><a href="#h3-0-48" id="h3-0-48" class="i">+    intrusive_ptr&lt;IndexKey&gt; key = indexRE(re);
+</a><a href="#h3-0-49" id="h3-0-49" class="i">+    EXPECT_FALSE(key-&gt;anchor &amp; kAnchorRight);
+</a><a href="#h3-0-50" id="h3-0-50" class="i">+}
+</a><a href="#h3-0-51" id="h3-0-51" class="i">+
+</a><a href="#h3-0-52" id="h3-0-52" class="i">+TEST(IndexKeyTest, CaseFoldRegression) {
+</a><a href="#h3-0-53" id="h3-0-53" class="i">+    re2::RE2::Options opts;
+</a><a href="#h3-0-54" id="h3-0-54" class="i">+    opts.set_case_sensitive(false);
+</a><a href="#h3-0-55" id="h3-0-55" class="i">+
+</a><a href="#h3-0-56" id="h3-0-56" class="i">+    re2::RE2 re(&quot;ksp&quot;, opts);
+</a><a href="#h3-0-57" id="h3-0-57" class="i">+    intrusive_ptr&lt;IndexKey&gt; key = indexRE(re);
+</a><a href="#h3-0-58" id="h3-0-58" class="i">+    EXPECT_TRUE(key-&gt;anchor &amp; kAnchorLeft);
+</a><a href="#h3-0-59" id="h3-0-59" class="i">+    EXPECT_TRUE(key-&gt;anchor &amp; kAnchorRight);
+</a><a href="#h3-0-60" id="h3-0-60" class="i">+}
+</a></pre>
+</div>
+</body>
+</html>

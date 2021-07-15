@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Add rudimentary stats reporting - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/1cf9f5c4567d8543261956de2c1ae2f113b801f4">1cf9f5c4567d8543261956de2c1ae2f113b801f4</a>
+<b>parent</b> <a href="../commit/830c34051f868d59df861866c97c63978a3a55ec">830c34051f868d59df861866c97c63978a3a55ec</a>
+<b>Author:</b> Josiah Boning &lt;<a href="mailto:josiah@dropbox.com">josiah@dropbox.com</a>&gt;
+<b>Date:</b>   Wed,  5 Jul 2017 17:06:26 +0000
+
+Add rudimentary stats reporting
+
+ - Create a /debug/stats route
+ - Include index creation time in Info RPC result
+ - Report index age as a stat
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">server/backend.go</a></td><td> | </td><td class="num">2</td><td><span class="i">++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">server/server.go</a></td><td> | </td><td class="num">24</td><td><span class="i">++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">src/codesearch.cc</a></td><td> | </td><td class="num">5</td><td><span class="i">+++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">src/codesearch.h</a></td><td> | </td><td class="num">7</td><td><span class="i">+++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h4">src/dump_load.cc</a></td><td> | </td><td class="num">4</td><td><span class="i">++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h5">src/proto/livegrep.proto</a></td><td> | </td><td class="num">2</td><td><span class="i">++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h6">src/tools/grpc_server.cc</a></td><td> | </td><td class="num">1</td><td><span class="i">+</span><span class="d"></span></td></tr>
+</table></pre><pre>7 files changed, 45 insertions(+), 0 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/server/backend.go">server/backend.go</a> b/<a href="../file/server/backend.go">server/backend.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -21,6 +21,7 @@ type I struct {
+</a> 	Name  string
+ 	Trees []Tree
+ 	sync.Mutex
+<a href="#h0-0-3" id="h0-0-3" class="i">+	IndexTime time.Time
+</a> }
+ 
+ type Backend struct {
+<a href="#h0-1" id="h0-1" class="h">@@ -69,6 +70,7 @@ func (bk *Backend) refresh(info *pb.ServerInfo) {
+</a> 	if info.Name != &quot;&quot; {
+ 		bk.I.Name = info.Name
+ 	}
+<a href="#h0-1-3" id="h0-1-3" class="i">+	bk.I.IndexTime = time.Unix(info.IndexTime, 0)
+</a> 	if len(info.Trees) &gt; 0 {
+ 		bk.I.Trees = nil
+ 		for _, r := range info.Trees {
+<b>diff --git a/<a id="h1" href="../file/server/server.go">server/server.go</a> b/<a href="../file/server/server.go">server/server.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -161,6 +161,29 @@ func (s *server) ServeHealthcheck(w http.ResponseWriter, r *http.Request) {
+</a> 	io.WriteString(w, &quot;ok\n&quot;)
+ }
+ 
+<a href="#h1-0-3" id="h1-0-3" class="i">+type stats struct {
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+	IndexAge int64 `json:&quot;index_age&quot;`
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+}
+</a><a href="#h1-0-6" id="h1-0-6" class="i">+
+</a><a href="#h1-0-7" id="h1-0-7" class="i">+func (s *server) ServeStats(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+</a><a href="#h1-0-8" id="h1-0-8" class="i">+	// For index age, report the age of the stalest backend&#39;s index.
+</a><a href="#h1-0-9" id="h1-0-9" class="i">+	now := time.Now()
+</a><a href="#h1-0-10" id="h1-0-10" class="i">+	maxBkAge := time.Duration(-1) * time.Second
+</a><a href="#h1-0-11" id="h1-0-11" class="i">+	for _, bk := range s.bk {
+</a><a href="#h1-0-12" id="h1-0-12" class="i">+		if bk.I.IndexTime == time.Unix(0, 0) {
+</a><a href="#h1-0-13" id="h1-0-13" class="i">+			// backend didn&#39;t report index time
+</a><a href="#h1-0-14" id="h1-0-14" class="i">+			continue
+</a><a href="#h1-0-15" id="h1-0-15" class="i">+		}
+</a><a href="#h1-0-16" id="h1-0-16" class="i">+		bkAge := now.Sub(bk.I.IndexTime)
+</a><a href="#h1-0-17" id="h1-0-17" class="i">+		if bkAge &gt; maxBkAge {
+</a><a href="#h1-0-18" id="h1-0-18" class="i">+			maxBkAge = bkAge
+</a><a href="#h1-0-19" id="h1-0-19" class="i">+		}
+</a><a href="#h1-0-20" id="h1-0-20" class="i">+	}
+</a><a href="#h1-0-21" id="h1-0-21" class="i">+	replyJSON(ctx, w, 200, &amp;stats{
+</a><a href="#h1-0-22" id="h1-0-22" class="i">+		IndexAge: int64(maxBkAge / time.Second),
+</a><a href="#h1-0-23" id="h1-0-23" class="i">+	})
+</a><a href="#h1-0-24" id="h1-0-24" class="i">+}
+</a><a href="#h1-0-25" id="h1-0-25" class="i">+
+</a> func (s *server) requestProtocol(r *http.Request) string {
+ 	if s.config.ReverseProxy {
+ 		if proto := r.Header.Get(&quot;X-Real-Proto&quot;); len(proto) &gt; 0 {
+<a href="#h1-1" id="h1-1" class="h">@@ -247,6 +270,7 @@ func New(cfg *config.Config) (http.Handler, error) {
+</a> 
+ 	m := pat.New()
+ 	m.Add(&quot;GET&quot;, &quot;/debug/healthcheck&quot;, http.HandlerFunc(srv.ServeHealthcheck))
+<a href="#h1-1-3" id="h1-1-3" class="i">+	m.Add(&quot;GET&quot;, &quot;/debug/stats&quot;, srv.Handler(srv.ServeStats))
+</a> 	m.Add(&quot;GET&quot;, &quot;/search/:backend&quot;, srv.Handler(srv.ServeSearch))
+ 	m.Add(&quot;GET&quot;, &quot;/search/&quot;, srv.Handler(srv.ServeSearch))
+ 	m.Add(&quot;GET&quot;, &quot;/view/:repo/&quot;, srv.Handler(srv.ServeFile))
+<b>diff --git a/<a id="h2" href="../file/src/codesearch.cc">src/codesearch.cc</a> b/<a href="../file/src/codesearch.cc">src/codesearch.cc</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -384,6 +384,11 @@ void code_searcher::finalize() {
+</a>     assert(!finalized_);
+     finalized_ = true;
+     alloc_-&gt;finalize();
+<a href="#h2-0-3" id="h2-0-3" class="i">+
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+    timeval now;
+</a><a href="#h2-0-5" id="h2-0-5" class="i">+    gettimeofday(&amp;now, NULL);
+</a><a href="#h2-0-6" id="h2-0-6" class="i">+    index_timestamp_ = now.tv_sec;
+</a><a href="#h2-0-7" id="h2-0-7" class="i">+
+</a>     idx_data_chunks.inc(alloc_-&gt;end() - alloc_-&gt;begin());
+     idx_content_chunks.inc(alloc_-&gt;end_content() - alloc_-&gt;begin_content());
+ }
+<b>diff --git a/<a id="h3" href="../file/src/codesearch.h">src/codesearch.h</a> b/<a href="../file/src/codesearch.h">src/codesearch.h</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -163,6 +163,10 @@ public:
+</a>         return files_.end();
+     }
+ 
+<a href="#h3-0-3" id="h3-0-3" class="i">+    int64_t index_timestamp() {
+</a><a href="#h3-0-4" id="h3-0-4" class="i">+        return index_timestamp_;
+</a><a href="#h3-0-5" id="h3-0-5" class="i">+    }
+</a><a href="#h3-0-6" id="h3-0-6" class="i">+
+</a>     class search_thread {
+     public:
+         search_thread(code_searcher *cs);
+<a href="#h3-1" id="h3-1" class="h">@@ -215,6 +219,9 @@ protected:
+</a>     // index or initializing it from a file.
+     bool finalized_;
+ 
+<a href="#h3-1-3" id="h3-1-3" class="i">+    // Timestamp representing the end of index construction.
+</a><a href="#h3-1-4" id="h3-1-4" class="i">+    int64_t index_timestamp_;
+</a><a href="#h3-1-5" id="h3-1-5" class="i">+
+</a>     vector&lt;indexed_tree*&gt; trees_;
+     vector&lt;indexed_file*&gt; files_;
+ 
+<b>diff --git a/<a id="h4" href="../file/src/dump_load.cc">src/dump_load.cc</a> b/<a href="../file/src/dump_load.cc">src/dump_load.cc</a></b>
+<a href="#h4-0" id="h4-0" class="h">@@ -467,6 +467,10 @@ void load_allocator::load(code_searcher *cs) {
+</a>     }
+     assert(it == cs-&gt;files_.end());
+ 
+<a href="#h4-0-3" id="h4-0-3" class="i">+    struct stat st;
+</a><a href="#h4-0-4" id="h4-0-4" class="i">+    assert(fstat(fd_, &amp;st) == 0);
+</a><a href="#h4-0-5" id="h4-0-5" class="i">+    cs-&gt;index_timestamp_ = st.st_mtime;
+</a><a href="#h4-0-6" id="h4-0-6" class="i">+
+</a>     cs-&gt;finalized_ = true;
+ }
+ 
+<b>diff --git a/<a id="h5" href="../file/src/proto/livegrep.proto">src/proto/livegrep.proto</a> b/<a href="../file/src/proto/livegrep.proto">src/proto/livegrep.proto</a></b>
+<a href="#h5-0" id="h5-0" class="h">@@ -51,6 +51,8 @@ message ServerInfo {
+</a>     }
+     repeated Tree trees = 2;
+     bool has_tags = 3;
+<a href="#h5-0-3" id="h5-0-3" class="i">+    // unix timestamp (seconds)
+</a><a href="#h5-0-4" id="h5-0-4" class="i">+    int64 index_time = 4;
+</a> }
+ 
+ message CodeSearchResult {
+<b>diff --git a/<a id="h6" href="../file/src/tools/grpc_server.cc">src/tools/grpc_server.cc</a> b/<a href="../file/src/tools/grpc_server.cc">src/tools/grpc_server.cc</a></b>
+<a href="#h6-0" id="h6-0" class="h">@@ -102,6 +102,7 @@ Status CodeSearchImpl::Info(ServerContext* context, const ::InfoRequest* request
+</a>         }
+     }
+     response-&gt;set_has_tags(tagdata_ != nullptr);
+<a href="#h6-0-3" id="h6-0-3" class="i">+    response-&gt;set_index_time(cs_-&gt;index_timestamp());
+</a>     return Status::OK;
+ }
+ 
+</pre>
+</div>
+</body>
+</html>

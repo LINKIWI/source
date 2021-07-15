@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Perform a search over possible subgroups to concatenate. - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/cb16aa5c6adb9e3e91ac70d921285a25f16ada64">cb16aa5c6adb9e3e91ac70d921285a25f16ada64</a>
+<b>parent</b> <a href="../commit/df764775e1144e409ef2d6e982feff5efe26e50e">df764775e1144e409ef2d6e982feff5efe26e50e</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Wed, 28 Dec 2011 09:44:51 -0500
+
+Perform a search over possible subgroups to concatenate.
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">indexer.cc</a></td><td> | </td><td class="num">84</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">-----------</span></td></tr>
+</table></pre><pre>1 file changed, 73 insertions(+), 11 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/indexer.cc">indexer.cc</a> b/<a href="../file/indexer.cc">indexer.cc</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -35,12 +35,16 @@ const int kMaxRecursion   = 10;
+</a> const int kMaxNodes       = (1 &lt;&lt; 24);
+ 
+ IndexKey::Stats::Stats ()
+<a href="#h0-0-3" id="h0-0-3" class="d">-    : selectivity_(0.0), depth_(0), nodes_(1), tail_paths_(0) {
+</a><a href="#h0-0-4" id="h0-0-4" class="d">-
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+    : selectivity_(1.0), depth_(0), nodes_(1), tail_paths_(1) {
+</a> }
+ 
+ IndexKey::Stats IndexKey::Stats::insert(const value_type&amp; val) const {
+     Stats out(*this);
+<a href="#h0-0-10" id="h0-0-10" class="i">+    if (out.selectivity_ == 1.0) {
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+        out.selectivity_ = 0.0;
+</a><a href="#h0-0-12" id="h0-0-12" class="i">+        out.tail_paths_  = 0;
+</a><a href="#h0-0-13" id="h0-0-13" class="i">+    }
+</a><a href="#h0-0-14" id="h0-0-14" class="i">+
+</a>     out.selectivity_ += (val.first.second - val.first.first + 1)/128. * val.second-&gt;selectivity();
+     out.depth_ = max(depth_, val.second-&gt;depth() + 1);
+     out.nodes_ += (val.first.second - val.first.first + 1) * val.second-&gt;nodes();
+<a href="#h0-1" id="h0-1" class="h">@@ -78,7 +82,7 @@ double IndexKey::selectivity() {
+</a>         return 1.0;
+ 
+     if (empty())
+<a href="#h0-1-3" id="h0-1-3" class="d">-        return 1.0;
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+        assert(stats_.selectivity_ == 1.0);
+</a> 
+     return stats_.selectivity_;
+ }
+<a href="#h0-2" id="h0-2" class="h">@@ -115,6 +119,9 @@ void IndexKey::concat(shared_ptr&lt;IndexKey&gt; rhs) {
+</a>     assert(rhs-&gt;anchor &amp; kAnchorLeft);
+     assert(!empty());
+ 
+<a href="#h0-2-3" id="h0-2-3" class="i">+    if (rhs-&gt;empty())
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+        return;
+</a><a href="#h0-2-5" id="h0-2-5" class="i">+
+</a>     list&lt;IndexKey::iterator&gt; tails;
+     collect_tails(tails);
+     for (auto it = tails.begin(); it != tails.end(); ++it) {
+<a href="#h0-3" id="h0-3" class="h">@@ -254,7 +261,7 @@ namespace {
+</a>         if (!(lhs-&gt;anchor &amp; kAnchorRight) ||
+             !(rhs-&gt;anchor &amp; kAnchorLeft))
+             return false;
+<a href="#h0-3-3" id="h0-3-3" class="d">-        if (lhs-&gt;empty() || rhs-&gt;empty())
+</a><a href="#h0-3-4" id="h0-3-4" class="i">+        if (lhs-&gt;empty())
+</a>             return false;
+         IndexKey::Stats concat = lhs-&gt;stats().concat(rhs-&gt;stats());
+         if (concat.nodes_ &gt;= kMaxNodes)
+<a href="#h0-4" id="h0-4" class="h">@@ -278,13 +285,70 @@ namespace {
+</a>             out-&gt;anchor &amp;= ~kAnchorRight;
+         }
+ 
+<a href="#h0-4-3" id="h0-4-3" class="d">-        if (rhs &amp;&amp; rhs-&gt;weight() &gt; out-&gt;weight()) {
+</a><a href="#h0-4-4" id="h0-4-4" class="d">-            out = rhs;
+</a><a href="#h0-4-5" id="h0-4-5" class="d">-            out-&gt;anchor &amp;= ~kAnchorLeft;
+</a><a href="#h0-4-6" id="h0-4-6" class="i">+        debug(2, &quot;[%s]\n&quot;, out-&gt;ToString().c_str());
+</a><a href="#h0-4-7" id="h0-4-7" class="i">+
+</a><a href="#h0-4-8" id="h0-4-8" class="i">+        return out;
+</a><a href="#h0-4-9" id="h0-4-9" class="i">+    }
+</a><a href="#h0-4-10" id="h0-4-10" class="i">+
+</a><a href="#h0-4-11" id="h0-4-11" class="i">+    IndexKey::Stats TryConcat(shared_ptr&lt;IndexKey&gt; *start,
+</a><a href="#h0-4-12" id="h0-4-12" class="i">+                              shared_ptr&lt;IndexKey&gt; *end) {
+</a><a href="#h0-4-13" id="h0-4-13" class="i">+        IndexKey::Stats st = (*start)-&gt;stats();
+</a><a href="#h0-4-14" id="h0-4-14" class="i">+        debug(4, &quot;TryConcat: Searching suffix of length %ld\n&quot;,
+</a><a href="#h0-4-15" id="h0-4-15" class="i">+              end - start);
+</a><a href="#h0-4-16" id="h0-4-16" class="i">+        if (!*start || !((*start)-&gt;anchor &amp; kAnchorRight) || (*start)-&gt;empty()) {
+</a><a href="#h0-4-17" id="h0-4-17" class="i">+            debug(4, &quot;!ConcatRight, returning early.\n&quot;);
+</a><a href="#h0-4-18" id="h0-4-18" class="i">+            return st;
+</a>         }
+<a href="#h0-4-20" id="h0-4-20" class="i">+        for (shared_ptr&lt;IndexKey&gt; *ptr = start + 1; ptr != end; ptr++) {
+</a><a href="#h0-4-21" id="h0-4-21" class="i">+            if (!*(ptr) || !((*ptr)-&gt;anchor &amp; kAnchorLeft))
+</a><a href="#h0-4-22" id="h0-4-22" class="i">+                break;
+</a> 
+<a href="#h0-4-24" id="h0-4-24" class="d">-        debug(2, &quot;[%s]\n&quot;, out-&gt;ToString().c_str());
+</a><a href="#h0-4-25" id="h0-4-25" class="i">+            st = st.concat((*ptr)-&gt;stats());
+</a> 
+<a href="#h0-4-27" id="h0-4-27" class="i">+            if (st.nodes_ &gt;= kMaxNodes)
+</a><a href="#h0-4-28" id="h0-4-28" class="i">+                break;
+</a><a href="#h0-4-29" id="h0-4-29" class="i">+            if (((*ptr)-&gt;anchor &amp; (kAnchorRepeat|kAnchorRight)) != kAnchorRight)
+</a><a href="#h0-4-30" id="h0-4-30" class="i">+                break;
+</a><a href="#h0-4-31" id="h0-4-31" class="i">+        }
+</a><a href="#h0-4-32" id="h0-4-32" class="i">+        debug(4, &quot;TryConcat: nodes=%ld, selectivity=%f\n&quot;,
+</a><a href="#h0-4-33" id="h0-4-33" class="i">+              st.nodes_, st.selectivity_);
+</a><a href="#h0-4-34" id="h0-4-34" class="i">+        return st;
+</a><a href="#h0-4-35" id="h0-4-35" class="i">+    }
+</a><a href="#h0-4-36" id="h0-4-36" class="i">+
+</a><a href="#h0-4-37" id="h0-4-37" class="i">+    bool Prefer(const IndexKey::Stats&amp; lhs,
+</a><a href="#h0-4-38" id="h0-4-38" class="i">+                const IndexKey::Stats&amp; rhs) {
+</a><a href="#h0-4-39" id="h0-4-39" class="i">+        return (lhs.selectivity_ &lt; rhs.selectivity_);
+</a><a href="#h0-4-40" id="h0-4-40" class="i">+        /*
+</a><a href="#h0-4-41" id="h0-4-41" class="i">+        return (kRECost * lhs.selectivity_ + kNodeCost * lhs.nodes_ &lt;
+</a><a href="#h0-4-42" id="h0-4-42" class="i">+                kRECost * rhs.selectivity_ + kNodeCost * rhs.nodes_);
+</a><a href="#h0-4-43" id="h0-4-43" class="i">+        */
+</a><a href="#h0-4-44" id="h0-4-44" class="i">+    }
+</a><a href="#h0-4-45" id="h0-4-45" class="i">+
+</a><a href="#h0-4-46" id="h0-4-46" class="i">+    shared_ptr&lt;IndexKey&gt; Concat(shared_ptr&lt;IndexKey&gt; *children,
+</a><a href="#h0-4-47" id="h0-4-47" class="i">+                                int nchildren) {
+</a><a href="#h0-4-48" id="h0-4-48" class="i">+        shared_ptr&lt;IndexKey&gt; *end = children + nchildren, *best_start = 0, *ptr;
+</a><a href="#h0-4-49" id="h0-4-49" class="i">+        IndexKey::Stats best_stats;
+</a><a href="#h0-4-50" id="h0-4-50" class="i">+
+</a><a href="#h0-4-51" id="h0-4-51" class="i">+        debug(3, &quot;Concat: Searching %d positions\n&quot;, nchildren);
+</a><a href="#h0-4-52" id="h0-4-52" class="i">+        for (ptr = children; ptr != end; ptr++) {
+</a><a href="#h0-4-53" id="h0-4-53" class="i">+            IndexKey::Stats st = TryConcat(ptr, end);
+</a><a href="#h0-4-54" id="h0-4-54" class="i">+            if (st.nodes_ &gt; 1 &amp;&amp; Prefer(st, best_stats)) {
+</a><a href="#h0-4-55" id="h0-4-55" class="i">+                debug(3, &quot;Concat: Found new best: %ld: %f\n&quot;,
+</a><a href="#h0-4-56" id="h0-4-56" class="i">+                      ptr - children, st.selectivity_);
+</a><a href="#h0-4-57" id="h0-4-57" class="i">+                best_start = ptr;
+</a><a href="#h0-4-58" id="h0-4-58" class="i">+                best_stats = st;
+</a><a href="#h0-4-59" id="h0-4-59" class="i">+            }
+</a><a href="#h0-4-60" id="h0-4-60" class="i">+        }
+</a><a href="#h0-4-61" id="h0-4-61" class="i">+
+</a><a href="#h0-4-62" id="h0-4-62" class="i">+        if (best_start == 0) {
+</a><a href="#h0-4-63" id="h0-4-63" class="i">+            debug(3, &quot;Concat: No good results found.\n&quot;);
+</a><a href="#h0-4-64" id="h0-4-64" class="i">+            return Any();
+</a><a href="#h0-4-65" id="h0-4-65" class="i">+        }
+</a><a href="#h0-4-66" id="h0-4-66" class="i">+
+</a><a href="#h0-4-67" id="h0-4-67" class="i">+        shared_ptr&lt;IndexKey&gt; out = *best_start;
+</a><a href="#h0-4-68" id="h0-4-68" class="i">+        for (ptr = best_start + 1; ptr != end; ptr++) {
+</a><a href="#h0-4-69" id="h0-4-69" class="i">+            out = Concat(out, *ptr);
+</a><a href="#h0-4-70" id="h0-4-70" class="i">+        }
+</a>         return out;
+     }
+ 
+<a href="#h0-5" id="h0-5" class="h">@@ -472,9 +536,7 @@ IndexWalker::PostVisit(Regexp* re, shared_ptr&lt;IndexKey&gt; parent_arg,
+</a>         break;
+ 
+     case kRegexpConcat:
+<a href="#h0-5-3" id="h0-5-3" class="d">-        key = Empty();
+</a><a href="#h0-5-4" id="h0-5-4" class="d">-        for (int i = 0; i &lt; nchild_args; i++)
+</a><a href="#h0-5-5" id="h0-5-5" class="d">-            key = Concat(key, child_args[i]);
+</a><a href="#h0-5-6" id="h0-5-6" class="i">+        key = Concat(child_args, nchild_args);
+</a>         break;
+ 
+     case kRegexpAlternate:
+</pre>
+</div>
+</body>
+</html>

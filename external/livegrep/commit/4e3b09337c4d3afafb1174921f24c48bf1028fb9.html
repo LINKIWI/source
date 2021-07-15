@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Cap the size of index keys during concatenation. - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/4e3b09337c4d3afafb1174921f24c48bf1028fb9">4e3b09337c4d3afafb1174921f24c48bf1028fb9</a>
+<b>parent</b> <a href="../commit/e44e5b4f139e6060ef70395a2b0805979095fc23">e44e5b4f139e6060ef70395a2b0805979095fc23</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Mon, 26 Dec 2011 17:49:02 -0500
+
+Cap the size of index keys during concatenation.
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">indexer.cc</a></td><td> | </td><td class="num">23</td><td><span class="i">+++++++++++++++++++</span><span class="d">----</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">indexer.h</a></td><td> | </td><td class="num">1</td><td><span class="i">+</span><span class="d"></span></td></tr>
+</table></pre><pre>2 files changed, 20 insertions(+), 4 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/indexer.cc">indexer.cc</a> b/<a href="../file/indexer.cc">indexer.cc</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -32,6 +32,7 @@ using namespace std;
+</a> const unsigned kMinWeight = 16;
+ const int kMaxWidth       = 32;
+ const int kMaxRecursion   = 10;
+<a href="#h0-0-3" id="h0-0-3" class="i">+const int kMaxNodes       = (1 &lt;&lt; 24);
+</a> 
+ void IndexKey::insert(const value_type&amp; val) {
+     selectivity_ += (val.first.second - val.first.first + 1)/128. * val.second-&gt;selectivity();
+<a href="#h0-1" id="h0-1" class="h">@@ -75,6 +76,10 @@ int IndexKey::depth() {
+</a>     return depth_;
+ }
+ 
+<a href="#h0-1-3" id="h0-1-3" class="i">+long IndexKey::concat_nodes(shared_ptr&lt;IndexKey&gt; rhs) {
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+    return nodes_ + tail_paths_ * rhs-&gt;nodes();
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+}
+</a><a href="#h0-1-6" id="h0-1-6" class="i">+
+</a> void IndexKey::collect_tails(list&lt;IndexKey::iterator&gt;&amp; tails) {
+     if (this == 0)
+         return;
+<a href="#h0-2" id="h0-2" class="h">@@ -225,6 +230,19 @@ namespace {
+</a>         return k;
+     }
+ 
+<a href="#h0-2-3" id="h0-2-3" class="i">+    bool ShouldConcat(shared_ptr&lt;IndexKey&gt; lhs, shared_ptr&lt;IndexKey&gt; rhs) {
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+        if (!lhs || !rhs)
+</a><a href="#h0-2-5" id="h0-2-5" class="i">+            return false;
+</a><a href="#h0-2-6" id="h0-2-6" class="i">+        if (!(lhs-&gt;anchor &amp; kAnchorRight) ||
+</a><a href="#h0-2-7" id="h0-2-7" class="i">+            !(rhs-&gt;anchor &amp; kAnchorLeft))
+</a><a href="#h0-2-8" id="h0-2-8" class="i">+            return false;
+</a><a href="#h0-2-9" id="h0-2-9" class="i">+        if (lhs-&gt;empty() || rhs-&gt;empty())
+</a><a href="#h0-2-10" id="h0-2-10" class="i">+            return false;
+</a><a href="#h0-2-11" id="h0-2-11" class="i">+        if (lhs-&gt;concat_nodes(rhs) &gt;= kMaxNodes)
+</a><a href="#h0-2-12" id="h0-2-12" class="i">+            return false;
+</a><a href="#h0-2-13" id="h0-2-13" class="i">+        return true;
+</a><a href="#h0-2-14" id="h0-2-14" class="i">+    }
+</a><a href="#h0-2-15" id="h0-2-15" class="i">+
+</a>     shared_ptr&lt;IndexKey&gt; Concat(shared_ptr&lt;IndexKey&gt; lhs, shared_ptr&lt;IndexKey&gt; rhs) {
+         assert(lhs);
+         shared_ptr&lt;IndexKey&gt; out = lhs;
+<a href="#h0-3" id="h0-3" class="h">@@ -235,10 +253,7 @@ namespace {
+</a>               rhs-&gt;ToString().c_str(),
+               rhs-&gt;nodes());
+ 
+<a href="#h0-3-3" id="h0-3-3" class="d">-        if (lhs &amp;&amp; rhs &amp;&amp;
+</a><a href="#h0-3-4" id="h0-3-4" class="d">-            (lhs-&gt;anchor &amp; kAnchorRight) &amp;&amp;
+</a><a href="#h0-3-5" id="h0-3-5" class="d">-            (rhs-&gt;anchor &amp; kAnchorLeft) &amp;&amp;
+</a><a href="#h0-3-6" id="h0-3-6" class="d">-            !lhs-&gt;empty() &amp;&amp; !rhs-&gt;empty()) {
+</a><a href="#h0-3-7" id="h0-3-7" class="i">+        if (ShouldConcat(lhs, rhs)) {
+</a>             out-&gt;concat(rhs);
+         } else  {
+             out-&gt;anchor &amp;= ~kAnchorRight;
+<b>diff --git a/<a id="h1" href="../file/indexer.h">indexer.h</a> b/<a href="../file/indexer.h">indexer.h</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -85,6 +85,7 @@ public:
+</a>     unsigned weight();
+     int depth();
+     long nodes();
+<a href="#h1-0-3" id="h1-0-3" class="i">+    long concat_nodes(shared_ptr&lt;IndexKey&gt; rhs);
+</a> 
+     string ToString();
+ 
+</pre>
+</div>
+</body>
+</html>

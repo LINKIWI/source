@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>radix_sort.cc - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../../../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../../../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../../../log">Log</a> | <a href="../../../files">Files</a> | <a href="../../../refs">Refs</a> | <a href="../../../file/README.md">README</a> | <a href="../../../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<p> radix_sort.cc (1735B) (<a href="../../../raw/src/lib/radix_sort.cc">raw</a>)</p><hr/><pre id="blob">
+<a href="#l1" class="line" id="l1">      1</a> /********************************************************************
+<a href="#l2" class="line" id="l2">      2</a>  * livegrep -- radix_sort.cc
+<a href="#l3" class="line" id="l3">      3</a>  * Copyright (c) 2011-2013 Nelson Elhage
+<a href="#l4" class="line" id="l4">      4</a>  *
+<a href="#l5" class="line" id="l5">      5</a>  * This program is free software. You may use, redistribute, and/or
+<a href="#l6" class="line" id="l6">      6</a>  * modify it under the terms listed in the COPYING file.
+<a href="#l7" class="line" id="l7">      7</a>  ********************************************************************/
+<a href="#l8" class="line" id="l8">      8</a> #include &lt;stdint.h&gt;
+<a href="#l9" class="line" id="l9">      9</a> #include &lt;string.h&gt;
+<a href="#l10" class="line" id="l10">     10</a> #include &lt;vector&gt;
+<a href="#l11" class="line" id="l11">     11</a> 
+<a href="#l12" class="line" id="l12">     12</a> using std::vector;
+<a href="#l13" class="line" id="l13">     13</a> 
+<a href="#l14" class="line" id="l14">     14</a> #include &quot;per_thread.h&quot;
+<a href="#l15" class="line" id="l15">     15</a> 
+<a href="#l16" class="line" id="l16">     16</a> void lsd_radix_sort(uint32_t *left, uint32_t *right)
+<a href="#l17" class="line" id="l17">     17</a> {
+<a href="#l18" class="line" id="l18">     18</a>     static per_thread&lt;vector&lt;uint32_t&gt; &gt; scratch;
+<a href="#l19" class="line" id="l19">     19</a> 
+<a href="#l20" class="line" id="l20">     20</a>     int width = right - left;
+<a href="#l21" class="line" id="l21">     21</a>     if (!scratch.get())
+<a href="#l22" class="line" id="l22">     22</a>         scratch.put(new vector&lt;uint32_t&gt;(width));
+<a href="#l23" class="line" id="l23">     23</a>     scratch-&gt;reserve(width);
+<a href="#l24" class="line" id="l24">     24</a>     uint32_t *cur = left, *other = &amp;(*scratch)[0];
+<a href="#l25" class="line" id="l25">     25</a>     uint32_t counts[4][256];
+<a href="#l26" class="line" id="l26">     26</a>     /*
+<a href="#l27" class="line" id="l27">     27</a>      * We do four passes
+<a href="#l28" class="line" id="l28">     28</a>      * (0) input -&gt; scratch
+<a href="#l29" class="line" id="l29">     29</a>      * (1) scratch -&gt; input
+<a href="#l30" class="line" id="l30">     30</a>      * (2) input -&gt; scratch
+<a href="#l31" class="line" id="l31">     31</a>      * (3) scratch -&gt; input
+<a href="#l32" class="line" id="l32">     32</a>      *
+<a href="#l33" class="line" id="l33">     33</a>      * So after the fourth pass, the input array is sorted and back in
+<a href="#l34" class="line" id="l34">     34</a>      * the original storage.
+<a href="#l35" class="line" id="l35">     35</a>      */
+<a href="#l36" class="line" id="l36">     36</a> 
+<a href="#l37" class="line" id="l37">     37</a>     memset(counts, 0, sizeof counts);
+<a href="#l38" class="line" id="l38">     38</a>     for (int i = 0; i &lt; width; i++) {
+<a href="#l39" class="line" id="l39">     39</a>         counts[0][(cur[i] &gt;&gt; 0 ) &amp; 0xFF]++;
+<a href="#l40" class="line" id="l40">     40</a>         counts[1][(cur[i] &gt;&gt; 8 ) &amp; 0xFF]++;
+<a href="#l41" class="line" id="l41">     41</a>         counts[2][(cur[i] &gt;&gt; 16) &amp; 0xFF]++;
+<a href="#l42" class="line" id="l42">     42</a>         counts[3][(cur[i] &gt;&gt; 24) &amp; 0xFF]++;
+<a href="#l43" class="line" id="l43">     43</a>     }
+<a href="#l44" class="line" id="l44">     44</a> 
+<a href="#l45" class="line" id="l45">     45</a>     for (int digit = 0; digit &lt; 4; digit++) {
+<a href="#l46" class="line" id="l46">     46</a>         int total = 0;
+<a href="#l47" class="line" id="l47">     47</a>         for (int i = 0; i &lt; 256; i++) {
+<a href="#l48" class="line" id="l48">     48</a>             int tmp = counts[digit][i];
+<a href="#l49" class="line" id="l49">     49</a>             counts[digit][i] = total;
+<a href="#l50" class="line" id="l50">     50</a>             total += tmp;
+<a href="#l51" class="line" id="l51">     51</a>         }
+<a href="#l52" class="line" id="l52">     52</a>         for (int i = 0; i &lt; width; i++) {
+<a href="#l53" class="line" id="l53">     53</a>             int d = (cur[i] &gt;&gt; (8 * digit)) &amp; 0xFF;
+<a href="#l54" class="line" id="l54">     54</a>             other[counts[digit][d]++] = cur[i];
+<a href="#l55" class="line" id="l55">     55</a>         }
+<a href="#l56" class="line" id="l56">     56</a>         uint32_t *tmp = cur;
+<a href="#l57" class="line" id="l57">     57</a>         cur = other;
+<a href="#l58" class="line" id="l58">     58</a>         other = tmp;
+<a href="#l59" class="line" id="l59">     59</a>     }
+<a href="#l60" class="line" id="l60">     60</a> }
+</pre>
+</div>
+</body>
+</html>

@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Rip out the old, non-GRPC, transport. - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/9bffceeb439394d93897ceb570f2fb9bcaa92a13">9bffceeb439394d93897ceb570f2fb9bcaa92a13</a>
+<b>parent</b> <a href="../commit/3d308220f83c1d56037dfbe959ba237d2ae18814">3d308220f83c1d56037dfbe959ba237d2ae18814</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Tue, 14 Feb 2017 11:55:01 -0800
+
+Rip out the old, non-GRPC, transport.
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">src/tools/codesearch.cc</a></td><td> | </td><td class="num">268</td><td><span class="i">+</span><span class="d">------------------------------------------------------------------------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">src/tools/transport.cc</a></td><td> | </td><td class="num">217</td><td><span class="i"></span><span class="d">-------------------------------------------------------------------------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">src/tools/transport.h</a></td><td> | </td><td class="num">17</td><td><span class="i"></span><span class="d">-----------------</span></td></tr>
+</table></pre><pre>3 files changed, 2 insertions(+), 500 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/src/tools/codesearch.cc">src/tools/codesearch.cc</a> b/<a href="../file/src/tools/codesearch.cc">src/tools/codesearch.cc</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -43,14 +43,11 @@
+</a> #include &lt;grpc++/server.h&gt;
+ #include &lt;grpc++/server_builder.h&gt;
+ 
+<a href="#h0-0-3" id="h0-0-3" class="d">-DEFINE_int32(concurrency, 16, &quot;Number of concurrent queries to allow.&quot;);
+</a> DEFINE_string(dump_index, &quot;&quot;, &quot;Dump the produced index to a specified file&quot;);
+ DEFINE_string(load_index, &quot;&quot;, &quot;Load the index from a file instead of walking the repository&quot;);
+ DEFINE_string(load_tags, &quot;&quot;, &quot;Load the index built from a tags file.&quot;);
+ DEFINE_bool(quiet, false, &quot;Do the search, but don&#39;t print results.&quot;);
+<a href="#h0-0-8" id="h0-0-8" class="d">-DEFINE_string(listen, &quot;&quot;, &quot;Listen on a socket for connections. example: -listen tcp://localhost:9999&quot;);
+</a><a href="#h0-0-9" id="h0-0-9" class="d">-DEFINE_string(grpc, &quot;&quot;, &quot;Listen for GRPC clients. example: -grpc localhost:9999&quot;);
+</a><a href="#h0-0-10" id="h0-0-10" class="d">-DEFINE_string(listen_tags, &quot;&quot;, &quot;Listen on a socket for connections to tag search. example: -listen_tags tcp://localhost:9998&quot;);
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+DEFINE_string(grpc, &quot;localhost:9999&quot;, &quot;GRPC listeneder address&quot;);
+</a> 
+ using namespace std;
+ using namespace re2;
+<a href="#h0-1" id="h0-1" class="h">@@ -58,127 +55,11 @@ using namespace re2;
+</a> using grpc::Server;
+ using grpc::ServerBuilder;
+ 
+<a href="#h0-1-3" id="h0-1-3" class="d">-sem_t interact_sem;
+</a><a href="#h0-1-4" id="h0-1-4" class="d">-
+</a> void die_errno(const char *str) {
+     perror(str);
+     exit(1);
+ }
+ 
+<a href="#h0-1-10" id="h0-1-10" class="d">-struct print_match {
+</a><a href="#h0-1-11" id="h0-1-11" class="d">-    print_match(codesearch_transport *tx) : tx_(tx) {}
+</a><a href="#h0-1-12" id="h0-1-12" class="d">-
+</a><a href="#h0-1-13" id="h0-1-13" class="d">-    void operator()(const match_result *m) const {
+</a><a href="#h0-1-14" id="h0-1-14" class="d">-        if (FLAGS_quiet)
+</a><a href="#h0-1-15" id="h0-1-15" class="d">-            return;
+</a><a href="#h0-1-16" id="h0-1-16" class="d">-        tx_-&gt;write_match(m);
+</a><a href="#h0-1-17" id="h0-1-17" class="d">-    }
+</a><a href="#h0-1-18" id="h0-1-18" class="d">-protected:
+</a><a href="#h0-1-19" id="h0-1-19" class="d">-    codesearch_transport *tx_;
+</a><a href="#h0-1-20" id="h0-1-20" class="d">-};
+</a><a href="#h0-1-21" id="h0-1-21" class="d">-
+</a><a href="#h0-1-22" id="h0-1-22" class="d">-typedef std::function&lt;match_stats (code_searcher::search_thread*,
+</a><a href="#h0-1-23" id="h0-1-23" class="d">-                                   query*,
+</a><a href="#h0-1-24" id="h0-1-24" class="d">-                                   codesearch_transport*)&gt; match_func;
+</a><a href="#h0-1-25" id="h0-1-25" class="d">-
+</a><a href="#h0-1-26" id="h0-1-26" class="d">-struct codesearch_matcher {
+</a><a href="#h0-1-27" id="h0-1-27" class="d">-    match_stats operator()(code_searcher::search_thread *s, query *q, codesearch_transport *tx) {
+</a><a href="#h0-1-28" id="h0-1-28" class="d">-        match_stats stats;
+</a><a href="#h0-1-29" id="h0-1-29" class="d">-        sem_wait(&amp;interact_sem);
+</a><a href="#h0-1-30" id="h0-1-30" class="d">-        s-&gt;match(*q, print_match(tx), &amp;stats);
+</a><a href="#h0-1-31" id="h0-1-31" class="d">-        sem_post(&amp;interact_sem);
+</a><a href="#h0-1-32" id="h0-1-32" class="d">-        return stats;
+</a><a href="#h0-1-33" id="h0-1-33" class="d">-    }
+</a><a href="#h0-1-34" id="h0-1-34" class="d">-};
+</a><a href="#h0-1-35" id="h0-1-35" class="d">-
+</a><a href="#h0-1-36" id="h0-1-36" class="d">-struct tagsearch_matcher {
+</a><a href="#h0-1-37" id="h0-1-37" class="d">-    tagsearch_matcher(code_searcher *cs, code_searcher *tagdata) : tagdata_(tagdata) {
+</a><a href="#h0-1-38" id="h0-1-38" class="d">-        ts_.cache_indexed_files(cs);
+</a><a href="#h0-1-39" id="h0-1-39" class="d">-    }
+</a><a href="#h0-1-40" id="h0-1-40" class="d">-
+</a><a href="#h0-1-41" id="h0-1-41" class="d">-    match_stats operator()(code_searcher::search_thread *s, query *q, codesearch_transport *tx) {
+</a><a href="#h0-1-42" id="h0-1-42" class="d">-        match_stats stats;
+</a><a href="#h0-1-43" id="h0-1-43" class="d">-        // the negation constraints will be checked when we transform the match
+</a><a href="#h0-1-44" id="h0-1-44" class="d">-        // (unfortunately, we can&#39;t construct a line query that checks these)
+</a><a href="#h0-1-45" id="h0-1-45" class="d">-        query constraints;
+</a><a href="#h0-1-46" id="h0-1-46" class="d">-        constraints.negate.file_pat.swap(q-&gt;negate.file_pat);
+</a><a href="#h0-1-47" id="h0-1-47" class="d">-        constraints.negate.tags_pat.swap(q-&gt;negate.tags_pat);
+</a><a href="#h0-1-48" id="h0-1-48" class="d">-
+</a><a href="#h0-1-49" id="h0-1-49" class="d">-        // modify the line pattern to match the constraints that we can handle now
+</a><a href="#h0-1-50" id="h0-1-50" class="d">-        std::string regex = tag_searcher::create_tag_line_regex_from_query(q);
+</a><a href="#h0-1-51" id="h0-1-51" class="d">-        q-&gt;line_pat.reset(new RE2(regex, q-&gt;line_pat-&gt;options()));
+</a><a href="#h0-1-52" id="h0-1-52" class="d">-        q-&gt;file_pat.reset();
+</a><a href="#h0-1-53" id="h0-1-53" class="d">-        q-&gt;tags_pat.reset();
+</a><a href="#h0-1-54" id="h0-1-54" class="d">-
+</a><a href="#h0-1-55" id="h0-1-55" class="d">-        sem_wait(&amp;interact_sem);
+</a><a href="#h0-1-56" id="h0-1-56" class="d">-        s-&gt;match(*q,
+</a><a href="#h0-1-57" id="h0-1-57" class="d">-                 print_match(tx),
+</a><a href="#h0-1-58" id="h0-1-58" class="d">-                 boost::bind(&amp;tag_searcher::transform, &amp;ts_, &amp;constraints, _1),
+</a><a href="#h0-1-59" id="h0-1-59" class="d">-                 &amp;stats);
+</a><a href="#h0-1-60" id="h0-1-60" class="d">-        sem_post(&amp;interact_sem);
+</a><a href="#h0-1-61" id="h0-1-61" class="d">-        return stats;
+</a><a href="#h0-1-62" id="h0-1-62" class="d">-    }
+</a><a href="#h0-1-63" id="h0-1-63" class="d">-protected:
+</a><a href="#h0-1-64" id="h0-1-64" class="d">-    code_searcher *tagdata_;
+</a><a href="#h0-1-65" id="h0-1-65" class="d">-    tag_searcher ts_;
+</a><a href="#h0-1-66" id="h0-1-66" class="d">-};
+</a><a href="#h0-1-67" id="h0-1-67" class="d">-
+</a><a href="#h0-1-68" id="h0-1-68" class="d">-static std::string pat(const std::unique_ptr&lt;RE2&gt; &amp;p) {
+</a><a href="#h0-1-69" id="h0-1-69" class="d">-    if (p.get() == 0)
+</a><a href="#h0-1-70" id="h0-1-70" class="d">-        return &quot;&quot;;
+</a><a href="#h0-1-71" id="h0-1-71" class="d">-    return p-&gt;pattern();
+</a><a href="#h0-1-72" id="h0-1-72" class="d">-}
+</a><a href="#h0-1-73" id="h0-1-73" class="d">-
+</a><a href="#h0-1-74" id="h0-1-74" class="d">-void interact(code_searcher *cs, codesearch_transport *tx, const match_func&amp; match) {
+</a><a href="#h0-1-75" id="h0-1-75" class="d">-    code_searcher::search_thread search(cs);
+</a><a href="#h0-1-76" id="h0-1-76" class="d">-    WidthWalker width;
+</a><a href="#h0-1-77" id="h0-1-77" class="d">-
+</a><a href="#h0-1-78" id="h0-1-78" class="d">-    index_info info;
+</a><a href="#h0-1-79" id="h0-1-79" class="d">-    info.name = cs-&gt;name();
+</a><a href="#h0-1-80" id="h0-1-80" class="d">-    info.trees = cs-&gt;trees();
+</a><a href="#h0-1-81" id="h0-1-81" class="d">-    bool done = false;
+</a><a href="#h0-1-82" id="h0-1-82" class="d">-
+</a><a href="#h0-1-83" id="h0-1-83" class="d">-    while (!done) {
+</a><a href="#h0-1-84" id="h0-1-84" class="d">-        tx-&gt;write_ready(&amp;info);
+</a><a href="#h0-1-85" id="h0-1-85" class="d">-
+</a><a href="#h0-1-86" id="h0-1-86" class="d">-        query q;
+</a><a href="#h0-1-87" id="h0-1-87" class="d">-        if (!tx-&gt;read_query(&amp;q, &amp;done))
+</a><a href="#h0-1-88" id="h0-1-88" class="d">-            continue;
+</a><a href="#h0-1-89" id="h0-1-89" class="d">-
+</a><a href="#h0-1-90" id="h0-1-90" class="d">-        log(q.trace_id,
+</a><a href="#h0-1-91" id="h0-1-91" class="d">-            &quot;processing query line=&#39;%s&#39; file=&#39;%s&#39; tree=&#39;%s&#39; tags=&#39;%s&#39; &quot;
+</a><a href="#h0-1-92" id="h0-1-92" class="d">-                                        &quot;not_file=&#39;%s&#39; not_tree=&#39;%s&#39; not_tags=&#39;%s&#39;&quot;,
+</a><a href="#h0-1-93" id="h0-1-93" class="d">-            pat(q.line_pat).c_str(),
+</a><a href="#h0-1-94" id="h0-1-94" class="d">-            pat(q.file_pat).c_str(),
+</a><a href="#h0-1-95" id="h0-1-95" class="d">-            pat(q.tree_pat).c_str(),
+</a><a href="#h0-1-96" id="h0-1-96" class="d">-            pat(q.tags_pat).c_str(),
+</a><a href="#h0-1-97" id="h0-1-97" class="d">-            pat(q.negate.file_pat).c_str(),
+</a><a href="#h0-1-98" id="h0-1-98" class="d">-            pat(q.negate.tree_pat).c_str(),
+</a><a href="#h0-1-99" id="h0-1-99" class="d">-            pat(q.negate.tags_pat).c_str());
+</a><a href="#h0-1-100" id="h0-1-100" class="d">-
+</a><a href="#h0-1-101" id="h0-1-101" class="d">-        if (q.line_pat-&gt;ProgramSize() &gt; kMaxProgramSize) {
+</a><a href="#h0-1-102" id="h0-1-102" class="d">-            log(q.trace_id, &quot;program too large size=%d&quot;, q.line_pat-&gt;ProgramSize());
+</a><a href="#h0-1-103" id="h0-1-103" class="d">-            tx-&gt;write_error(&quot;Parse error.&quot;);
+</a><a href="#h0-1-104" id="h0-1-104" class="d">-            continue;
+</a><a href="#h0-1-105" id="h0-1-105" class="d">-        }
+</a><a href="#h0-1-106" id="h0-1-106" class="d">-        int w = width.Walk(q.line_pat-&gt;Regexp(), 0);
+</a><a href="#h0-1-107" id="h0-1-107" class="d">-        if (w &gt; kMaxWidth) {
+</a><a href="#h0-1-108" id="h0-1-108" class="d">-            log(q.trace_id, &quot;program too wide width=%d&quot;, w);
+</a><a href="#h0-1-109" id="h0-1-109" class="d">-            tx-&gt;write_error(&quot;Parse error.&quot;);
+</a><a href="#h0-1-110" id="h0-1-110" class="d">-            continue;
+</a><a href="#h0-1-111" id="h0-1-111" class="d">-        }
+</a><a href="#h0-1-112" id="h0-1-112" class="d">-        {
+</a><a href="#h0-1-113" id="h0-1-113" class="d">-            timer tm;
+</a><a href="#h0-1-114" id="h0-1-114" class="d">-            struct timeval elapsed;
+</a><a href="#h0-1-115" id="h0-1-115" class="d">-            match_stats stats = match(&amp;search, &amp;q, tx);
+</a><a href="#h0-1-116" id="h0-1-116" class="d">-            elapsed = tm.elapsed();
+</a><a href="#h0-1-117" id="h0-1-117" class="d">-            tx-&gt;write_done(elapsed, &amp;stats);
+</a><a href="#h0-1-118" id="h0-1-118" class="d">-            log(q.trace_id, &quot;done elapsed=%ld matches=%d why=%d&quot;,
+</a><a href="#h0-1-119" id="h0-1-119" class="d">-                timeval_ms(elapsed), stats.matches, int(stats.why));
+</a><a href="#h0-1-120" id="h0-1-120" class="d">-        }
+</a><a href="#h0-1-121" id="h0-1-121" class="d">-    }
+</a><a href="#h0-1-122" id="h0-1-122" class="d">-}
+</a><a href="#h0-1-123" id="h0-1-123" class="d">-
+</a> void build_index(code_searcher *cs, const vector&lt;std::string&gt; &amp;argv) {
+     if (argv.size() != 2) {
+         fprintf(stderr, &quot;Usage: %s [OPTIONS] config.json\n&quot;, argv[0].c_str());
+<a href="#h0-2" id="h0-2" class="h">@@ -256,127 +137,6 @@ void initialize_search(code_searcher *search,
+</a>         search-&gt;dump_index(FLAGS_dump_index);
+ }
+ 
+<a href="#h0-2-3" id="h0-2-3" class="d">-struct child_state {
+</a><a href="#h0-2-4" id="h0-2-4" class="d">-    int fd;
+</a><a href="#h0-2-5" id="h0-2-5" class="d">-    code_searcher *search;
+</a><a href="#h0-2-6" id="h0-2-6" class="d">-    match_func match;
+</a><a href="#h0-2-7" id="h0-2-7" class="d">-};
+</a><a href="#h0-2-8" id="h0-2-8" class="d">-
+</a><a href="#h0-2-9" id="h0-2-9" class="d">-void *handle_client(void *data) {
+</a><a href="#h0-2-10" id="h0-2-10" class="d">-    child_state *child = static_cast&lt;child_state*&gt;(data);
+</a><a href="#h0-2-11" id="h0-2-11" class="d">-    FILE *r = fdopen(child-&gt;fd, &quot;r&quot;);
+</a><a href="#h0-2-12" id="h0-2-12" class="d">-    FILE *w = fdopen(dup(child-&gt;fd), &quot;w&quot;);
+</a><a href="#h0-2-13" id="h0-2-13" class="d">-
+</a><a href="#h0-2-14" id="h0-2-14" class="d">-    union {
+</a><a href="#h0-2-15" id="h0-2-15" class="d">-        struct sockaddr addr;
+</a><a href="#h0-2-16" id="h0-2-16" class="d">-        struct sockaddr_in addr_in;
+</a><a href="#h0-2-17" id="h0-2-17" class="d">-        struct sockaddr_un addr_un;
+</a><a href="#h0-2-18" id="h0-2-18" class="d">-    } addr;
+</a><a href="#h0-2-19" id="h0-2-19" class="d">-    socklen_t socklen = sizeof(addr);
+</a><a href="#h0-2-20" id="h0-2-20" class="d">-
+</a><a href="#h0-2-21" id="h0-2-21" class="d">-    if (getpeername(child-&gt;fd, &amp;addr.addr, &amp;socklen) == 0) {
+</a><a href="#h0-2-22" id="h0-2-22" class="d">-        if (addr.addr.sa_family == AF_INET) {
+</a><a href="#h0-2-23" id="h0-2-23" class="d">-            char name[256];
+</a><a href="#h0-2-24" id="h0-2-24" class="d">-            printf(&quot;connection received from %s:%d\n&quot;,
+</a><a href="#h0-2-25" id="h0-2-25" class="d">-                   inet_ntop(addr.addr.sa_family, &amp;addr.addr_in.sin_addr,
+</a><a href="#h0-2-26" id="h0-2-26" class="d">-                             name, sizeof(name)),
+</a><a href="#h0-2-27" id="h0-2-27" class="d">-                   int(addr.addr_in.sin_port));
+</a><a href="#h0-2-28" id="h0-2-28" class="d">-        }
+</a><a href="#h0-2-29" id="h0-2-29" class="d">-    }
+</a><a href="#h0-2-30" id="h0-2-30" class="d">-
+</a><a href="#h0-2-31" id="h0-2-31" class="d">-
+</a><a href="#h0-2-32" id="h0-2-32" class="d">-    codesearch_transport *tx = new codesearch_transport(r, w);
+</a><a href="#h0-2-33" id="h0-2-33" class="d">-    interact(child-&gt;search, tx, child-&gt;match);
+</a><a href="#h0-2-34" id="h0-2-34" class="d">-    delete tx;
+</a><a href="#h0-2-35" id="h0-2-35" class="d">-    delete child;
+</a><a href="#h0-2-36" id="h0-2-36" class="d">-    fclose(r);
+</a><a href="#h0-2-37" id="h0-2-37" class="d">-    fclose(w);
+</a><a href="#h0-2-38" id="h0-2-38" class="d">-    return 0;
+</a><a href="#h0-2-39" id="h0-2-39" class="d">-}
+</a><a href="#h0-2-40" id="h0-2-40" class="d">-
+</a><a href="#h0-2-41" id="h0-2-41" class="d">-int bind_to_address(string spec) {
+</a><a href="#h0-2-42" id="h0-2-42" class="d">-    int off = spec.find(&quot;://&quot;);
+</a><a href="#h0-2-43" id="h0-2-43" class="d">-    string proto, address;
+</a><a href="#h0-2-44" id="h0-2-44" class="d">-
+</a><a href="#h0-2-45" id="h0-2-45" class="d">-    if (off == string::npos) {
+</a><a href="#h0-2-46" id="h0-2-46" class="d">-        proto = &quot;unix&quot;;
+</a><a href="#h0-2-47" id="h0-2-47" class="d">-        address = spec;
+</a><a href="#h0-2-48" id="h0-2-48" class="d">-    } else {
+</a><a href="#h0-2-49" id="h0-2-49" class="d">-        proto = spec.substr(0, off);
+</a><a href="#h0-2-50" id="h0-2-50" class="d">-        address = spec.substr(off + 3);
+</a><a href="#h0-2-51" id="h0-2-51" class="d">-    }
+</a><a href="#h0-2-52" id="h0-2-52" class="d">-
+</a><a href="#h0-2-53" id="h0-2-53" class="d">-    int server;
+</a><a href="#h0-2-54" id="h0-2-54" class="d">-
+</a><a href="#h0-2-55" id="h0-2-55" class="d">-    if (proto == &quot;unix&quot;) {
+</a><a href="#h0-2-56" id="h0-2-56" class="d">-        server = socket(AF_UNIX, SOCK_STREAM, 0);
+</a><a href="#h0-2-57" id="h0-2-57" class="d">-        if (server &lt; 0)
+</a><a href="#h0-2-58" id="h0-2-58" class="d">-            die_errno(&quot;socket(AF_UNIX)&quot;);
+</a><a href="#h0-2-59" id="h0-2-59" class="d">-
+</a><a href="#h0-2-60" id="h0-2-60" class="d">-        struct sockaddr_un addr;
+</a><a href="#h0-2-61" id="h0-2-61" class="d">-
+</a><a href="#h0-2-62" id="h0-2-62" class="d">-        memset(&amp;addr, 0, sizeof addr);
+</a><a href="#h0-2-63" id="h0-2-63" class="d">-        addr.sun_family = AF_UNIX;
+</a><a href="#h0-2-64" id="h0-2-64" class="d">-        memcpy(addr.sun_path, address.c_str(), min(address.size(), sizeof(addr.sun_path) - 1));
+</a><a href="#h0-2-65" id="h0-2-65" class="d">-
+</a><a href="#h0-2-66" id="h0-2-66" class="d">-        if (::bind(server, reinterpret_cast&lt;sockaddr*&gt;(&amp;addr), sizeof addr) &lt; 0)
+</a><a href="#h0-2-67" id="h0-2-67" class="d">-            die_errno(&quot;Unable to bind socket&quot;);
+</a><a href="#h0-2-68" id="h0-2-68" class="d">-    } else if (proto == &quot;tcp&quot;) {
+</a><a href="#h0-2-69" id="h0-2-69" class="d">-        int colon = address.find(&#39;:&#39;);
+</a><a href="#h0-2-70" id="h0-2-70" class="d">-        if (colon == string::npos) {
+</a><a href="#h0-2-71" id="h0-2-71" class="d">-            die(&quot;-listen: TCP addresses must be HOST:PORT.&quot;);
+</a><a href="#h0-2-72" id="h0-2-72" class="d">-        }
+</a><a href="#h0-2-73" id="h0-2-73" class="d">-        string host = address.substr(0, colon);
+</a><a href="#h0-2-74" id="h0-2-74" class="d">-        struct addrinfo hint = {};
+</a><a href="#h0-2-75" id="h0-2-75" class="d">-        hint.ai_family = AF_INET;
+</a><a href="#h0-2-76" id="h0-2-76" class="d">-        hint.ai_socktype = SOCK_STREAM;
+</a><a href="#h0-2-77" id="h0-2-77" class="d">-
+</a><a href="#h0-2-78" id="h0-2-78" class="d">-        struct addrinfo *addrs = NULL;
+</a><a href="#h0-2-79" id="h0-2-79" class="d">-        int err;
+</a><a href="#h0-2-80" id="h0-2-80" class="d">-        if ((err = getaddrinfo(host.c_str(), address.c_str() + colon + 1,
+</a><a href="#h0-2-81" id="h0-2-81" class="d">-                               &amp;hint, &amp;addrs)) != 0) {
+</a><a href="#h0-2-82" id="h0-2-82" class="d">-            die(&quot;Error resolving %s: %s&quot;, host.c_str(), gai_strerror(err));
+</a><a href="#h0-2-83" id="h0-2-83" class="d">-        }
+</a><a href="#h0-2-84" id="h0-2-84" class="d">-
+</a><a href="#h0-2-85" id="h0-2-85" class="d">-        server = socket(addrs-&gt;ai_family, addrs-&gt;ai_socktype, addrs-&gt;ai_protocol);
+</a><a href="#h0-2-86" id="h0-2-86" class="d">-        if (server &lt; 0)
+</a><a href="#h0-2-87" id="h0-2-87" class="d">-            die_errno(&quot;Creating socket&quot;);
+</a><a href="#h0-2-88" id="h0-2-88" class="d">-        int one = 1;
+</a><a href="#h0-2-89" id="h0-2-89" class="d">-        if (setsockopt(server, SOL_SOCKET, SO_REUSEADDR, &amp;one, sizeof(one)) != 0)
+</a><a href="#h0-2-90" id="h0-2-90" class="d">-            die_errno(&quot;set reuseaddr&quot;);
+</a><a href="#h0-2-91" id="h0-2-91" class="d">-        if (::bind(server, addrs-&gt;ai_addr, addrs-&gt;ai_addrlen) != 0)
+</a><a href="#h0-2-92" id="h0-2-92" class="d">-            die_errno(&quot;Binding to address&quot;);
+</a><a href="#h0-2-93" id="h0-2-93" class="d">-        freeaddrinfo(addrs);
+</a><a href="#h0-2-94" id="h0-2-94" class="d">-    } else {
+</a><a href="#h0-2-95" id="h0-2-95" class="d">-        die(&quot;Unknown protocol: %s&quot;, proto.c_str());
+</a><a href="#h0-2-96" id="h0-2-96" class="d">-    }
+</a><a href="#h0-2-97" id="h0-2-97" class="d">-
+</a><a href="#h0-2-98" id="h0-2-98" class="d">-    if (listen(server, 4) &lt; 0)
+</a><a href="#h0-2-99" id="h0-2-99" class="d">-        die_errno(&quot;listen()&quot;);
+</a><a href="#h0-2-100" id="h0-2-100" class="d">-
+</a><a href="#h0-2-101" id="h0-2-101" class="d">-    return server;
+</a><a href="#h0-2-102" id="h0-2-102" class="d">-}
+</a><a href="#h0-2-103" id="h0-2-103" class="d">-
+</a><a href="#h0-2-104" id="h0-2-104" class="d">-void listen(code_searcher *search, const string&amp; path, const match_func&amp; match) {
+</a><a href="#h0-2-105" id="h0-2-105" class="d">-    int server = bind_to_address(path);
+</a><a href="#h0-2-106" id="h0-2-106" class="d">-
+</a><a href="#h0-2-107" id="h0-2-107" class="d">-    printf(&quot;codesearch: listening on %s.\n&quot;, path.c_str());
+</a><a href="#h0-2-108" id="h0-2-108" class="d">-
+</a><a href="#h0-2-109" id="h0-2-109" class="d">-    while(1) {
+</a><a href="#h0-2-110" id="h0-2-110" class="d">-        int fd = accept(server, NULL, NULL);
+</a><a href="#h0-2-111" id="h0-2-111" class="d">-        if (fd &lt; 0)
+</a><a href="#h0-2-112" id="h0-2-112" class="d">-            die_errno(&quot;accept&quot;);
+</a><a href="#h0-2-113" id="h0-2-113" class="d">-
+</a><a href="#h0-2-114" id="h0-2-114" class="d">-        child_state *state = new child_state;
+</a><a href="#h0-2-115" id="h0-2-115" class="d">-        state-&gt;fd = fd;
+</a><a href="#h0-2-116" id="h0-2-116" class="d">-        state-&gt;search = search;
+</a><a href="#h0-2-117" id="h0-2-117" class="d">-        state-&gt;match = match;
+</a><a href="#h0-2-118" id="h0-2-118" class="d">-
+</a><a href="#h0-2-119" id="h0-2-119" class="d">-        pthread_t thread;
+</a><a href="#h0-2-120" id="h0-2-120" class="d">-        pthread_create(&amp;thread, NULL, handle_client, state);
+</a><a href="#h0-2-121" id="h0-2-121" class="d">-    }
+</a><a href="#h0-2-122" id="h0-2-122" class="d">-}
+</a><a href="#h0-2-123" id="h0-2-123" class="d">-
+</a> void listen_grpc(code_searcher *search, code_searcher *tags, const string&amp; addr) {
+     CodeSearchImpl service(search, tags);
+ 
+<a href="#h0-3" id="h0-3" class="h">@@ -400,32 +160,8 @@ int main(int argc, char **argv) {
+</a> 
+     initialize_search(&amp;search, &amp;tags, argc, argv);
+ 
+<a href="#h0-3-3" id="h0-3-3" class="d">-    if (sem_init(&amp;interact_sem, 0, FLAGS_concurrency) &lt; 0)
+</a><a href="#h0-3-4" id="h0-3-4" class="d">-        die_errno(&quot;sem_init&quot;);
+</a><a href="#h0-3-5" id="h0-3-5" class="d">-
+</a><a href="#h0-3-6" id="h0-3-6" class="d">-    std::vector&lt;std::thread&gt; listeners;
+</a>     if (FLAGS_grpc.size()) {
+<a href="#h0-3-8" id="h0-3-8" class="d">-        listeners.emplace_back(
+</a><a href="#h0-3-9" id="h0-3-9" class="d">-            std::thread(boost::bind(&amp;listen_grpc, &amp;search, &amp;tags, FLAGS_grpc)));
+</a><a href="#h0-3-10" id="h0-3-10" class="d">-    }
+</a><a href="#h0-3-11" id="h0-3-11" class="d">-    if (FLAGS_listen.size()) {
+</a><a href="#h0-3-12" id="h0-3-12" class="d">-        codesearch_matcher matcher;
+</a><a href="#h0-3-13" id="h0-3-13" class="d">-        listeners.emplace_back(
+</a><a href="#h0-3-14" id="h0-3-14" class="d">-            std::thread(boost::bind(&amp;listen, &amp;search, FLAGS_listen, matcher)));
+</a><a href="#h0-3-15" id="h0-3-15" class="d">-    }
+</a><a href="#h0-3-16" id="h0-3-16" class="d">-    if (FLAGS_listen_tags.size()) {
+</a><a href="#h0-3-17" id="h0-3-17" class="d">-        tagsearch_matcher matcher(&amp;search, &amp;tags);
+</a><a href="#h0-3-18" id="h0-3-18" class="d">-        listeners.emplace_back(
+</a><a href="#h0-3-19" id="h0-3-19" class="d">-            std::thread(boost::bind(&amp;listen, &amp;tags, FLAGS_listen_tags, matcher)));
+</a><a href="#h0-3-20" id="h0-3-20" class="d">-    }
+</a><a href="#h0-3-21" id="h0-3-21" class="d">-    for (auto&amp; listener : listeners) {
+</a><a href="#h0-3-22" id="h0-3-22" class="d">-        listener.join();
+</a><a href="#h0-3-23" id="h0-3-23" class="d">-    }
+</a><a href="#h0-3-24" id="h0-3-24" class="d">-
+</a><a href="#h0-3-25" id="h0-3-25" class="d">-    if (listeners.size() == 0) {
+</a><a href="#h0-3-26" id="h0-3-26" class="d">-        codesearch_transport *tx = new codesearch_transport(stdin, stdout);
+</a><a href="#h0-3-27" id="h0-3-27" class="d">-        interact(&amp;search, tx, codesearch_matcher());
+</a><a href="#h0-3-28" id="h0-3-28" class="d">-        delete tx;
+</a><a href="#h0-3-29" id="h0-3-29" class="i">+        listen_grpc(&amp;search, &amp;tags, FLAGS_grpc);
+</a>     }
+ 
+     return 0;
+<b>diff --git a/<a id="h1" href="../file/src/tools/transport.cc">src/tools/transport.cc</a> b/<a href="../file/src/tools/transport.cc">src/tools/transport.cc</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -21,87 +21,6 @@ using std::unique_ptr;
+</a> 
+ namespace {
+ 
+<a href="#h1-0-3" id="h1-0-3" class="d">-json_object *to_json(const string &amp;str) {
+</a><a href="#h1-0-4" id="h1-0-4" class="d">-    return json_object_new_string(str.c_str());
+</a><a href="#h1-0-5" id="h1-0-5" class="d">-}
+</a><a href="#h1-0-6" id="h1-0-6" class="d">-
+</a><a href="#h1-0-7" id="h1-0-7" class="d">-json_object *to_json(const StringPiece &amp;str) {
+</a><a href="#h1-0-8" id="h1-0-8" class="d">-    return json_object_new_string_len(str.data(),
+</a><a href="#h1-0-9" id="h1-0-9" class="d">-                                      str.size());
+</a><a href="#h1-0-10" id="h1-0-10" class="d">-}
+</a><a href="#h1-0-11" id="h1-0-11" class="d">-
+</a><a href="#h1-0-12" id="h1-0-12" class="d">-json_object *to_json(int i) {
+</a><a href="#h1-0-13" id="h1-0-13" class="d">-    return json_object_new_int(i);
+</a><a href="#h1-0-14" id="h1-0-14" class="d">-}
+</a><a href="#h1-0-15" id="h1-0-15" class="d">-
+</a><a href="#h1-0-16" id="h1-0-16" class="d">-json_object *to_json(const indexed_tree &amp;tree) {
+</a><a href="#h1-0-17" id="h1-0-17" class="d">-    json_object *out = json_object_new_object();
+</a><a href="#h1-0-18" id="h1-0-18" class="d">-    json_object_object_add(out, &quot;name&quot;, to_json(tree.name));
+</a><a href="#h1-0-19" id="h1-0-19" class="d">-    json_object_object_add(out, &quot;version&quot;, to_json(tree.version));
+</a><a href="#h1-0-20" id="h1-0-20" class="d">-    if (tree.metadata)
+</a><a href="#h1-0-21" id="h1-0-21" class="d">-        json_object_object_add(out, &quot;metadata&quot;, json_object_get(tree.metadata));
+</a><a href="#h1-0-22" id="h1-0-22" class="d">-    return out;
+</a><a href="#h1-0-23" id="h1-0-23" class="d">-}
+</a><a href="#h1-0-24" id="h1-0-24" class="d">-
+</a><a href="#h1-0-25" id="h1-0-25" class="d">-template &lt;class T&gt;
+</a><a href="#h1-0-26" id="h1-0-26" class="d">-json_object *to_json(vector&lt;T&gt; vec) {
+</a><a href="#h1-0-27" id="h1-0-27" class="d">-    json_object *out = json_object_new_array();
+</a><a href="#h1-0-28" id="h1-0-28" class="d">-    for (auto it = vec.begin(); it != vec.end(); it++)
+</a><a href="#h1-0-29" id="h1-0-29" class="d">-        json_object_array_add(out, to_json(*it));
+</a><a href="#h1-0-30" id="h1-0-30" class="d">-    return out;
+</a><a href="#h1-0-31" id="h1-0-31" class="d">-}
+</a><a href="#h1-0-32" id="h1-0-32" class="d">-
+</a><a href="#h1-0-33" id="h1-0-33" class="d">-json_object *to_json(const index_info *info) {
+</a><a href="#h1-0-34" id="h1-0-34" class="d">-    json_object *out = json_object_new_object();
+</a><a href="#h1-0-35" id="h1-0-35" class="d">-    json_object_object_add(out, &quot;name&quot;, to_json(info-&gt;name));
+</a><a href="#h1-0-36" id="h1-0-36" class="d">-    json_object_object_add(out, &quot;trees&quot;, to_json(info-&gt;trees));
+</a><a href="#h1-0-37" id="h1-0-37" class="d">-    return out;
+</a><a href="#h1-0-38" id="h1-0-38" class="d">-}
+</a><a href="#h1-0-39" id="h1-0-39" class="d">-
+</a><a href="#h1-0-40" id="h1-0-40" class="d">-json_object *to_json(timeval t) {
+</a><a href="#h1-0-41" id="h1-0-41" class="d">-    return json_object_new_int(timeval_ms(t));
+</a><a href="#h1-0-42" id="h1-0-42" class="d">-}
+</a><a href="#h1-0-43" id="h1-0-43" class="d">-
+</a><a href="#h1-0-44" id="h1-0-44" class="d">-json_object *to_json(const match_stats *stats) {
+</a><a href="#h1-0-45" id="h1-0-45" class="d">-    json_object *obj = json_object_new_object();
+</a><a href="#h1-0-46" id="h1-0-46" class="d">-    json_object_object_add(obj, &quot;re2_time&quot;, to_json(stats-&gt;re2_time));
+</a><a href="#h1-0-47" id="h1-0-47" class="d">-    json_object_object_add(obj, &quot;git_time&quot;,  to_json(stats-&gt;git_time));
+</a><a href="#h1-0-48" id="h1-0-48" class="d">-    json_object_object_add(obj, &quot;sort_time&quot;, to_json(stats-&gt;sort_time));
+</a><a href="#h1-0-49" id="h1-0-49" class="d">-    json_object_object_add(obj, &quot;index_time&quot;, to_json(stats-&gt;index_time));
+</a><a href="#h1-0-50" id="h1-0-50" class="d">-    json_object_object_add(obj, &quot;analyze_time&quot;, to_json(stats-&gt;analyze_time));
+</a><a href="#h1-0-51" id="h1-0-51" class="d">-    switch(stats-&gt;why) {
+</a><a href="#h1-0-52" id="h1-0-52" class="d">-    case kExitNone: break;
+</a><a href="#h1-0-53" id="h1-0-53" class="d">-    case kExitMatchLimit:
+</a><a href="#h1-0-54" id="h1-0-54" class="d">-        json_object_object_add(obj, &quot;why&quot;, json_object_new_string(&quot;limit&quot;));
+</a><a href="#h1-0-55" id="h1-0-55" class="d">-        break;
+</a><a href="#h1-0-56" id="h1-0-56" class="d">-    case kExitTimeout:
+</a><a href="#h1-0-57" id="h1-0-57" class="d">-        json_object_object_add(obj, &quot;why&quot;, json_object_new_string(&quot;timeout&quot;));
+</a><a href="#h1-0-58" id="h1-0-58" class="d">-        break;
+</a><a href="#h1-0-59" id="h1-0-59" class="d">-    }
+</a><a href="#h1-0-60" id="h1-0-60" class="d">-    return obj;
+</a><a href="#h1-0-61" id="h1-0-61" class="d">-}
+</a><a href="#h1-0-62" id="h1-0-62" class="d">-
+</a><a href="#h1-0-63" id="h1-0-63" class="d">-json_object *json_frame(const std::string op, json_object *body) {
+</a><a href="#h1-0-64" id="h1-0-64" class="d">-    json_object *frame = json_object_new_object();
+</a><a href="#h1-0-65" id="h1-0-65" class="d">-    json_object_object_add(frame, &quot;opcode&quot;, to_json(op));
+</a><a href="#h1-0-66" id="h1-0-66" class="d">-    json_object_object_add(frame, &quot;body&quot;, body);
+</a><a href="#h1-0-67" id="h1-0-67" class="d">-    return frame;
+</a><a href="#h1-0-68" id="h1-0-68" class="d">-}
+</a><a href="#h1-0-69" id="h1-0-69" class="d">-
+</a><a href="#h1-0-70" id="h1-0-70" class="d">-bool getline(std::string &amp;out, FILE *in) {
+</a><a href="#h1-0-71" id="h1-0-71" class="d">-    char *line = 0;
+</a><a href="#h1-0-72" id="h1-0-72" class="d">-    size_t n = 0;
+</a><a href="#h1-0-73" id="h1-0-73" class="d">-    ssize_t r;
+</a><a href="#h1-0-74" id="h1-0-74" class="d">-    r = getline(&amp;line, &amp;n, in);
+</a><a href="#h1-0-75" id="h1-0-75" class="d">-    if (r == 0 || r == -1)
+</a><a href="#h1-0-76" id="h1-0-76" class="d">-        out.clear();
+</a><a href="#h1-0-77" id="h1-0-77" class="d">-    else
+</a><a href="#h1-0-78" id="h1-0-78" class="d">-        out.assign(line, r - 1);
+</a><a href="#h1-0-79" id="h1-0-79" class="d">-
+</a><a href="#h1-0-80" id="h1-0-80" class="d">-    return (r != -1) &amp;&amp; !feof(in) &amp;&amp; !ferror(in) ;
+</a><a href="#h1-0-81" id="h1-0-81" class="d">-}
+</a><a href="#h1-0-82" id="h1-0-82" class="d">-
+</a><a href="#h1-0-83" id="h1-0-83" class="d">-json_parse_error parse_object(json_object *j, bool *);
+</a> json_parse_error parse_object(json_object *j, std::string *);
+ json_parse_error parse_object(json_object *j, path_spec *);
+ json_parse_error parse_object(json_object *j, repo_spec *);
+<a href="#h1-1" id="h1-1" class="h">@@ -112,13 +31,6 @@ json_parse_error parse_object(json_object *j, std::vector&lt;T&gt; *);
+</a> template&lt;class T&gt;
+ json_parse_error parse_object(json_object *j, const char *key, T *t);
+ 
+<a href="#h1-1-3" id="h1-1-3" class="d">-json_parse_error parse_object(json_object *j, bool *b) {
+</a><a href="#h1-1-4" id="h1-1-4" class="d">-    if (json_object_get_type(j) != json_type_boolean)
+</a><a href="#h1-1-5" id="h1-1-5" class="d">-        return json_parse_error(&quot;expected boolean&quot;);
+</a><a href="#h1-1-6" id="h1-1-6" class="d">-    *b = json_object_get_boolean(j);
+</a><a href="#h1-1-7" id="h1-1-7" class="d">-    return json_parse_error();
+</a><a href="#h1-1-8" id="h1-1-8" class="d">-}
+</a><a href="#h1-1-9" id="h1-1-9" class="d">-
+</a> json_parse_error parse_object(json_object *j, std::string *s) {
+     if (json_object_get_type(j) != json_type_string)
+         return json_parse_error(&quot;expected string&quot;);
+<a href="#h1-2" id="h1-2" class="h">@@ -152,70 +64,6 @@ json_parse_error parse_object(json_object *j, const char *key, T *t) {
+</a>     return json_parse_error();
+ }
+ 
+<a href="#h1-2-3" id="h1-2-3" class="d">-json_parse_error parse_regex(json_object *js, const char *key,
+</a><a href="#h1-2-4" id="h1-2-4" class="d">-                             const RE2::Options &amp;opts, unique_ptr&lt;RE2&gt; *out) {
+</a><a href="#h1-2-5" id="h1-2-5" class="d">-    std::string str;
+</a><a href="#h1-2-6" id="h1-2-6" class="d">-    json_parse_error err;
+</a><a href="#h1-2-7" id="h1-2-7" class="d">-    err = parse_object(js, key, &amp;str);
+</a><a href="#h1-2-8" id="h1-2-8" class="d">-    if (!err.ok())
+</a><a href="#h1-2-9" id="h1-2-9" class="d">-        return err;
+</a><a href="#h1-2-10" id="h1-2-10" class="d">-    if (str.size() == 0)
+</a><a href="#h1-2-11" id="h1-2-11" class="d">-        return json_parse_error();
+</a><a href="#h1-2-12" id="h1-2-12" class="d">-    unique_ptr&lt;RE2&gt; re(new RE2(str, opts));
+</a><a href="#h1-2-13" id="h1-2-13" class="d">-    if (!re-&gt;ok()) {
+</a><a href="#h1-2-14" id="h1-2-14" class="d">-        return json_parse_error(re-&gt;error()).wrap(key);
+</a><a href="#h1-2-15" id="h1-2-15" class="d">-    }
+</a><a href="#h1-2-16" id="h1-2-16" class="d">-    *out = std::move(re);
+</a><a href="#h1-2-17" id="h1-2-17" class="d">-    return json_parse_error();
+</a><a href="#h1-2-18" id="h1-2-18" class="d">-}
+</a><a href="#h1-2-19" id="h1-2-19" class="d">-
+</a><a href="#h1-2-20" id="h1-2-20" class="d">-json_parse_error parse_object(json_object *js, query *q) {
+</a><a href="#h1-2-21" id="h1-2-21" class="d">-    json_object *b = NULL, *negate = NULL;
+</a><a href="#h1-2-22" id="h1-2-22" class="d">-    json_parse_error err;
+</a><a href="#h1-2-23" id="h1-2-23" class="d">-
+</a><a href="#h1-2-24" id="h1-2-24" class="d">-    err = parse_object(js, &quot;trace_id&quot;, &amp;q-&gt;trace_id);
+</a><a href="#h1-2-25" id="h1-2-25" class="d">-    if (!err.ok())
+</a><a href="#h1-2-26" id="h1-2-26" class="d">-        return err;
+</a><a href="#h1-2-27" id="h1-2-27" class="d">-
+</a><a href="#h1-2-28" id="h1-2-28" class="d">-    err = parse_object(js, &quot;body&quot;, &amp;b);
+</a><a href="#h1-2-29" id="h1-2-29" class="d">-    if (!err.ok())
+</a><a href="#h1-2-30" id="h1-2-30" class="d">-        return err;
+</a><a href="#h1-2-31" id="h1-2-31" class="d">-    if (!b)
+</a><a href="#h1-2-32" id="h1-2-32" class="d">-        return json_parse_error(&quot;expected a body&quot;);
+</a><a href="#h1-2-33" id="h1-2-33" class="d">-
+</a><a href="#h1-2-34" id="h1-2-34" class="d">-    err = parse_object(b, &quot;not&quot;, &amp;negate);
+</a><a href="#h1-2-35" id="h1-2-35" class="d">-    if (!err.ok())
+</a><a href="#h1-2-36" id="h1-2-36" class="d">-        return err.wrap(&quot;body&quot;);
+</a><a href="#h1-2-37" id="h1-2-37" class="d">-
+</a><a href="#h1-2-38" id="h1-2-38" class="d">-    RE2::Options opts;
+</a><a href="#h1-2-39" id="h1-2-39" class="d">-    default_re2_options(opts);
+</a><a href="#h1-2-40" id="h1-2-40" class="d">-    bool fold_case = false;
+</a><a href="#h1-2-41" id="h1-2-41" class="d">-    err = parse_object(b, &quot;fold_case&quot;, &amp;fold_case);
+</a><a href="#h1-2-42" id="h1-2-42" class="d">-    if (!err.ok())
+</a><a href="#h1-2-43" id="h1-2-43" class="d">-        return err.wrap(&quot;body&quot;);
+</a><a href="#h1-2-44" id="h1-2-44" class="d">-    opts.set_case_sensitive(!fold_case);
+</a><a href="#h1-2-45" id="h1-2-45" class="d">-    err = parse_regex(b, &quot;line&quot;, opts, &amp;q-&gt;line_pat);
+</a><a href="#h1-2-46" id="h1-2-46" class="d">-
+</a><a href="#h1-2-47" id="h1-2-47" class="d">-    // file and repo are always case-sensitive
+</a><a href="#h1-2-48" id="h1-2-48" class="d">-    opts.set_case_sensitive(false);
+</a><a href="#h1-2-49" id="h1-2-49" class="d">-
+</a><a href="#h1-2-50" id="h1-2-50" class="d">-    if (err.ok())
+</a><a href="#h1-2-51" id="h1-2-51" class="d">-        err = parse_regex(b, &quot;file&quot;, opts, &amp;q-&gt;file_pat);
+</a><a href="#h1-2-52" id="h1-2-52" class="d">-    if (err.ok())
+</a><a href="#h1-2-53" id="h1-2-53" class="d">-        err = parse_regex(b, &quot;repo&quot;, opts, &amp;q-&gt;tree_pat);
+</a><a href="#h1-2-54" id="h1-2-54" class="d">-    if (err.ok())
+</a><a href="#h1-2-55" id="h1-2-55" class="d">-        err = parse_regex(b, &quot;tags&quot;, opts, &amp;q-&gt;tags_pat);
+</a><a href="#h1-2-56" id="h1-2-56" class="d">-
+</a><a href="#h1-2-57" id="h1-2-57" class="d">-    if (err.ok() &amp;&amp; negate)
+</a><a href="#h1-2-58" id="h1-2-58" class="d">-        err = parse_regex(negate, &quot;file&quot;, opts, &amp;q-&gt;negate.file_pat);
+</a><a href="#h1-2-59" id="h1-2-59" class="d">-    if (err.ok() &amp;&amp; negate)
+</a><a href="#h1-2-60" id="h1-2-60" class="d">-        err = parse_regex(negate, &quot;repo&quot;, opts, &amp;q-&gt;negate.tree_pat);
+</a><a href="#h1-2-61" id="h1-2-61" class="d">-    if (err.ok() &amp;&amp; negate)
+</a><a href="#h1-2-62" id="h1-2-62" class="d">-        err = parse_regex(negate, &quot;tags&quot;, opts, &amp;q-&gt;negate.tags_pat);
+</a><a href="#h1-2-63" id="h1-2-63" class="d">-
+</a><a href="#h1-2-64" id="h1-2-64" class="d">-    return err;
+</a><a href="#h1-2-65" id="h1-2-65" class="d">-}
+</a><a href="#h1-2-66" id="h1-2-66" class="d">-
+</a> json_parse_error parse_object(json_object *js, json_object **out) {
+     if (json_object_get_type(js) != json_type_object)
+         return json_parse_error(&quot;expected a JSON object&quot;);
+<a href="#h1-3" id="h1-3" class="h">@@ -256,71 +104,6 @@ json_parse_error parse_object(json_object *js, repo_spec *r) {
+</a> 
+ };
+ 
+<a href="#h1-3-3" id="h1-3-3" class="d">-codesearch_transport::codesearch_transport(FILE *in, FILE *out) : in_(in), out_(out) {
+</a><a href="#h1-3-4" id="h1-3-4" class="d">-    assert(!setvbuf(in_,  NULL, _IOFBF, 4096*4));
+</a><a href="#h1-3-5" id="h1-3-5" class="d">-    assert(!setvbuf(out_, NULL, _IOLBF, 4096));
+</a><a href="#h1-3-6" id="h1-3-6" class="d">-}
+</a><a href="#h1-3-7" id="h1-3-7" class="d">-
+</a><a href="#h1-3-8" id="h1-3-8" class="d">-void codesearch_transport::write_frame(const std::string &amp;opcode, json_object *body) {
+</a><a href="#h1-3-9" id="h1-3-9" class="d">-    json_object *frame = json_frame(opcode, body);
+</a><a href="#h1-3-10" id="h1-3-10" class="d">-    fprintf(out_, &quot;%s\n&quot;, json_object_to_json_string(frame));
+</a><a href="#h1-3-11" id="h1-3-11" class="d">-    json_object_put(frame);
+</a><a href="#h1-3-12" id="h1-3-12" class="d">-}
+</a><a href="#h1-3-13" id="h1-3-13" class="d">-
+</a><a href="#h1-3-14" id="h1-3-14" class="d">-void codesearch_transport::write_match(const match_result *m) {
+</a><a href="#h1-3-15" id="h1-3-15" class="d">-    json_object *obj = json_object_new_object();
+</a><a href="#h1-3-16" id="h1-3-16" class="d">-
+</a><a href="#h1-3-17" id="h1-3-17" class="d">-    json_object_object_add(obj, &quot;tree&quot;,  to_json(m-&gt;file-&gt;tree-&gt;name));
+</a><a href="#h1-3-18" id="h1-3-18" class="d">-    json_object_object_add(obj, &quot;version&quot;,  to_json(m-&gt;file-&gt;tree-&gt;version));
+</a><a href="#h1-3-19" id="h1-3-19" class="d">-    json_object_object_add(obj, &quot;path&quot;,  to_json(m-&gt;file-&gt;path));
+</a><a href="#h1-3-20" id="h1-3-20" class="d">-    json_object_object_add(obj, &quot;lno&quot;, to_json(m-&gt;lno));
+</a><a href="#h1-3-21" id="h1-3-21" class="d">-    json_object_object_add(obj, &quot;context_before&quot;,
+</a><a href="#h1-3-22" id="h1-3-22" class="d">-                           to_json(m-&gt;context_before));
+</a><a href="#h1-3-23" id="h1-3-23" class="d">-    json_object_object_add(obj, &quot;context_after&quot;,
+</a><a href="#h1-3-24" id="h1-3-24" class="d">-                           to_json(m-&gt;context_after));
+</a><a href="#h1-3-25" id="h1-3-25" class="d">-    json_object *bounds = json_object_new_array();
+</a><a href="#h1-3-26" id="h1-3-26" class="d">-    json_object_array_add(bounds, to_json(m-&gt;matchleft));
+</a><a href="#h1-3-27" id="h1-3-27" class="d">-    json_object_array_add(bounds, to_json(m-&gt;matchright));
+</a><a href="#h1-3-28" id="h1-3-28" class="d">-    json_object_object_add(obj, &quot;bounds&quot;, bounds);
+</a><a href="#h1-3-29" id="h1-3-29" class="d">-    json_object_object_add(obj, &quot;line&quot;, to_json(m-&gt;line));
+</a><a href="#h1-3-30" id="h1-3-30" class="d">-    write_frame(&quot;match&quot;, obj);
+</a><a href="#h1-3-31" id="h1-3-31" class="d">-}
+</a><a href="#h1-3-32" id="h1-3-32" class="d">-
+</a><a href="#h1-3-33" id="h1-3-33" class="d">-void codesearch_transport::write_error(const std::string &amp;err) {
+</a><a href="#h1-3-34" id="h1-3-34" class="d">-    write_frame(&quot;error&quot;, to_json(err));
+</a><a href="#h1-3-35" id="h1-3-35" class="d">-}
+</a><a href="#h1-3-36" id="h1-3-36" class="d">-
+</a><a href="#h1-3-37" id="h1-3-37" class="d">-void codesearch_transport::write_ready (const index_info *info) {
+</a><a href="#h1-3-38" id="h1-3-38" class="d">-    write_frame(&quot;ready&quot;, to_json(info));
+</a><a href="#h1-3-39" id="h1-3-39" class="d">-}
+</a><a href="#h1-3-40" id="h1-3-40" class="d">-
+</a><a href="#h1-3-41" id="h1-3-41" class="d">-void codesearch_transport::write_done(timeval elapsed, const match_stats *stats) {
+</a><a href="#h1-3-42" id="h1-3-42" class="d">-    write_frame(&quot;done&quot;, to_json(stats));
+</a><a href="#h1-3-43" id="h1-3-43" class="d">-}
+</a><a href="#h1-3-44" id="h1-3-44" class="d">-
+</a><a href="#h1-3-45" id="h1-3-45" class="d">-bool codesearch_transport::read_query(query *q, bool *done) {
+</a><a href="#h1-3-46" id="h1-3-46" class="d">-    std::string line;
+</a><a href="#h1-3-47" id="h1-3-47" class="d">-    if (!getline(line, in_)) {
+</a><a href="#h1-3-48" id="h1-3-48" class="d">-        *done = true;
+</a><a href="#h1-3-49" id="h1-3-49" class="d">-        return false;
+</a><a href="#h1-3-50" id="h1-3-50" class="d">-    }
+</a><a href="#h1-3-51" id="h1-3-51" class="d">-    json_tokener_error json_err;
+</a><a href="#h1-3-52" id="h1-3-52" class="d">-    json_object *js = json_tokener_parse_verbose(line.c_str(), &amp;json_err);
+</a><a href="#h1-3-53" id="h1-3-53" class="d">-    if (js == NULL) {
+</a><a href="#h1-3-54" id="h1-3-54" class="d">-        write_error(&quot;Parse error: &quot; +
+</a><a href="#h1-3-55" id="h1-3-55" class="d">-                    string(json_tokener_error_desc(json_err)));
+</a><a href="#h1-3-56" id="h1-3-56" class="d">-        return false;
+</a><a href="#h1-3-57" id="h1-3-57" class="d">-    }
+</a><a href="#h1-3-58" id="h1-3-58" class="d">-
+</a><a href="#h1-3-59" id="h1-3-59" class="d">-    auto err = parse_object(js, q);
+</a><a href="#h1-3-60" id="h1-3-60" class="d">-    json_object_put(js);
+</a><a href="#h1-3-61" id="h1-3-61" class="d">-    if (!err.ok()) {
+</a><a href="#h1-3-62" id="h1-3-62" class="d">-        write_error(err.err());
+</a><a href="#h1-3-63" id="h1-3-63" class="d">-    }
+</a><a href="#h1-3-64" id="h1-3-64" class="d">-
+</a><a href="#h1-3-65" id="h1-3-65" class="d">-    return err.ok();
+</a><a href="#h1-3-66" id="h1-3-66" class="d">-}
+</a><a href="#h1-3-67" id="h1-3-67" class="d">-
+</a> json_parse_error parse_index_spec(json_object *in, index_spec *out) {
+     json_parse_error err = parse_object(in, &quot;name&quot;, &amp;out-&gt;name);
+     if (!err.ok())
+<b>diff --git a/<a id="h2" href="../file/src/tools/transport.h">src/tools/transport.h</a> b/<a href="../file/src/tools/transport.h">src/tools/transport.h</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -13,11 +13,7 @@
+</a> #include &lt;vector&gt;
+ #include &lt;stdio.h&gt;
+ 
+<a href="#h2-0-3" id="h2-0-3" class="d">-struct match_result;
+</a><a href="#h2-0-4" id="h2-0-4" class="d">-struct match_stats;
+</a> struct json_object;
+<a href="#h2-0-6" id="h2-0-6" class="d">-struct index_info;
+</a><a href="#h2-0-7" id="h2-0-7" class="d">-struct query;
+</a> 
+ struct path_spec {
+     std::string path;
+<a href="#h2-1" id="h2-1" class="h">@@ -42,19 +38,6 @@ struct index_spec {
+</a>     std::vector&lt;repo_spec&gt; repos;
+ };
+ 
+<a href="#h2-1-3" id="h2-1-3" class="d">-class codesearch_transport {
+</a><a href="#h2-1-4" id="h2-1-4" class="d">-public:
+</a><a href="#h2-1-5" id="h2-1-5" class="d">-    codesearch_transport(FILE *in, FILE *out);
+</a><a href="#h2-1-6" id="h2-1-6" class="d">-    void write_match(const match_result *m);
+</a><a href="#h2-1-7" id="h2-1-7" class="d">-    void write_error(const std::string &amp;err);
+</a><a href="#h2-1-8" id="h2-1-8" class="d">-    void write_ready(const index_info *info);
+</a><a href="#h2-1-9" id="h2-1-9" class="d">-    void write_done(timeval, const match_stats *);
+</a><a href="#h2-1-10" id="h2-1-10" class="d">-    bool read_query(query *, bool *done);
+</a><a href="#h2-1-11" id="h2-1-11" class="d">-protected:
+</a><a href="#h2-1-12" id="h2-1-12" class="d">-    void write_frame(const std::string &amp;opcode, json_object *body);
+</a><a href="#h2-1-13" id="h2-1-13" class="d">-    FILE *in_, *out_;
+</a><a href="#h2-1-14" id="h2-1-14" class="d">-};
+</a><a href="#h2-1-15" id="h2-1-15" class="d">-
+</a> struct json_parse_error {
+     json_parse_error() : ok_(true) {}
+     json_parse_error(const std::string &amp;err) : ok_(false), error(err) {}
+</pre>
+</div>
+</body>
+</html>

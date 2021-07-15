@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Better typechecking on JSON input. - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/22b8a1a9794bf16818504d8f4c60b30780cd2cd9">22b8a1a9794bf16818504d8f4c60b30780cd2cd9</a>
+<b>parent</b> <a href="../commit/f738083d47b6c6aa3a7b620cf6da382ba1bd77e7">f738083d47b6c6aa3a7b620cf6da382ba1bd77e7</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Fri, 30 May 2014 15:55:41 -0700
+
+Better typechecking on JSON input.
+
+should fix #4
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">src/lib/debug.cc</a></td><td> | </td><td class="num">10</td><td><span class="i">++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">src/lib/debug.h</a></td><td> | </td><td class="num">3</td><td><span class="i">+++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">src/tools/json_interface.cc</a></td><td> | </td><td class="num">39</td><td><span class="i">++++++++++++++++++++++++</span><span class="d">---------------</span></td></tr>
+</table></pre><pre>3 files changed, 37 insertions(+), 15 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/src/lib/debug.cc">src/lib/debug.cc</a> b/<a href="../file/src/lib/debug.cc">src/lib/debug.cc</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -92,3 +92,13 @@ void cs_debug(const char *file, int lno, const char *fmt, ...) {
+</a> 
+     fputs(buf.c_str(), stderr);
+ }
+<a href="#h0-0-3" id="h0-0-3" class="i">+
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+void die(const char *fmt, ...) {
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+    va_list ap;
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+    va_start(ap, fmt);
+</a><a href="#h0-0-8" id="h0-0-8" class="i">+    vfprintf(stderr, fmt, ap);
+</a><a href="#h0-0-9" id="h0-0-9" class="i">+    fprintf(stderr, &quot;\n&quot;);
+</a><a href="#h0-0-10" id="h0-0-10" class="i">+    va_end(ap);
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+    exit(1);
+</a><a href="#h0-0-12" id="h0-0-12" class="i">+}
+</a><b>diff --git a/<a id="h1" href="../file/src/lib/debug.h">src/lib/debug.h</a> b/<a href="../file/src/lib/debug.h">src/lib/debug.h</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -31,4 +31,7 @@ void cs_debug(const char *file, int lno, const char *fmt, ...)
+</a> std::string strprintf(const char *fmt, ...)
+     __attribute__((format (printf, 1, 2)));
+ 
+<a href="#h1-0-3" id="h1-0-3" class="i">+void die(const char *fmt, ...)
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+    __attribute__((format (printf, 1, 2), noreturn));
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+
+</a> #endif
+<b>diff --git a/<a id="h2" href="../file/src/tools/json_interface.cc">src/tools/json_interface.cc</a> b/<a href="../file/src/tools/json_interface.cc">src/tools/json_interface.cc</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -78,28 +78,37 @@ struct repo_spec {
+</a>     json_object *metadata;
+ };
+ 
+<a href="#h2-0-3" id="h2-0-3" class="i">+json_object *get_with_type(json_object *parent, const char *key, json_type type) {
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+    json_object *val = json_object_object_get(parent, key);
+</a><a href="#h2-0-5" id="h2-0-5" class="i">+    if (val == NULL || json_object_is_type(val, type)) {
+</a><a href="#h2-0-6" id="h2-0-6" class="i">+        return val;
+</a><a href="#h2-0-7" id="h2-0-7" class="i">+    }
+</a><a href="#h2-0-8" id="h2-0-8" class="i">+    die(&quot;Error: &#39;%s&#39;: expected %s, got %s&quot;, key,
+</a><a href="#h2-0-9" id="h2-0-9" class="i">+        json_type_to_name(type),
+</a><a href="#h2-0-10" id="h2-0-10" class="i">+        json_type_to_name(json_object_get_type(val)));
+</a><a href="#h2-0-11" id="h2-0-11" class="i">+}
+</a><a href="#h2-0-12" id="h2-0-12" class="i">+
+</a> repo_spec parse_repo_spec(json_object *js) {
+     debug(kDebugUI, &quot;Parsing: %s&quot;, json_object_to_json_string(js));
+     if (!json_object_is_type(js, json_type_object)) {
+<a href="#h2-0-16" id="h2-0-16" class="d">-        fprintf(stderr, &quot;Repo spec is not an object!\n&quot;);
+</a><a href="#h2-0-17" id="h2-0-17" class="d">-        exit(1);
+</a><a href="#h2-0-18" id="h2-0-18" class="i">+        die(&quot;repository spec must be an object.&quot;);
+</a>     }
+ 
+     repo_spec spec;
+<a href="#h2-0-22" id="h2-0-22" class="d">-    json_object *js_path = json_object_object_get(js, &quot;path&quot;);
+</a><a href="#h2-0-23" id="h2-0-23" class="d">-    if (js_path &amp;&amp; json_object_is_type(js_path, json_type_string))
+</a><a href="#h2-0-24" id="h2-0-24" class="d">-        spec.path = json_object_get_string(js_path);
+</a><a href="#h2-0-25" id="h2-0-25" class="d">-    json_object *js_name = json_object_object_get(js, &quot;name&quot;);
+</a><a href="#h2-0-26" id="h2-0-26" class="d">-    if (js_name &amp;&amp; json_object_is_type(js_name, json_type_string))
+</a><a href="#h2-0-27" id="h2-0-27" class="d">-        spec.name = json_object_get_string(js_name);
+</a><a href="#h2-0-28" id="h2-0-28" class="d">-    spec.metadata = json_object_get(json_object_object_get(js, &quot;metadata&quot;));
+</a><a href="#h2-0-29" id="h2-0-29" class="d">-
+</a><a href="#h2-0-30" id="h2-0-30" class="d">-    json_object *js_revs = json_object_object_get(js, &quot;revisions&quot;);
+</a><a href="#h2-0-31" id="h2-0-31" class="i">+    json_object *prop;
+</a><a href="#h2-0-32" id="h2-0-32" class="i">+    if ((prop = get_with_type(js, &quot;path&quot;, json_type_string)))
+</a><a href="#h2-0-33" id="h2-0-33" class="i">+        spec.path = json_object_get_string(prop);
+</a><a href="#h2-0-34" id="h2-0-34" class="i">+    if ((prop = get_with_type(js, &quot;name&quot;, json_type_string)))
+</a><a href="#h2-0-35" id="h2-0-35" class="i">+        spec.name = json_object_get_string(prop);
+</a><a href="#h2-0-36" id="h2-0-36" class="i">+    spec.metadata = json_object_get(get_with_type(js, &quot;metadata&quot;, json_type_object));
+</a><a href="#h2-0-37" id="h2-0-37" class="i">+
+</a><a href="#h2-0-38" id="h2-0-38" class="i">+    json_object *js_revs = get_with_type(js, &quot;revisions&quot;, json_type_array);
+</a>     if (js_revs &amp;&amp; json_object_is_type(js_revs, json_type_array)) {
+         for (int i = 0; i &lt; json_object_array_length(js_revs); ++i) {
+             json_object *elt = json_object_array_get_idx(js_revs, i);
+<a href="#h2-0-42" id="h2-0-42" class="d">-            if (json_object_is_type(elt, json_type_string))
+</a><a href="#h2-0-43" id="h2-0-43" class="d">-                spec.revisions.push_back(json_object_get_string(elt));
+</a><a href="#h2-0-44" id="h2-0-44" class="i">+            if (!json_object_is_type(elt, json_type_string))
+</a><a href="#h2-0-45" id="h2-0-45" class="i">+                die(&quot;repository: &#39;revisions&#39; must be list of strings&quot;);
+</a><a href="#h2-0-46" id="h2-0-46" class="i">+            spec.revisions.push_back(json_object_get_string(elt));
+</a>         }
+     }
+ 
+<a href="#h2-1" id="h2-1" class="h">@@ -119,8 +128,8 @@ void extract_repo_specs(vector&lt;repo_spec&gt; &amp;out, json_object *js) {
+</a>         }
+         break;
+     default:
+<a href="#h2-1-3" id="h2-1-3" class="d">-        fprintf(stderr, &quot;Error: unrecognized type for repo spec: %s\n&quot;,
+</a><a href="#h2-1-4" id="h2-1-4" class="d">-                json_object_to_json_string(js));
+</a><a href="#h2-1-5" id="h2-1-5" class="i">+        die(&quot;unrecognized type for repo spec: %s&quot;,
+</a><a href="#h2-1-6" id="h2-1-6" class="i">+            json_object_to_json_string(js));
+</a>         exit(1);
+     }
+ }
+</pre>
+</div>
+</body>
+</html>

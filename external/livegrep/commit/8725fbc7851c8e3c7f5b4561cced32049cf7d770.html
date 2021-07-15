@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>cmd: GitLab reindexer - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/8725fbc7851c8e3c7f5b4561cced32049cf7d770">8725fbc7851c8e3c7f5b4561cced32049cf7d770</a>
+<b>parent</b> <a href="../commit/963dde3dc0dd8b8d3dae564c15b61927caf4c92a">963dde3dc0dd8b8d3dae564c15b61927caf4c92a</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sat, 25 May 2019 12:28:19 -0700
+
+cmd: GitLab reindexer
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">cmd/livegrep-gitlab-reindex/BUILD</a></td><td> | </td><td class="num">9</td><td><span class="i">++++++++</span><span class="d">-</span></td></tr>
+<tr><td class="A">A</td><td><a href="#h1">cmd/livegrep-gitlab-reindex/config.go</a></td><td> | </td><td class="num">33</td><td><span class="i">+++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="A">A</td><td><a href="#h2">cmd/livegrep-gitlab-reindex/flags.go</a></td><td> | </td><td class="num">32</td><td><span class="i">++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">cmd/livegrep-gitlab-reindex/main.go</a></td><td> | </td><td class="num">90</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">-</span></td></tr>
+<tr><td class="A">A</td><td><a href="#h4">cmd/livegrep-gitlab-reindex/vcs.go</a></td><td> | </td><td class="num">89</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+</table></pre><pre>5 files changed, 251 insertions(+), 2 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/cmd/livegrep-gitlab-reindex/BUILD">cmd/livegrep-gitlab-reindex/BUILD</a> b/<a href="../file/cmd/livegrep-gitlab-reindex/BUILD">cmd/livegrep-gitlab-reindex/BUILD</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -3,11 +3,18 @@ load(&quot;@io_bazel_rules_go//go:def.bzl&quot;, &quot;go_binary&quot;, &quot;go_library&quot;)
+</a> go_library(
+     name = &quot;go_default_library&quot;,
+     srcs = [
+<a href="#h0-0-3" id="h0-0-3" class="i">+        &quot;config.go&quot;,
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+        &quot;flags.go&quot;,
+</a>         &quot;main.go&quot;,
+<a href="#h0-0-6" id="h0-0-6" class="i">+        &quot;vcs.go&quot;,
+</a>     ],
+     importpath = &quot;gitlab.com/livegrep/livegrep/cmd/livegrep-gitlab-reindex&quot;,
+     visibility = [&quot;//visibility:private&quot;],
+<a href="#h0-0-10" id="h0-0-10" class="d">-    deps = [],
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+    deps = [
+</a><a href="#h0-0-12" id="h0-0-12" class="i">+        &quot;//server/config:go_default_library&quot;,
+</a><a href="#h0-0-13" id="h0-0-13" class="i">+        &quot;@com_github_xanzy_go_gitlab//:go_default_library&quot;,
+</a><a href="#h0-0-14" id="h0-0-14" class="i">+        &quot;@in_gopkg_src_d_go_git_v4//:go_default_library&quot;,
+</a><a href="#h0-0-15" id="h0-0-15" class="i">+    ],
+</a> )
+ 
+ go_binary(
+<b>diff --git a/<a id="h1" href="../file/cmd/livegrep-gitlab-reindex/config.go">cmd/livegrep-gitlab-reindex/config.go</a> b/<a href="../file/cmd/livegrep-gitlab-reindex/config.go">cmd/livegrep-gitlab-reindex/config.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -0,0 +1,33 @@
+</a><a href="#h1-0-0" id="h1-0-0" class="i">+package main
+</a><a href="#h1-0-1" id="h1-0-1" class="i">+
+</a><a href="#h1-0-2" id="h1-0-2" class="i">+import (
+</a><a href="#h1-0-3" id="h1-0-3" class="i">+	&quot;strings&quot;
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+	&quot;github.com/xanzy/go-gitlab&quot;
+</a><a href="#h1-0-6" id="h1-0-6" class="i">+
+</a><a href="#h1-0-7" id="h1-0-7" class="i">+	&quot;github.com/livegrep/livegrep/server/config&quot;
+</a><a href="#h1-0-8" id="h1-0-8" class="i">+)
+</a><a href="#h1-0-9" id="h1-0-9" class="i">+
+</a><a href="#h1-0-10" id="h1-0-10" class="i">+// indexConfig generates a Livegrep index config struct given some parameters and a list of GitLab
+</a><a href="#h1-0-11" id="h1-0-11" class="i">+// projects.
+</a><a href="#h1-0-12" id="h1-0-12" class="i">+func indexConfig(name string, baseURL string, repoBasePath string, projects []*gitlab.Project) *config.IndexConfig {
+</a><a href="#h1-0-13" id="h1-0-13" class="i">+	var repositories []config.RepoConfig
+</a><a href="#h1-0-14" id="h1-0-14" class="i">+
+</a><a href="#h1-0-15" id="h1-0-15" class="i">+	for _, project := range projects {
+</a><a href="#h1-0-16" id="h1-0-16" class="i">+		repo := config.RepoConfig{
+</a><a href="#h1-0-17" id="h1-0-17" class="i">+			Path:      diskRepoPath(repoBasePath, project.PathWithNamespace),
+</a><a href="#h1-0-18" id="h1-0-18" class="i">+			Name:      project.PathWithNamespace,
+</a><a href="#h1-0-19" id="h1-0-19" class="i">+			Revisions: []string{&quot;origin/master&quot;},
+</a><a href="#h1-0-20" id="h1-0-20" class="i">+			Metadata: map[string]string{
+</a><a href="#h1-0-21" id="h1-0-21" class="i">+				&quot;url-pattern&quot;: strings.TrimSuffix(baseURL, &quot;/&quot;) + &quot;/{name}/blob/{version}/{path}#L{lno}&quot;,
+</a><a href="#h1-0-22" id="h1-0-22" class="i">+			},
+</a><a href="#h1-0-23" id="h1-0-23" class="i">+		}
+</a><a href="#h1-0-24" id="h1-0-24" class="i">+
+</a><a href="#h1-0-25" id="h1-0-25" class="i">+		repositories = append(repositories, repo)
+</a><a href="#h1-0-26" id="h1-0-26" class="i">+	}
+</a><a href="#h1-0-27" id="h1-0-27" class="i">+
+</a><a href="#h1-0-28" id="h1-0-28" class="i">+	return &amp;config.IndexConfig{
+</a><a href="#h1-0-29" id="h1-0-29" class="i">+		Name:         name,
+</a><a href="#h1-0-30" id="h1-0-30" class="i">+		Repositories: repositories,
+</a><a href="#h1-0-31" id="h1-0-31" class="i">+	}
+</a><a href="#h1-0-32" id="h1-0-32" class="i">+}
+</a><b>diff --git a/<a id="h2" href="../file/cmd/livegrep-gitlab-reindex/flags.go">cmd/livegrep-gitlab-reindex/flags.go</a> b/<a href="../file/cmd/livegrep-gitlab-reindex/flags.go">cmd/livegrep-gitlab-reindex/flags.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -0,0 +1,32 @@
+</a><a href="#h2-0-0" id="h2-0-0" class="i">+package main
+</a><a href="#h2-0-1" id="h2-0-1" class="i">+
+</a><a href="#h2-0-2" id="h2-0-2" class="i">+import (
+</a><a href="#h2-0-3" id="h2-0-3" class="i">+	&quot;flag&quot;
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+	&quot;strings&quot;
+</a><a href="#h2-0-5" id="h2-0-5" class="i">+)
+</a><a href="#h2-0-6" id="h2-0-6" class="i">+
+</a><a href="#h2-0-7" id="h2-0-7" class="i">+// stringListFlag implements flag.Value and provides the ability to specify multiple instances of a
+</a><a href="#h2-0-8" id="h2-0-8" class="i">+// flag value.
+</a><a href="#h2-0-9" id="h2-0-9" class="i">+type stringListFlag struct {
+</a><a href="#h2-0-10" id="h2-0-10" class="i">+	flag.Value
+</a><a href="#h2-0-11" id="h2-0-11" class="i">+
+</a><a href="#h2-0-12" id="h2-0-12" class="i">+	values []string
+</a><a href="#h2-0-13" id="h2-0-13" class="i">+}
+</a><a href="#h2-0-14" id="h2-0-14" class="i">+
+</a><a href="#h2-0-15" id="h2-0-15" class="i">+func newStringListFlag() *stringListFlag {
+</a><a href="#h2-0-16" id="h2-0-16" class="i">+	return &amp;stringListFlag{}
+</a><a href="#h2-0-17" id="h2-0-17" class="i">+}
+</a><a href="#h2-0-18" id="h2-0-18" class="i">+
+</a><a href="#h2-0-19" id="h2-0-19" class="i">+func (sl *stringListFlag) Set(value string) error {
+</a><a href="#h2-0-20" id="h2-0-20" class="i">+	sl.values = append(sl.values, value)
+</a><a href="#h2-0-21" id="h2-0-21" class="i">+
+</a><a href="#h2-0-22" id="h2-0-22" class="i">+	return nil
+</a><a href="#h2-0-23" id="h2-0-23" class="i">+}
+</a><a href="#h2-0-24" id="h2-0-24" class="i">+
+</a><a href="#h2-0-25" id="h2-0-25" class="i">+func (sl *stringListFlag) Values() []string {
+</a><a href="#h2-0-26" id="h2-0-26" class="i">+	return sl.values
+</a><a href="#h2-0-27" id="h2-0-27" class="i">+}
+</a><a href="#h2-0-28" id="h2-0-28" class="i">+
+</a><a href="#h2-0-29" id="h2-0-29" class="i">+func (sl *stringListFlag) String() string {
+</a><a href="#h2-0-30" id="h2-0-30" class="i">+	return strings.Join(sl.values, &quot;,&quot;)
+</a><a href="#h2-0-31" id="h2-0-31" class="i">+}
+</a><b>diff --git a/<a id="h3" href="../file/cmd/livegrep-gitlab-reindex/main.go">cmd/livegrep-gitlab-reindex/main.go</a> b/<a href="../file/cmd/livegrep-gitlab-reindex/main.go">cmd/livegrep-gitlab-reindex/main.go</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -1,5 +1,93 @@
+</a> package main
+ 
+<a href="#h3-0-2" id="h3-0-2" class="i">+import (
+</a><a href="#h3-0-3" id="h3-0-3" class="i">+	&quot;encoding/json&quot;
+</a><a href="#h3-0-4" id="h3-0-4" class="i">+	&quot;errors&quot;
+</a><a href="#h3-0-5" id="h3-0-5" class="i">+	&quot;flag&quot;
+</a><a href="#h3-0-6" id="h3-0-6" class="i">+	&quot;io/ioutil&quot;
+</a><a href="#h3-0-7" id="h3-0-7" class="i">+	&quot;log&quot;
+</a><a href="#h3-0-8" id="h3-0-8" class="i">+	&quot;os&quot;
+</a><a href="#h3-0-9" id="h3-0-9" class="i">+	&quot;strings&quot;
+</a><a href="#h3-0-10" id="h3-0-10" class="i">+
+</a><a href="#h3-0-11" id="h3-0-11" class="i">+	&quot;github.com/xanzy/go-gitlab&quot;
+</a><a href="#h3-0-12" id="h3-0-12" class="i">+)
+</a><a href="#h3-0-13" id="h3-0-13" class="i">+
+</a><a href="#h3-0-14" id="h3-0-14" class="i">+var (
+</a><a href="#h3-0-15" id="h3-0-15" class="i">+	flagIndexName        = flag.String(&quot;index-name&quot;, &quot;gitlab-index&quot;, &quot;name of the generated index&quot;)
+</a><a href="#h3-0-16" id="h3-0-16" class="i">+	flagBaseURL          = flag.String(&quot;base-url&quot;, &quot;https://gitlab.com/&quot;, &quot;GitLab instance base URL&quot;)
+</a><a href="#h3-0-17" id="h3-0-17" class="i">+	flagAccessToken      = flag.String(&quot;access-token&quot;, os.Getenv(&quot;GITLAB_ACCESS_TOKEN&quot;), &quot;GitLab API access token&quot;)
+</a><a href="#h3-0-18" id="h3-0-18" class="i">+	flagRepoBasePath     = flag.String(&quot;repo-base-path&quot;, &quot;/tmp&quot;, &quot;working directory on disk for storing repositories&quot;)
+</a><a href="#h3-0-19" id="h3-0-19" class="i">+	flagOutIndexConfig   = flag.String(&quot;out-index-config&quot;, &quot;index.json&quot;, &quot;path on disk to save the livegrep index config&quot;)
+</a><a href="#h3-0-20" id="h3-0-20" class="i">+	flagIncludeNamespace = newStringListFlag()
+</a><a href="#h3-0-21" id="h3-0-21" class="i">+
+</a><a href="#h3-0-22" id="h3-0-22" class="i">+	gitlabClient *gitlab.Client
+</a><a href="#h3-0-23" id="h3-0-23" class="i">+)
+</a><a href="#h3-0-24" id="h3-0-24" class="i">+
+</a><a href="#h3-0-25" id="h3-0-25" class="i">+func init() {
+</a><a href="#h3-0-26" id="h3-0-26" class="i">+	flag.Var(flagIncludeNamespace, &quot;include-namespace&quot;, &quot;repository namespace to include&quot;)
+</a><a href="#h3-0-27" id="h3-0-27" class="i">+
+</a><a href="#h3-0-28" id="h3-0-28" class="i">+	flag.Parse()
+</a><a href="#h3-0-29" id="h3-0-29" class="i">+}
+</a><a href="#h3-0-30" id="h3-0-30" class="i">+
+</a> func main() {
+<a href="#h3-0-32" id="h3-0-32" class="d">-	// lol
+</a><a href="#h3-0-33" id="h3-0-33" class="i">+	/* Initialization of GitLab client */
+</a><a href="#h3-0-34" id="h3-0-34" class="i">+
+</a><a href="#h3-0-35" id="h3-0-35" class="i">+	if *flagAccessToken == &quot;&quot; {
+</a><a href="#h3-0-36" id="h3-0-36" class="i">+		panic(errors.New(&quot;GitLab access token must be specified&quot;))
+</a><a href="#h3-0-37" id="h3-0-37" class="i">+	}
+</a><a href="#h3-0-38" id="h3-0-38" class="i">+
+</a><a href="#h3-0-39" id="h3-0-39" class="i">+	gitlabClient = gitlab.NewClient(nil, *flagAccessToken)
+</a><a href="#h3-0-40" id="h3-0-40" class="i">+	apiBaseURL := strings.TrimSuffix(*flagBaseURL, &quot;/&quot;) + &quot;/api/v4&quot;
+</a><a href="#h3-0-41" id="h3-0-41" class="i">+	if err := gitlabClient.SetBaseURL(apiBaseURL); err != nil {
+</a><a href="#h3-0-42" id="h3-0-42" class="i">+		panic(err)
+</a><a href="#h3-0-43" id="h3-0-43" class="i">+	}
+</a><a href="#h3-0-44" id="h3-0-44" class="i">+
+</a><a href="#h3-0-45" id="h3-0-45" class="i">+	log.Printf(&quot;initialized GitLab client: baseURL=%s&quot;, *flagBaseURL)
+</a><a href="#h3-0-46" id="h3-0-46" class="i">+
+</a><a href="#h3-0-47" id="h3-0-47" class="i">+	/* Retrieve a list of all repositories */
+</a><a href="#h3-0-48" id="h3-0-48" class="i">+
+</a><a href="#h3-0-49" id="h3-0-49" class="i">+	projectFilter := func(project *gitlab.Project) bool {
+</a><a href="#h3-0-50" id="h3-0-50" class="i">+		// Whitelist specified repository namespaces
+</a><a href="#h3-0-51" id="h3-0-51" class="i">+		for _, namespace := range flagIncludeNamespace.Values() {
+</a><a href="#h3-0-52" id="h3-0-52" class="i">+			if project.Namespace.Name == namespace {
+</a><a href="#h3-0-53" id="h3-0-53" class="i">+				return true
+</a><a href="#h3-0-54" id="h3-0-54" class="i">+			}
+</a><a href="#h3-0-55" id="h3-0-55" class="i">+		}
+</a><a href="#h3-0-56" id="h3-0-56" class="i">+
+</a><a href="#h3-0-57" id="h3-0-57" class="i">+		return false
+</a><a href="#h3-0-58" id="h3-0-58" class="i">+	}
+</a><a href="#h3-0-59" id="h3-0-59" class="i">+
+</a><a href="#h3-0-60" id="h3-0-60" class="i">+	projects, err := listProjects(projectFilter)
+</a><a href="#h3-0-61" id="h3-0-61" class="i">+	if err != nil {
+</a><a href="#h3-0-62" id="h3-0-62" class="i">+		panic(err)
+</a><a href="#h3-0-63" id="h3-0-63" class="i">+	}
+</a><a href="#h3-0-64" id="h3-0-64" class="i">+
+</a><a href="#h3-0-65" id="h3-0-65" class="i">+	log.Printf(&quot;listed projects matching namespace whitelist: projects=%d&quot;, len(projects))
+</a><a href="#h3-0-66" id="h3-0-66" class="i">+
+</a><a href="#h3-0-67" id="h3-0-67" class="i">+	/* Generate a livegrep index config and write it to disk */
+</a><a href="#h3-0-68" id="h3-0-68" class="i">+
+</a><a href="#h3-0-69" id="h3-0-69" class="i">+	cfg := indexConfig(*flagIndexName, *flagBaseURL, *flagRepoBasePath, projects)
+</a><a href="#h3-0-70" id="h3-0-70" class="i">+
+</a><a href="#h3-0-71" id="h3-0-71" class="i">+	cfgJSON, err := json.Marshal(&amp;cfg)
+</a><a href="#h3-0-72" id="h3-0-72" class="i">+	if err != nil {
+</a><a href="#h3-0-73" id="h3-0-73" class="i">+		panic(err)
+</a><a href="#h3-0-74" id="h3-0-74" class="i">+	}
+</a><a href="#h3-0-75" id="h3-0-75" class="i">+
+</a><a href="#h3-0-76" id="h3-0-76" class="i">+	if err := ioutil.WriteFile(*flagOutIndexConfig, cfgJSON, 0644); err != nil {
+</a><a href="#h3-0-77" id="h3-0-77" class="i">+		panic(err)
+</a><a href="#h3-0-78" id="h3-0-78" class="i">+	}
+</a><a href="#h3-0-79" id="h3-0-79" class="i">+
+</a><a href="#h3-0-80" id="h3-0-80" class="i">+	log.Printf(&quot;wrote livegrep index configuration: path=%s&quot;, *flagOutIndexConfig)
+</a><a href="#h3-0-81" id="h3-0-81" class="i">+
+</a><a href="#h3-0-82" id="h3-0-82" class="i">+	/* Synchronize the repositories requested for indexing */
+</a><a href="#h3-0-83" id="h3-0-83" class="i">+
+</a><a href="#h3-0-84" id="h3-0-84" class="i">+	for _, project := range projects {
+</a><a href="#h3-0-85" id="h3-0-85" class="i">+		log.Printf(&quot;synchronizing repository: name=%s remote=%s&quot;, project.PathWithNamespace, project.SSHURLToRepo)
+</a><a href="#h3-0-86" id="h3-0-86" class="i">+
+</a><a href="#h3-0-87" id="h3-0-87" class="i">+		if err := syncRepository(project.PathWithNamespace, project.SSHURLToRepo, *flagRepoBasePath); err != nil {
+</a><a href="#h3-0-88" id="h3-0-88" class="i">+			panic(err)
+</a><a href="#h3-0-89" id="h3-0-89" class="i">+		}
+</a><a href="#h3-0-90" id="h3-0-90" class="i">+	}
+</a><a href="#h3-0-91" id="h3-0-91" class="i">+
+</a><a href="#h3-0-92" id="h3-0-92" class="i">+	log.Printf(&quot;repository synchronization complete&quot;)
+</a> }
+<b>diff --git a/<a id="h4" href="../file/cmd/livegrep-gitlab-reindex/vcs.go">cmd/livegrep-gitlab-reindex/vcs.go</a> b/<a href="../file/cmd/livegrep-gitlab-reindex/vcs.go">cmd/livegrep-gitlab-reindex/vcs.go</a></b>
+<a href="#h4-0" id="h4-0" class="h">@@ -0,0 +1,89 @@
+</a><a href="#h4-0-0" id="h4-0-0" class="i">+package main
+</a><a href="#h4-0-1" id="h4-0-1" class="i">+
+</a><a href="#h4-0-2" id="h4-0-2" class="i">+import (
+</a><a href="#h4-0-3" id="h4-0-3" class="i">+	&quot;crypto/sha256&quot;
+</a><a href="#h4-0-4" id="h4-0-4" class="i">+	&quot;encoding/base64&quot;
+</a><a href="#h4-0-5" id="h4-0-5" class="i">+	&quot;path&quot;
+</a><a href="#h4-0-6" id="h4-0-6" class="i">+
+</a><a href="#h4-0-7" id="h4-0-7" class="i">+	&quot;github.com/xanzy/go-gitlab&quot;
+</a><a href="#h4-0-8" id="h4-0-8" class="i">+	&quot;gopkg.in/src-d/go-git.v4&quot;
+</a><a href="#h4-0-9" id="h4-0-9" class="i">+)
+</a><a href="#h4-0-10" id="h4-0-10" class="i">+
+</a><a href="#h4-0-11" id="h4-0-11" class="i">+// syncRepository clones a new repository or fetches an existing repository on disk.
+</a><a href="#h4-0-12" id="h4-0-12" class="i">+func syncRepository(name string, remote string, basePath string) error {
+</a><a href="#h4-0-13" id="h4-0-13" class="i">+	repoPath := diskRepoPath(basePath, name)
+</a><a href="#h4-0-14" id="h4-0-14" class="i">+
+</a><a href="#h4-0-15" id="h4-0-15" class="i">+	repo, err := git.PlainOpen(repoPath)
+</a><a href="#h4-0-16" id="h4-0-16" class="i">+	if err == git.ErrRepositoryNotExists {
+</a><a href="#h4-0-17" id="h4-0-17" class="i">+		repo, err = git.PlainClone(repoPath, false, &amp;git.CloneOptions{URL: remote})
+</a><a href="#h4-0-18" id="h4-0-18" class="i">+		if err != nil {
+</a><a href="#h4-0-19" id="h4-0-19" class="i">+			return err
+</a><a href="#h4-0-20" id="h4-0-20" class="i">+		}
+</a><a href="#h4-0-21" id="h4-0-21" class="i">+	} else if err != nil {
+</a><a href="#h4-0-22" id="h4-0-22" class="i">+		return err
+</a><a href="#h4-0-23" id="h4-0-23" class="i">+	}
+</a><a href="#h4-0-24" id="h4-0-24" class="i">+
+</a><a href="#h4-0-25" id="h4-0-25" class="i">+	if err := repo.Fetch(&amp;git.FetchOptions{}); err != nil {
+</a><a href="#h4-0-26" id="h4-0-26" class="i">+		if err != git.NoErrAlreadyUpToDate {
+</a><a href="#h4-0-27" id="h4-0-27" class="i">+			return err
+</a><a href="#h4-0-28" id="h4-0-28" class="i">+		}
+</a><a href="#h4-0-29" id="h4-0-29" class="i">+	}
+</a><a href="#h4-0-30" id="h4-0-30" class="i">+
+</a><a href="#h4-0-31" id="h4-0-31" class="i">+	return nil
+</a><a href="#h4-0-32" id="h4-0-32" class="i">+}
+</a><a href="#h4-0-33" id="h4-0-33" class="i">+
+</a><a href="#h4-0-34" id="h4-0-34" class="i">+// listProjects lists all projects in the GitLab instance (exhausting pagination), optionally
+</a><a href="#h4-0-35" id="h4-0-35" class="i">+// applying a predicate to filter projects.
+</a><a href="#h4-0-36" id="h4-0-36" class="i">+func listProjects(filterPredicate func(*gitlab.Project) bool) ([]*gitlab.Project, error) {
+</a><a href="#h4-0-37" id="h4-0-37" class="i">+	var fetchPaginatedProjects func(page int) ([]*gitlab.Project, error)
+</a><a href="#h4-0-38" id="h4-0-38" class="i">+
+</a><a href="#h4-0-39" id="h4-0-39" class="i">+	applyFilter := func(projects []*gitlab.Project) []*gitlab.Project {
+</a><a href="#h4-0-40" id="h4-0-40" class="i">+		var filtered []*gitlab.Project
+</a><a href="#h4-0-41" id="h4-0-41" class="i">+
+</a><a href="#h4-0-42" id="h4-0-42" class="i">+		for _, project := range projects {
+</a><a href="#h4-0-43" id="h4-0-43" class="i">+			if filterPredicate(project) {
+</a><a href="#h4-0-44" id="h4-0-44" class="i">+				filtered = append(filtered, project)
+</a><a href="#h4-0-45" id="h4-0-45" class="i">+			}
+</a><a href="#h4-0-46" id="h4-0-46" class="i">+		}
+</a><a href="#h4-0-47" id="h4-0-47" class="i">+
+</a><a href="#h4-0-48" id="h4-0-48" class="i">+		return filtered
+</a><a href="#h4-0-49" id="h4-0-49" class="i">+	}
+</a><a href="#h4-0-50" id="h4-0-50" class="i">+
+</a><a href="#h4-0-51" id="h4-0-51" class="i">+	fetchPaginatedProjects = func(page int) ([]*gitlab.Project, error) {
+</a><a href="#h4-0-52" id="h4-0-52" class="i">+		var empty []*gitlab.Project
+</a><a href="#h4-0-53" id="h4-0-53" class="i">+
+</a><a href="#h4-0-54" id="h4-0-54" class="i">+		opts := &amp;gitlab.ListProjectsOptions{
+</a><a href="#h4-0-55" id="h4-0-55" class="i">+			ListOptions: gitlab.ListOptions{
+</a><a href="#h4-0-56" id="h4-0-56" class="i">+				Page:    page,
+</a><a href="#h4-0-57" id="h4-0-57" class="i">+				PerPage: 100,
+</a><a href="#h4-0-58" id="h4-0-58" class="i">+			},
+</a><a href="#h4-0-59" id="h4-0-59" class="i">+		}
+</a><a href="#h4-0-60" id="h4-0-60" class="i">+
+</a><a href="#h4-0-61" id="h4-0-61" class="i">+		projects, resp, err := gitlabClient.Projects.ListProjects(opts)
+</a><a href="#h4-0-62" id="h4-0-62" class="i">+		if err != nil {
+</a><a href="#h4-0-63" id="h4-0-63" class="i">+			return empty, err
+</a><a href="#h4-0-64" id="h4-0-64" class="i">+		}
+</a><a href="#h4-0-65" id="h4-0-65" class="i">+		if resp.NextPage == 0 {
+</a><a href="#h4-0-66" id="h4-0-66" class="i">+			return applyFilter(projects), nil
+</a><a href="#h4-0-67" id="h4-0-67" class="i">+		}
+</a><a href="#h4-0-68" id="h4-0-68" class="i">+
+</a><a href="#h4-0-69" id="h4-0-69" class="i">+		additionalProjects, err := fetchPaginatedProjects(resp.NextPage)
+</a><a href="#h4-0-70" id="h4-0-70" class="i">+		if err != nil {
+</a><a href="#h4-0-71" id="h4-0-71" class="i">+			return empty, nil
+</a><a href="#h4-0-72" id="h4-0-72" class="i">+		}
+</a><a href="#h4-0-73" id="h4-0-73" class="i">+
+</a><a href="#h4-0-74" id="h4-0-74" class="i">+		return applyFilter(append(projects, additionalProjects...)), nil
+</a><a href="#h4-0-75" id="h4-0-75" class="i">+	}
+</a><a href="#h4-0-76" id="h4-0-76" class="i">+
+</a><a href="#h4-0-77" id="h4-0-77" class="i">+	return fetchPaginatedProjects(1)
+</a><a href="#h4-0-78" id="h4-0-78" class="i">+}
+</a><a href="#h4-0-79" id="h4-0-79" class="i">+
+</a><a href="#h4-0-80" id="h4-0-80" class="i">+// diskRepoPath generates a path on disk where a repository should be stored. It hashes the
+</a><a href="#h4-0-81" id="h4-0-81" class="i">+// repository name to generate filesystem-safe paths.
+</a><a href="#h4-0-82" id="h4-0-82" class="i">+func diskRepoPath(basePath string, name string) string {
+</a><a href="#h4-0-83" id="h4-0-83" class="i">+	hasher := sha256.New()
+</a><a href="#h4-0-84" id="h4-0-84" class="i">+	hasher.Write([]byte(name))
+</a><a href="#h4-0-85" id="h4-0-85" class="i">+	hash := hasher.Sum(nil)
+</a><a href="#h4-0-86" id="h4-0-86" class="i">+
+</a><a href="#h4-0-87" id="h4-0-87" class="i">+	return path.Join(basePath, base64.URLEncoding.EncodeToString(hash))
+</a><a href="#h4-0-88" id="h4-0-88" class="i">+}
+</a></pre>
+</div>
+</body>
+</html>

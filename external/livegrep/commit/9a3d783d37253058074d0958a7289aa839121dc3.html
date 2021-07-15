@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>integration tests: handle long lines - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/9a3d783d37253058074d0958a7289aa839121dc3">9a3d783d37253058074d0958a7289aa839121dc3</a>
+<b>parent</b> <a href="../commit/8242217a598fb4f7d3af6b487d444cb94fbb7d4e">8242217a598fb4f7d3af6b487d444cb94fbb7d4e</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Sat, 10 Jan 2015 20:19:43 +0000
+
+integration tests: handle long lines
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">client/test/integration_test.go</a></td><td> | </td><td class="num">44</td><td><span class="i">+++++++++++++++++++++++++++++++++++++</span><span class="d">-------</span></td></tr>
+</table></pre><pre>1 file changed, 37 insertions(+), 7 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/client/test/integration_test.go">client/test/integration_test.go</a> b/<a href="../file/client/test/integration_test.go">client/test/integration_test.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -2,9 +2,11 @@ package test
+</a> 
+ import (
+ 	&quot;bufio&quot;
+<a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;bytes&quot;
+</a> 	&quot;encoding/json&quot;
+ 	&quot;flag&quot;
+ 	&quot;fmt&quot;
+<a href="#h0-0-7" id="h0-0-7" class="i">+	&quot;io&quot;
+</a> 	&quot;io/ioutil&quot;
+ 	&quot;os&quot;
+ 	&quot;os/exec&quot;
+<a href="#h0-1" id="h0-1" class="h">@@ -17,6 +19,8 @@ import (
+</a> 	&quot;gopkg.in/check.v1&quot;
+ )
+ 
+<a href="#h0-1-3" id="h0-1-3" class="i">+const LineLimit = 1024
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+
+</a> func Test(t *testing.T) { check.TestingT(t) }
+ 
+ var repo = flag.String(&quot;test.repo&quot;, &quot;&quot;, &quot;Git repository to run integration tests against.&quot;)
+<a href="#h0-2" id="h0-2" class="h">@@ -67,6 +71,7 @@ func (i *IntegrationSuite) SetUpSuite(c *check.C) {
+</a> 		&quot;--dump_index&quot;, i.index.Name(),
+ 		&quot;--max_matches&quot;, &quot;100000&quot;,
+ 		&quot;--timeout&quot;, &quot;100000&quot;,
+<a href="#h0-2-3" id="h0-2-3" class="i">+		&quot;--line_limit&quot;, strconv.Itoa(LineLimit),
+</a> 		i.config.Name())
+ 	if err != nil {
+ 		c.Fatalf(&quot;NewClient: %s&quot;, err)
+<a href="#h0-3" id="h0-3" class="h">@@ -123,6 +128,25 @@ func (s SortMatches) Swap(i, j int) {
+</a> 
+ var grepRE = regexp.MustCompile(`^HEAD:([^:]+):(\d+):`)
+ 
+<a href="#h0-3-3" id="h0-3-3" class="i">+func readLineDropTooLong(r *bufio.Reader) ([]byte, error) {
+</a><a href="#h0-3-4" id="h0-3-4" class="i">+	for {
+</a><a href="#h0-3-5" id="h0-3-5" class="i">+		line, isPrefix, err := r.ReadLine()
+</a><a href="#h0-3-6" id="h0-3-6" class="i">+		if err != nil {
+</a><a href="#h0-3-7" id="h0-3-7" class="i">+			return nil, err
+</a><a href="#h0-3-8" id="h0-3-8" class="i">+		}
+</a><a href="#h0-3-9" id="h0-3-9" class="i">+		if !isPrefix {
+</a><a href="#h0-3-10" id="h0-3-10" class="i">+			line = bytes.TrimRight(line, &quot;\n&quot;)
+</a><a href="#h0-3-11" id="h0-3-11" class="i">+			return line, nil
+</a><a href="#h0-3-12" id="h0-3-12" class="i">+		}
+</a><a href="#h0-3-13" id="h0-3-13" class="i">+		for isPrefix {
+</a><a href="#h0-3-14" id="h0-3-14" class="i">+			line, isPrefix, err = r.ReadLine()
+</a><a href="#h0-3-15" id="h0-3-15" class="i">+			if err != nil {
+</a><a href="#h0-3-16" id="h0-3-16" class="i">+				return nil, err
+</a><a href="#h0-3-17" id="h0-3-17" class="i">+			}
+</a><a href="#h0-3-18" id="h0-3-18" class="i">+		}
+</a><a href="#h0-3-19" id="h0-3-19" class="i">+	}
+</a><a href="#h0-3-20" id="h0-3-20" class="i">+}
+</a><a href="#h0-3-21" id="h0-3-21" class="i">+
+</a> func gitGrep(path, regex string) ([]Match, error) {
+ 	cmd := exec.Command(&quot;git&quot;, &quot;grep&quot;, &quot;-n&quot;, &quot;-I&quot;, &quot;-E&quot;, &quot;-e&quot;, regex, &quot;HEAD&quot;)
+ 	cmd.Dir = path
+<a href="#h0-4" id="h0-4" class="h">@@ -134,21 +158,27 @@ func gitGrep(path, regex string) ([]Match, error) {
+</a> 	var matches []Match
+ 
+ 	cmd.Start()
+<a href="#h0-4-3" id="h0-4-3" class="d">-	scan := bufio.NewScanner(out)
+</a><a href="#h0-4-4" id="h0-4-4" class="d">-	for scan.Scan() {
+</a><a href="#h0-4-5" id="h0-4-5" class="d">-		line := scan.Bytes()
+</a><a href="#h0-4-6" id="h0-4-6" class="i">+	buf := bufio.NewReader(out)
+</a><a href="#h0-4-7" id="h0-4-7" class="i">+	for {
+</a><a href="#h0-4-8" id="h0-4-8" class="i">+		line, err := readLineDropTooLong(buf)
+</a><a href="#h0-4-9" id="h0-4-9" class="i">+		if err != nil {
+</a><a href="#h0-4-10" id="h0-4-10" class="i">+			if err == io.EOF {
+</a><a href="#h0-4-11" id="h0-4-11" class="i">+				break
+</a><a href="#h0-4-12" id="h0-4-12" class="i">+			}
+</a><a href="#h0-4-13" id="h0-4-13" class="i">+			cmd.Process.Kill()
+</a><a href="#h0-4-14" id="h0-4-14" class="i">+			return nil, err
+</a><a href="#h0-4-15" id="h0-4-15" class="i">+		}
+</a> 		m := grepRE.FindSubmatch(line)
+ 		if m == nil {
+ 			cmd.Process.Kill()
+ 			return nil, fmt.Errorf(&quot;unparsable: `%s&#39;&quot;, line)
+ 		}
+<a href="#h0-4-21" id="h0-4-21" class="i">+		if len(line)-len(m[0]) &gt; LineLimit {
+</a><a href="#h0-4-22" id="h0-4-22" class="i">+			continue
+</a><a href="#h0-4-23" id="h0-4-23" class="i">+		}
+</a> 		lno, _ := strconv.Atoi(string(m[2]))
+ 		matches = append(matches, Match{string(m[1]), lno})
+ 	}
+<a href="#h0-4-27" id="h0-4-27" class="d">-	if err := scan.Err(); err != nil {
+</a><a href="#h0-4-28" id="h0-4-28" class="d">-		cmd.Process.Kill()
+</a><a href="#h0-4-29" id="h0-4-29" class="d">-		return nil, err
+</a><a href="#h0-4-30" id="h0-4-30" class="d">-	}
+</a> 	cmd.Wait()
+ 
+ 	return matches, nil
+</pre>
+</div>
+</body>
+</html>

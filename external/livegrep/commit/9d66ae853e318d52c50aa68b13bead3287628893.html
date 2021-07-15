@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>bench.html: Actually track the correct latency values. - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/9d66ae853e318d52c50aa68b13bead3287628893">9d66ae853e318d52c50aa68b13bead3287628893</a>
+<b>parent</b> <a href="../commit/e4294d9193b2ae4ab6cf9762b383a5d46783fedd">e4294d9193b2ae4ab6cf9762b383a5d46783fedd</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Sat, 21 Jan 2012 16:49:17 -0500
+
+bench.html: Actually track the correct latency values.
+
+Allow the sender to provide a search ID, and reflect that back,
+instead of the search term. Default to the search term if not
+provided.
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">web/appserver.js</a></td><td> | </td><td class="num">17</td><td><span class="i">+++++++++++</span><span class="d">------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">web/static/bench.js</a></td><td> | </td><td class="num">20</td><td><span class="i">+++++++++++++</span><span class="d">-------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">web/static/codesearch.js</a></td><td> | </td><td class="num">4</td><td><span class="i">++</span><span class="d">--</span></td></tr>
+</table></pre><pre>3 files changed, 26 insertions(+), 15 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/web/appserver.js">web/appserver.js</a> b/<a href="../file/web/appserver.js">web/appserver.js</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -10,13 +10,15 @@ function Client(parent, sock) {
+</a>   this.parent = parent;
+   this.socket = sock;
+   this.pending_search = null;
+<a href="#h0-0-3" id="h0-0-3" class="i">+  this.pending_id = null;
+</a>   this.last_search = null;
+ }
+ 
+<a href="#h0-0-7" id="h0-0-7" class="d">-Client.prototype.new_search = function (str) {
+</a><a href="#h0-0-8" id="h0-0-8" class="i">+Client.prototype.new_search = function (str, id) {
+</a>   if (str === this.last_search)
+     return;
+   this.pending_search = str;
+<a href="#h0-0-12" id="h0-0-12" class="i">+  this.pending_id = id;
+</a>   this.dispatch_search();
+ }
+ 
+<a href="#h0-1" id="h0-1" class="h">@@ -30,11 +32,12 @@ Client.prototype.dispatch_search = function() {
+</a>     logger.debug(&#39;dispatching: %s...&#39;, this.pending_search);
+ 
+     var search = this.pending_search;
+<a href="#h0-1-3" id="h0-1-3" class="i">+    var id     = this.pending_id;
+</a>     this.pending_search = null;
+     var self   = this;
+     var sock   = this.socket;
+     var batch  = new Batch(function (m) {
+<a href="#h0-1-8" id="h0-1-8" class="d">-                             sock.emit(&#39;match&#39;, search, m);
+</a><a href="#h0-1-9" id="h0-1-9" class="i">+                             sock.emit(&#39;match&#39;, id, m);
+</a>                            });
+     var cbs = {
+       not_ready: function() {
+<a href="#h0-2" id="h0-2" class="h">@@ -43,7 +46,7 @@ Client.prototype.dispatch_search = function() {
+</a>           self.pending_search = search;
+       },
+       error: function (err) {
+<a href="#h0-2-3" id="h0-2-3" class="d">-        sock.emit(&#39;regex_error&#39;, search, err);
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+        sock.emit(&#39;regex_error&#39;, id, err);
+</a>       },
+       match: function (match) {
+         match = JSON.parse(match);
+<a href="#h0-3" id="h0-3" class="h">@@ -54,7 +57,7 @@ Client.prototype.dispatch_search = function() {
+</a>         stats = JSON.parse(stats);
+         var time = (new Date()) - start;
+         batch.flush();
+<a href="#h0-3-3" id="h0-3-3" class="d">-        sock.emit(&#39;search_done&#39;, search, time, stats.why);
+</a><a href="#h0-3-4" id="h0-3-4" class="i">+        sock.emit(&#39;search_done&#39;, id, time, stats.why);
+</a>         logger.debug(&quot;Search done: %s: %s&quot;, search, time);
+       }
+     }
+<a href="#h0-4" id="h0-4" class="h">@@ -106,8 +109,10 @@ function SearchServer(config, io) {
+</a> 
+   var Server = function (sock) {
+     parent.clients[sock.id] = new Client(parent, sock);
+<a href="#h0-4-3" id="h0-4-3" class="d">-    sock.on(&#39;new_search&#39;, function(str) {
+</a><a href="#h0-4-4" id="h0-4-4" class="d">-      parent.clients[sock.id].new_search(str);
+</a><a href="#h0-4-5" id="h0-4-5" class="i">+    sock.on(&#39;new_search&#39;, function(str, id) {
+</a><a href="#h0-4-6" id="h0-4-6" class="i">+              if (id == null)
+</a><a href="#h0-4-7" id="h0-4-7" class="i">+                id = str;
+</a><a href="#h0-4-8" id="h0-4-8" class="i">+              parent.clients[sock.id].new_search(str, id);
+</a>     });
+     sock.on(&#39;disconnect&#39;, function() {
+               delete parent.clients[sock.id];
+<b>diff --git a/<a id="h1" href="../file/web/static/bench.js">web/static/bench.js</a> b/<a href="../file/web/static/bench.js">web/static/bench.js</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -34,31 +34,37 @@ var Benchmark = function() {
+</a>     $(&quot;#val_max&quot;).text(max_time());
+   }
+ 
+<a href="#h1-0-3" id="h1-0-3" class="d">-  function done(error) {
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+  function done(search, error) {
+</a>     var now = new Date();
+     Benchmark.searches++;
+     if (error)
+       Benchmark.errors++;
+     Benchmark.responses.push({
+                                end: now,
+<a href="#h1-0-11" id="h1-0-11" class="d">-                               time: now - Benchmark.search_start
+</a><a href="#h1-0-12" id="h1-0-12" class="i">+                               time: now - Benchmark.search_start[search]
+</a>                              });
+     while ((now - Benchmark.responses[0].end) &gt; WINDOW)
+       Benchmark.responses.shift(1);
+     render();
+<a href="#h1-0-17" id="h1-0-17" class="i">+    Object.keys(Benchmark.search_start).forEach(
+</a><a href="#h1-0-18" id="h1-0-18" class="i">+      function (n) {
+</a><a href="#h1-0-19" id="h1-0-19" class="i">+        if (+n &lt; search)
+</a><a href="#h1-0-20" id="h1-0-20" class="i">+          delete Benchmark.search_start[n];
+</a><a href="#h1-0-21" id="h1-0-21" class="i">+      });
+</a>   }
+ 
+   function loop(i) {
+     if (i === queries.length)
+       i = 0;
+<a href="#h1-0-27" id="h1-0-27" class="d">-    Benchmark.search_start = new Date();
+</a><a href="#h1-0-28" id="h1-0-28" class="d">-    Codesearch.new_search(queries[i]);
+</a><a href="#h1-0-29" id="h1-0-29" class="i">+    Benchmark.search_start[++Benchmark.search_id] = new Date();
+</a><a href="#h1-0-30" id="h1-0-30" class="i">+    Codesearch.new_search(queries[i], Benchmark.search_id);
+</a>     Benchmark.timer = setTimeout(function() {loop(i+1)}, 10);
+   }
+ 
+   return {
+     start_time: 0,
+<a href="#h1-0-36" id="h1-0-36" class="d">-    search_start: 0,
+</a><a href="#h1-0-37" id="h1-0-37" class="i">+    search_start: {},
+</a><a href="#h1-0-38" id="h1-0-38" class="i">+    search_id: 0,
+</a>     searches: 0,
+     errors: 0,
+     responses: [],
+<a href="#h1-1" id="h1-1" class="h">@@ -68,12 +74,12 @@ var Benchmark = function() {
+</a>       Codesearch.connect(Benchmark);
+     },
+     regex_error: function(search, err) {
+<a href="#h1-1-3" id="h1-1-3" class="d">-      done(true);
+</a><a href="#h1-1-4" id="h1-1-4" class="i">+      done(search, true);
+</a>     },
+     match: function(search, match) {
+     },
+     search_done: function(search, time, why) {
+<a href="#h1-1-9" id="h1-1-9" class="d">-      done(false);
+</a><a href="#h1-1-10" id="h1-1-10" class="i">+      done(search, false);
+</a>     },
+     on_connect: function() {
+       if (Benchmark.timer === undefined)
+<b>diff --git a/<a id="h2" href="../file/web/static/codesearch.js">web/static/codesearch.js</a> b/<a href="../file/web/static/codesearch.js">web/static/codesearch.js</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -19,9 +19,9 @@ var Codesearch = function() {
+</a>       socket.on(&#39;match&#39;, Codesearch.delegate.match);
+       socket.on(&#39;search_done&#39;, Codesearch.delegate.search_done);
+     },
+<a href="#h2-0-3" id="h2-0-3" class="d">-    new_search: function(re) {
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+    new_search: function(re, id) {
+</a>       if (Codesearch.socket !== null)
+<a href="#h2-0-6" id="h2-0-6" class="d">-        Codesearch.socket.emit(&#39;new_search&#39;, re);
+</a><a href="#h2-0-7" id="h2-0-7" class="i">+        Codesearch.socket.emit(&#39;new_search&#39;, re, id);
+</a>     }
+   };
+ }();
+</pre>
+</div>
+</body>
+</html>

@@ -1,0 +1,2172 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Merge pull request #213 from livegrep/query-planner - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/30118d9347f765263b77c7f30d84d97a61287a78">30118d9347f765263b77c7f30d84d97a61287a78</a>
+<b>parent</b> <a href="../commit/74c2bf2cb01cd2f61d519ec37c3b805353d01c9f">74c2bf2cb01cd2f61d519ec37c3b805353d01c9f</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Mon, 11 Feb 2019 22:17:58 -0800
+
+Merge pull request #213 from livegrep/query-planner
+
+Rename the &quot;indexer&quot; to the &quot;query planner&quot;
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">src/codesearch.cc</a></td><td> | </td><td class="num">22</td><td><span class="i">+++++++++++</span><span class="d">-----------</span></td></tr>
+<tr><td class="D">D</td><td><a href="#h1">src/indexer.cc</a></td><td> | </td><td class="num">667</td><td><span class="i"></span><span class="d">-------------------------------------------------------------------------------</span></td></tr>
+<tr><td class="D">D</td><td><a href="#h2">src/indexer.h</a></td><td> | </td><td class="num">141</td><td><span class="i"></span><span class="d">-------------------------------------------------------------------------------</span></td></tr>
+<tr><td class="A">A</td><td><a href="#h3">src/query_planner.cc</a></td><td> | </td><td class="num">667</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="A">A</td><td><a href="#h4">src/query_planner.h</a></td><td> | </td><td class="num">141</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h5">src/tools/analyze-re.cc</a></td><td> | </td><td class="num">24</td><td><span class="i">++++++++++++</span><span class="d">------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h6">src/tools/dump-file.cc</a></td><td> | </td><td class="num">1</td><td><span class="i"></span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h7">test/BUILD</a></td><td> | </td><td class="num">4</td><td><span class="i">++</span><span class="d">--</span></td></tr>
+<tr><td class="D">D</td><td><a href="#h8">test/indexer_test.cc</a></td><td> | </td><td class="num">99</td><td><span class="i"></span><span class="d">-------------------------------------------------------------------------------</span></td></tr>
+<tr><td class="A">A</td><td><a href="#h9">test/planner_test.cc</a></td><td> | </td><td class="num">99</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+</table></pre><pre>10 files changed, 932 insertions(+), 933 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/src/codesearch.cc">src/codesearch.cc</a> b/<a href="../file/src/codesearch.cc">src/codesearch.cc</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -28,7 +28,7 @@
+</a> #include &quot;src/codesearch.h&quot;
+ #include &quot;src/chunk.h&quot;
+ #include &quot;src/chunk_allocator.h&quot;
+<a href="#h0-0-3" id="h0-0-3" class="d">-#include &quot;src/indexer.h&quot;
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+#include &quot;src/query_planner.h&quot;
+</a> #include &quot;src/content.h&quot;
+ 
+ #include &quot;absl/strings/string_view.h&quot;
+<a href="#h0-1" id="h0-1" class="h">@@ -195,7 +195,7 @@ class searcher {
+</a> public:
+     searcher(const code_searcher *cc,
+              const query &amp;q,
+<a href="#h0-1-3" id="h0-1-3" class="d">-             const intrusive_ptr&lt;IndexKey&gt; index_key,
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+             const intrusive_ptr&lt;QueryPlan&gt; index_key,
+</a>              const code_searcher::search_thread::transform_func&amp; func) :
+         cc_(cc), query_(&amp;q), transform_(func), queue_(),
+         limiter_(q.max_matches), index_key_(index_key), re2_time_(false),
+<a href="#h0-2" id="h0-2" class="h">@@ -335,7 +335,7 @@ p     * which contain `match&#39;, which is contained within `line&#39;.
+</a>     const code_searcher::search_thread::transform_func transform_;
+     thread_queue&lt;match_result*&gt; queue_;
+     search_limiter limiter_;
+<a href="#h0-2-3" id="h0-2-3" class="d">-    intrusive_ptr&lt;IndexKey&gt; index_key_;
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+    intrusive_ptr&lt;QueryPlan&gt; index_key_;
+</a>     timer re2_time_;
+     timer git_time_;
+     timer index_time_;
+<a href="#h0-3" id="h0-3" class="h">@@ -358,7 +358,7 @@ class filename_searcher {
+</a> public:
+     filename_searcher(const code_searcher *cc,
+                       const query &amp;q,
+<a href="#h0-3-3" id="h0-3-3" class="d">-                      intrusive_ptr&lt;IndexKey&gt; index_key) :
+</a><a href="#h0-3-4" id="h0-3-4" class="i">+                      intrusive_ptr&lt;QueryPlan&gt; index_key) :
+</a>         cc_(cc), query_(&amp;q), index_key_(index_key), queue_(), limiter_(q.max_matches)
+     {}
+ 
+<a href="#h0-4" id="h0-4" class="h">@@ -373,7 +373,7 @@ protected:
+</a> 
+     const code_searcher *cc_;
+     const query *query_;
+<a href="#h0-4-3" id="h0-4-3" class="d">-    intrusive_ptr&lt;IndexKey&gt; index_key_;
+</a><a href="#h0-4-4" id="h0-4-4" class="i">+    intrusive_ptr&lt;QueryPlan&gt; index_key_;
+</a>     thread_queue&lt;file_result*&gt; queue_;
+     search_limiter limiter_;
+ 
+<a href="#h0-5" id="h0-5" class="h">@@ -383,7 +383,7 @@ protected:
+</a> int suffix_search(const unsigned char *data,
+                   const uint32_t *suffixes,
+                   int size,
+<a href="#h0-5-3" id="h0-5-3" class="d">-                  intrusive_ptr&lt;IndexKey&gt; index,
+</a><a href="#h0-5-4" id="h0-5-4" class="i">+                  intrusive_ptr&lt;QueryPlan&gt; index,
+</a>                   vector&lt;uint32_t&gt; &amp;indexes_out);
+ 
+ void filename_searcher::operator()()
+<a href="#h0-6" id="h0-6" class="h">@@ -674,7 +674,7 @@ void searcher::operator()(const chunk *chunk)
+</a> 
+ struct walk_state {
+     const uint32_t *left, *right;
+<a href="#h0-6-3" id="h0-6-3" class="d">-    intrusive_ptr&lt;IndexKey&gt; key;
+</a><a href="#h0-6-4" id="h0-6-4" class="i">+    intrusive_ptr&lt;QueryPlan&gt; key;
+</a>     int depth;
+ };
+ 
+<a href="#h0-7" id="h0-7" class="h">@@ -701,7 +701,7 @@ struct lt_index {
+</a> int suffix_search(const unsigned char *data,
+                   const uint32_t *suffixes,
+                   int size,
+<a href="#h0-7-3" id="h0-7-3" class="d">-                  intrusive_ptr&lt;IndexKey&gt; index,
+</a><a href="#h0-7-4" id="h0-7-4" class="i">+                  intrusive_ptr&lt;QueryPlan&gt; index,
+</a>                   vector&lt;uint32_t&gt; &amp;indexes_out) {
+     int count = 0;
+     vector&lt;walk_state&gt; stack;
+<a href="#h0-8" id="h0-8" class="h">@@ -722,7 +722,7 @@ int suffix_search(const unsigned char *data,
+</a>             continue;
+         }
+         lt_index lt = {data, st.depth};
+<a href="#h0-8-3" id="h0-8-3" class="d">-        for (IndexKey::iterator it = st.key-&gt;begin();
+</a><a href="#h0-8-4" id="h0-8-4" class="i">+        for (QueryPlan::iterator it = st.key-&gt;begin();
+</a>              it != st.key-&gt;end(); ++it) {
+             const uint32_t *l, *r;
+             l = lower_bound(st.left, st.right, it-&gt;first.first, lt);
+<a href="#h0-9" id="h0-9" class="h">@@ -1098,10 +1098,10 @@ void code_searcher::search_thread::match(const query &amp;q,
+</a>     }
+ 
+     timer analyze_time(false);
+<a href="#h0-9-3" id="h0-9-3" class="d">-    intrusive_ptr&lt;IndexKey&gt; index_key;
+</a><a href="#h0-9-4" id="h0-9-4" class="i">+    intrusive_ptr&lt;QueryPlan&gt; index_key;
+</a>     {
+         run_timer run(analyze_time);
+<a href="#h0-9-7" id="h0-9-7" class="d">-        index_key = indexRE(*q.line_pat);
+</a><a href="#h0-9-8" id="h0-9-8" class="i">+        index_key = constructQueryPlan(*q.line_pat);
+</a>     }
+     debug(kDebugProfile, &quot;analyze time: %d.%06ds&quot;,
+           int(analyze_time.elapsed().tv_sec),
+<b>diff --git a/<a id="h1" href="../file/src/indexer.cc">src/indexer.cc</a> b/<a href="../file/src/indexer.cc">src/indexer.cc</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -1,667 +0,0 @@
+</a><a href="#h1-0-0" id="h1-0-0" class="d">-/********************************************************************
+</a><a href="#h1-0-1" id="h1-0-1" class="d">- * livegrep -- indexer.cc
+</a><a href="#h1-0-2" id="h1-0-2" class="d">- * Copyright (c) 2011-2013 Nelson Elhage
+</a><a href="#h1-0-3" id="h1-0-3" class="d">- *
+</a><a href="#h1-0-4" id="h1-0-4" class="d">- * This program is free software. You may use, redistribute, and/or
+</a><a href="#h1-0-5" id="h1-0-5" class="d">- * modify it under the terms listed in the COPYING file.
+</a><a href="#h1-0-6" id="h1-0-6" class="d">- ********************************************************************/
+</a><a href="#h1-0-7" id="h1-0-7" class="d">-#include &quot;src/lib/recursion.h&quot;
+</a><a href="#h1-0-8" id="h1-0-8" class="d">-#include &quot;src/lib/debug.h&quot;
+</a><a href="#h1-0-9" id="h1-0-9" class="d">-
+</a><a href="#h1-0-10" id="h1-0-10" class="d">-#include &quot;src/indexer.h&quot;
+</a><a href="#h1-0-11" id="h1-0-11" class="d">-
+</a><a href="#h1-0-12" id="h1-0-12" class="d">-#include &lt;gflags/gflags.h&gt;
+</a><a href="#h1-0-13" id="h1-0-13" class="d">-
+</a><a href="#h1-0-14" id="h1-0-14" class="d">-#include &lt;list&gt;
+</a><a href="#h1-0-15" id="h1-0-15" class="d">-#include &lt;limits&gt;
+</a><a href="#h1-0-16" id="h1-0-16" class="d">-
+</a><a href="#h1-0-17" id="h1-0-17" class="d">-#include &lt;stdarg.h&gt;
+</a><a href="#h1-0-18" id="h1-0-18" class="d">-
+</a><a href="#h1-0-19" id="h1-0-19" class="d">-using namespace re2;
+</a><a href="#h1-0-20" id="h1-0-20" class="d">-using namespace std;
+</a><a href="#h1-0-21" id="h1-0-21" class="d">-
+</a><a href="#h1-0-22" id="h1-0-22" class="d">-const unsigned kMinWeight = 16;
+</a><a href="#h1-0-23" id="h1-0-23" class="d">-const int kMaxWidth       = 32;
+</a><a href="#h1-0-24" id="h1-0-24" class="d">-const int kMaxRecursion   = 10;
+</a><a href="#h1-0-25" id="h1-0-25" class="d">-const int kMaxNodes       = (1 &lt;&lt; 24);
+</a><a href="#h1-0-26" id="h1-0-26" class="d">-
+</a><a href="#h1-0-27" id="h1-0-27" class="d">-namespace {
+</a><a href="#h1-0-28" id="h1-0-28" class="d">-    static IndexKey::Stats null_stats;
+</a><a href="#h1-0-29" id="h1-0-29" class="d">-};
+</a><a href="#h1-0-30" id="h1-0-30" class="d">-
+</a><a href="#h1-0-31" id="h1-0-31" class="d">-IndexKey::Stats::Stats ()
+</a><a href="#h1-0-32" id="h1-0-32" class="d">-    : selectivity_(1.0), depth_(0), nodes_(1), tail_paths_(1) {
+</a><a href="#h1-0-33" id="h1-0-33" class="d">-}
+</a><a href="#h1-0-34" id="h1-0-34" class="d">-
+</a><a href="#h1-0-35" id="h1-0-35" class="d">-IndexKey::Stats IndexKey::Stats::insert(const value_type&amp; val) const {
+</a><a href="#h1-0-36" id="h1-0-36" class="d">-    Stats out(*this);
+</a><a href="#h1-0-37" id="h1-0-37" class="d">-    if (out.selectivity_ == 1.0) {
+</a><a href="#h1-0-38" id="h1-0-38" class="d">-        out.selectivity_ = 0.0;
+</a><a href="#h1-0-39" id="h1-0-39" class="d">-        out.tail_paths_  = 0;
+</a><a href="#h1-0-40" id="h1-0-40" class="d">-    }
+</a><a href="#h1-0-41" id="h1-0-41" class="d">-
+</a><a href="#h1-0-42" id="h1-0-42" class="d">-    const Stats&amp; rstats = val.second ? val.second-&gt;stats() : null_stats;
+</a><a href="#h1-0-43" id="h1-0-43" class="d">-
+</a><a href="#h1-0-44" id="h1-0-44" class="d">-    // There are 100 printable ASCII characters. As a zeroth-order
+</a><a href="#h1-0-45" id="h1-0-45" class="d">-    // approximation, assume our corpus is random strings of printable
+</a><a href="#h1-0-46" id="h1-0-46" class="d">-    // ASCII characters.  The exact computation of selectivity turn
+</a><a href="#h1-0-47" id="h1-0-47" class="d">-    // out not to matter all that much in most cases.
+</a><a href="#h1-0-48" id="h1-0-48" class="d">-    out.selectivity_ += (val.first.second - val.first.first + 1)/100. * rstats.selectivity_;
+</a><a href="#h1-0-49" id="h1-0-49" class="d">-    out.depth_ = max(depth_, rstats.depth_ + 1);
+</a><a href="#h1-0-50" id="h1-0-50" class="d">-    out.nodes_ += (val.first.second - val.first.first + 1) * rstats.nodes_;
+</a><a href="#h1-0-51" id="h1-0-51" class="d">-    if (!val.second)
+</a><a href="#h1-0-52" id="h1-0-52" class="d">-        out.tail_paths_ += (val.first.second - val.first.first + 1);
+</a><a href="#h1-0-53" id="h1-0-53" class="d">-
+</a><a href="#h1-0-54" id="h1-0-54" class="d">-    return out;
+</a><a href="#h1-0-55" id="h1-0-55" class="d">-}
+</a><a href="#h1-0-56" id="h1-0-56" class="d">-
+</a><a href="#h1-0-57" id="h1-0-57" class="d">-IndexKey::Stats IndexKey::Stats::concat(const IndexKey::Stats&amp; rhs) const {
+</a><a href="#h1-0-58" id="h1-0-58" class="d">-    Stats out(*this);
+</a><a href="#h1-0-59" id="h1-0-59" class="d">-    out.selectivity_ *= rhs.selectivity_;
+</a><a href="#h1-0-60" id="h1-0-60" class="d">-    out.depth_ += rhs.depth_;
+</a><a href="#h1-0-61" id="h1-0-61" class="d">-    out.nodes_ += tail_paths_ * rhs.nodes_;
+</a><a href="#h1-0-62" id="h1-0-62" class="d">-    out.tail_paths_ *= rhs.tail_paths_;
+</a><a href="#h1-0-63" id="h1-0-63" class="d">-
+</a><a href="#h1-0-64" id="h1-0-64" class="d">-    return out;
+</a><a href="#h1-0-65" id="h1-0-65" class="d">-}
+</a><a href="#h1-0-66" id="h1-0-66" class="d">-
+</a><a href="#h1-0-67" id="h1-0-67" class="d">-void IndexKey::insert(const value_type&amp; val) {
+</a><a href="#h1-0-68" id="h1-0-68" class="d">-    stats_ = stats_.insert(val);
+</a><a href="#h1-0-69" id="h1-0-69" class="d">-
+</a><a href="#h1-0-70" id="h1-0-70" class="d">-    edges_.insert(val);
+</a><a href="#h1-0-71" id="h1-0-71" class="d">-    if (val.second &amp;&amp; !(val.second-&gt;anchor &amp; kAnchorRight)) {
+</a><a href="#h1-0-72" id="h1-0-72" class="d">-        anchor &amp;= ~kAnchorRight;
+</a><a href="#h1-0-73" id="h1-0-73" class="d">-    }
+</a><a href="#h1-0-74" id="h1-0-74" class="d">-}
+</a><a href="#h1-0-75" id="h1-0-75" class="d">-
+</a><a href="#h1-0-76" id="h1-0-76" class="d">-double IndexKey::selectivity() {
+</a><a href="#h1-0-77" id="h1-0-77" class="d">-    if (empty())
+</a><a href="#h1-0-78" id="h1-0-78" class="d">-        assert(stats_.selectivity_ == 1.0);
+</a><a href="#h1-0-79" id="h1-0-79" class="d">-
+</a><a href="#h1-0-80" id="h1-0-80" class="d">-    return stats_.selectivity_;
+</a><a href="#h1-0-81" id="h1-0-81" class="d">-}
+</a><a href="#h1-0-82" id="h1-0-82" class="d">-
+</a><a href="#h1-0-83" id="h1-0-83" class="d">-unsigned IndexKey::weight() {
+</a><a href="#h1-0-84" id="h1-0-84" class="d">-    if (1/selectivity() &gt; double(numeric_limits&lt;unsigned&gt;::max()))
+</a><a href="#h1-0-85" id="h1-0-85" class="d">-        return numeric_limits&lt;unsigned&gt;::max() / 2;
+</a><a href="#h1-0-86" id="h1-0-86" class="d">-    return 1/selectivity();
+</a><a href="#h1-0-87" id="h1-0-87" class="d">-}
+</a><a href="#h1-0-88" id="h1-0-88" class="d">-
+</a><a href="#h1-0-89" id="h1-0-89" class="d">-long IndexKey::nodes() {
+</a><a href="#h1-0-90" id="h1-0-90" class="d">-    return stats_.nodes_;
+</a><a href="#h1-0-91" id="h1-0-91" class="d">-}
+</a><a href="#h1-0-92" id="h1-0-92" class="d">-
+</a><a href="#h1-0-93" id="h1-0-93" class="d">-int IndexKey::depth() {
+</a><a href="#h1-0-94" id="h1-0-94" class="d">-    return stats_.depth_;
+</a><a href="#h1-0-95" id="h1-0-95" class="d">-}
+</a><a href="#h1-0-96" id="h1-0-96" class="d">-
+</a><a href="#h1-0-97" id="h1-0-97" class="d">-void IndexKey::collect_tails(list&lt;IndexKey::iterator&gt;&amp; tails) {
+</a><a href="#h1-0-98" id="h1-0-98" class="d">-    set&lt;IndexKey*&gt; seen;
+</a><a href="#h1-0-99" id="h1-0-99" class="d">-    collect_tails(tails, seen);
+</a><a href="#h1-0-100" id="h1-0-100" class="d">-}
+</a><a href="#h1-0-101" id="h1-0-101" class="d">-
+</a><a href="#h1-0-102" id="h1-0-102" class="d">-void IndexKey::collect_tails(list&lt;IndexKey::const_iterator&gt;&amp; tails) {
+</a><a href="#h1-0-103" id="h1-0-103" class="d">-    list&lt;iterator&gt; tmp;
+</a><a href="#h1-0-104" id="h1-0-104" class="d">-    collect_tails(tmp);
+</a><a href="#h1-0-105" id="h1-0-105" class="d">-    tails.insert(tails.end(), tmp.begin(), tmp.end());
+</a><a href="#h1-0-106" id="h1-0-106" class="d">-}
+</a><a href="#h1-0-107" id="h1-0-107" class="d">-
+</a><a href="#h1-0-108" id="h1-0-108" class="d">-void IndexKey::collect_tails(list&lt;IndexKey::iterator&gt;&amp; tails,
+</a><a href="#h1-0-109" id="h1-0-109" class="d">-                             set&lt;IndexKey*&gt; &amp;seen) {
+</a><a href="#h1-0-110" id="h1-0-110" class="d">-    if (seen.find(this) != seen.end())
+</a><a href="#h1-0-111" id="h1-0-111" class="d">-        return;
+</a><a href="#h1-0-112" id="h1-0-112" class="d">-    seen.insert(this);
+</a><a href="#h1-0-113" id="h1-0-113" class="d">-
+</a><a href="#h1-0-114" id="h1-0-114" class="d">-    for (auto it = begin(); it != end(); ++it) {
+</a><a href="#h1-0-115" id="h1-0-115" class="d">-        if (it-&gt;second)
+</a><a href="#h1-0-116" id="h1-0-116" class="d">-            it-&gt;second-&gt;collect_tails(tails, seen);
+</a><a href="#h1-0-117" id="h1-0-117" class="d">-        else
+</a><a href="#h1-0-118" id="h1-0-118" class="d">-            tails.push_back(it);
+</a><a href="#h1-0-119" id="h1-0-119" class="d">-    }
+</a><a href="#h1-0-120" id="h1-0-120" class="d">-}
+</a><a href="#h1-0-121" id="h1-0-121" class="d">-
+</a><a href="#h1-0-122" id="h1-0-122" class="d">-void IndexKey::concat(intrusive_ptr&lt;IndexKey&gt; rhs) {
+</a><a href="#h1-0-123" id="h1-0-123" class="d">-    assert(anchor &amp; kAnchorRight);
+</a><a href="#h1-0-124" id="h1-0-124" class="d">-    assert(rhs-&gt;anchor &amp; kAnchorLeft);
+</a><a href="#h1-0-125" id="h1-0-125" class="d">-    assert(!empty());
+</a><a href="#h1-0-126" id="h1-0-126" class="d">-
+</a><a href="#h1-0-127" id="h1-0-127" class="d">-    if (rhs-&gt;empty())
+</a><a href="#h1-0-128" id="h1-0-128" class="d">-        return;
+</a><a href="#h1-0-129" id="h1-0-129" class="d">-
+</a><a href="#h1-0-130" id="h1-0-130" class="d">-    list&lt;IndexKey::iterator&gt; tails;
+</a><a href="#h1-0-131" id="h1-0-131" class="d">-    collect_tails(tails);
+</a><a href="#h1-0-132" id="h1-0-132" class="d">-    for (auto it = tails.begin(); it != tails.end(); ++it) {
+</a><a href="#h1-0-133" id="h1-0-133" class="d">-        assert(!(*it)-&gt;second);
+</a><a href="#h1-0-134" id="h1-0-134" class="d">-        (*it)-&gt;second = rhs;
+</a><a href="#h1-0-135" id="h1-0-135" class="d">-    }
+</a><a href="#h1-0-136" id="h1-0-136" class="d">-    if (anchor &amp; kAnchorRepeat)
+</a><a href="#h1-0-137" id="h1-0-137" class="d">-        anchor &amp;= ~kAnchorLeft;
+</a><a href="#h1-0-138" id="h1-0-138" class="d">-    if ((rhs-&gt;anchor &amp; (kAnchorRepeat|kAnchorRight)) != kAnchorRight)
+</a><a href="#h1-0-139" id="h1-0-139" class="d">-        anchor &amp;= ~kAnchorRight;
+</a><a href="#h1-0-140" id="h1-0-140" class="d">-
+</a><a href="#h1-0-141" id="h1-0-141" class="d">-    stats_ = stats_.concat(rhs-&gt;stats());
+</a><a href="#h1-0-142" id="h1-0-142" class="d">-}
+</a><a href="#h1-0-143" id="h1-0-143" class="d">-
+</a><a href="#h1-0-144" id="h1-0-144" class="d">-static string StrChar(uchar c) {
+</a><a href="#h1-0-145" id="h1-0-145" class="d">-    if (c &gt; &#39; &#39; &amp;&amp; c &lt;= &#39;~&#39;)
+</a><a href="#h1-0-146" id="h1-0-146" class="d">-        return strprintf(&quot;%c&quot;, c);
+</a><a href="#h1-0-147" id="h1-0-147" class="d">-    return strprintf(&quot;\\x%02x&quot;, c);
+</a><a href="#h1-0-148" id="h1-0-148" class="d">-}
+</a><a href="#h1-0-149" id="h1-0-149" class="d">-
+</a><a href="#h1-0-150" id="h1-0-150" class="d">-static string ToString(IndexKey *k, int indent = 0) {
+</a><a href="#h1-0-151" id="h1-0-151" class="d">-    string out;
+</a><a href="#h1-0-152" id="h1-0-152" class="d">-    if (k == 0)
+</a><a href="#h1-0-153" id="h1-0-153" class="d">-        return strprintf(&quot;%*.s[null]\n&quot;, indent, &quot;&quot;);
+</a><a href="#h1-0-154" id="h1-0-154" class="d">-    if (k-&gt;empty())
+</a><a href="#h1-0-155" id="h1-0-155" class="d">-        return strprintf(&quot;%*.s[]\n&quot;, indent, &quot;&quot;);
+</a><a href="#h1-0-156" id="h1-0-156" class="d">-
+</a><a href="#h1-0-157" id="h1-0-157" class="d">-    for (IndexKey::iterator it = k-&gt;begin(); it != k-&gt;end(); ++it) {
+</a><a href="#h1-0-158" id="h1-0-158" class="d">-        out += strprintf(&quot;%*.s[%s-%s] -&gt; \n&quot;,
+</a><a href="#h1-0-159" id="h1-0-159" class="d">-                         indent, &quot;&quot;,
+</a><a href="#h1-0-160" id="h1-0-160" class="d">-                         StrChar(it-&gt;first.first).c_str(),
+</a><a href="#h1-0-161" id="h1-0-161" class="d">-                         StrChar(it-&gt;first.second).c_str());
+</a><a href="#h1-0-162" id="h1-0-162" class="d">-        out += ToString(it-&gt;second.get(), indent + 1);
+</a><a href="#h1-0-163" id="h1-0-163" class="d">-    }
+</a><a href="#h1-0-164" id="h1-0-164" class="d">-    return out;
+</a><a href="#h1-0-165" id="h1-0-165" class="d">-}
+</a><a href="#h1-0-166" id="h1-0-166" class="d">-
+</a><a href="#h1-0-167" id="h1-0-167" class="d">-string IndexKey::ToString() {
+</a><a href="#h1-0-168" id="h1-0-168" class="d">-    string out = ::ToString(this, 0);
+</a><a href="#h1-0-169" id="h1-0-169" class="d">-
+</a><a href="#h1-0-170" id="h1-0-170" class="d">-    out += &quot;|&quot;;
+</a><a href="#h1-0-171" id="h1-0-171" class="d">-    if (anchor &amp; kAnchorLeft)
+</a><a href="#h1-0-172" id="h1-0-172" class="d">-        out += &quot;&lt;&quot;;
+</a><a href="#h1-0-173" id="h1-0-173" class="d">-    if (anchor &amp; kAnchorRepeat)
+</a><a href="#h1-0-174" id="h1-0-174" class="d">-        out += &quot;*&quot;;
+</a><a href="#h1-0-175" id="h1-0-175" class="d">-    if (anchor &amp; kAnchorRight)
+</a><a href="#h1-0-176" id="h1-0-176" class="d">-        out += &quot;&gt;&quot;;
+</a><a href="#h1-0-177" id="h1-0-177" class="d">-    return out;
+</a><a href="#h1-0-178" id="h1-0-178" class="d">-}
+</a><a href="#h1-0-179" id="h1-0-179" class="d">-
+</a><a href="#h1-0-180" id="h1-0-180" class="d">-class IndexWalker : public Regexp::Walker&lt;intrusive_ptr&lt;IndexKey&gt; &gt; {
+</a><a href="#h1-0-181" id="h1-0-181" class="d">-public:
+</a><a href="#h1-0-182" id="h1-0-182" class="d">-    IndexWalker() { }
+</a><a href="#h1-0-183" id="h1-0-183" class="d">-    virtual intrusive_ptr&lt;IndexKey&gt;
+</a><a href="#h1-0-184" id="h1-0-184" class="d">-    PostVisit(Regexp* re, intrusive_ptr&lt;IndexKey&gt; parent_arg,
+</a><a href="#h1-0-185" id="h1-0-185" class="d">-              intrusive_ptr&lt;IndexKey&gt; pre_arg,
+</a><a href="#h1-0-186" id="h1-0-186" class="d">-              intrusive_ptr&lt;IndexKey&gt; *child_args, int nchild_args);
+</a><a href="#h1-0-187" id="h1-0-187" class="d">-
+</a><a href="#h1-0-188" id="h1-0-188" class="d">-    virtual intrusive_ptr&lt;IndexKey&gt;
+</a><a href="#h1-0-189" id="h1-0-189" class="d">-    ShortVisit(Regexp* re,
+</a><a href="#h1-0-190" id="h1-0-190" class="d">-               intrusive_ptr&lt;IndexKey&gt; parent_arg);
+</a><a href="#h1-0-191" id="h1-0-191" class="d">-
+</a><a href="#h1-0-192" id="h1-0-192" class="d">-private:
+</a><a href="#h1-0-193" id="h1-0-193" class="d">-    IndexWalker(const IndexWalker&amp;);
+</a><a href="#h1-0-194" id="h1-0-194" class="d">-    void operator=(const IndexWalker&amp;);
+</a><a href="#h1-0-195" id="h1-0-195" class="d">-};
+</a><a href="#h1-0-196" id="h1-0-196" class="d">-
+</a><a href="#h1-0-197" id="h1-0-197" class="d">-namespace {
+</a><a href="#h1-0-198" id="h1-0-198" class="d">-    typedef map&lt;pair&lt;intrusive_ptr&lt;IndexKey&gt;, intrusive_ptr&lt;IndexKey&gt; &gt;,
+</a><a href="#h1-0-199" id="h1-0-199" class="d">-                intrusive_ptr&lt;IndexKey&gt; &gt; alternate_cache;
+</a><a href="#h1-0-200" id="h1-0-200" class="d">-
+</a><a href="#h1-0-201" id="h1-0-201" class="d">-    intrusive_ptr&lt;IndexKey&gt; Alternate(alternate_cache&amp;,
+</a><a href="#h1-0-202" id="h1-0-202" class="d">-                                   intrusive_ptr&lt;IndexKey&gt;,
+</a><a href="#h1-0-203" id="h1-0-203" class="d">-                                   intrusive_ptr&lt;IndexKey&gt;);
+</a><a href="#h1-0-204" id="h1-0-204" class="d">-
+</a><a href="#h1-0-205" id="h1-0-205" class="d">-    string RuneToString(Rune r) {
+</a><a href="#h1-0-206" id="h1-0-206" class="d">-        char buf[UTFmax];
+</a><a href="#h1-0-207" id="h1-0-207" class="d">-        int n = runetochar(buf, &amp;r);
+</a><a href="#h1-0-208" id="h1-0-208" class="d">-        return string(buf, n);
+</a><a href="#h1-0-209" id="h1-0-209" class="d">-    }
+</a><a href="#h1-0-210" id="h1-0-210" class="d">-
+</a><a href="#h1-0-211" id="h1-0-211" class="d">-    intrusive_ptr&lt;IndexKey&gt; Any() {
+</a><a href="#h1-0-212" id="h1-0-212" class="d">-        return intrusive_ptr&lt;IndexKey&gt;(new IndexKey());
+</a><a href="#h1-0-213" id="h1-0-213" class="d">-    }
+</a><a href="#h1-0-214" id="h1-0-214" class="d">-
+</a><a href="#h1-0-215" id="h1-0-215" class="d">-    intrusive_ptr&lt;IndexKey&gt; Empty() {
+</a><a href="#h1-0-216" id="h1-0-216" class="d">-        return intrusive_ptr&lt;IndexKey&gt;(new IndexKey(kAnchorBoth));
+</a><a href="#h1-0-217" id="h1-0-217" class="d">-    }
+</a><a href="#h1-0-218" id="h1-0-218" class="d">-
+</a><a href="#h1-0-219" id="h1-0-219" class="d">-    intrusive_ptr&lt;IndexKey&gt; Literal(string s) {
+</a><a href="#h1-0-220" id="h1-0-220" class="d">-        intrusive_ptr&lt;IndexKey&gt; k = 0;
+</a><a href="#h1-0-221" id="h1-0-221" class="d">-        for (string::reverse_iterator it = s.rbegin();
+</a><a href="#h1-0-222" id="h1-0-222" class="d">-             it != s.rend(); ++it) {
+</a><a href="#h1-0-223" id="h1-0-223" class="d">-            k = intrusive_ptr&lt;IndexKey&gt;(new IndexKey(pair&lt;uchar, uchar&gt;(*it, *it), k));
+</a><a href="#h1-0-224" id="h1-0-224" class="d">-        }
+</a><a href="#h1-0-225" id="h1-0-225" class="d">-        k-&gt;anchor = kAnchorBoth;
+</a><a href="#h1-0-226" id="h1-0-226" class="d">-        return k;
+</a><a href="#h1-0-227" id="h1-0-227" class="d">-    }
+</a><a href="#h1-0-228" id="h1-0-228" class="d">-
+</a><a href="#h1-0-229" id="h1-0-229" class="d">-    intrusive_ptr&lt;IndexKey&gt; Literal(Rune r) {
+</a><a href="#h1-0-230" id="h1-0-230" class="d">-        return Literal(RuneToString(r));
+</a><a href="#h1-0-231" id="h1-0-231" class="d">-    }
+</a><a href="#h1-0-232" id="h1-0-232" class="d">-
+</a><a href="#h1-0-233" id="h1-0-233" class="d">-    intrusive_ptr&lt;IndexKey&gt; CaseFoldLiteral(Rune r) {
+</a><a href="#h1-0-234" id="h1-0-234" class="d">-        if (r &gt; 127)
+</a><a href="#h1-0-235" id="h1-0-235" class="d">-            return Any();
+</a><a href="#h1-0-236" id="h1-0-236" class="d">-        if (r &lt; &#39;a&#39; || r &gt; &#39;z&#39;) {
+</a><a href="#h1-0-237" id="h1-0-237" class="d">-            return Literal(r);
+</a><a href="#h1-0-238" id="h1-0-238" class="d">-        }
+</a><a href="#h1-0-239" id="h1-0-239" class="d">-        intrusive_ptr&lt;IndexKey&gt; k(new IndexKey(kAnchorBoth));
+</a><a href="#h1-0-240" id="h1-0-240" class="d">-        k-&gt;insert(make_pair(make_pair((uchar)r, (uchar)r), (IndexKey*)0));
+</a><a href="#h1-0-241" id="h1-0-241" class="d">-        k-&gt;insert(make_pair(make_pair((uchar)r - &#39;a&#39; + &#39;A&#39;,
+</a><a href="#h1-0-242" id="h1-0-242" class="d">-                                      (uchar)r - &#39;a&#39; + &#39;A&#39;), (IndexKey*)0));
+</a><a href="#h1-0-243" id="h1-0-243" class="d">-        return k;
+</a><a href="#h1-0-244" id="h1-0-244" class="d">-    }
+</a><a href="#h1-0-245" id="h1-0-245" class="d">-
+</a><a href="#h1-0-246" id="h1-0-246" class="d">-    intrusive_ptr&lt;IndexKey&gt; Literal(Rune *runes, int nrunes) {
+</a><a href="#h1-0-247" id="h1-0-247" class="d">-        string lit;
+</a><a href="#h1-0-248" id="h1-0-248" class="d">-
+</a><a href="#h1-0-249" id="h1-0-249" class="d">-        for (int i = 0; i &lt; nrunes; i++) {
+</a><a href="#h1-0-250" id="h1-0-250" class="d">-            lit.append(RuneToString(runes[i]));
+</a><a href="#h1-0-251" id="h1-0-251" class="d">-        }
+</a><a href="#h1-0-252" id="h1-0-252" class="d">-
+</a><a href="#h1-0-253" id="h1-0-253" class="d">-        return Literal(lit);
+</a><a href="#h1-0-254" id="h1-0-254" class="d">-    }
+</a><a href="#h1-0-255" id="h1-0-255" class="d">-
+</a><a href="#h1-0-256" id="h1-0-256" class="d">-    intrusive_ptr&lt;IndexKey&gt; Concat(intrusive_ptr&lt;IndexKey&gt; *children, int nchildren);
+</a><a href="#h1-0-257" id="h1-0-257" class="d">-    intrusive_ptr&lt;IndexKey&gt; CaseFoldLiteral(Rune *runes, int nrunes) {
+</a><a href="#h1-0-258" id="h1-0-258" class="d">-        if (nrunes == 0)
+</a><a href="#h1-0-259" id="h1-0-259" class="d">-            return Empty();
+</a><a href="#h1-0-260" id="h1-0-260" class="d">-        std::vector&lt;intrusive_ptr&lt;IndexKey&gt; &gt; keys;
+</a><a href="#h1-0-261" id="h1-0-261" class="d">-        for (int i = 0; i &lt; nrunes; ++i) {
+</a><a href="#h1-0-262" id="h1-0-262" class="d">-            keys.push_back(CaseFoldLiteral(runes[i]));
+</a><a href="#h1-0-263" id="h1-0-263" class="d">-        }
+</a><a href="#h1-0-264" id="h1-0-264" class="d">-        return Concat(&amp;keys[0], nrunes);
+</a><a href="#h1-0-265" id="h1-0-265" class="d">-    }
+</a><a href="#h1-0-266" id="h1-0-266" class="d">-
+</a><a href="#h1-0-267" id="h1-0-267" class="d">-    intrusive_ptr&lt;IndexKey&gt; LexRange(const string &amp;lo, const string&amp; hi) {
+</a><a href="#h1-0-268" id="h1-0-268" class="d">-        if (lo.size() == 0 &amp;&amp; hi.size() == 0)
+</a><a href="#h1-0-269" id="h1-0-269" class="d">-            return intrusive_ptr&lt;IndexKey&gt;();
+</a><a href="#h1-0-270" id="h1-0-270" class="d">-        if (lo.size() == 0)
+</a><a href="#h1-0-271" id="h1-0-271" class="d">-            return Literal(hi);
+</a><a href="#h1-0-272" id="h1-0-272" class="d">-
+</a><a href="#h1-0-273" id="h1-0-273" class="d">-        intrusive_ptr&lt;IndexKey&gt; out(new IndexKey(kAnchorBoth));
+</a><a href="#h1-0-274" id="h1-0-274" class="d">-        assert(hi.size() != 0);
+</a><a href="#h1-0-275" id="h1-0-275" class="d">-        if (lo[0] &lt; hi[0])
+</a><a href="#h1-0-276" id="h1-0-276" class="d">-            out-&gt;insert(IndexKey::value_type
+</a><a href="#h1-0-277" id="h1-0-277" class="d">-                        (pair&lt;uchar, uchar&gt;(lo[0], hi[0] - 1), (IndexKey*)0));
+</a><a href="#h1-0-278" id="h1-0-278" class="d">-        out-&gt;insert(IndexKey::value_type
+</a><a href="#h1-0-279" id="h1-0-279" class="d">-                    (pair&lt;uchar, uchar&gt;(hi[0], hi[0]),
+</a><a href="#h1-0-280" id="h1-0-280" class="d">-                     LexRange(lo.substr(1), hi.substr(1))));
+</a><a href="#h1-0-281" id="h1-0-281" class="d">-        return out;
+</a><a href="#h1-0-282" id="h1-0-282" class="d">-    }
+</a><a href="#h1-0-283" id="h1-0-283" class="d">-
+</a><a href="#h1-0-284" id="h1-0-284" class="d">-    intrusive_ptr&lt;IndexKey&gt; CClass(CharClass *cc) {
+</a><a href="#h1-0-285" id="h1-0-285" class="d">-        if (cc-&gt;size() &gt; kMaxWidth)
+</a><a href="#h1-0-286" id="h1-0-286" class="d">-            return Any();
+</a><a href="#h1-0-287" id="h1-0-287" class="d">-
+</a><a href="#h1-0-288" id="h1-0-288" class="d">-        intrusive_ptr&lt;IndexKey&gt; k(new IndexKey(kAnchorBoth));
+</a><a href="#h1-0-289" id="h1-0-289" class="d">-
+</a><a href="#h1-0-290" id="h1-0-290" class="d">-        for (CharClass::iterator i = cc-&gt;begin(); i != cc-&gt;end(); ++i) {
+</a><a href="#h1-0-291" id="h1-0-291" class="d">-            if (i-&gt;hi &lt; Runeself)
+</a><a href="#h1-0-292" id="h1-0-292" class="d">-                k-&gt;insert(IndexKey::value_type
+</a><a href="#h1-0-293" id="h1-0-293" class="d">-                          (pair&lt;uchar, uchar&gt;(i-&gt;lo, i-&gt;hi),
+</a><a href="#h1-0-294" id="h1-0-294" class="d">-                           (IndexKey*)0));
+</a><a href="#h1-0-295" id="h1-0-295" class="d">-            else {
+</a><a href="#h1-0-296" id="h1-0-296" class="d">-                alternate_cache cache;
+</a><a href="#h1-0-297" id="h1-0-297" class="d">-                k = Alternate(cache, k, LexRange(RuneToString(i-&gt;lo),
+</a><a href="#h1-0-298" id="h1-0-298" class="d">-                                                 RuneToString(i-&gt;hi)));
+</a><a href="#h1-0-299" id="h1-0-299" class="d">-            }
+</a><a href="#h1-0-300" id="h1-0-300" class="d">-        }
+</a><a href="#h1-0-301" id="h1-0-301" class="d">-
+</a><a href="#h1-0-302" id="h1-0-302" class="d">-        return k;
+</a><a href="#h1-0-303" id="h1-0-303" class="d">-    }
+</a><a href="#h1-0-304" id="h1-0-304" class="d">-
+</a><a href="#h1-0-305" id="h1-0-305" class="d">-    bool ShouldConcat(intrusive_ptr&lt;IndexKey&gt; lhs, intrusive_ptr&lt;IndexKey&gt; rhs) {
+</a><a href="#h1-0-306" id="h1-0-306" class="d">-        assert(lhs &amp;&amp; rhs);
+</a><a href="#h1-0-307" id="h1-0-307" class="d">-        if (!(lhs-&gt;anchor &amp; kAnchorRight) ||
+</a><a href="#h1-0-308" id="h1-0-308" class="d">-            !(rhs-&gt;anchor &amp; kAnchorLeft))
+</a><a href="#h1-0-309" id="h1-0-309" class="d">-            return false;
+</a><a href="#h1-0-310" id="h1-0-310" class="d">-        if (lhs-&gt;empty())
+</a><a href="#h1-0-311" id="h1-0-311" class="d">-            return false;
+</a><a href="#h1-0-312" id="h1-0-312" class="d">-        IndexKey::Stats concat = lhs-&gt;stats().concat(rhs-&gt;stats());
+</a><a href="#h1-0-313" id="h1-0-313" class="d">-        if (concat.nodes_ &gt;= kMaxNodes)
+</a><a href="#h1-0-314" id="h1-0-314" class="d">-            return false;
+</a><a href="#h1-0-315" id="h1-0-315" class="d">-        return true;
+</a><a href="#h1-0-316" id="h1-0-316" class="d">-    }
+</a><a href="#h1-0-317" id="h1-0-317" class="d">-
+</a><a href="#h1-0-318" id="h1-0-318" class="d">-    bool Prefer(const IndexKey::Stats&amp; lhs,
+</a><a href="#h1-0-319" id="h1-0-319" class="d">-                const IndexKey::Stats&amp; rhs) {
+</a><a href="#h1-0-320" id="h1-0-320" class="d">-        return (lhs.selectivity_ &lt; rhs.selectivity_);
+</a><a href="#h1-0-321" id="h1-0-321" class="d">-        /*
+</a><a href="#h1-0-322" id="h1-0-322" class="d">-        return (kRECost * lhs.selectivity_ + kNodeCost * lhs.nodes_ &lt;
+</a><a href="#h1-0-323" id="h1-0-323" class="d">-                kRECost * rhs.selectivity_ + kNodeCost * rhs.nodes_);
+</a><a href="#h1-0-324" id="h1-0-324" class="d">-        */
+</a><a href="#h1-0-325" id="h1-0-325" class="d">-    }
+</a><a href="#h1-0-326" id="h1-0-326" class="d">-
+</a><a href="#h1-0-327" id="h1-0-327" class="d">-    intrusive_ptr&lt;IndexKey&gt; Concat(intrusive_ptr&lt;IndexKey&gt; lhs, intrusive_ptr&lt;IndexKey&gt; rhs) {
+</a><a href="#h1-0-328" id="h1-0-328" class="d">-        assert(lhs);
+</a><a href="#h1-0-329" id="h1-0-329" class="d">-        intrusive_ptr&lt;IndexKey&gt; out = lhs;
+</a><a href="#h1-0-330" id="h1-0-330" class="d">-
+</a><a href="#h1-0-331" id="h1-0-331" class="d">-        debug(kDebugIndexAll,
+</a><a href="#h1-0-332" id="h1-0-332" class="d">-              &quot;Concat([%s](%ld), [%s](%ld)) = &quot;,
+</a><a href="#h1-0-333" id="h1-0-333" class="d">-              lhs ? lhs-&gt;ToString().c_str() : &quot;&quot;,
+</a><a href="#h1-0-334" id="h1-0-334" class="d">-              lhs-&gt;nodes(),
+</a><a href="#h1-0-335" id="h1-0-335" class="d">-              rhs ? rhs-&gt;ToString().c_str() : &quot;&quot;,
+</a><a href="#h1-0-336" id="h1-0-336" class="d">-              rhs-&gt;nodes());
+</a><a href="#h1-0-337" id="h1-0-337" class="d">-
+</a><a href="#h1-0-338" id="h1-0-338" class="d">-        if (ShouldConcat(lhs, rhs)) {
+</a><a href="#h1-0-339" id="h1-0-339" class="d">-            out-&gt;concat(rhs);
+</a><a href="#h1-0-340" id="h1-0-340" class="d">-        } else if(Prefer(lhs-&gt;stats(), rhs-&gt;stats()))  {
+</a><a href="#h1-0-341" id="h1-0-341" class="d">-            out-&gt;anchor &amp;= ~kAnchorRight;
+</a><a href="#h1-0-342" id="h1-0-342" class="d">-        } else {
+</a><a href="#h1-0-343" id="h1-0-343" class="d">-            out = rhs;
+</a><a href="#h1-0-344" id="h1-0-344" class="d">-            out-&gt;anchor &amp;= ~kAnchorLeft;
+</a><a href="#h1-0-345" id="h1-0-345" class="d">-        }
+</a><a href="#h1-0-346" id="h1-0-346" class="d">-
+</a><a href="#h1-0-347" id="h1-0-347" class="d">-        debug(kDebugIndexAll, &quot;[%s]&quot;, out-&gt;ToString().c_str());
+</a><a href="#h1-0-348" id="h1-0-348" class="d">-
+</a><a href="#h1-0-349" id="h1-0-349" class="d">-        return out;
+</a><a href="#h1-0-350" id="h1-0-350" class="d">-    }
+</a><a href="#h1-0-351" id="h1-0-351" class="d">-
+</a><a href="#h1-0-352" id="h1-0-352" class="d">-    IndexKey::Stats TryConcat(intrusive_ptr&lt;IndexKey&gt; *start,
+</a><a href="#h1-0-353" id="h1-0-353" class="d">-                              intrusive_ptr&lt;IndexKey&gt; *end) {
+</a><a href="#h1-0-354" id="h1-0-354" class="d">-        IndexKey::Stats st = (*start)-&gt;stats();
+</a><a href="#h1-0-355" id="h1-0-355" class="d">-        debug(kDebugIndexAll, &quot;TryConcat: Searching suffix of length %d&quot;,
+</a><a href="#h1-0-356" id="h1-0-356" class="d">-              int(end - start));
+</a><a href="#h1-0-357" id="h1-0-357" class="d">-        if (!*start || !((*start)-&gt;anchor &amp; kAnchorRight) || (*start)-&gt;empty()) {
+</a><a href="#h1-0-358" id="h1-0-358" class="d">-            debug(kDebugIndexAll, &quot;!ConcatRight, returning early.&quot;);
+</a><a href="#h1-0-359" id="h1-0-359" class="d">-            return st;
+</a><a href="#h1-0-360" id="h1-0-360" class="d">-        }
+</a><a href="#h1-0-361" id="h1-0-361" class="d">-        for (intrusive_ptr&lt;IndexKey&gt; *ptr = start + 1; ptr != end; ptr++) {
+</a><a href="#h1-0-362" id="h1-0-362" class="d">-            if (!*(ptr) || !((*ptr)-&gt;anchor &amp; kAnchorLeft))
+</a><a href="#h1-0-363" id="h1-0-363" class="d">-                break;
+</a><a href="#h1-0-364" id="h1-0-364" class="d">-            IndexKey::Stats concat = st.concat((*ptr)-&gt;stats());
+</a><a href="#h1-0-365" id="h1-0-365" class="d">-
+</a><a href="#h1-0-366" id="h1-0-366" class="d">-            if (concat.nodes_ &gt;= kMaxNodes)
+</a><a href="#h1-0-367" id="h1-0-367" class="d">-                break;
+</a><a href="#h1-0-368" id="h1-0-368" class="d">-
+</a><a href="#h1-0-369" id="h1-0-369" class="d">-            st = concat;
+</a><a href="#h1-0-370" id="h1-0-370" class="d">-
+</a><a href="#h1-0-371" id="h1-0-371" class="d">-            if (((*ptr)-&gt;anchor &amp; (kAnchorRepeat|kAnchorRight)) != kAnchorRight)
+</a><a href="#h1-0-372" id="h1-0-372" class="d">-                break;
+</a><a href="#h1-0-373" id="h1-0-373" class="d">-        }
+</a><a href="#h1-0-374" id="h1-0-374" class="d">-        debug(kDebugIndexAll, &quot;TryConcat: nodes=%ld, selectivity=%f&quot;,
+</a><a href="#h1-0-375" id="h1-0-375" class="d">-              st.nodes_, st.selectivity_);
+</a><a href="#h1-0-376" id="h1-0-376" class="d">-        return st;
+</a><a href="#h1-0-377" id="h1-0-377" class="d">-    }
+</a><a href="#h1-0-378" id="h1-0-378" class="d">-
+</a><a href="#h1-0-379" id="h1-0-379" class="d">-    intrusive_ptr&lt;IndexKey&gt; Concat(intrusive_ptr&lt;IndexKey&gt; *children,
+</a><a href="#h1-0-380" id="h1-0-380" class="d">-                                int nchildren) {
+</a><a href="#h1-0-381" id="h1-0-381" class="d">-        intrusive_ptr&lt;IndexKey&gt; *end = children + nchildren, *best_start = 0, *ptr;
+</a><a href="#h1-0-382" id="h1-0-382" class="d">-        IndexKey::Stats best_stats;
+</a><a href="#h1-0-383" id="h1-0-383" class="d">-
+</a><a href="#h1-0-384" id="h1-0-384" class="d">-        debug(kDebugIndexAll, &quot;Concat: Searching %d positions&quot;, nchildren);
+</a><a href="#h1-0-385" id="h1-0-385" class="d">-        for (ptr = children; ptr != end; ptr++) {
+</a><a href="#h1-0-386" id="h1-0-386" class="d">-            IndexKey::Stats st = TryConcat(ptr, end);
+</a><a href="#h1-0-387" id="h1-0-387" class="d">-            if (st.nodes_ &gt; 1 &amp;&amp; Prefer(st, best_stats)) {
+</a><a href="#h1-0-388" id="h1-0-388" class="d">-                debug(kDebugIndexAll, &quot;Concat: Found new best: %d: %f&quot;,
+</a><a href="#h1-0-389" id="h1-0-389" class="d">-                      int(ptr - children), st.selectivity_);
+</a><a href="#h1-0-390" id="h1-0-390" class="d">-                best_start = ptr;
+</a><a href="#h1-0-391" id="h1-0-391" class="d">-                best_stats = st;
+</a><a href="#h1-0-392" id="h1-0-392" class="d">-            }
+</a><a href="#h1-0-393" id="h1-0-393" class="d">-        }
+</a><a href="#h1-0-394" id="h1-0-394" class="d">-
+</a><a href="#h1-0-395" id="h1-0-395" class="d">-        if (best_start == 0) {
+</a><a href="#h1-0-396" id="h1-0-396" class="d">-            debug(kDebugIndexAll, &quot;Concat: No good results found.&quot;);
+</a><a href="#h1-0-397" id="h1-0-397" class="d">-            return Any();
+</a><a href="#h1-0-398" id="h1-0-398" class="d">-        }
+</a><a href="#h1-0-399" id="h1-0-399" class="d">-
+</a><a href="#h1-0-400" id="h1-0-400" class="d">-        intrusive_ptr&lt;IndexKey&gt; out = *best_start;
+</a><a href="#h1-0-401" id="h1-0-401" class="d">-        for (ptr = best_start + 1; ptr != end; ptr++) {
+</a><a href="#h1-0-402" id="h1-0-402" class="d">-            out = Concat(out, *ptr);
+</a><a href="#h1-0-403" id="h1-0-403" class="d">-        }
+</a><a href="#h1-0-404" id="h1-0-404" class="d">-        if (best_start != children)
+</a><a href="#h1-0-405" id="h1-0-405" class="d">-            out-&gt;anchor &amp;= ~kAnchorLeft;
+</a><a href="#h1-0-406" id="h1-0-406" class="d">-        return out;
+</a><a href="#h1-0-407" id="h1-0-407" class="d">-    }
+</a><a href="#h1-0-408" id="h1-0-408" class="d">-
+</a><a href="#h1-0-409" id="h1-0-409" class="d">-    bool intersects(const pair&lt;uchar, uchar&gt;&amp; left,
+</a><a href="#h1-0-410" id="h1-0-410" class="d">-                    const pair&lt;uchar, uchar&gt;&amp; right) {
+</a><a href="#h1-0-411" id="h1-0-411" class="d">-        if (left.first &lt;= right.first)
+</a><a href="#h1-0-412" id="h1-0-412" class="d">-            return left.second &gt;= right.first;
+</a><a href="#h1-0-413" id="h1-0-413" class="d">-        else
+</a><a href="#h1-0-414" id="h1-0-414" class="d">-            return right.second &gt;= left.first;
+</a><a href="#h1-0-415" id="h1-0-415" class="d">-    }
+</a><a href="#h1-0-416" id="h1-0-416" class="d">-
+</a><a href="#h1-0-417" id="h1-0-417" class="d">-    enum {
+</a><a href="#h1-0-418" id="h1-0-418" class="d">-        kTakeLeft  = 0x01,
+</a><a href="#h1-0-419" id="h1-0-419" class="d">-        kTakeRight = 0x02,
+</a><a href="#h1-0-420" id="h1-0-420" class="d">-        kTakeBoth  = 0x03
+</a><a href="#h1-0-421" id="h1-0-421" class="d">-    };
+</a><a href="#h1-0-422" id="h1-0-422" class="d">-
+</a><a href="#h1-0-423" id="h1-0-423" class="d">-    int Merge(alternate_cache&amp; cache,
+</a><a href="#h1-0-424" id="h1-0-424" class="d">-              intrusive_ptr&lt;IndexKey&gt; out,
+</a><a href="#h1-0-425" id="h1-0-425" class="d">-              pair&lt;uchar, uchar&gt;&amp; left,
+</a><a href="#h1-0-426" id="h1-0-426" class="d">-              intrusive_ptr&lt;IndexKey&gt; lnext,
+</a><a href="#h1-0-427" id="h1-0-427" class="d">-              pair&lt;uchar, uchar&gt;&amp; right,
+</a><a href="#h1-0-428" id="h1-0-428" class="d">-              intrusive_ptr&lt;IndexKey&gt; rnext) {
+</a><a href="#h1-0-429" id="h1-0-429" class="d">-        if (intersects(left, right)) {
+</a><a href="#h1-0-430" id="h1-0-430" class="d">-            debug(kDebugIndexAll,
+</a><a href="#h1-0-431" id="h1-0-431" class="d">-                  &quot;Processing intersection: &lt;%hhx,%hhx&gt; vs. &lt;%hhx,%hhx&gt;&quot;,
+</a><a href="#h1-0-432" id="h1-0-432" class="d">-                  left.first, left.second, right.first, right.second);
+</a><a href="#h1-0-433" id="h1-0-433" class="d">-            if (left.first &lt; right.first) {
+</a><a href="#h1-0-434" id="h1-0-434" class="d">-                out-&gt;insert
+</a><a href="#h1-0-435" id="h1-0-435" class="d">-                    (make_pair(make_pair(left.first,
+</a><a href="#h1-0-436" id="h1-0-436" class="d">-                                         right.first - 1),
+</a><a href="#h1-0-437" id="h1-0-437" class="d">-                               lnext));
+</a><a href="#h1-0-438" id="h1-0-438" class="d">-                left.first = right.first;
+</a><a href="#h1-0-439" id="h1-0-439" class="d">-            } else if (right.first &lt; left.first) {
+</a><a href="#h1-0-440" id="h1-0-440" class="d">-                out-&gt;insert
+</a><a href="#h1-0-441" id="h1-0-441" class="d">-                    (make_pair(make_pair(right.first,
+</a><a href="#h1-0-442" id="h1-0-442" class="d">-                                         left.first - 1),
+</a><a href="#h1-0-443" id="h1-0-443" class="d">-                               rnext));
+</a><a href="#h1-0-444" id="h1-0-444" class="d">-                right.first = left.first;
+</a><a href="#h1-0-445" id="h1-0-445" class="d">-            }
+</a><a href="#h1-0-446" id="h1-0-446" class="d">-            /* left and right now start at the same location */
+</a><a href="#h1-0-447" id="h1-0-447" class="d">-            assert(left.first == right.first);
+</a><a href="#h1-0-448" id="h1-0-448" class="d">-
+</a><a href="#h1-0-449" id="h1-0-449" class="d">-            uchar end = min(left.second, right.second);
+</a><a href="#h1-0-450" id="h1-0-450" class="d">-            out-&gt;insert
+</a><a href="#h1-0-451" id="h1-0-451" class="d">-                (make_pair(make_pair(left.first, end),
+</a><a href="#h1-0-452" id="h1-0-452" class="d">-                           Alternate(cache, lnext, rnext)));
+</a><a href="#h1-0-453" id="h1-0-453" class="d">-            if (left.second &gt; end) {
+</a><a href="#h1-0-454" id="h1-0-454" class="d">-                left.first = end+1;
+</a><a href="#h1-0-455" id="h1-0-455" class="d">-                return kTakeRight;
+</a><a href="#h1-0-456" id="h1-0-456" class="d">-            } else if (right.second &gt; end) {
+</a><a href="#h1-0-457" id="h1-0-457" class="d">-                right.first = end+1;
+</a><a href="#h1-0-458" id="h1-0-458" class="d">-                return kTakeLeft;
+</a><a href="#h1-0-459" id="h1-0-459" class="d">-            }
+</a><a href="#h1-0-460" id="h1-0-460" class="d">-            return kTakeBoth;
+</a><a href="#h1-0-461" id="h1-0-461" class="d">-        }
+</a><a href="#h1-0-462" id="h1-0-462" class="d">-        /* Non-intersecting */
+</a><a href="#h1-0-463" id="h1-0-463" class="d">-        if (left.first &lt; right.first) {
+</a><a href="#h1-0-464" id="h1-0-464" class="d">-            out-&gt;insert(make_pair(left, lnext));
+</a><a href="#h1-0-465" id="h1-0-465" class="d">-            return kTakeLeft;
+</a><a href="#h1-0-466" id="h1-0-466" class="d">-        }
+</a><a href="#h1-0-467" id="h1-0-467" class="d">-        assert(right.first &lt; left.first);
+</a><a href="#h1-0-468" id="h1-0-468" class="d">-        out-&gt;insert(make_pair(right, rnext));
+</a><a href="#h1-0-469" id="h1-0-469" class="d">-        return kTakeRight;
+</a><a href="#h1-0-470" id="h1-0-470" class="d">-    }
+</a><a href="#h1-0-471" id="h1-0-471" class="d">-
+</a><a href="#h1-0-472" id="h1-0-472" class="d">-    intrusive_ptr&lt;IndexKey&gt; AlternateInternal(alternate_cache&amp; cache,
+</a><a href="#h1-0-473" id="h1-0-473" class="d">-                                           intrusive_ptr&lt;IndexKey&gt; lhs,
+</a><a href="#h1-0-474" id="h1-0-474" class="d">-                                           intrusive_ptr&lt;IndexKey&gt; rhs) {
+</a><a href="#h1-0-475" id="h1-0-475" class="d">-        if (lhs == rhs)
+</a><a href="#h1-0-476" id="h1-0-476" class="d">-            return lhs;
+</a><a href="#h1-0-477" id="h1-0-477" class="d">-        if (!lhs || !rhs ||
+</a><a href="#h1-0-478" id="h1-0-478" class="d">-            lhs-&gt;empty() || rhs-&gt;empty() ||
+</a><a href="#h1-0-479" id="h1-0-479" class="d">-            lhs-&gt;size() + rhs-&gt;size() &gt;= kMaxWidth)
+</a><a href="#h1-0-480" id="h1-0-480" class="d">-            return Any();
+</a><a href="#h1-0-481" id="h1-0-481" class="d">-
+</a><a href="#h1-0-482" id="h1-0-482" class="d">-        static int recursion_depth = 0;
+</a><a href="#h1-0-483" id="h1-0-483" class="d">-        RecursionCounter guard(recursion_depth);
+</a><a href="#h1-0-484" id="h1-0-484" class="d">-        if (recursion_depth &gt; kMaxRecursion)
+</a><a href="#h1-0-485" id="h1-0-485" class="d">-            return Any();
+</a><a href="#h1-0-486" id="h1-0-486" class="d">-
+</a><a href="#h1-0-487" id="h1-0-487" class="d">-        intrusive_ptr&lt;IndexKey&gt; out(new IndexKey(lhs-&gt;anchor &amp; rhs-&gt;anchor &amp; (kAnchorLeft|kAnchorRight)));
+</a><a href="#h1-0-488" id="h1-0-488" class="d">-        IndexKey::const_iterator lit, rit;
+</a><a href="#h1-0-489" id="h1-0-489" class="d">-        lit = lhs-&gt;begin();
+</a><a href="#h1-0-490" id="h1-0-490" class="d">-        rit = rhs-&gt;begin();
+</a><a href="#h1-0-491" id="h1-0-491" class="d">-        pair&lt;uchar, uchar&gt; left;
+</a><a href="#h1-0-492" id="h1-0-492" class="d">-        if (lit != lhs-&gt;end())
+</a><a href="#h1-0-493" id="h1-0-493" class="d">-            left = lit-&gt;first;
+</a><a href="#h1-0-494" id="h1-0-494" class="d">-        pair&lt;uchar, uchar&gt; right = rit-&gt;first;
+</a><a href="#h1-0-495" id="h1-0-495" class="d">-        if (rit != rhs-&gt;end())
+</a><a href="#h1-0-496" id="h1-0-496" class="d">-            right = rit-&gt;first;
+</a><a href="#h1-0-497" id="h1-0-497" class="d">-        while (lit != lhs-&gt;end() &amp;&amp; rit != rhs-&gt;end()) {
+</a><a href="#h1-0-498" id="h1-0-498" class="d">-            int action = Merge(cache, out, left, lit-&gt;second, right, rit-&gt;second);
+</a><a href="#h1-0-499" id="h1-0-499" class="d">-            if (action &amp; kTakeLeft)
+</a><a href="#h1-0-500" id="h1-0-500" class="d">-                if (++lit != lhs-&gt;end())
+</a><a href="#h1-0-501" id="h1-0-501" class="d">-                    left = lit-&gt;first;
+</a><a href="#h1-0-502" id="h1-0-502" class="d">-            if (action &amp; kTakeRight)
+</a><a href="#h1-0-503" id="h1-0-503" class="d">-                if (++rit != rhs-&gt;end())
+</a><a href="#h1-0-504" id="h1-0-504" class="d">-                    right = rit-&gt;first;
+</a><a href="#h1-0-505" id="h1-0-505" class="d">-        }
+</a><a href="#h1-0-506" id="h1-0-506" class="d">-
+</a><a href="#h1-0-507" id="h1-0-507" class="d">-        if (lit != lhs-&gt;end()) {
+</a><a href="#h1-0-508" id="h1-0-508" class="d">-            out-&gt;insert(make_pair(left, lit-&gt;second));
+</a><a href="#h1-0-509" id="h1-0-509" class="d">-            ++lit;
+</a><a href="#h1-0-510" id="h1-0-510" class="d">-        }
+</a><a href="#h1-0-511" id="h1-0-511" class="d">-        if (rit != rhs-&gt;end()) {
+</a><a href="#h1-0-512" id="h1-0-512" class="d">-            out-&gt;insert(make_pair(right, rit-&gt;second));
+</a><a href="#h1-0-513" id="h1-0-513" class="d">-            ++rit;
+</a><a href="#h1-0-514" id="h1-0-514" class="d">-        }
+</a><a href="#h1-0-515" id="h1-0-515" class="d">-
+</a><a href="#h1-0-516" id="h1-0-516" class="d">-        for (; lit != lhs-&gt;end(); ++lit)
+</a><a href="#h1-0-517" id="h1-0-517" class="d">-            out-&gt;insert(*lit);
+</a><a href="#h1-0-518" id="h1-0-518" class="d">-        for (; rit != rhs-&gt;end(); ++rit)
+</a><a href="#h1-0-519" id="h1-0-519" class="d">-            out-&gt;insert(*rit);
+</a><a href="#h1-0-520" id="h1-0-520" class="d">-
+</a><a href="#h1-0-521" id="h1-0-521" class="d">-        return out;
+</a><a href="#h1-0-522" id="h1-0-522" class="d">-    }
+</a><a href="#h1-0-523" id="h1-0-523" class="d">-
+</a><a href="#h1-0-524" id="h1-0-524" class="d">-    intrusive_ptr&lt;IndexKey&gt; Alternate(alternate_cache&amp; cache,
+</a><a href="#h1-0-525" id="h1-0-525" class="d">-                                   intrusive_ptr&lt;IndexKey&gt; lhs,
+</a><a href="#h1-0-526" id="h1-0-526" class="d">-                                   intrusive_ptr&lt;IndexKey&gt; rhs) {
+</a><a href="#h1-0-527" id="h1-0-527" class="d">-        auto it = cache.find(make_pair(lhs, rhs));
+</a><a href="#h1-0-528" id="h1-0-528" class="d">-        if (it != cache.end())
+</a><a href="#h1-0-529" id="h1-0-529" class="d">-            return it-&gt;second;
+</a><a href="#h1-0-530" id="h1-0-530" class="d">-        intrusive_ptr&lt;IndexKey&gt; out = AlternateInternal(cache, lhs, rhs);
+</a><a href="#h1-0-531" id="h1-0-531" class="d">-        cache[make_pair(lhs, rhs)] = out;
+</a><a href="#h1-0-532" id="h1-0-532" class="d">-        return out;
+</a><a href="#h1-0-533" id="h1-0-533" class="d">-    }
+</a><a href="#h1-0-534" id="h1-0-534" class="d">-
+</a><a href="#h1-0-535" id="h1-0-535" class="d">-};
+</a><a href="#h1-0-536" id="h1-0-536" class="d">-
+</a><a href="#h1-0-537" id="h1-0-537" class="d">-intrusive_ptr&lt;IndexKey&gt; indexRE(const re2::RE2 &amp;re) {
+</a><a href="#h1-0-538" id="h1-0-538" class="d">-    IndexWalker walk;
+</a><a href="#h1-0-539" id="h1-0-539" class="d">-
+</a><a href="#h1-0-540" id="h1-0-540" class="d">-    Regexp *sre = re.Regexp()-&gt;Simplify();
+</a><a href="#h1-0-541" id="h1-0-541" class="d">-    intrusive_ptr&lt;IndexKey&gt; key = walk.WalkExponential(sre, 0, 10000);
+</a><a href="#h1-0-542" id="h1-0-542" class="d">-    sre-&gt;Decref();
+</a><a href="#h1-0-543" id="h1-0-543" class="d">-
+</a><a href="#h1-0-544" id="h1-0-544" class="d">-    if (key &amp;&amp; key-&gt;weight() &lt; kMinWeight)
+</a><a href="#h1-0-545" id="h1-0-545" class="d">-        key = 0;
+</a><a href="#h1-0-546" id="h1-0-546" class="d">-    return key;
+</a><a href="#h1-0-547" id="h1-0-547" class="d">-}
+</a><a href="#h1-0-548" id="h1-0-548" class="d">-
+</a><a href="#h1-0-549" id="h1-0-549" class="d">-intrusive_ptr&lt;IndexKey&gt;
+</a><a href="#h1-0-550" id="h1-0-550" class="d">-IndexWalker::PostVisit(Regexp* re, intrusive_ptr&lt;IndexKey&gt; parent_arg,
+</a><a href="#h1-0-551" id="h1-0-551" class="d">-                       intrusive_ptr&lt;IndexKey&gt; pre_arg,
+</a><a href="#h1-0-552" id="h1-0-552" class="d">-                       intrusive_ptr&lt;IndexKey&gt; *child_args,
+</a><a href="#h1-0-553" id="h1-0-553" class="d">-                       int nchild_args) {
+</a><a href="#h1-0-554" id="h1-0-554" class="d">-    intrusive_ptr&lt;IndexKey&gt; key;
+</a><a href="#h1-0-555" id="h1-0-555" class="d">-
+</a><a href="#h1-0-556" id="h1-0-556" class="d">-    switch (re-&gt;op()) {
+</a><a href="#h1-0-557" id="h1-0-557" class="d">-    case kRegexpNoMatch:
+</a><a href="#h1-0-558" id="h1-0-558" class="d">-    case kRegexpEmptyMatch:      // anywhere
+</a><a href="#h1-0-559" id="h1-0-559" class="d">-    case kRegexpBeginLine:       // at beginning of line
+</a><a href="#h1-0-560" id="h1-0-560" class="d">-    case kRegexpEndLine:         // at end of line
+</a><a href="#h1-0-561" id="h1-0-561" class="d">-    case kRegexpBeginText:       // at beginning of text
+</a><a href="#h1-0-562" id="h1-0-562" class="d">-    case kRegexpEndText:         // at end of text
+</a><a href="#h1-0-563" id="h1-0-563" class="d">-    case kRegexpWordBoundary:    // at word boundary
+</a><a href="#h1-0-564" id="h1-0-564" class="d">-    case kRegexpNoWordBoundary:  // not at word boundary
+</a><a href="#h1-0-565" id="h1-0-565" class="d">-        key = Empty();
+</a><a href="#h1-0-566" id="h1-0-566" class="d">-        break;
+</a><a href="#h1-0-567" id="h1-0-567" class="d">-
+</a><a href="#h1-0-568" id="h1-0-568" class="d">-    case kRegexpAnyChar:
+</a><a href="#h1-0-569" id="h1-0-569" class="d">-    case kRegexpAnyByte:
+</a><a href="#h1-0-570" id="h1-0-570" class="d">-        key = Any();
+</a><a href="#h1-0-571" id="h1-0-571" class="d">-        break;
+</a><a href="#h1-0-572" id="h1-0-572" class="d">-
+</a><a href="#h1-0-573" id="h1-0-573" class="d">-    case kRegexpLiteral:
+</a><a href="#h1-0-574" id="h1-0-574" class="d">-        if (re-&gt;parse_flags() &amp; Regexp::FoldCase) {
+</a><a href="#h1-0-575" id="h1-0-575" class="d">-            key = CaseFoldLiteral(re-&gt;rune());
+</a><a href="#h1-0-576" id="h1-0-576" class="d">-        } else {
+</a><a href="#h1-0-577" id="h1-0-577" class="d">-            key = Literal(re-&gt;rune());
+</a><a href="#h1-0-578" id="h1-0-578" class="d">-        }
+</a><a href="#h1-0-579" id="h1-0-579" class="d">-        break;
+</a><a href="#h1-0-580" id="h1-0-580" class="d">-
+</a><a href="#h1-0-581" id="h1-0-581" class="d">-    case kRegexpCharClass:
+</a><a href="#h1-0-582" id="h1-0-582" class="d">-        key = CClass(re-&gt;cc());
+</a><a href="#h1-0-583" id="h1-0-583" class="d">-        break;
+</a><a href="#h1-0-584" id="h1-0-584" class="d">-
+</a><a href="#h1-0-585" id="h1-0-585" class="d">-    case kRegexpLiteralString:
+</a><a href="#h1-0-586" id="h1-0-586" class="d">-        if (re-&gt;parse_flags() &amp; Regexp::FoldCase) {
+</a><a href="#h1-0-587" id="h1-0-587" class="d">-            key = CaseFoldLiteral(re-&gt;runes(), re-&gt;nrunes());
+</a><a href="#h1-0-588" id="h1-0-588" class="d">-        } else {
+</a><a href="#h1-0-589" id="h1-0-589" class="d">-            key = Literal(re-&gt;runes(), re-&gt;nrunes());
+</a><a href="#h1-0-590" id="h1-0-590" class="d">-        }
+</a><a href="#h1-0-591" id="h1-0-591" class="d">-        break;
+</a><a href="#h1-0-592" id="h1-0-592" class="d">-
+</a><a href="#h1-0-593" id="h1-0-593" class="d">-    case kRegexpConcat:
+</a><a href="#h1-0-594" id="h1-0-594" class="d">-        key = Concat(child_args, nchild_args);
+</a><a href="#h1-0-595" id="h1-0-595" class="d">-        break;
+</a><a href="#h1-0-596" id="h1-0-596" class="d">-
+</a><a href="#h1-0-597" id="h1-0-597" class="d">-    case kRegexpAlternate:
+</a><a href="#h1-0-598" id="h1-0-598" class="d">-        {
+</a><a href="#h1-0-599" id="h1-0-599" class="d">-            alternate_cache cache;
+</a><a href="#h1-0-600" id="h1-0-600" class="d">-            key = child_args[0];
+</a><a href="#h1-0-601" id="h1-0-601" class="d">-            for (int i = 1; i &lt; nchild_args; i++)
+</a><a href="#h1-0-602" id="h1-0-602" class="d">-                key = Alternate(cache, key, child_args[i]);
+</a><a href="#h1-0-603" id="h1-0-603" class="d">-        }
+</a><a href="#h1-0-604" id="h1-0-604" class="d">-        break;
+</a><a href="#h1-0-605" id="h1-0-605" class="d">-
+</a><a href="#h1-0-606" id="h1-0-606" class="d">-    case kRegexpStar:
+</a><a href="#h1-0-607" id="h1-0-607" class="d">-    case kRegexpQuest:
+</a><a href="#h1-0-608" id="h1-0-608" class="d">-        key = Any();
+</a><a href="#h1-0-609" id="h1-0-609" class="d">-        break;
+</a><a href="#h1-0-610" id="h1-0-610" class="d">-
+</a><a href="#h1-0-611" id="h1-0-611" class="d">-    case kRegexpCapture:
+</a><a href="#h1-0-612" id="h1-0-612" class="d">-        key = child_args[0];
+</a><a href="#h1-0-613" id="h1-0-613" class="d">-        break;
+</a><a href="#h1-0-614" id="h1-0-614" class="d">-
+</a><a href="#h1-0-615" id="h1-0-615" class="d">-    case kRegexpRepeat:
+</a><a href="#h1-0-616" id="h1-0-616" class="d">-        if (re-&gt;min() == 0)
+</a><a href="#h1-0-617" id="h1-0-617" class="d">-            return Any();
+</a><a href="#h1-0-618" id="h1-0-618" class="d">-    case kRegexpPlus:
+</a><a href="#h1-0-619" id="h1-0-619" class="d">-        key = child_args[0];
+</a><a href="#h1-0-620" id="h1-0-620" class="d">-        if ((key-&gt;anchor &amp; kAnchorBoth) == kAnchorBoth)
+</a><a href="#h1-0-621" id="h1-0-621" class="d">-            key-&gt;anchor |= kAnchorRepeat;
+</a><a href="#h1-0-622" id="h1-0-622" class="d">-        break;
+</a><a href="#h1-0-623" id="h1-0-623" class="d">-
+</a><a href="#h1-0-624" id="h1-0-624" class="d">-    default:
+</a><a href="#h1-0-625" id="h1-0-625" class="d">-        assert(false);
+</a><a href="#h1-0-626" id="h1-0-626" class="d">-    }
+</a><a href="#h1-0-627" id="h1-0-627" class="d">-
+</a><a href="#h1-0-628" id="h1-0-628" class="d">-    assert(key);
+</a><a href="#h1-0-629" id="h1-0-629" class="d">-
+</a><a href="#h1-0-630" id="h1-0-630" class="d">-    debug(kDebugIndex, &quot;* INDEX %s ==&gt; &quot;, re-&gt;ToString().c_str());
+</a><a href="#h1-0-631" id="h1-0-631" class="d">-    if (key)
+</a><a href="#h1-0-632" id="h1-0-632" class="d">-        debug(kDebugIndex, &quot;[weight %d, nodes %ld, depth %d]&quot;,
+</a><a href="#h1-0-633" id="h1-0-633" class="d">-              key-&gt;weight(), key-&gt;nodes(), key-&gt;depth());
+</a><a href="#h1-0-634" id="h1-0-634" class="d">-    else
+</a><a href="#h1-0-635" id="h1-0-635" class="d">-        debug(kDebugIndex, &quot;nul&quot;);
+</a><a href="#h1-0-636" id="h1-0-636" class="d">-
+</a><a href="#h1-0-637" id="h1-0-637" class="d">-    debug(kDebugIndexAll, &quot;           ==&gt; [%s]&quot;,
+</a><a href="#h1-0-638" id="h1-0-638" class="d">-          key ? key-&gt;ToString().c_str() : &quot;nul&quot;);
+</a><a href="#h1-0-639" id="h1-0-639" class="d">-
+</a><a href="#h1-0-640" id="h1-0-640" class="d">-    if ((debug_enabled &amp; kDebugIndex) &amp;&amp; key)
+</a><a href="#h1-0-641" id="h1-0-641" class="d">-        key-&gt;check_rep();
+</a><a href="#h1-0-642" id="h1-0-642" class="d">-
+</a><a href="#h1-0-643" id="h1-0-643" class="d">-    return key;
+</a><a href="#h1-0-644" id="h1-0-644" class="d">-}
+</a><a href="#h1-0-645" id="h1-0-645" class="d">-
+</a><a href="#h1-0-646" id="h1-0-646" class="d">-intrusive_ptr&lt;IndexKey&gt;
+</a><a href="#h1-0-647" id="h1-0-647" class="d">-IndexWalker::ShortVisit(Regexp* re, intrusive_ptr&lt;IndexKey&gt; parent_arg) {
+</a><a href="#h1-0-648" id="h1-0-648" class="d">-    return Any();
+</a><a href="#h1-0-649" id="h1-0-649" class="d">-}
+</a><a href="#h1-0-650" id="h1-0-650" class="d">-
+</a><a href="#h1-0-651" id="h1-0-651" class="d">-void IndexKey::check_rep() {
+</a><a href="#h1-0-652" id="h1-0-652" class="d">-    pair&lt;uchar, uchar&gt; last = make_pair(&#39;\0&#39;, &#39;\0&#39;);
+</a><a href="#h1-0-653" id="h1-0-653" class="d">-    for (iterator it = begin(); it != end(); ++it) {
+</a><a href="#h1-0-654" id="h1-0-654" class="d">-        assert(!intersects(last, it-&gt;first));
+</a><a href="#h1-0-655" id="h1-0-655" class="d">-        last = it-&gt;first;
+</a><a href="#h1-0-656" id="h1-0-656" class="d">-    }
+</a><a href="#h1-0-657" id="h1-0-657" class="d">-}
+</a><a href="#h1-0-658" id="h1-0-658" class="d">-
+</a><a href="#h1-0-659" id="h1-0-659" class="d">-void intrusive_ptr_add_ref(IndexKey *key) {
+</a><a href="#h1-0-660" id="h1-0-660" class="d">-    ++key-&gt;refs_;
+</a><a href="#h1-0-661" id="h1-0-661" class="d">-}
+</a><a href="#h1-0-662" id="h1-0-662" class="d">-
+</a><a href="#h1-0-663" id="h1-0-663" class="d">-void intrusive_ptr_release(IndexKey *key) {
+</a><a href="#h1-0-664" id="h1-0-664" class="d">-    if (--key-&gt;refs_ == 0)
+</a><a href="#h1-0-665" id="h1-0-665" class="d">-        delete key;
+</a><a href="#h1-0-666" id="h1-0-666" class="d">-}
+</a><b>diff --git a/<a id="h2" href="../file/src/indexer.h">src/indexer.h</a> b/<a href="../file/src/indexer.h">src/indexer.h</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -1,141 +0,0 @@
+</a><a href="#h2-0-0" id="h2-0-0" class="d">-/********************************************************************
+</a><a href="#h2-0-1" id="h2-0-1" class="d">- * livegrep -- indexer.h
+</a><a href="#h2-0-2" id="h2-0-2" class="d">- * Copyright (c) 2011-2013 Nelson Elhage
+</a><a href="#h2-0-3" id="h2-0-3" class="d">- *
+</a><a href="#h2-0-4" id="h2-0-4" class="d">- * This program is free software. You may use, redistribute, and/or
+</a><a href="#h2-0-5" id="h2-0-5" class="d">- * modify it under the terms listed in the COPYING file.
+</a><a href="#h2-0-6" id="h2-0-6" class="d">- ********************************************************************/
+</a><a href="#h2-0-7" id="h2-0-7" class="d">-#ifndef CODESEARCH_INDEXER_H
+</a><a href="#h2-0-8" id="h2-0-8" class="d">-#define CODESEARCH_INDEXER_H
+</a><a href="#h2-0-9" id="h2-0-9" class="d">-
+</a><a href="#h2-0-10" id="h2-0-10" class="d">-#include &lt;vector&gt;
+</a><a href="#h2-0-11" id="h2-0-11" class="d">-#include &lt;list&gt;
+</a><a href="#h2-0-12" id="h2-0-12" class="d">-#include &lt;set&gt;
+</a><a href="#h2-0-13" id="h2-0-13" class="d">-#include &lt;string&gt;
+</a><a href="#h2-0-14" id="h2-0-14" class="d">-#include &lt;atomic&gt;
+</a><a href="#h2-0-15" id="h2-0-15" class="d">-#include &lt;map&gt;
+</a><a href="#h2-0-16" id="h2-0-16" class="d">-#include &lt;boost/intrusive_ptr.hpp&gt;
+</a><a href="#h2-0-17" id="h2-0-17" class="d">-
+</a><a href="#h2-0-18" id="h2-0-18" class="d">-#include &quot;re2/re2.h&quot;
+</a><a href="#h2-0-19" id="h2-0-19" class="d">-#include &quot;re2/walker-inl.h&quot;
+</a><a href="#h2-0-20" id="h2-0-20" class="d">-
+</a><a href="#h2-0-21" id="h2-0-21" class="d">-#include &quot;src/common.h&quot;
+</a><a href="#h2-0-22" id="h2-0-22" class="d">-
+</a><a href="#h2-0-23" id="h2-0-23" class="d">-using std::string;
+</a><a href="#h2-0-24" id="h2-0-24" class="d">-using std::vector;
+</a><a href="#h2-0-25" id="h2-0-25" class="d">-using std::list;
+</a><a href="#h2-0-26" id="h2-0-26" class="d">-using std::set;
+</a><a href="#h2-0-27" id="h2-0-27" class="d">-using boost::intrusive_ptr;
+</a><a href="#h2-0-28" id="h2-0-28" class="d">-
+</a><a href="#h2-0-29" id="h2-0-29" class="d">-enum {
+</a><a href="#h2-0-30" id="h2-0-30" class="d">-    kAnchorNone   = 0x00,
+</a><a href="#h2-0-31" id="h2-0-31" class="d">-    kAnchorLeft   = 0x01,
+</a><a href="#h2-0-32" id="h2-0-32" class="d">-    kAnchorRight  = 0x02,
+</a><a href="#h2-0-33" id="h2-0-33" class="d">-    kAnchorBoth   = 0x03,
+</a><a href="#h2-0-34" id="h2-0-34" class="d">-    kAnchorRepeat = 0x04
+</a><a href="#h2-0-35" id="h2-0-35" class="d">-};
+</a><a href="#h2-0-36" id="h2-0-36" class="d">-
+</a><a href="#h2-0-37" id="h2-0-37" class="d">-class IndexKey {
+</a><a href="#h2-0-38" id="h2-0-38" class="d">-public:
+</a><a href="#h2-0-39" id="h2-0-39" class="d">-    typedef std::map&lt;std::pair&lt;uchar, uchar&gt;, intrusive_ptr&lt;IndexKey&gt; &gt;::iterator iterator;
+</a><a href="#h2-0-40" id="h2-0-40" class="d">-    typedef std::map&lt;std::pair&lt;uchar, uchar&gt;, intrusive_ptr&lt;IndexKey&gt; &gt;::const_iterator const_iterator;
+</a><a href="#h2-0-41" id="h2-0-41" class="d">-    typedef std::pair&lt;std::pair&lt;uchar, uchar&gt;, intrusive_ptr&lt;IndexKey&gt; &gt; value_type;
+</a><a href="#h2-0-42" id="h2-0-42" class="d">-
+</a><a href="#h2-0-43" id="h2-0-43" class="d">-    iterator begin() {
+</a><a href="#h2-0-44" id="h2-0-44" class="d">-        return edges_.begin();
+</a><a href="#h2-0-45" id="h2-0-45" class="d">-    }
+</a><a href="#h2-0-46" id="h2-0-46" class="d">-
+</a><a href="#h2-0-47" id="h2-0-47" class="d">-    iterator end() {
+</a><a href="#h2-0-48" id="h2-0-48" class="d">-        return edges_.end();
+</a><a href="#h2-0-49" id="h2-0-49" class="d">-    }
+</a><a href="#h2-0-50" id="h2-0-50" class="d">-
+</a><a href="#h2-0-51" id="h2-0-51" class="d">-    IndexKey(int anchor = kAnchorNone)
+</a><a href="#h2-0-52" id="h2-0-52" class="d">-        : anchor(anchor), refs_(0) { }
+</a><a href="#h2-0-53" id="h2-0-53" class="d">-
+</a><a href="#h2-0-54" id="h2-0-54" class="d">-    IndexKey(std::pair&lt;uchar, uchar&gt; p,
+</a><a href="#h2-0-55" id="h2-0-55" class="d">-             intrusive_ptr&lt;IndexKey&gt; next,
+</a><a href="#h2-0-56" id="h2-0-56" class="d">-             int anchor = kAnchorNone)
+</a><a href="#h2-0-57" id="h2-0-57" class="d">-        : anchor(anchor), refs_(0) {
+</a><a href="#h2-0-58" id="h2-0-58" class="d">-        insert(value_type(p, next));
+</a><a href="#h2-0-59" id="h2-0-59" class="d">-    }
+</a><a href="#h2-0-60" id="h2-0-60" class="d">-
+</a><a href="#h2-0-61" id="h2-0-61" class="d">-    void insert(const value_type&amp; v);
+</a><a href="#h2-0-62" id="h2-0-62" class="d">-    void concat(intrusive_ptr&lt;IndexKey&gt; rhs);
+</a><a href="#h2-0-63" id="h2-0-63" class="d">-
+</a><a href="#h2-0-64" id="h2-0-64" class="d">-    bool empty() {
+</a><a href="#h2-0-65" id="h2-0-65" class="d">-        return edges_.empty();
+</a><a href="#h2-0-66" id="h2-0-66" class="d">-    }
+</a><a href="#h2-0-67" id="h2-0-67" class="d">-
+</a><a href="#h2-0-68" id="h2-0-68" class="d">-    size_t size() {
+</a><a href="#h2-0-69" id="h2-0-69" class="d">-        return edges_.size();
+</a><a href="#h2-0-70" id="h2-0-70" class="d">-    }
+</a><a href="#h2-0-71" id="h2-0-71" class="d">-
+</a><a href="#h2-0-72" id="h2-0-72" class="d">-    class Stats {
+</a><a href="#h2-0-73" id="h2-0-73" class="d">-    public:
+</a><a href="#h2-0-74" id="h2-0-74" class="d">-        double selectivity_;
+</a><a href="#h2-0-75" id="h2-0-75" class="d">-        int depth_;
+</a><a href="#h2-0-76" id="h2-0-76" class="d">-        long nodes_;
+</a><a href="#h2-0-77" id="h2-0-77" class="d">-        long tail_paths_;
+</a><a href="#h2-0-78" id="h2-0-78" class="d">-
+</a><a href="#h2-0-79" id="h2-0-79" class="d">-        Stats();
+</a><a href="#h2-0-80" id="h2-0-80" class="d">-        Stats insert(const value_type&amp; v) const;
+</a><a href="#h2-0-81" id="h2-0-81" class="d">-        Stats concat(const Stats&amp; rhs) const;
+</a><a href="#h2-0-82" id="h2-0-82" class="d">-    };
+</a><a href="#h2-0-83" id="h2-0-83" class="d">-
+</a><a href="#h2-0-84" id="h2-0-84" class="d">-    const Stats&amp; stats() {
+</a><a href="#h2-0-85" id="h2-0-85" class="d">-        return stats_;
+</a><a href="#h2-0-86" id="h2-0-86" class="d">-    }
+</a><a href="#h2-0-87" id="h2-0-87" class="d">-
+</a><a href="#h2-0-88" id="h2-0-88" class="d">-    /*
+</a><a href="#h2-0-89" id="h2-0-89" class="d">-     * Returns an approximation of the fraction of the input corpus
+</a><a href="#h2-0-90" id="h2-0-90" class="d">-     * that this index key will reduce the search space to.
+</a><a href="#h2-0-91" id="h2-0-91" class="d">-     *
+</a><a href="#h2-0-92" id="h2-0-92" class="d">-     * e.g. selectivity() == 1.0 implies that this index key includes
+</a><a href="#h2-0-93" id="h2-0-93" class="d">-     *      the entire input.
+</a><a href="#h2-0-94" id="h2-0-94" class="d">-     *
+</a><a href="#h2-0-95" id="h2-0-95" class="d">-     *      selectivity() == 0.1 means that using this index key will
+</a><a href="#h2-0-96" id="h2-0-96" class="d">-     *      only require searching 1/10th of the corpus.
+</a><a href="#h2-0-97" id="h2-0-97" class="d">-     *
+</a><a href="#h2-0-98" id="h2-0-98" class="d">-     * This value is computed without any reference to the actual
+</a><a href="#h2-0-99" id="h2-0-99" class="d">-     * characteristics of any particular corpus, and so is a rough
+</a><a href="#h2-0-100" id="h2-0-100" class="d">-     * approximation at best.
+</a><a href="#h2-0-101" id="h2-0-101" class="d">-     */
+</a><a href="#h2-0-102" id="h2-0-102" class="d">-    double selectivity();
+</a><a href="#h2-0-103" id="h2-0-103" class="d">-
+</a><a href="#h2-0-104" id="h2-0-104" class="d">-    /*
+</a><a href="#h2-0-105" id="h2-0-105" class="d">-     * Returns a value approximating the &quot;goodness&quot; of this index key,
+</a><a href="#h2-0-106" id="h2-0-106" class="d">-     * in arbitrary units. Higher is better. The weight incorporates
+</a><a href="#h2-0-107" id="h2-0-107" class="d">-     * both the selectivity, above, and the cost of using this index
+</a><a href="#h2-0-108" id="h2-0-108" class="d">-     * key.
+</a><a href="#h2-0-109" id="h2-0-109" class="d">-     */
+</a><a href="#h2-0-110" id="h2-0-110" class="d">-    unsigned weight();
+</a><a href="#h2-0-111" id="h2-0-111" class="d">-    int depth();
+</a><a href="#h2-0-112" id="h2-0-112" class="d">-    long nodes();
+</a><a href="#h2-0-113" id="h2-0-113" class="d">-
+</a><a href="#h2-0-114" id="h2-0-114" class="d">-    string ToString();
+</a><a href="#h2-0-115" id="h2-0-115" class="d">-
+</a><a href="#h2-0-116" id="h2-0-116" class="d">-    void check_rep();
+</a><a href="#h2-0-117" id="h2-0-117" class="d">-
+</a><a href="#h2-0-118" id="h2-0-118" class="d">-    int anchor;
+</a><a href="#h2-0-119" id="h2-0-119" class="d">-
+</a><a href="#h2-0-120" id="h2-0-120" class="d">-    void collect_tails(list&lt;IndexKey::const_iterator&gt;&amp; tails);
+</a><a href="#h2-0-121" id="h2-0-121" class="d">-protected:
+</a><a href="#h2-0-122" id="h2-0-122" class="d">-    std::map&lt;std::pair&lt;uchar, uchar&gt;, intrusive_ptr&lt;IndexKey&gt; &gt; edges_;
+</a><a href="#h2-0-123" id="h2-0-123" class="d">-    Stats stats_;
+</a><a href="#h2-0-124" id="h2-0-124" class="d">-    std::atomic_int refs_;
+</a><a href="#h2-0-125" id="h2-0-125" class="d">-
+</a><a href="#h2-0-126" id="h2-0-126" class="d">-    void collect_tails(list&lt;IndexKey::iterator&gt;&amp; tails);
+</a><a href="#h2-0-127" id="h2-0-127" class="d">-    void collect_tails(list&lt;IndexKey::iterator&gt;&amp; tails,
+</a><a href="#h2-0-128" id="h2-0-128" class="d">-                       set&lt;IndexKey*&gt; &amp;seen);
+</a><a href="#h2-0-129" id="h2-0-129" class="d">-
+</a><a href="#h2-0-130" id="h2-0-130" class="d">-private:
+</a><a href="#h2-0-131" id="h2-0-131" class="d">-    IndexKey(const IndexKey&amp;);
+</a><a href="#h2-0-132" id="h2-0-132" class="d">-    void operator=(const IndexKey&amp;);
+</a><a href="#h2-0-133" id="h2-0-133" class="d">-
+</a><a href="#h2-0-134" id="h2-0-134" class="d">-    friend void intrusive_ptr_add_ref(IndexKey *key);
+</a><a href="#h2-0-135" id="h2-0-135" class="d">-    friend void intrusive_ptr_release(IndexKey *key);
+</a><a href="#h2-0-136" id="h2-0-136" class="d">-};
+</a><a href="#h2-0-137" id="h2-0-137" class="d">-
+</a><a href="#h2-0-138" id="h2-0-138" class="d">-intrusive_ptr&lt;IndexKey&gt; indexRE(const re2::RE2 &amp;pat);
+</a><a href="#h2-0-139" id="h2-0-139" class="d">-
+</a><a href="#h2-0-140" id="h2-0-140" class="d">-#endif /* CODESEARCH_INDEXER_H */
+</a><b>diff --git a/<a id="h3" href="../file/src/query_planner.cc">src/query_planner.cc</a> b/<a href="../file/src/query_planner.cc">src/query_planner.cc</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -0,0 +1,667 @@
+</a><a href="#h3-0-0" id="h3-0-0" class="i">+/********************************************************************
+</a><a href="#h3-0-1" id="h3-0-1" class="i">+ * livegrep -- query_planner.cc
+</a><a href="#h3-0-2" id="h3-0-2" class="i">+ * Copyright (c) 2011-2013 Nelson Elhage
+</a><a href="#h3-0-3" id="h3-0-3" class="i">+ *
+</a><a href="#h3-0-4" id="h3-0-4" class="i">+ * This program is free software. You may use, redistribute, and/or
+</a><a href="#h3-0-5" id="h3-0-5" class="i">+ * modify it under the terms listed in the COPYING file.
+</a><a href="#h3-0-6" id="h3-0-6" class="i">+ ********************************************************************/
+</a><a href="#h3-0-7" id="h3-0-7" class="i">+#include &quot;src/lib/recursion.h&quot;
+</a><a href="#h3-0-8" id="h3-0-8" class="i">+#include &quot;src/lib/debug.h&quot;
+</a><a href="#h3-0-9" id="h3-0-9" class="i">+
+</a><a href="#h3-0-10" id="h3-0-10" class="i">+#include &quot;src/query_planner.h&quot;
+</a><a href="#h3-0-11" id="h3-0-11" class="i">+
+</a><a href="#h3-0-12" id="h3-0-12" class="i">+#include &lt;gflags/gflags.h&gt;
+</a><a href="#h3-0-13" id="h3-0-13" class="i">+
+</a><a href="#h3-0-14" id="h3-0-14" class="i">+#include &lt;list&gt;
+</a><a href="#h3-0-15" id="h3-0-15" class="i">+#include &lt;limits&gt;
+</a><a href="#h3-0-16" id="h3-0-16" class="i">+
+</a><a href="#h3-0-17" id="h3-0-17" class="i">+#include &lt;stdarg.h&gt;
+</a><a href="#h3-0-18" id="h3-0-18" class="i">+
+</a><a href="#h3-0-19" id="h3-0-19" class="i">+using namespace re2;
+</a><a href="#h3-0-20" id="h3-0-20" class="i">+using namespace std;
+</a><a href="#h3-0-21" id="h3-0-21" class="i">+
+</a><a href="#h3-0-22" id="h3-0-22" class="i">+const unsigned kMinWeight = 16;
+</a><a href="#h3-0-23" id="h3-0-23" class="i">+const int kMaxWidth       = 32;
+</a><a href="#h3-0-24" id="h3-0-24" class="i">+const int kMaxRecursion   = 10;
+</a><a href="#h3-0-25" id="h3-0-25" class="i">+const int kMaxNodes       = (1 &lt;&lt; 24);
+</a><a href="#h3-0-26" id="h3-0-26" class="i">+
+</a><a href="#h3-0-27" id="h3-0-27" class="i">+namespace {
+</a><a href="#h3-0-28" id="h3-0-28" class="i">+    static QueryPlan::Stats null_stats;
+</a><a href="#h3-0-29" id="h3-0-29" class="i">+};
+</a><a href="#h3-0-30" id="h3-0-30" class="i">+
+</a><a href="#h3-0-31" id="h3-0-31" class="i">+QueryPlan::Stats::Stats ()
+</a><a href="#h3-0-32" id="h3-0-32" class="i">+    : selectivity_(1.0), depth_(0), nodes_(1), tail_paths_(1) {
+</a><a href="#h3-0-33" id="h3-0-33" class="i">+}
+</a><a href="#h3-0-34" id="h3-0-34" class="i">+
+</a><a href="#h3-0-35" id="h3-0-35" class="i">+QueryPlan::Stats QueryPlan::Stats::insert(const value_type&amp; val) const {
+</a><a href="#h3-0-36" id="h3-0-36" class="i">+    Stats out(*this);
+</a><a href="#h3-0-37" id="h3-0-37" class="i">+    if (out.selectivity_ == 1.0) {
+</a><a href="#h3-0-38" id="h3-0-38" class="i">+        out.selectivity_ = 0.0;
+</a><a href="#h3-0-39" id="h3-0-39" class="i">+        out.tail_paths_  = 0;
+</a><a href="#h3-0-40" id="h3-0-40" class="i">+    }
+</a><a href="#h3-0-41" id="h3-0-41" class="i">+
+</a><a href="#h3-0-42" id="h3-0-42" class="i">+    const Stats&amp; rstats = val.second ? val.second-&gt;stats() : null_stats;
+</a><a href="#h3-0-43" id="h3-0-43" class="i">+
+</a><a href="#h3-0-44" id="h3-0-44" class="i">+    // There are 100 printable ASCII characters. As a zeroth-order
+</a><a href="#h3-0-45" id="h3-0-45" class="i">+    // approximation, assume our corpus is random strings of printable
+</a><a href="#h3-0-46" id="h3-0-46" class="i">+    // ASCII characters.  The exact computation of selectivity turn
+</a><a href="#h3-0-47" id="h3-0-47" class="i">+    // out not to matter all that much in most cases.
+</a><a href="#h3-0-48" id="h3-0-48" class="i">+    out.selectivity_ += (val.first.second - val.first.first + 1)/100. * rstats.selectivity_;
+</a><a href="#h3-0-49" id="h3-0-49" class="i">+    out.depth_ = max(depth_, rstats.depth_ + 1);
+</a><a href="#h3-0-50" id="h3-0-50" class="i">+    out.nodes_ += (val.first.second - val.first.first + 1) * rstats.nodes_;
+</a><a href="#h3-0-51" id="h3-0-51" class="i">+    if (!val.second)
+</a><a href="#h3-0-52" id="h3-0-52" class="i">+        out.tail_paths_ += (val.first.second - val.first.first + 1);
+</a><a href="#h3-0-53" id="h3-0-53" class="i">+
+</a><a href="#h3-0-54" id="h3-0-54" class="i">+    return out;
+</a><a href="#h3-0-55" id="h3-0-55" class="i">+}
+</a><a href="#h3-0-56" id="h3-0-56" class="i">+
+</a><a href="#h3-0-57" id="h3-0-57" class="i">+QueryPlan::Stats QueryPlan::Stats::concat(const QueryPlan::Stats&amp; rhs) const {
+</a><a href="#h3-0-58" id="h3-0-58" class="i">+    Stats out(*this);
+</a><a href="#h3-0-59" id="h3-0-59" class="i">+    out.selectivity_ *= rhs.selectivity_;
+</a><a href="#h3-0-60" id="h3-0-60" class="i">+    out.depth_ += rhs.depth_;
+</a><a href="#h3-0-61" id="h3-0-61" class="i">+    out.nodes_ += tail_paths_ * rhs.nodes_;
+</a><a href="#h3-0-62" id="h3-0-62" class="i">+    out.tail_paths_ *= rhs.tail_paths_;
+</a><a href="#h3-0-63" id="h3-0-63" class="i">+
+</a><a href="#h3-0-64" id="h3-0-64" class="i">+    return out;
+</a><a href="#h3-0-65" id="h3-0-65" class="i">+}
+</a><a href="#h3-0-66" id="h3-0-66" class="i">+
+</a><a href="#h3-0-67" id="h3-0-67" class="i">+void QueryPlan::insert(const value_type&amp; val) {
+</a><a href="#h3-0-68" id="h3-0-68" class="i">+    stats_ = stats_.insert(val);
+</a><a href="#h3-0-69" id="h3-0-69" class="i">+
+</a><a href="#h3-0-70" id="h3-0-70" class="i">+    edges_.insert(val);
+</a><a href="#h3-0-71" id="h3-0-71" class="i">+    if (val.second &amp;&amp; !(val.second-&gt;anchor &amp; kAnchorRight)) {
+</a><a href="#h3-0-72" id="h3-0-72" class="i">+        anchor &amp;= ~kAnchorRight;
+</a><a href="#h3-0-73" id="h3-0-73" class="i">+    }
+</a><a href="#h3-0-74" id="h3-0-74" class="i">+}
+</a><a href="#h3-0-75" id="h3-0-75" class="i">+
+</a><a href="#h3-0-76" id="h3-0-76" class="i">+double QueryPlan::selectivity() {
+</a><a href="#h3-0-77" id="h3-0-77" class="i">+    if (empty())
+</a><a href="#h3-0-78" id="h3-0-78" class="i">+        assert(stats_.selectivity_ == 1.0);
+</a><a href="#h3-0-79" id="h3-0-79" class="i">+
+</a><a href="#h3-0-80" id="h3-0-80" class="i">+    return stats_.selectivity_;
+</a><a href="#h3-0-81" id="h3-0-81" class="i">+}
+</a><a href="#h3-0-82" id="h3-0-82" class="i">+
+</a><a href="#h3-0-83" id="h3-0-83" class="i">+unsigned QueryPlan::weight() {
+</a><a href="#h3-0-84" id="h3-0-84" class="i">+    if (1/selectivity() &gt; double(numeric_limits&lt;unsigned&gt;::max()))
+</a><a href="#h3-0-85" id="h3-0-85" class="i">+        return numeric_limits&lt;unsigned&gt;::max() / 2;
+</a><a href="#h3-0-86" id="h3-0-86" class="i">+    return 1/selectivity();
+</a><a href="#h3-0-87" id="h3-0-87" class="i">+}
+</a><a href="#h3-0-88" id="h3-0-88" class="i">+
+</a><a href="#h3-0-89" id="h3-0-89" class="i">+long QueryPlan::nodes() {
+</a><a href="#h3-0-90" id="h3-0-90" class="i">+    return stats_.nodes_;
+</a><a href="#h3-0-91" id="h3-0-91" class="i">+}
+</a><a href="#h3-0-92" id="h3-0-92" class="i">+
+</a><a href="#h3-0-93" id="h3-0-93" class="i">+int QueryPlan::depth() {
+</a><a href="#h3-0-94" id="h3-0-94" class="i">+    return stats_.depth_;
+</a><a href="#h3-0-95" id="h3-0-95" class="i">+}
+</a><a href="#h3-0-96" id="h3-0-96" class="i">+
+</a><a href="#h3-0-97" id="h3-0-97" class="i">+void QueryPlan::collect_tails(list&lt;QueryPlan::iterator&gt;&amp; tails) {
+</a><a href="#h3-0-98" id="h3-0-98" class="i">+    set&lt;QueryPlan*&gt; seen;
+</a><a href="#h3-0-99" id="h3-0-99" class="i">+    collect_tails(tails, seen);
+</a><a href="#h3-0-100" id="h3-0-100" class="i">+}
+</a><a href="#h3-0-101" id="h3-0-101" class="i">+
+</a><a href="#h3-0-102" id="h3-0-102" class="i">+void QueryPlan::collect_tails(list&lt;QueryPlan::const_iterator&gt;&amp; tails) {
+</a><a href="#h3-0-103" id="h3-0-103" class="i">+    list&lt;iterator&gt; tmp;
+</a><a href="#h3-0-104" id="h3-0-104" class="i">+    collect_tails(tmp);
+</a><a href="#h3-0-105" id="h3-0-105" class="i">+    tails.insert(tails.end(), tmp.begin(), tmp.end());
+</a><a href="#h3-0-106" id="h3-0-106" class="i">+}
+</a><a href="#h3-0-107" id="h3-0-107" class="i">+
+</a><a href="#h3-0-108" id="h3-0-108" class="i">+void QueryPlan::collect_tails(list&lt;QueryPlan::iterator&gt;&amp; tails,
+</a><a href="#h3-0-109" id="h3-0-109" class="i">+                             set&lt;QueryPlan*&gt; &amp;seen) {
+</a><a href="#h3-0-110" id="h3-0-110" class="i">+    if (seen.find(this) != seen.end())
+</a><a href="#h3-0-111" id="h3-0-111" class="i">+        return;
+</a><a href="#h3-0-112" id="h3-0-112" class="i">+    seen.insert(this);
+</a><a href="#h3-0-113" id="h3-0-113" class="i">+
+</a><a href="#h3-0-114" id="h3-0-114" class="i">+    for (auto it = begin(); it != end(); ++it) {
+</a><a href="#h3-0-115" id="h3-0-115" class="i">+        if (it-&gt;second)
+</a><a href="#h3-0-116" id="h3-0-116" class="i">+            it-&gt;second-&gt;collect_tails(tails, seen);
+</a><a href="#h3-0-117" id="h3-0-117" class="i">+        else
+</a><a href="#h3-0-118" id="h3-0-118" class="i">+            tails.push_back(it);
+</a><a href="#h3-0-119" id="h3-0-119" class="i">+    }
+</a><a href="#h3-0-120" id="h3-0-120" class="i">+}
+</a><a href="#h3-0-121" id="h3-0-121" class="i">+
+</a><a href="#h3-0-122" id="h3-0-122" class="i">+void QueryPlan::concat(intrusive_ptr&lt;QueryPlan&gt; rhs) {
+</a><a href="#h3-0-123" id="h3-0-123" class="i">+    assert(anchor &amp; kAnchorRight);
+</a><a href="#h3-0-124" id="h3-0-124" class="i">+    assert(rhs-&gt;anchor &amp; kAnchorLeft);
+</a><a href="#h3-0-125" id="h3-0-125" class="i">+    assert(!empty());
+</a><a href="#h3-0-126" id="h3-0-126" class="i">+
+</a><a href="#h3-0-127" id="h3-0-127" class="i">+    if (rhs-&gt;empty())
+</a><a href="#h3-0-128" id="h3-0-128" class="i">+        return;
+</a><a href="#h3-0-129" id="h3-0-129" class="i">+
+</a><a href="#h3-0-130" id="h3-0-130" class="i">+    list&lt;QueryPlan::iterator&gt; tails;
+</a><a href="#h3-0-131" id="h3-0-131" class="i">+    collect_tails(tails);
+</a><a href="#h3-0-132" id="h3-0-132" class="i">+    for (auto it = tails.begin(); it != tails.end(); ++it) {
+</a><a href="#h3-0-133" id="h3-0-133" class="i">+        assert(!(*it)-&gt;second);
+</a><a href="#h3-0-134" id="h3-0-134" class="i">+        (*it)-&gt;second = rhs;
+</a><a href="#h3-0-135" id="h3-0-135" class="i">+    }
+</a><a href="#h3-0-136" id="h3-0-136" class="i">+    if (anchor &amp; kAnchorRepeat)
+</a><a href="#h3-0-137" id="h3-0-137" class="i">+        anchor &amp;= ~kAnchorLeft;
+</a><a href="#h3-0-138" id="h3-0-138" class="i">+    if ((rhs-&gt;anchor &amp; (kAnchorRepeat|kAnchorRight)) != kAnchorRight)
+</a><a href="#h3-0-139" id="h3-0-139" class="i">+        anchor &amp;= ~kAnchorRight;
+</a><a href="#h3-0-140" id="h3-0-140" class="i">+
+</a><a href="#h3-0-141" id="h3-0-141" class="i">+    stats_ = stats_.concat(rhs-&gt;stats());
+</a><a href="#h3-0-142" id="h3-0-142" class="i">+}
+</a><a href="#h3-0-143" id="h3-0-143" class="i">+
+</a><a href="#h3-0-144" id="h3-0-144" class="i">+static string StrChar(uchar c) {
+</a><a href="#h3-0-145" id="h3-0-145" class="i">+    if (c &gt; &#39; &#39; &amp;&amp; c &lt;= &#39;~&#39;)
+</a><a href="#h3-0-146" id="h3-0-146" class="i">+        return strprintf(&quot;%c&quot;, c);
+</a><a href="#h3-0-147" id="h3-0-147" class="i">+    return strprintf(&quot;\\x%02x&quot;, c);
+</a><a href="#h3-0-148" id="h3-0-148" class="i">+}
+</a><a href="#h3-0-149" id="h3-0-149" class="i">+
+</a><a href="#h3-0-150" id="h3-0-150" class="i">+static string ToString(QueryPlan *k, int indent = 0) {
+</a><a href="#h3-0-151" id="h3-0-151" class="i">+    string out;
+</a><a href="#h3-0-152" id="h3-0-152" class="i">+    if (k == 0)
+</a><a href="#h3-0-153" id="h3-0-153" class="i">+        return strprintf(&quot;%*.s[null]\n&quot;, indent, &quot;&quot;);
+</a><a href="#h3-0-154" id="h3-0-154" class="i">+    if (k-&gt;empty())
+</a><a href="#h3-0-155" id="h3-0-155" class="i">+        return strprintf(&quot;%*.s[]\n&quot;, indent, &quot;&quot;);
+</a><a href="#h3-0-156" id="h3-0-156" class="i">+
+</a><a href="#h3-0-157" id="h3-0-157" class="i">+    for (QueryPlan::iterator it = k-&gt;begin(); it != k-&gt;end(); ++it) {
+</a><a href="#h3-0-158" id="h3-0-158" class="i">+        out += strprintf(&quot;%*.s[%s-%s] -&gt; \n&quot;,
+</a><a href="#h3-0-159" id="h3-0-159" class="i">+                         indent, &quot;&quot;,
+</a><a href="#h3-0-160" id="h3-0-160" class="i">+                         StrChar(it-&gt;first.first).c_str(),
+</a><a href="#h3-0-161" id="h3-0-161" class="i">+                         StrChar(it-&gt;first.second).c_str());
+</a><a href="#h3-0-162" id="h3-0-162" class="i">+        out += ToString(it-&gt;second.get(), indent + 1);
+</a><a href="#h3-0-163" id="h3-0-163" class="i">+    }
+</a><a href="#h3-0-164" id="h3-0-164" class="i">+    return out;
+</a><a href="#h3-0-165" id="h3-0-165" class="i">+}
+</a><a href="#h3-0-166" id="h3-0-166" class="i">+
+</a><a href="#h3-0-167" id="h3-0-167" class="i">+string QueryPlan::ToString() {
+</a><a href="#h3-0-168" id="h3-0-168" class="i">+    string out = ::ToString(this, 0);
+</a><a href="#h3-0-169" id="h3-0-169" class="i">+
+</a><a href="#h3-0-170" id="h3-0-170" class="i">+    out += &quot;|&quot;;
+</a><a href="#h3-0-171" id="h3-0-171" class="i">+    if (anchor &amp; kAnchorLeft)
+</a><a href="#h3-0-172" id="h3-0-172" class="i">+        out += &quot;&lt;&quot;;
+</a><a href="#h3-0-173" id="h3-0-173" class="i">+    if (anchor &amp; kAnchorRepeat)
+</a><a href="#h3-0-174" id="h3-0-174" class="i">+        out += &quot;*&quot;;
+</a><a href="#h3-0-175" id="h3-0-175" class="i">+    if (anchor &amp; kAnchorRight)
+</a><a href="#h3-0-176" id="h3-0-176" class="i">+        out += &quot;&gt;&quot;;
+</a><a href="#h3-0-177" id="h3-0-177" class="i">+    return out;
+</a><a href="#h3-0-178" id="h3-0-178" class="i">+}
+</a><a href="#h3-0-179" id="h3-0-179" class="i">+
+</a><a href="#h3-0-180" id="h3-0-180" class="i">+class IndexWalker : public Regexp::Walker&lt;intrusive_ptr&lt;QueryPlan&gt; &gt; {
+</a><a href="#h3-0-181" id="h3-0-181" class="i">+public:
+</a><a href="#h3-0-182" id="h3-0-182" class="i">+    IndexWalker() { }
+</a><a href="#h3-0-183" id="h3-0-183" class="i">+    virtual intrusive_ptr&lt;QueryPlan&gt;
+</a><a href="#h3-0-184" id="h3-0-184" class="i">+    PostVisit(Regexp* re, intrusive_ptr&lt;QueryPlan&gt; parent_arg,
+</a><a href="#h3-0-185" id="h3-0-185" class="i">+              intrusive_ptr&lt;QueryPlan&gt; pre_arg,
+</a><a href="#h3-0-186" id="h3-0-186" class="i">+              intrusive_ptr&lt;QueryPlan&gt; *child_args, int nchild_args);
+</a><a href="#h3-0-187" id="h3-0-187" class="i">+
+</a><a href="#h3-0-188" id="h3-0-188" class="i">+    virtual intrusive_ptr&lt;QueryPlan&gt;
+</a><a href="#h3-0-189" id="h3-0-189" class="i">+    ShortVisit(Regexp* re,
+</a><a href="#h3-0-190" id="h3-0-190" class="i">+               intrusive_ptr&lt;QueryPlan&gt; parent_arg);
+</a><a href="#h3-0-191" id="h3-0-191" class="i">+
+</a><a href="#h3-0-192" id="h3-0-192" class="i">+private:
+</a><a href="#h3-0-193" id="h3-0-193" class="i">+    IndexWalker(const IndexWalker&amp;);
+</a><a href="#h3-0-194" id="h3-0-194" class="i">+    void operator=(const IndexWalker&amp;);
+</a><a href="#h3-0-195" id="h3-0-195" class="i">+};
+</a><a href="#h3-0-196" id="h3-0-196" class="i">+
+</a><a href="#h3-0-197" id="h3-0-197" class="i">+namespace {
+</a><a href="#h3-0-198" id="h3-0-198" class="i">+    typedef map&lt;pair&lt;intrusive_ptr&lt;QueryPlan&gt;, intrusive_ptr&lt;QueryPlan&gt; &gt;,
+</a><a href="#h3-0-199" id="h3-0-199" class="i">+                intrusive_ptr&lt;QueryPlan&gt; &gt; alternate_cache;
+</a><a href="#h3-0-200" id="h3-0-200" class="i">+
+</a><a href="#h3-0-201" id="h3-0-201" class="i">+    intrusive_ptr&lt;QueryPlan&gt; Alternate(alternate_cache&amp;,
+</a><a href="#h3-0-202" id="h3-0-202" class="i">+                                   intrusive_ptr&lt;QueryPlan&gt;,
+</a><a href="#h3-0-203" id="h3-0-203" class="i">+                                   intrusive_ptr&lt;QueryPlan&gt;);
+</a><a href="#h3-0-204" id="h3-0-204" class="i">+
+</a><a href="#h3-0-205" id="h3-0-205" class="i">+    string RuneToString(Rune r) {
+</a><a href="#h3-0-206" id="h3-0-206" class="i">+        char buf[UTFmax];
+</a><a href="#h3-0-207" id="h3-0-207" class="i">+        int n = runetochar(buf, &amp;r);
+</a><a href="#h3-0-208" id="h3-0-208" class="i">+        return string(buf, n);
+</a><a href="#h3-0-209" id="h3-0-209" class="i">+    }
+</a><a href="#h3-0-210" id="h3-0-210" class="i">+
+</a><a href="#h3-0-211" id="h3-0-211" class="i">+    intrusive_ptr&lt;QueryPlan&gt; Any() {
+</a><a href="#h3-0-212" id="h3-0-212" class="i">+        return intrusive_ptr&lt;QueryPlan&gt;(new QueryPlan());
+</a><a href="#h3-0-213" id="h3-0-213" class="i">+    }
+</a><a href="#h3-0-214" id="h3-0-214" class="i">+
+</a><a href="#h3-0-215" id="h3-0-215" class="i">+    intrusive_ptr&lt;QueryPlan&gt; Empty() {
+</a><a href="#h3-0-216" id="h3-0-216" class="i">+        return intrusive_ptr&lt;QueryPlan&gt;(new QueryPlan(kAnchorBoth));
+</a><a href="#h3-0-217" id="h3-0-217" class="i">+    }
+</a><a href="#h3-0-218" id="h3-0-218" class="i">+
+</a><a href="#h3-0-219" id="h3-0-219" class="i">+    intrusive_ptr&lt;QueryPlan&gt; Literal(string s) {
+</a><a href="#h3-0-220" id="h3-0-220" class="i">+        intrusive_ptr&lt;QueryPlan&gt; k = 0;
+</a><a href="#h3-0-221" id="h3-0-221" class="i">+        for (string::reverse_iterator it = s.rbegin();
+</a><a href="#h3-0-222" id="h3-0-222" class="i">+             it != s.rend(); ++it) {
+</a><a href="#h3-0-223" id="h3-0-223" class="i">+            k = intrusive_ptr&lt;QueryPlan&gt;(new QueryPlan(pair&lt;uchar, uchar&gt;(*it, *it), k));
+</a><a href="#h3-0-224" id="h3-0-224" class="i">+        }
+</a><a href="#h3-0-225" id="h3-0-225" class="i">+        k-&gt;anchor = kAnchorBoth;
+</a><a href="#h3-0-226" id="h3-0-226" class="i">+        return k;
+</a><a href="#h3-0-227" id="h3-0-227" class="i">+    }
+</a><a href="#h3-0-228" id="h3-0-228" class="i">+
+</a><a href="#h3-0-229" id="h3-0-229" class="i">+    intrusive_ptr&lt;QueryPlan&gt; Literal(Rune r) {
+</a><a href="#h3-0-230" id="h3-0-230" class="i">+        return Literal(RuneToString(r));
+</a><a href="#h3-0-231" id="h3-0-231" class="i">+    }
+</a><a href="#h3-0-232" id="h3-0-232" class="i">+
+</a><a href="#h3-0-233" id="h3-0-233" class="i">+    intrusive_ptr&lt;QueryPlan&gt; CaseFoldLiteral(Rune r) {
+</a><a href="#h3-0-234" id="h3-0-234" class="i">+        if (r &gt; 127)
+</a><a href="#h3-0-235" id="h3-0-235" class="i">+            return Any();
+</a><a href="#h3-0-236" id="h3-0-236" class="i">+        if (r &lt; &#39;a&#39; || r &gt; &#39;z&#39;) {
+</a><a href="#h3-0-237" id="h3-0-237" class="i">+            return Literal(r);
+</a><a href="#h3-0-238" id="h3-0-238" class="i">+        }
+</a><a href="#h3-0-239" id="h3-0-239" class="i">+        intrusive_ptr&lt;QueryPlan&gt; k(new QueryPlan(kAnchorBoth));
+</a><a href="#h3-0-240" id="h3-0-240" class="i">+        k-&gt;insert(make_pair(make_pair((uchar)r, (uchar)r), (QueryPlan*)0));
+</a><a href="#h3-0-241" id="h3-0-241" class="i">+        k-&gt;insert(make_pair(make_pair((uchar)r - &#39;a&#39; + &#39;A&#39;,
+</a><a href="#h3-0-242" id="h3-0-242" class="i">+                                      (uchar)r - &#39;a&#39; + &#39;A&#39;), (QueryPlan*)0));
+</a><a href="#h3-0-243" id="h3-0-243" class="i">+        return k;
+</a><a href="#h3-0-244" id="h3-0-244" class="i">+    }
+</a><a href="#h3-0-245" id="h3-0-245" class="i">+
+</a><a href="#h3-0-246" id="h3-0-246" class="i">+    intrusive_ptr&lt;QueryPlan&gt; Literal(Rune *runes, int nrunes) {
+</a><a href="#h3-0-247" id="h3-0-247" class="i">+        string lit;
+</a><a href="#h3-0-248" id="h3-0-248" class="i">+
+</a><a href="#h3-0-249" id="h3-0-249" class="i">+        for (int i = 0; i &lt; nrunes; i++) {
+</a><a href="#h3-0-250" id="h3-0-250" class="i">+            lit.append(RuneToString(runes[i]));
+</a><a href="#h3-0-251" id="h3-0-251" class="i">+        }
+</a><a href="#h3-0-252" id="h3-0-252" class="i">+
+</a><a href="#h3-0-253" id="h3-0-253" class="i">+        return Literal(lit);
+</a><a href="#h3-0-254" id="h3-0-254" class="i">+    }
+</a><a href="#h3-0-255" id="h3-0-255" class="i">+
+</a><a href="#h3-0-256" id="h3-0-256" class="i">+    intrusive_ptr&lt;QueryPlan&gt; Concat(intrusive_ptr&lt;QueryPlan&gt; *children, int nchildren);
+</a><a href="#h3-0-257" id="h3-0-257" class="i">+    intrusive_ptr&lt;QueryPlan&gt; CaseFoldLiteral(Rune *runes, int nrunes) {
+</a><a href="#h3-0-258" id="h3-0-258" class="i">+        if (nrunes == 0)
+</a><a href="#h3-0-259" id="h3-0-259" class="i">+            return Empty();
+</a><a href="#h3-0-260" id="h3-0-260" class="i">+        std::vector&lt;intrusive_ptr&lt;QueryPlan&gt; &gt; keys;
+</a><a href="#h3-0-261" id="h3-0-261" class="i">+        for (int i = 0; i &lt; nrunes; ++i) {
+</a><a href="#h3-0-262" id="h3-0-262" class="i">+            keys.push_back(CaseFoldLiteral(runes[i]));
+</a><a href="#h3-0-263" id="h3-0-263" class="i">+        }
+</a><a href="#h3-0-264" id="h3-0-264" class="i">+        return Concat(&amp;keys[0], nrunes);
+</a><a href="#h3-0-265" id="h3-0-265" class="i">+    }
+</a><a href="#h3-0-266" id="h3-0-266" class="i">+
+</a><a href="#h3-0-267" id="h3-0-267" class="i">+    intrusive_ptr&lt;QueryPlan&gt; LexRange(const string &amp;lo, const string&amp; hi) {
+</a><a href="#h3-0-268" id="h3-0-268" class="i">+        if (lo.size() == 0 &amp;&amp; hi.size() == 0)
+</a><a href="#h3-0-269" id="h3-0-269" class="i">+            return intrusive_ptr&lt;QueryPlan&gt;();
+</a><a href="#h3-0-270" id="h3-0-270" class="i">+        if (lo.size() == 0)
+</a><a href="#h3-0-271" id="h3-0-271" class="i">+            return Literal(hi);
+</a><a href="#h3-0-272" id="h3-0-272" class="i">+
+</a><a href="#h3-0-273" id="h3-0-273" class="i">+        intrusive_ptr&lt;QueryPlan&gt; out(new QueryPlan(kAnchorBoth));
+</a><a href="#h3-0-274" id="h3-0-274" class="i">+        assert(hi.size() != 0);
+</a><a href="#h3-0-275" id="h3-0-275" class="i">+        if (lo[0] &lt; hi[0])
+</a><a href="#h3-0-276" id="h3-0-276" class="i">+            out-&gt;insert(QueryPlan::value_type
+</a><a href="#h3-0-277" id="h3-0-277" class="i">+                        (pair&lt;uchar, uchar&gt;(lo[0], hi[0] - 1), (QueryPlan*)0));
+</a><a href="#h3-0-278" id="h3-0-278" class="i">+        out-&gt;insert(QueryPlan::value_type
+</a><a href="#h3-0-279" id="h3-0-279" class="i">+                    (pair&lt;uchar, uchar&gt;(hi[0], hi[0]),
+</a><a href="#h3-0-280" id="h3-0-280" class="i">+                     LexRange(lo.substr(1), hi.substr(1))));
+</a><a href="#h3-0-281" id="h3-0-281" class="i">+        return out;
+</a><a href="#h3-0-282" id="h3-0-282" class="i">+    }
+</a><a href="#h3-0-283" id="h3-0-283" class="i">+
+</a><a href="#h3-0-284" id="h3-0-284" class="i">+    intrusive_ptr&lt;QueryPlan&gt; CClass(CharClass *cc) {
+</a><a href="#h3-0-285" id="h3-0-285" class="i">+        if (cc-&gt;size() &gt; kMaxWidth)
+</a><a href="#h3-0-286" id="h3-0-286" class="i">+            return Any();
+</a><a href="#h3-0-287" id="h3-0-287" class="i">+
+</a><a href="#h3-0-288" id="h3-0-288" class="i">+        intrusive_ptr&lt;QueryPlan&gt; k(new QueryPlan(kAnchorBoth));
+</a><a href="#h3-0-289" id="h3-0-289" class="i">+
+</a><a href="#h3-0-290" id="h3-0-290" class="i">+        for (CharClass::iterator i = cc-&gt;begin(); i != cc-&gt;end(); ++i) {
+</a><a href="#h3-0-291" id="h3-0-291" class="i">+            if (i-&gt;hi &lt; Runeself)
+</a><a href="#h3-0-292" id="h3-0-292" class="i">+                k-&gt;insert(QueryPlan::value_type
+</a><a href="#h3-0-293" id="h3-0-293" class="i">+                          (pair&lt;uchar, uchar&gt;(i-&gt;lo, i-&gt;hi),
+</a><a href="#h3-0-294" id="h3-0-294" class="i">+                           (QueryPlan*)0));
+</a><a href="#h3-0-295" id="h3-0-295" class="i">+            else {
+</a><a href="#h3-0-296" id="h3-0-296" class="i">+                alternate_cache cache;
+</a><a href="#h3-0-297" id="h3-0-297" class="i">+                k = Alternate(cache, k, LexRange(RuneToString(i-&gt;lo),
+</a><a href="#h3-0-298" id="h3-0-298" class="i">+                                                 RuneToString(i-&gt;hi)));
+</a><a href="#h3-0-299" id="h3-0-299" class="i">+            }
+</a><a href="#h3-0-300" id="h3-0-300" class="i">+        }
+</a><a href="#h3-0-301" id="h3-0-301" class="i">+
+</a><a href="#h3-0-302" id="h3-0-302" class="i">+        return k;
+</a><a href="#h3-0-303" id="h3-0-303" class="i">+    }
+</a><a href="#h3-0-304" id="h3-0-304" class="i">+
+</a><a href="#h3-0-305" id="h3-0-305" class="i">+    bool ShouldConcat(intrusive_ptr&lt;QueryPlan&gt; lhs, intrusive_ptr&lt;QueryPlan&gt; rhs) {
+</a><a href="#h3-0-306" id="h3-0-306" class="i">+        assert(lhs &amp;&amp; rhs);
+</a><a href="#h3-0-307" id="h3-0-307" class="i">+        if (!(lhs-&gt;anchor &amp; kAnchorRight) ||
+</a><a href="#h3-0-308" id="h3-0-308" class="i">+            !(rhs-&gt;anchor &amp; kAnchorLeft))
+</a><a href="#h3-0-309" id="h3-0-309" class="i">+            return false;
+</a><a href="#h3-0-310" id="h3-0-310" class="i">+        if (lhs-&gt;empty())
+</a><a href="#h3-0-311" id="h3-0-311" class="i">+            return false;
+</a><a href="#h3-0-312" id="h3-0-312" class="i">+        QueryPlan::Stats concat = lhs-&gt;stats().concat(rhs-&gt;stats());
+</a><a href="#h3-0-313" id="h3-0-313" class="i">+        if (concat.nodes_ &gt;= kMaxNodes)
+</a><a href="#h3-0-314" id="h3-0-314" class="i">+            return false;
+</a><a href="#h3-0-315" id="h3-0-315" class="i">+        return true;
+</a><a href="#h3-0-316" id="h3-0-316" class="i">+    }
+</a><a href="#h3-0-317" id="h3-0-317" class="i">+
+</a><a href="#h3-0-318" id="h3-0-318" class="i">+    bool Prefer(const QueryPlan::Stats&amp; lhs,
+</a><a href="#h3-0-319" id="h3-0-319" class="i">+                const QueryPlan::Stats&amp; rhs) {
+</a><a href="#h3-0-320" id="h3-0-320" class="i">+        return (lhs.selectivity_ &lt; rhs.selectivity_);
+</a><a href="#h3-0-321" id="h3-0-321" class="i">+        /*
+</a><a href="#h3-0-322" id="h3-0-322" class="i">+        return (kRECost * lhs.selectivity_ + kNodeCost * lhs.nodes_ &lt;
+</a><a href="#h3-0-323" id="h3-0-323" class="i">+                kRECost * rhs.selectivity_ + kNodeCost * rhs.nodes_);
+</a><a href="#h3-0-324" id="h3-0-324" class="i">+        */
+</a><a href="#h3-0-325" id="h3-0-325" class="i">+    }
+</a><a href="#h3-0-326" id="h3-0-326" class="i">+
+</a><a href="#h3-0-327" id="h3-0-327" class="i">+    intrusive_ptr&lt;QueryPlan&gt; Concat(intrusive_ptr&lt;QueryPlan&gt; lhs, intrusive_ptr&lt;QueryPlan&gt; rhs) {
+</a><a href="#h3-0-328" id="h3-0-328" class="i">+        assert(lhs);
+</a><a href="#h3-0-329" id="h3-0-329" class="i">+        intrusive_ptr&lt;QueryPlan&gt; out = lhs;
+</a><a href="#h3-0-330" id="h3-0-330" class="i">+
+</a><a href="#h3-0-331" id="h3-0-331" class="i">+        debug(kDebugIndexAll,
+</a><a href="#h3-0-332" id="h3-0-332" class="i">+              &quot;Concat([%s](%ld), [%s](%ld)) = &quot;,
+</a><a href="#h3-0-333" id="h3-0-333" class="i">+              lhs ? lhs-&gt;ToString().c_str() : &quot;&quot;,
+</a><a href="#h3-0-334" id="h3-0-334" class="i">+              lhs-&gt;nodes(),
+</a><a href="#h3-0-335" id="h3-0-335" class="i">+              rhs ? rhs-&gt;ToString().c_str() : &quot;&quot;,
+</a><a href="#h3-0-336" id="h3-0-336" class="i">+              rhs-&gt;nodes());
+</a><a href="#h3-0-337" id="h3-0-337" class="i">+
+</a><a href="#h3-0-338" id="h3-0-338" class="i">+        if (ShouldConcat(lhs, rhs)) {
+</a><a href="#h3-0-339" id="h3-0-339" class="i">+            out-&gt;concat(rhs);
+</a><a href="#h3-0-340" id="h3-0-340" class="i">+        } else if(Prefer(lhs-&gt;stats(), rhs-&gt;stats()))  {
+</a><a href="#h3-0-341" id="h3-0-341" class="i">+            out-&gt;anchor &amp;= ~kAnchorRight;
+</a><a href="#h3-0-342" id="h3-0-342" class="i">+        } else {
+</a><a href="#h3-0-343" id="h3-0-343" class="i">+            out = rhs;
+</a><a href="#h3-0-344" id="h3-0-344" class="i">+            out-&gt;anchor &amp;= ~kAnchorLeft;
+</a><a href="#h3-0-345" id="h3-0-345" class="i">+        }
+</a><a href="#h3-0-346" id="h3-0-346" class="i">+
+</a><a href="#h3-0-347" id="h3-0-347" class="i">+        debug(kDebugIndexAll, &quot;[%s]&quot;, out-&gt;ToString().c_str());
+</a><a href="#h3-0-348" id="h3-0-348" class="i">+
+</a><a href="#h3-0-349" id="h3-0-349" class="i">+        return out;
+</a><a href="#h3-0-350" id="h3-0-350" class="i">+    }
+</a><a href="#h3-0-351" id="h3-0-351" class="i">+
+</a><a href="#h3-0-352" id="h3-0-352" class="i">+    QueryPlan::Stats TryConcat(intrusive_ptr&lt;QueryPlan&gt; *start,
+</a><a href="#h3-0-353" id="h3-0-353" class="i">+                              intrusive_ptr&lt;QueryPlan&gt; *end) {
+</a><a href="#h3-0-354" id="h3-0-354" class="i">+        QueryPlan::Stats st = (*start)-&gt;stats();
+</a><a href="#h3-0-355" id="h3-0-355" class="i">+        debug(kDebugIndexAll, &quot;TryConcat: Searching suffix of length %d&quot;,
+</a><a href="#h3-0-356" id="h3-0-356" class="i">+              int(end - start));
+</a><a href="#h3-0-357" id="h3-0-357" class="i">+        if (!*start || !((*start)-&gt;anchor &amp; kAnchorRight) || (*start)-&gt;empty()) {
+</a><a href="#h3-0-358" id="h3-0-358" class="i">+            debug(kDebugIndexAll, &quot;!ConcatRight, returning early.&quot;);
+</a><a href="#h3-0-359" id="h3-0-359" class="i">+            return st;
+</a><a href="#h3-0-360" id="h3-0-360" class="i">+        }
+</a><a href="#h3-0-361" id="h3-0-361" class="i">+        for (intrusive_ptr&lt;QueryPlan&gt; *ptr = start + 1; ptr != end; ptr++) {
+</a><a href="#h3-0-362" id="h3-0-362" class="i">+            if (!*(ptr) || !((*ptr)-&gt;anchor &amp; kAnchorLeft))
+</a><a href="#h3-0-363" id="h3-0-363" class="i">+                break;
+</a><a href="#h3-0-364" id="h3-0-364" class="i">+            QueryPlan::Stats concat = st.concat((*ptr)-&gt;stats());
+</a><a href="#h3-0-365" id="h3-0-365" class="i">+
+</a><a href="#h3-0-366" id="h3-0-366" class="i">+            if (concat.nodes_ &gt;= kMaxNodes)
+</a><a href="#h3-0-367" id="h3-0-367" class="i">+                break;
+</a><a href="#h3-0-368" id="h3-0-368" class="i">+
+</a><a href="#h3-0-369" id="h3-0-369" class="i">+            st = concat;
+</a><a href="#h3-0-370" id="h3-0-370" class="i">+
+</a><a href="#h3-0-371" id="h3-0-371" class="i">+            if (((*ptr)-&gt;anchor &amp; (kAnchorRepeat|kAnchorRight)) != kAnchorRight)
+</a><a href="#h3-0-372" id="h3-0-372" class="i">+                break;
+</a><a href="#h3-0-373" id="h3-0-373" class="i">+        }
+</a><a href="#h3-0-374" id="h3-0-374" class="i">+        debug(kDebugIndexAll, &quot;TryConcat: nodes=%ld, selectivity=%f&quot;,
+</a><a href="#h3-0-375" id="h3-0-375" class="i">+              st.nodes_, st.selectivity_);
+</a><a href="#h3-0-376" id="h3-0-376" class="i">+        return st;
+</a><a href="#h3-0-377" id="h3-0-377" class="i">+    }
+</a><a href="#h3-0-378" id="h3-0-378" class="i">+
+</a><a href="#h3-0-379" id="h3-0-379" class="i">+    intrusive_ptr&lt;QueryPlan&gt; Concat(intrusive_ptr&lt;QueryPlan&gt; *children,
+</a><a href="#h3-0-380" id="h3-0-380" class="i">+                                int nchildren) {
+</a><a href="#h3-0-381" id="h3-0-381" class="i">+        intrusive_ptr&lt;QueryPlan&gt; *end = children + nchildren, *best_start = 0, *ptr;
+</a><a href="#h3-0-382" id="h3-0-382" class="i">+        QueryPlan::Stats best_stats;
+</a><a href="#h3-0-383" id="h3-0-383" class="i">+
+</a><a href="#h3-0-384" id="h3-0-384" class="i">+        debug(kDebugIndexAll, &quot;Concat: Searching %d positions&quot;, nchildren);
+</a><a href="#h3-0-385" id="h3-0-385" class="i">+        for (ptr = children; ptr != end; ptr++) {
+</a><a href="#h3-0-386" id="h3-0-386" class="i">+            QueryPlan::Stats st = TryConcat(ptr, end);
+</a><a href="#h3-0-387" id="h3-0-387" class="i">+            if (st.nodes_ &gt; 1 &amp;&amp; Prefer(st, best_stats)) {
+</a><a href="#h3-0-388" id="h3-0-388" class="i">+                debug(kDebugIndexAll, &quot;Concat: Found new best: %d: %f&quot;,
+</a><a href="#h3-0-389" id="h3-0-389" class="i">+                      int(ptr - children), st.selectivity_);
+</a><a href="#h3-0-390" id="h3-0-390" class="i">+                best_start = ptr;
+</a><a href="#h3-0-391" id="h3-0-391" class="i">+                best_stats = st;
+</a><a href="#h3-0-392" id="h3-0-392" class="i">+            }
+</a><a href="#h3-0-393" id="h3-0-393" class="i">+        }
+</a><a href="#h3-0-394" id="h3-0-394" class="i">+
+</a><a href="#h3-0-395" id="h3-0-395" class="i">+        if (best_start == 0) {
+</a><a href="#h3-0-396" id="h3-0-396" class="i">+            debug(kDebugIndexAll, &quot;Concat: No good results found.&quot;);
+</a><a href="#h3-0-397" id="h3-0-397" class="i">+            return Any();
+</a><a href="#h3-0-398" id="h3-0-398" class="i">+        }
+</a><a href="#h3-0-399" id="h3-0-399" class="i">+
+</a><a href="#h3-0-400" id="h3-0-400" class="i">+        intrusive_ptr&lt;QueryPlan&gt; out = *best_start;
+</a><a href="#h3-0-401" id="h3-0-401" class="i">+        for (ptr = best_start + 1; ptr != end; ptr++) {
+</a><a href="#h3-0-402" id="h3-0-402" class="i">+            out = Concat(out, *ptr);
+</a><a href="#h3-0-403" id="h3-0-403" class="i">+        }
+</a><a href="#h3-0-404" id="h3-0-404" class="i">+        if (best_start != children)
+</a><a href="#h3-0-405" id="h3-0-405" class="i">+            out-&gt;anchor &amp;= ~kAnchorLeft;
+</a><a href="#h3-0-406" id="h3-0-406" class="i">+        return out;
+</a><a href="#h3-0-407" id="h3-0-407" class="i">+    }
+</a><a href="#h3-0-408" id="h3-0-408" class="i">+
+</a><a href="#h3-0-409" id="h3-0-409" class="i">+    bool intersects(const pair&lt;uchar, uchar&gt;&amp; left,
+</a><a href="#h3-0-410" id="h3-0-410" class="i">+                    const pair&lt;uchar, uchar&gt;&amp; right) {
+</a><a href="#h3-0-411" id="h3-0-411" class="i">+        if (left.first &lt;= right.first)
+</a><a href="#h3-0-412" id="h3-0-412" class="i">+            return left.second &gt;= right.first;
+</a><a href="#h3-0-413" id="h3-0-413" class="i">+        else
+</a><a href="#h3-0-414" id="h3-0-414" class="i">+            return right.second &gt;= left.first;
+</a><a href="#h3-0-415" id="h3-0-415" class="i">+    }
+</a><a href="#h3-0-416" id="h3-0-416" class="i">+
+</a><a href="#h3-0-417" id="h3-0-417" class="i">+    enum {
+</a><a href="#h3-0-418" id="h3-0-418" class="i">+        kTakeLeft  = 0x01,
+</a><a href="#h3-0-419" id="h3-0-419" class="i">+        kTakeRight = 0x02,
+</a><a href="#h3-0-420" id="h3-0-420" class="i">+        kTakeBoth  = 0x03
+</a><a href="#h3-0-421" id="h3-0-421" class="i">+    };
+</a><a href="#h3-0-422" id="h3-0-422" class="i">+
+</a><a href="#h3-0-423" id="h3-0-423" class="i">+    int Merge(alternate_cache&amp; cache,
+</a><a href="#h3-0-424" id="h3-0-424" class="i">+              intrusive_ptr&lt;QueryPlan&gt; out,
+</a><a href="#h3-0-425" id="h3-0-425" class="i">+              pair&lt;uchar, uchar&gt;&amp; left,
+</a><a href="#h3-0-426" id="h3-0-426" class="i">+              intrusive_ptr&lt;QueryPlan&gt; lnext,
+</a><a href="#h3-0-427" id="h3-0-427" class="i">+              pair&lt;uchar, uchar&gt;&amp; right,
+</a><a href="#h3-0-428" id="h3-0-428" class="i">+              intrusive_ptr&lt;QueryPlan&gt; rnext) {
+</a><a href="#h3-0-429" id="h3-0-429" class="i">+        if (intersects(left, right)) {
+</a><a href="#h3-0-430" id="h3-0-430" class="i">+            debug(kDebugIndexAll,
+</a><a href="#h3-0-431" id="h3-0-431" class="i">+                  &quot;Processing intersection: &lt;%hhx,%hhx&gt; vs. &lt;%hhx,%hhx&gt;&quot;,
+</a><a href="#h3-0-432" id="h3-0-432" class="i">+                  left.first, left.second, right.first, right.second);
+</a><a href="#h3-0-433" id="h3-0-433" class="i">+            if (left.first &lt; right.first) {
+</a><a href="#h3-0-434" id="h3-0-434" class="i">+                out-&gt;insert
+</a><a href="#h3-0-435" id="h3-0-435" class="i">+                    (make_pair(make_pair(left.first,
+</a><a href="#h3-0-436" id="h3-0-436" class="i">+                                         right.first - 1),
+</a><a href="#h3-0-437" id="h3-0-437" class="i">+                               lnext));
+</a><a href="#h3-0-438" id="h3-0-438" class="i">+                left.first = right.first;
+</a><a href="#h3-0-439" id="h3-0-439" class="i">+            } else if (right.first &lt; left.first) {
+</a><a href="#h3-0-440" id="h3-0-440" class="i">+                out-&gt;insert
+</a><a href="#h3-0-441" id="h3-0-441" class="i">+                    (make_pair(make_pair(right.first,
+</a><a href="#h3-0-442" id="h3-0-442" class="i">+                                         left.first - 1),
+</a><a href="#h3-0-443" id="h3-0-443" class="i">+                               rnext));
+</a><a href="#h3-0-444" id="h3-0-444" class="i">+                right.first = left.first;
+</a><a href="#h3-0-445" id="h3-0-445" class="i">+            }
+</a><a href="#h3-0-446" id="h3-0-446" class="i">+            /* left and right now start at the same location */
+</a><a href="#h3-0-447" id="h3-0-447" class="i">+            assert(left.first == right.first);
+</a><a href="#h3-0-448" id="h3-0-448" class="i">+
+</a><a href="#h3-0-449" id="h3-0-449" class="i">+            uchar end = min(left.second, right.second);
+</a><a href="#h3-0-450" id="h3-0-450" class="i">+            out-&gt;insert
+</a><a href="#h3-0-451" id="h3-0-451" class="i">+                (make_pair(make_pair(left.first, end),
+</a><a href="#h3-0-452" id="h3-0-452" class="i">+                           Alternate(cache, lnext, rnext)));
+</a><a href="#h3-0-453" id="h3-0-453" class="i">+            if (left.second &gt; end) {
+</a><a href="#h3-0-454" id="h3-0-454" class="i">+                left.first = end+1;
+</a><a href="#h3-0-455" id="h3-0-455" class="i">+                return kTakeRight;
+</a><a href="#h3-0-456" id="h3-0-456" class="i">+            } else if (right.second &gt; end) {
+</a><a href="#h3-0-457" id="h3-0-457" class="i">+                right.first = end+1;
+</a><a href="#h3-0-458" id="h3-0-458" class="i">+                return kTakeLeft;
+</a><a href="#h3-0-459" id="h3-0-459" class="i">+            }
+</a><a href="#h3-0-460" id="h3-0-460" class="i">+            return kTakeBoth;
+</a><a href="#h3-0-461" id="h3-0-461" class="i">+        }
+</a><a href="#h3-0-462" id="h3-0-462" class="i">+        /* Non-intersecting */
+</a><a href="#h3-0-463" id="h3-0-463" class="i">+        if (left.first &lt; right.first) {
+</a><a href="#h3-0-464" id="h3-0-464" class="i">+            out-&gt;insert(make_pair(left, lnext));
+</a><a href="#h3-0-465" id="h3-0-465" class="i">+            return kTakeLeft;
+</a><a href="#h3-0-466" id="h3-0-466" class="i">+        }
+</a><a href="#h3-0-467" id="h3-0-467" class="i">+        assert(right.first &lt; left.first);
+</a><a href="#h3-0-468" id="h3-0-468" class="i">+        out-&gt;insert(make_pair(right, rnext));
+</a><a href="#h3-0-469" id="h3-0-469" class="i">+        return kTakeRight;
+</a><a href="#h3-0-470" id="h3-0-470" class="i">+    }
+</a><a href="#h3-0-471" id="h3-0-471" class="i">+
+</a><a href="#h3-0-472" id="h3-0-472" class="i">+    intrusive_ptr&lt;QueryPlan&gt; AlternateInternal(alternate_cache&amp; cache,
+</a><a href="#h3-0-473" id="h3-0-473" class="i">+                                           intrusive_ptr&lt;QueryPlan&gt; lhs,
+</a><a href="#h3-0-474" id="h3-0-474" class="i">+                                           intrusive_ptr&lt;QueryPlan&gt; rhs) {
+</a><a href="#h3-0-475" id="h3-0-475" class="i">+        if (lhs == rhs)
+</a><a href="#h3-0-476" id="h3-0-476" class="i">+            return lhs;
+</a><a href="#h3-0-477" id="h3-0-477" class="i">+        if (!lhs || !rhs ||
+</a><a href="#h3-0-478" id="h3-0-478" class="i">+            lhs-&gt;empty() || rhs-&gt;empty() ||
+</a><a href="#h3-0-479" id="h3-0-479" class="i">+            lhs-&gt;size() + rhs-&gt;size() &gt;= kMaxWidth)
+</a><a href="#h3-0-480" id="h3-0-480" class="i">+            return Any();
+</a><a href="#h3-0-481" id="h3-0-481" class="i">+
+</a><a href="#h3-0-482" id="h3-0-482" class="i">+        static int recursion_depth = 0;
+</a><a href="#h3-0-483" id="h3-0-483" class="i">+        RecursionCounter guard(recursion_depth);
+</a><a href="#h3-0-484" id="h3-0-484" class="i">+        if (recursion_depth &gt; kMaxRecursion)
+</a><a href="#h3-0-485" id="h3-0-485" class="i">+            return Any();
+</a><a href="#h3-0-486" id="h3-0-486" class="i">+
+</a><a href="#h3-0-487" id="h3-0-487" class="i">+        intrusive_ptr&lt;QueryPlan&gt; out(new QueryPlan(lhs-&gt;anchor &amp; rhs-&gt;anchor &amp; (kAnchorLeft|kAnchorRight)));
+</a><a href="#h3-0-488" id="h3-0-488" class="i">+        QueryPlan::const_iterator lit, rit;
+</a><a href="#h3-0-489" id="h3-0-489" class="i">+        lit = lhs-&gt;begin();
+</a><a href="#h3-0-490" id="h3-0-490" class="i">+        rit = rhs-&gt;begin();
+</a><a href="#h3-0-491" id="h3-0-491" class="i">+        pair&lt;uchar, uchar&gt; left;
+</a><a href="#h3-0-492" id="h3-0-492" class="i">+        if (lit != lhs-&gt;end())
+</a><a href="#h3-0-493" id="h3-0-493" class="i">+            left = lit-&gt;first;
+</a><a href="#h3-0-494" id="h3-0-494" class="i">+        pair&lt;uchar, uchar&gt; right = rit-&gt;first;
+</a><a href="#h3-0-495" id="h3-0-495" class="i">+        if (rit != rhs-&gt;end())
+</a><a href="#h3-0-496" id="h3-0-496" class="i">+            right = rit-&gt;first;
+</a><a href="#h3-0-497" id="h3-0-497" class="i">+        while (lit != lhs-&gt;end() &amp;&amp; rit != rhs-&gt;end()) {
+</a><a href="#h3-0-498" id="h3-0-498" class="i">+            int action = Merge(cache, out, left, lit-&gt;second, right, rit-&gt;second);
+</a><a href="#h3-0-499" id="h3-0-499" class="i">+            if (action &amp; kTakeLeft)
+</a><a href="#h3-0-500" id="h3-0-500" class="i">+                if (++lit != lhs-&gt;end())
+</a><a href="#h3-0-501" id="h3-0-501" class="i">+                    left = lit-&gt;first;
+</a><a href="#h3-0-502" id="h3-0-502" class="i">+            if (action &amp; kTakeRight)
+</a><a href="#h3-0-503" id="h3-0-503" class="i">+                if (++rit != rhs-&gt;end())
+</a><a href="#h3-0-504" id="h3-0-504" class="i">+                    right = rit-&gt;first;
+</a><a href="#h3-0-505" id="h3-0-505" class="i">+        }
+</a><a href="#h3-0-506" id="h3-0-506" class="i">+
+</a><a href="#h3-0-507" id="h3-0-507" class="i">+        if (lit != lhs-&gt;end()) {
+</a><a href="#h3-0-508" id="h3-0-508" class="i">+            out-&gt;insert(make_pair(left, lit-&gt;second));
+</a><a href="#h3-0-509" id="h3-0-509" class="i">+            ++lit;
+</a><a href="#h3-0-510" id="h3-0-510" class="i">+        }
+</a><a href="#h3-0-511" id="h3-0-511" class="i">+        if (rit != rhs-&gt;end()) {
+</a><a href="#h3-0-512" id="h3-0-512" class="i">+            out-&gt;insert(make_pair(right, rit-&gt;second));
+</a><a href="#h3-0-513" id="h3-0-513" class="i">+            ++rit;
+</a><a href="#h3-0-514" id="h3-0-514" class="i">+        }
+</a><a href="#h3-0-515" id="h3-0-515" class="i">+
+</a><a href="#h3-0-516" id="h3-0-516" class="i">+        for (; lit != lhs-&gt;end(); ++lit)
+</a><a href="#h3-0-517" id="h3-0-517" class="i">+            out-&gt;insert(*lit);
+</a><a href="#h3-0-518" id="h3-0-518" class="i">+        for (; rit != rhs-&gt;end(); ++rit)
+</a><a href="#h3-0-519" id="h3-0-519" class="i">+            out-&gt;insert(*rit);
+</a><a href="#h3-0-520" id="h3-0-520" class="i">+
+</a><a href="#h3-0-521" id="h3-0-521" class="i">+        return out;
+</a><a href="#h3-0-522" id="h3-0-522" class="i">+    }
+</a><a href="#h3-0-523" id="h3-0-523" class="i">+
+</a><a href="#h3-0-524" id="h3-0-524" class="i">+    intrusive_ptr&lt;QueryPlan&gt; Alternate(alternate_cache&amp; cache,
+</a><a href="#h3-0-525" id="h3-0-525" class="i">+                                   intrusive_ptr&lt;QueryPlan&gt; lhs,
+</a><a href="#h3-0-526" id="h3-0-526" class="i">+                                   intrusive_ptr&lt;QueryPlan&gt; rhs) {
+</a><a href="#h3-0-527" id="h3-0-527" class="i">+        auto it = cache.find(make_pair(lhs, rhs));
+</a><a href="#h3-0-528" id="h3-0-528" class="i">+        if (it != cache.end())
+</a><a href="#h3-0-529" id="h3-0-529" class="i">+            return it-&gt;second;
+</a><a href="#h3-0-530" id="h3-0-530" class="i">+        intrusive_ptr&lt;QueryPlan&gt; out = AlternateInternal(cache, lhs, rhs);
+</a><a href="#h3-0-531" id="h3-0-531" class="i">+        cache[make_pair(lhs, rhs)] = out;
+</a><a href="#h3-0-532" id="h3-0-532" class="i">+        return out;
+</a><a href="#h3-0-533" id="h3-0-533" class="i">+    }
+</a><a href="#h3-0-534" id="h3-0-534" class="i">+
+</a><a href="#h3-0-535" id="h3-0-535" class="i">+};
+</a><a href="#h3-0-536" id="h3-0-536" class="i">+
+</a><a href="#h3-0-537" id="h3-0-537" class="i">+intrusive_ptr&lt;QueryPlan&gt; constructQueryPlan(const re2::RE2 &amp;re) {
+</a><a href="#h3-0-538" id="h3-0-538" class="i">+    IndexWalker walk;
+</a><a href="#h3-0-539" id="h3-0-539" class="i">+
+</a><a href="#h3-0-540" id="h3-0-540" class="i">+    Regexp *sre = re.Regexp()-&gt;Simplify();
+</a><a href="#h3-0-541" id="h3-0-541" class="i">+    intrusive_ptr&lt;QueryPlan&gt; key = walk.WalkExponential(sre, 0, 10000);
+</a><a href="#h3-0-542" id="h3-0-542" class="i">+    sre-&gt;Decref();
+</a><a href="#h3-0-543" id="h3-0-543" class="i">+
+</a><a href="#h3-0-544" id="h3-0-544" class="i">+    if (key &amp;&amp; key-&gt;weight() &lt; kMinWeight)
+</a><a href="#h3-0-545" id="h3-0-545" class="i">+        key = 0;
+</a><a href="#h3-0-546" id="h3-0-546" class="i">+    return key;
+</a><a href="#h3-0-547" id="h3-0-547" class="i">+}
+</a><a href="#h3-0-548" id="h3-0-548" class="i">+
+</a><a href="#h3-0-549" id="h3-0-549" class="i">+intrusive_ptr&lt;QueryPlan&gt;
+</a><a href="#h3-0-550" id="h3-0-550" class="i">+IndexWalker::PostVisit(Regexp* re, intrusive_ptr&lt;QueryPlan&gt; parent_arg,
+</a><a href="#h3-0-551" id="h3-0-551" class="i">+                       intrusive_ptr&lt;QueryPlan&gt; pre_arg,
+</a><a href="#h3-0-552" id="h3-0-552" class="i">+                       intrusive_ptr&lt;QueryPlan&gt; *child_args,
+</a><a href="#h3-0-553" id="h3-0-553" class="i">+                       int nchild_args) {
+</a><a href="#h3-0-554" id="h3-0-554" class="i">+    intrusive_ptr&lt;QueryPlan&gt; key;
+</a><a href="#h3-0-555" id="h3-0-555" class="i">+
+</a><a href="#h3-0-556" id="h3-0-556" class="i">+    switch (re-&gt;op()) {
+</a><a href="#h3-0-557" id="h3-0-557" class="i">+    case kRegexpNoMatch:
+</a><a href="#h3-0-558" id="h3-0-558" class="i">+    case kRegexpEmptyMatch:      // anywhere
+</a><a href="#h3-0-559" id="h3-0-559" class="i">+    case kRegexpBeginLine:       // at beginning of line
+</a><a href="#h3-0-560" id="h3-0-560" class="i">+    case kRegexpEndLine:         // at end of line
+</a><a href="#h3-0-561" id="h3-0-561" class="i">+    case kRegexpBeginText:       // at beginning of text
+</a><a href="#h3-0-562" id="h3-0-562" class="i">+    case kRegexpEndText:         // at end of text
+</a><a href="#h3-0-563" id="h3-0-563" class="i">+    case kRegexpWordBoundary:    // at word boundary
+</a><a href="#h3-0-564" id="h3-0-564" class="i">+    case kRegexpNoWordBoundary:  // not at word boundary
+</a><a href="#h3-0-565" id="h3-0-565" class="i">+        key = Empty();
+</a><a href="#h3-0-566" id="h3-0-566" class="i">+        break;
+</a><a href="#h3-0-567" id="h3-0-567" class="i">+
+</a><a href="#h3-0-568" id="h3-0-568" class="i">+    case kRegexpAnyChar:
+</a><a href="#h3-0-569" id="h3-0-569" class="i">+    case kRegexpAnyByte:
+</a><a href="#h3-0-570" id="h3-0-570" class="i">+        key = Any();
+</a><a href="#h3-0-571" id="h3-0-571" class="i">+        break;
+</a><a href="#h3-0-572" id="h3-0-572" class="i">+
+</a><a href="#h3-0-573" id="h3-0-573" class="i">+    case kRegexpLiteral:
+</a><a href="#h3-0-574" id="h3-0-574" class="i">+        if (re-&gt;parse_flags() &amp; Regexp::FoldCase) {
+</a><a href="#h3-0-575" id="h3-0-575" class="i">+            key = CaseFoldLiteral(re-&gt;rune());
+</a><a href="#h3-0-576" id="h3-0-576" class="i">+        } else {
+</a><a href="#h3-0-577" id="h3-0-577" class="i">+            key = Literal(re-&gt;rune());
+</a><a href="#h3-0-578" id="h3-0-578" class="i">+        }
+</a><a href="#h3-0-579" id="h3-0-579" class="i">+        break;
+</a><a href="#h3-0-580" id="h3-0-580" class="i">+
+</a><a href="#h3-0-581" id="h3-0-581" class="i">+    case kRegexpCharClass:
+</a><a href="#h3-0-582" id="h3-0-582" class="i">+        key = CClass(re-&gt;cc());
+</a><a href="#h3-0-583" id="h3-0-583" class="i">+        break;
+</a><a href="#h3-0-584" id="h3-0-584" class="i">+
+</a><a href="#h3-0-585" id="h3-0-585" class="i">+    case kRegexpLiteralString:
+</a><a href="#h3-0-586" id="h3-0-586" class="i">+        if (re-&gt;parse_flags() &amp; Regexp::FoldCase) {
+</a><a href="#h3-0-587" id="h3-0-587" class="i">+            key = CaseFoldLiteral(re-&gt;runes(), re-&gt;nrunes());
+</a><a href="#h3-0-588" id="h3-0-588" class="i">+        } else {
+</a><a href="#h3-0-589" id="h3-0-589" class="i">+            key = Literal(re-&gt;runes(), re-&gt;nrunes());
+</a><a href="#h3-0-590" id="h3-0-590" class="i">+        }
+</a><a href="#h3-0-591" id="h3-0-591" class="i">+        break;
+</a><a href="#h3-0-592" id="h3-0-592" class="i">+
+</a><a href="#h3-0-593" id="h3-0-593" class="i">+    case kRegexpConcat:
+</a><a href="#h3-0-594" id="h3-0-594" class="i">+        key = Concat(child_args, nchild_args);
+</a><a href="#h3-0-595" id="h3-0-595" class="i">+        break;
+</a><a href="#h3-0-596" id="h3-0-596" class="i">+
+</a><a href="#h3-0-597" id="h3-0-597" class="i">+    case kRegexpAlternate:
+</a><a href="#h3-0-598" id="h3-0-598" class="i">+        {
+</a><a href="#h3-0-599" id="h3-0-599" class="i">+            alternate_cache cache;
+</a><a href="#h3-0-600" id="h3-0-600" class="i">+            key = child_args[0];
+</a><a href="#h3-0-601" id="h3-0-601" class="i">+            for (int i = 1; i &lt; nchild_args; i++)
+</a><a href="#h3-0-602" id="h3-0-602" class="i">+                key = Alternate(cache, key, child_args[i]);
+</a><a href="#h3-0-603" id="h3-0-603" class="i">+        }
+</a><a href="#h3-0-604" id="h3-0-604" class="i">+        break;
+</a><a href="#h3-0-605" id="h3-0-605" class="i">+
+</a><a href="#h3-0-606" id="h3-0-606" class="i">+    case kRegexpStar:
+</a><a href="#h3-0-607" id="h3-0-607" class="i">+    case kRegexpQuest:
+</a><a href="#h3-0-608" id="h3-0-608" class="i">+        key = Any();
+</a><a href="#h3-0-609" id="h3-0-609" class="i">+        break;
+</a><a href="#h3-0-610" id="h3-0-610" class="i">+
+</a><a href="#h3-0-611" id="h3-0-611" class="i">+    case kRegexpCapture:
+</a><a href="#h3-0-612" id="h3-0-612" class="i">+        key = child_args[0];
+</a><a href="#h3-0-613" id="h3-0-613" class="i">+        break;
+</a><a href="#h3-0-614" id="h3-0-614" class="i">+
+</a><a href="#h3-0-615" id="h3-0-615" class="i">+    case kRegexpRepeat:
+</a><a href="#h3-0-616" id="h3-0-616" class="i">+        if (re-&gt;min() == 0)
+</a><a href="#h3-0-617" id="h3-0-617" class="i">+            return Any();
+</a><a href="#h3-0-618" id="h3-0-618" class="i">+    case kRegexpPlus:
+</a><a href="#h3-0-619" id="h3-0-619" class="i">+        key = child_args[0];
+</a><a href="#h3-0-620" id="h3-0-620" class="i">+        if ((key-&gt;anchor &amp; kAnchorBoth) == kAnchorBoth)
+</a><a href="#h3-0-621" id="h3-0-621" class="i">+            key-&gt;anchor |= kAnchorRepeat;
+</a><a href="#h3-0-622" id="h3-0-622" class="i">+        break;
+</a><a href="#h3-0-623" id="h3-0-623" class="i">+
+</a><a href="#h3-0-624" id="h3-0-624" class="i">+    default:
+</a><a href="#h3-0-625" id="h3-0-625" class="i">+        assert(false);
+</a><a href="#h3-0-626" id="h3-0-626" class="i">+    }
+</a><a href="#h3-0-627" id="h3-0-627" class="i">+
+</a><a href="#h3-0-628" id="h3-0-628" class="i">+    assert(key);
+</a><a href="#h3-0-629" id="h3-0-629" class="i">+
+</a><a href="#h3-0-630" id="h3-0-630" class="i">+    debug(kDebugIndex, &quot;* INDEX %s ==&gt; &quot;, re-&gt;ToString().c_str());
+</a><a href="#h3-0-631" id="h3-0-631" class="i">+    if (key)
+</a><a href="#h3-0-632" id="h3-0-632" class="i">+        debug(kDebugIndex, &quot;[weight %d, nodes %ld, depth %d]&quot;,
+</a><a href="#h3-0-633" id="h3-0-633" class="i">+              key-&gt;weight(), key-&gt;nodes(), key-&gt;depth());
+</a><a href="#h3-0-634" id="h3-0-634" class="i">+    else
+</a><a href="#h3-0-635" id="h3-0-635" class="i">+        debug(kDebugIndex, &quot;nul&quot;);
+</a><a href="#h3-0-636" id="h3-0-636" class="i">+
+</a><a href="#h3-0-637" id="h3-0-637" class="i">+    debug(kDebugIndexAll, &quot;           ==&gt; [%s]&quot;,
+</a><a href="#h3-0-638" id="h3-0-638" class="i">+          key ? key-&gt;ToString().c_str() : &quot;nul&quot;);
+</a><a href="#h3-0-639" id="h3-0-639" class="i">+
+</a><a href="#h3-0-640" id="h3-0-640" class="i">+    if ((debug_enabled &amp; kDebugIndex) &amp;&amp; key)
+</a><a href="#h3-0-641" id="h3-0-641" class="i">+        key-&gt;check_rep();
+</a><a href="#h3-0-642" id="h3-0-642" class="i">+
+</a><a href="#h3-0-643" id="h3-0-643" class="i">+    return key;
+</a><a href="#h3-0-644" id="h3-0-644" class="i">+}
+</a><a href="#h3-0-645" id="h3-0-645" class="i">+
+</a><a href="#h3-0-646" id="h3-0-646" class="i">+intrusive_ptr&lt;QueryPlan&gt;
+</a><a href="#h3-0-647" id="h3-0-647" class="i">+IndexWalker::ShortVisit(Regexp* re, intrusive_ptr&lt;QueryPlan&gt; parent_arg) {
+</a><a href="#h3-0-648" id="h3-0-648" class="i">+    return Any();
+</a><a href="#h3-0-649" id="h3-0-649" class="i">+}
+</a><a href="#h3-0-650" id="h3-0-650" class="i">+
+</a><a href="#h3-0-651" id="h3-0-651" class="i">+void QueryPlan::check_rep() {
+</a><a href="#h3-0-652" id="h3-0-652" class="i">+    pair&lt;uchar, uchar&gt; last = make_pair(&#39;\0&#39;, &#39;\0&#39;);
+</a><a href="#h3-0-653" id="h3-0-653" class="i">+    for (iterator it = begin(); it != end(); ++it) {
+</a><a href="#h3-0-654" id="h3-0-654" class="i">+        assert(!intersects(last, it-&gt;first));
+</a><a href="#h3-0-655" id="h3-0-655" class="i">+        last = it-&gt;first;
+</a><a href="#h3-0-656" id="h3-0-656" class="i">+    }
+</a><a href="#h3-0-657" id="h3-0-657" class="i">+}
+</a><a href="#h3-0-658" id="h3-0-658" class="i">+
+</a><a href="#h3-0-659" id="h3-0-659" class="i">+void intrusive_ptr_add_ref(QueryPlan *key) {
+</a><a href="#h3-0-660" id="h3-0-660" class="i">+    ++key-&gt;refs_;
+</a><a href="#h3-0-661" id="h3-0-661" class="i">+}
+</a><a href="#h3-0-662" id="h3-0-662" class="i">+
+</a><a href="#h3-0-663" id="h3-0-663" class="i">+void intrusive_ptr_release(QueryPlan *key) {
+</a><a href="#h3-0-664" id="h3-0-664" class="i">+    if (--key-&gt;refs_ == 0)
+</a><a href="#h3-0-665" id="h3-0-665" class="i">+        delete key;
+</a><a href="#h3-0-666" id="h3-0-666" class="i">+}
+</a><b>diff --git a/<a id="h4" href="../file/src/query_planner.h">src/query_planner.h</a> b/<a href="../file/src/query_planner.h">src/query_planner.h</a></b>
+<a href="#h4-0" id="h4-0" class="h">@@ -0,0 +1,141 @@
+</a><a href="#h4-0-0" id="h4-0-0" class="i">+/********************************************************************
+</a><a href="#h4-0-1" id="h4-0-1" class="i">+ * livegrep -- query_planner.h
+</a><a href="#h4-0-2" id="h4-0-2" class="i">+ * Copyright (c) 2011-2013 Nelson Elhage
+</a><a href="#h4-0-3" id="h4-0-3" class="i">+ *
+</a><a href="#h4-0-4" id="h4-0-4" class="i">+ * This program is free software. You may use, redistribute, and/or
+</a><a href="#h4-0-5" id="h4-0-5" class="i">+ * modify it under the terms listed in the COPYING file.
+</a><a href="#h4-0-6" id="h4-0-6" class="i">+ ********************************************************************/
+</a><a href="#h4-0-7" id="h4-0-7" class="i">+#ifndef CODESEARCH_INDEXER_H
+</a><a href="#h4-0-8" id="h4-0-8" class="i">+#define CODESEARCH_INDEXER_H
+</a><a href="#h4-0-9" id="h4-0-9" class="i">+
+</a><a href="#h4-0-10" id="h4-0-10" class="i">+#include &lt;vector&gt;
+</a><a href="#h4-0-11" id="h4-0-11" class="i">+#include &lt;list&gt;
+</a><a href="#h4-0-12" id="h4-0-12" class="i">+#include &lt;set&gt;
+</a><a href="#h4-0-13" id="h4-0-13" class="i">+#include &lt;string&gt;
+</a><a href="#h4-0-14" id="h4-0-14" class="i">+#include &lt;atomic&gt;
+</a><a href="#h4-0-15" id="h4-0-15" class="i">+#include &lt;map&gt;
+</a><a href="#h4-0-16" id="h4-0-16" class="i">+#include &lt;boost/intrusive_ptr.hpp&gt;
+</a><a href="#h4-0-17" id="h4-0-17" class="i">+
+</a><a href="#h4-0-18" id="h4-0-18" class="i">+#include &quot;re2/re2.h&quot;
+</a><a href="#h4-0-19" id="h4-0-19" class="i">+#include &quot;re2/walker-inl.h&quot;
+</a><a href="#h4-0-20" id="h4-0-20" class="i">+
+</a><a href="#h4-0-21" id="h4-0-21" class="i">+#include &quot;src/common.h&quot;
+</a><a href="#h4-0-22" id="h4-0-22" class="i">+
+</a><a href="#h4-0-23" id="h4-0-23" class="i">+using std::string;
+</a><a href="#h4-0-24" id="h4-0-24" class="i">+using std::vector;
+</a><a href="#h4-0-25" id="h4-0-25" class="i">+using std::list;
+</a><a href="#h4-0-26" id="h4-0-26" class="i">+using std::set;
+</a><a href="#h4-0-27" id="h4-0-27" class="i">+using boost::intrusive_ptr;
+</a><a href="#h4-0-28" id="h4-0-28" class="i">+
+</a><a href="#h4-0-29" id="h4-0-29" class="i">+enum {
+</a><a href="#h4-0-30" id="h4-0-30" class="i">+    kAnchorNone   = 0x00,
+</a><a href="#h4-0-31" id="h4-0-31" class="i">+    kAnchorLeft   = 0x01,
+</a><a href="#h4-0-32" id="h4-0-32" class="i">+    kAnchorRight  = 0x02,
+</a><a href="#h4-0-33" id="h4-0-33" class="i">+    kAnchorBoth   = 0x03,
+</a><a href="#h4-0-34" id="h4-0-34" class="i">+    kAnchorRepeat = 0x04
+</a><a href="#h4-0-35" id="h4-0-35" class="i">+};
+</a><a href="#h4-0-36" id="h4-0-36" class="i">+
+</a><a href="#h4-0-37" id="h4-0-37" class="i">+class QueryPlan {
+</a><a href="#h4-0-38" id="h4-0-38" class="i">+public:
+</a><a href="#h4-0-39" id="h4-0-39" class="i">+    typedef std::map&lt;std::pair&lt;uchar, uchar&gt;, intrusive_ptr&lt;QueryPlan&gt; &gt;::iterator iterator;
+</a><a href="#h4-0-40" id="h4-0-40" class="i">+    typedef std::map&lt;std::pair&lt;uchar, uchar&gt;, intrusive_ptr&lt;QueryPlan&gt; &gt;::const_iterator const_iterator;
+</a><a href="#h4-0-41" id="h4-0-41" class="i">+    typedef std::pair&lt;std::pair&lt;uchar, uchar&gt;, intrusive_ptr&lt;QueryPlan&gt; &gt; value_type;
+</a><a href="#h4-0-42" id="h4-0-42" class="i">+
+</a><a href="#h4-0-43" id="h4-0-43" class="i">+    iterator begin() {
+</a><a href="#h4-0-44" id="h4-0-44" class="i">+        return edges_.begin();
+</a><a href="#h4-0-45" id="h4-0-45" class="i">+    }
+</a><a href="#h4-0-46" id="h4-0-46" class="i">+
+</a><a href="#h4-0-47" id="h4-0-47" class="i">+    iterator end() {
+</a><a href="#h4-0-48" id="h4-0-48" class="i">+        return edges_.end();
+</a><a href="#h4-0-49" id="h4-0-49" class="i">+    }
+</a><a href="#h4-0-50" id="h4-0-50" class="i">+
+</a><a href="#h4-0-51" id="h4-0-51" class="i">+    QueryPlan(int anchor = kAnchorNone)
+</a><a href="#h4-0-52" id="h4-0-52" class="i">+        : anchor(anchor), refs_(0) { }
+</a><a href="#h4-0-53" id="h4-0-53" class="i">+
+</a><a href="#h4-0-54" id="h4-0-54" class="i">+    QueryPlan(std::pair&lt;uchar, uchar&gt; p,
+</a><a href="#h4-0-55" id="h4-0-55" class="i">+             intrusive_ptr&lt;QueryPlan&gt; next,
+</a><a href="#h4-0-56" id="h4-0-56" class="i">+             int anchor = kAnchorNone)
+</a><a href="#h4-0-57" id="h4-0-57" class="i">+        : anchor(anchor), refs_(0) {
+</a><a href="#h4-0-58" id="h4-0-58" class="i">+        insert(value_type(p, next));
+</a><a href="#h4-0-59" id="h4-0-59" class="i">+    }
+</a><a href="#h4-0-60" id="h4-0-60" class="i">+
+</a><a href="#h4-0-61" id="h4-0-61" class="i">+    void insert(const value_type&amp; v);
+</a><a href="#h4-0-62" id="h4-0-62" class="i">+    void concat(intrusive_ptr&lt;QueryPlan&gt; rhs);
+</a><a href="#h4-0-63" id="h4-0-63" class="i">+
+</a><a href="#h4-0-64" id="h4-0-64" class="i">+    bool empty() {
+</a><a href="#h4-0-65" id="h4-0-65" class="i">+        return edges_.empty();
+</a><a href="#h4-0-66" id="h4-0-66" class="i">+    }
+</a><a href="#h4-0-67" id="h4-0-67" class="i">+
+</a><a href="#h4-0-68" id="h4-0-68" class="i">+    size_t size() {
+</a><a href="#h4-0-69" id="h4-0-69" class="i">+        return edges_.size();
+</a><a href="#h4-0-70" id="h4-0-70" class="i">+    }
+</a><a href="#h4-0-71" id="h4-0-71" class="i">+
+</a><a href="#h4-0-72" id="h4-0-72" class="i">+    class Stats {
+</a><a href="#h4-0-73" id="h4-0-73" class="i">+    public:
+</a><a href="#h4-0-74" id="h4-0-74" class="i">+        double selectivity_;
+</a><a href="#h4-0-75" id="h4-0-75" class="i">+        int depth_;
+</a><a href="#h4-0-76" id="h4-0-76" class="i">+        long nodes_;
+</a><a href="#h4-0-77" id="h4-0-77" class="i">+        long tail_paths_;
+</a><a href="#h4-0-78" id="h4-0-78" class="i">+
+</a><a href="#h4-0-79" id="h4-0-79" class="i">+        Stats();
+</a><a href="#h4-0-80" id="h4-0-80" class="i">+        Stats insert(const value_type&amp; v) const;
+</a><a href="#h4-0-81" id="h4-0-81" class="i">+        Stats concat(const Stats&amp; rhs) const;
+</a><a href="#h4-0-82" id="h4-0-82" class="i">+    };
+</a><a href="#h4-0-83" id="h4-0-83" class="i">+
+</a><a href="#h4-0-84" id="h4-0-84" class="i">+    const Stats&amp; stats() {
+</a><a href="#h4-0-85" id="h4-0-85" class="i">+        return stats_;
+</a><a href="#h4-0-86" id="h4-0-86" class="i">+    }
+</a><a href="#h4-0-87" id="h4-0-87" class="i">+
+</a><a href="#h4-0-88" id="h4-0-88" class="i">+    /*
+</a><a href="#h4-0-89" id="h4-0-89" class="i">+     * Returns an approximation of the fraction of the input corpus
+</a><a href="#h4-0-90" id="h4-0-90" class="i">+     * that this index key will reduce the search space to.
+</a><a href="#h4-0-91" id="h4-0-91" class="i">+     *
+</a><a href="#h4-0-92" id="h4-0-92" class="i">+     * e.g. selectivity() == 1.0 implies that this index key includes
+</a><a href="#h4-0-93" id="h4-0-93" class="i">+     *      the entire input.
+</a><a href="#h4-0-94" id="h4-0-94" class="i">+     *
+</a><a href="#h4-0-95" id="h4-0-95" class="i">+     *      selectivity() == 0.1 means that using this index key will
+</a><a href="#h4-0-96" id="h4-0-96" class="i">+     *      only require searching 1/10th of the corpus.
+</a><a href="#h4-0-97" id="h4-0-97" class="i">+     *
+</a><a href="#h4-0-98" id="h4-0-98" class="i">+     * This value is computed without any reference to the actual
+</a><a href="#h4-0-99" id="h4-0-99" class="i">+     * characteristics of any particular corpus, and so is a rough
+</a><a href="#h4-0-100" id="h4-0-100" class="i">+     * approximation at best.
+</a><a href="#h4-0-101" id="h4-0-101" class="i">+     */
+</a><a href="#h4-0-102" id="h4-0-102" class="i">+    double selectivity();
+</a><a href="#h4-0-103" id="h4-0-103" class="i">+
+</a><a href="#h4-0-104" id="h4-0-104" class="i">+    /*
+</a><a href="#h4-0-105" id="h4-0-105" class="i">+     * Returns a value approximating the &quot;goodness&quot; of this index key,
+</a><a href="#h4-0-106" id="h4-0-106" class="i">+     * in arbitrary units. Higher is better. The weight incorporates
+</a><a href="#h4-0-107" id="h4-0-107" class="i">+     * both the selectivity, above, and the cost of using this index
+</a><a href="#h4-0-108" id="h4-0-108" class="i">+     * key.
+</a><a href="#h4-0-109" id="h4-0-109" class="i">+     */
+</a><a href="#h4-0-110" id="h4-0-110" class="i">+    unsigned weight();
+</a><a href="#h4-0-111" id="h4-0-111" class="i">+    int depth();
+</a><a href="#h4-0-112" id="h4-0-112" class="i">+    long nodes();
+</a><a href="#h4-0-113" id="h4-0-113" class="i">+
+</a><a href="#h4-0-114" id="h4-0-114" class="i">+    string ToString();
+</a><a href="#h4-0-115" id="h4-0-115" class="i">+
+</a><a href="#h4-0-116" id="h4-0-116" class="i">+    void check_rep();
+</a><a href="#h4-0-117" id="h4-0-117" class="i">+
+</a><a href="#h4-0-118" id="h4-0-118" class="i">+    int anchor;
+</a><a href="#h4-0-119" id="h4-0-119" class="i">+
+</a><a href="#h4-0-120" id="h4-0-120" class="i">+    void collect_tails(list&lt;QueryPlan::const_iterator&gt;&amp; tails);
+</a><a href="#h4-0-121" id="h4-0-121" class="i">+protected:
+</a><a href="#h4-0-122" id="h4-0-122" class="i">+    std::map&lt;std::pair&lt;uchar, uchar&gt;, intrusive_ptr&lt;QueryPlan&gt; &gt; edges_;
+</a><a href="#h4-0-123" id="h4-0-123" class="i">+    Stats stats_;
+</a><a href="#h4-0-124" id="h4-0-124" class="i">+    std::atomic_int refs_;
+</a><a href="#h4-0-125" id="h4-0-125" class="i">+
+</a><a href="#h4-0-126" id="h4-0-126" class="i">+    void collect_tails(list&lt;QueryPlan::iterator&gt;&amp; tails);
+</a><a href="#h4-0-127" id="h4-0-127" class="i">+    void collect_tails(list&lt;QueryPlan::iterator&gt;&amp; tails,
+</a><a href="#h4-0-128" id="h4-0-128" class="i">+                       set&lt;QueryPlan*&gt; &amp;seen);
+</a><a href="#h4-0-129" id="h4-0-129" class="i">+
+</a><a href="#h4-0-130" id="h4-0-130" class="i">+private:
+</a><a href="#h4-0-131" id="h4-0-131" class="i">+    QueryPlan(const QueryPlan&amp;);
+</a><a href="#h4-0-132" id="h4-0-132" class="i">+    void operator=(const QueryPlan&amp;);
+</a><a href="#h4-0-133" id="h4-0-133" class="i">+
+</a><a href="#h4-0-134" id="h4-0-134" class="i">+    friend void intrusive_ptr_add_ref(QueryPlan *key);
+</a><a href="#h4-0-135" id="h4-0-135" class="i">+    friend void intrusive_ptr_release(QueryPlan *key);
+</a><a href="#h4-0-136" id="h4-0-136" class="i">+};
+</a><a href="#h4-0-137" id="h4-0-137" class="i">+
+</a><a href="#h4-0-138" id="h4-0-138" class="i">+intrusive_ptr&lt;QueryPlan&gt; constructQueryPlan(const re2::RE2 &amp;pat);
+</a><a href="#h4-0-139" id="h4-0-139" class="i">+
+</a><a href="#h4-0-140" id="h4-0-140" class="i">+#endif /* CODESEARCH_INDEXER_H */
+</a><b>diff --git a/<a id="h5" href="../file/src/tools/analyze-re.cc">src/tools/analyze-re.cc</a> b/<a href="../file/src/tools/analyze-re.cc">src/tools/analyze-re.cc</a></b>
+<a href="#h5-0" id="h5-0" class="h">@@ -16,7 +16,7 @@
+</a> 
+ #include &quot;src/dump_load.h&quot;
+ #include &quot;src/codesearch.h&quot;
+<a href="#h5-0-3" id="h5-0-3" class="d">-#include &quot;src/indexer.h&quot;
+</a><a href="#h5-0-4" id="h5-0-4" class="i">+#include &quot;src/query_planner.h&quot;
+</a> #include &quot;src/re_width.h&quot;
+ 
+ #include &lt;gflags/gflags.h&gt;
+<a href="#h5-1" id="h5-1" class="h">@@ -26,13 +26,13 @@ using namespace std;
+</a> DEFINE_string(dot_index, &quot;&quot;, &quot;Write a graph of the index key as a dot graph.&quot;);
+ DEFINE_bool(casefold, false, &quot;Treat the regex as case-insensitive.&quot;);
+ 
+<a href="#h5-1-3" id="h5-1-3" class="d">-class IndexKeyDotOutputter {
+</a><a href="#h5-1-4" id="h5-1-4" class="i">+class QueryPlanDotOutputter {
+</a> protected:
+<a href="#h5-1-6" id="h5-1-6" class="d">-    map&lt;IndexKey*, string&gt; names_;
+</a><a href="#h5-1-7" id="h5-1-7" class="d">-    set&lt;IndexKey*&gt; seen_;
+</a><a href="#h5-1-8" id="h5-1-8" class="i">+    map&lt;QueryPlan*, string&gt; names_;
+</a><a href="#h5-1-9" id="h5-1-9" class="i">+    set&lt;QueryPlan*&gt; seen_;
+</a>     ofstream out_;
+     int ct_;
+<a href="#h5-1-12" id="h5-1-12" class="d">-    intrusive_ptr&lt;IndexKey&gt; key_;
+</a><a href="#h5-1-13" id="h5-1-13" class="i">+    intrusive_ptr&lt;QueryPlan&gt; key_;
+</a> 
+     string escape(char c) {
+         if (c &lt;= &#39; &#39; || c &gt; &#39;~&#39; || c == &#39;&quot;&#39; || c == &#39;\\&#39;)
+<a href="#h5-2" id="h5-2" class="h">@@ -40,7 +40,7 @@ protected:
+</a>         return strprintf(&quot;%c&quot;, c);
+     }
+ 
+<a href="#h5-2-3" id="h5-2-3" class="d">-    void assign_names(intrusive_ptr&lt;IndexKey&gt; key) {
+</a><a href="#h5-2-4" id="h5-2-4" class="i">+    void assign_names(intrusive_ptr&lt;QueryPlan&gt; key) {
+</a>         if (names_.find(key.get()) != names_.end())
+             return;
+         names_[key.get()] = strprintf(&quot;node%d&quot;, ct_++);
+<a href="#h5-3" id="h5-3" class="h">@@ -62,7 +62,7 @@ protected:
+</a>         }
+     }
+ 
+<a href="#h5-3-3" id="h5-3-3" class="d">-    void dump(intrusive_ptr&lt;IndexKey&gt; key) {
+</a><a href="#h5-3-4" id="h5-3-4" class="i">+    void dump(intrusive_ptr&lt;QueryPlan&gt; key) {
+</a>         if (seen_.find(key.get()) != seen_.end())
+             return;
+         seen_.insert(key.get());
+<a href="#h5-4" id="h5-4" class="h">@@ -91,7 +91,7 @@ protected:
+</a>     }
+ 
+ public:
+<a href="#h5-4-3" id="h5-4-3" class="d">-    IndexKeyDotOutputter(const string &amp;path, intrusive_ptr&lt;IndexKey&gt; key)
+</a><a href="#h5-4-4" id="h5-4-4" class="i">+    QueryPlanDotOutputter(const string &amp;path, intrusive_ptr&lt;QueryPlan&gt; key)
+</a>         : out_(path.c_str()), ct_(0), key_(key) {
+     }
+ 
+<a href="#h5-5" id="h5-5" class="h">@@ -106,8 +106,8 @@ public:
+</a> };
+ 
+ 
+<a href="#h5-5-3" id="h5-5-3" class="d">-void write_dot_index(const string &amp;path, intrusive_ptr&lt;IndexKey&gt; key) {
+</a><a href="#h5-5-4" id="h5-5-4" class="d">-    IndexKeyDotOutputter out(path, key);
+</a><a href="#h5-5-5" id="h5-5-5" class="i">+void write_dot_index(const string &amp;path, intrusive_ptr&lt;QueryPlan&gt; key) {
+</a><a href="#h5-5-6" id="h5-5-6" class="i">+    QueryPlanDotOutputter out(path, key);
+</a>     out.output();
+ }
+ 
+<a href="#h5-6" id="h5-6" class="h">@@ -133,9 +133,9 @@ int analyze_re(int argc, char **argv) {
+</a>     printf(&quot;width: %d\n&quot;, width.Walk(re.Regexp(), 0));
+     printf(&quot;Program size: %d\n&quot;, re.ProgramSize());
+ 
+<a href="#h5-6-3" id="h5-6-3" class="d">-    intrusive_ptr&lt;IndexKey&gt; key = indexRE(re);
+</a><a href="#h5-6-4" id="h5-6-4" class="i">+    intrusive_ptr&lt;QueryPlan&gt; key = constructQueryPlan(re);
+</a>     if (key) {
+<a href="#h5-6-6" id="h5-6-6" class="d">-        IndexKey::Stats stats = key-&gt;stats();
+</a><a href="#h5-6-7" id="h5-6-7" class="i">+        QueryPlan::Stats stats = key-&gt;stats();
+</a>         printf(&quot;Index key:\n&quot;);
+         printf(&quot;  log10(selectivity): %f\n&quot;, log(stats.selectivity_)/log(10));
+         printf(&quot;  depth: %d\n&quot;, stats.depth_);
+<b>diff --git a/<a id="h6" href="../file/src/tools/dump-file.cc">src/tools/dump-file.cc</a> b/<a href="../file/src/tools/dump-file.cc">src/tools/dump-file.cc</a></b>
+<a href="#h6-0" id="h6-0" class="h">@@ -8,7 +8,6 @@
+</a> #include &quot;src/dump_load.h&quot;
+ #include &quot;src/codesearch.h&quot;
+ #include &quot;src/content.h&quot;
+<a href="#h6-0-3" id="h6-0-3" class="d">-#include &quot;src/indexer.h&quot;
+</a> #include &quot;src/re_width.h&quot;
+ 
+ #include &lt;gflags/gflags.h&gt;
+<b>diff --git a/<a id="h7" href="../file/test/BUILD">test/BUILD</a> b/<a href="../file/test/BUILD">test/BUILD</a></b>
+<a href="#h7-0" id="h7-0" class="h">@@ -8,9 +8,9 @@ cc_test(
+</a>     size = &quot;small&quot;,
+     srcs = [
+         &quot;codesearch_test.cc&quot;,
+<a href="#h7-0-3" id="h7-0-3" class="d">-        &quot;indexer_test.cc&quot;,
+</a><a href="#h7-0-4" id="h7-0-4" class="d">-        &quot;tagsearch_test.cc&quot;,
+</a>         &quot;main.cc&quot;,
+<a href="#h7-0-6" id="h7-0-6" class="i">+        &quot;planner_test.cc&quot;,
+</a><a href="#h7-0-7" id="h7-0-7" class="i">+        &quot;tagsearch_test.cc&quot;,
+</a>     ],
+     defines = select({
+         &quot;:darwin&quot;: [
+<b>diff --git a/<a id="h8" href="../file/test/indexer_test.cc">test/indexer_test.cc</a> b/<a href="../file/test/indexer_test.cc">test/indexer_test.cc</a></b>
+<a href="#h8-0" id="h8-0" class="h">@@ -1,99 +0,0 @@
+</a><a href="#h8-0-0" id="h8-0-0" class="d">-#include &lt;string.h&gt;
+</a><a href="#h8-0-1" id="h8-0-1" class="d">-#include &quot;gtest/gtest.h&quot;
+</a><a href="#h8-0-2" id="h8-0-2" class="d">-
+</a><a href="#h8-0-3" id="h8-0-3" class="d">-#include &quot;re2/re2.h&quot;
+</a><a href="#h8-0-4" id="h8-0-4" class="d">-
+</a><a href="#h8-0-5" id="h8-0-5" class="d">-#include &quot;src/codesearch.h&quot;
+</a><a href="#h8-0-6" id="h8-0-6" class="d">-#include &quot;src/indexer.h&quot;
+</a><a href="#h8-0-7" id="h8-0-7" class="d">-#include &quot;src/lib/debug.h&quot;
+</a><a href="#h8-0-8" id="h8-0-8" class="d">-
+</a><a href="#h8-0-9" id="h8-0-9" class="d">-TEST(IndexKeyTest, BasicCaseFold) {
+</a><a href="#h8-0-10" id="h8-0-10" class="d">-    re2::RE2::Options opts;
+</a><a href="#h8-0-11" id="h8-0-11" class="d">-    opts.set_case_sensitive(false);
+</a><a href="#h8-0-12" id="h8-0-12" class="d">-
+</a><a href="#h8-0-13" id="h8-0-13" class="d">-    re2::RE2 re(&quot;k&quot;, opts);
+</a><a href="#h8-0-14" id="h8-0-14" class="d">-    intrusive_ptr&lt;IndexKey&gt; key = indexRE(re);
+</a><a href="#h8-0-15" id="h8-0-15" class="d">-
+</a><a href="#h8-0-16" id="h8-0-16" class="d">-    ASSERT_EQ(3, key-&gt;size());
+</a><a href="#h8-0-17" id="h8-0-17" class="d">-    IndexKey::iterator it = key-&gt;begin();
+</a><a href="#h8-0-18" id="h8-0-18" class="d">-    EXPECT_EQ(&#39;K&#39;, it-&gt;first.first);
+</a><a href="#h8-0-19" id="h8-0-19" class="d">-    EXPECT_EQ(&#39;K&#39;, it-&gt;first.second);
+</a><a href="#h8-0-20" id="h8-0-20" class="d">-    EXPECT_FALSE(it-&gt;second);
+</a><a href="#h8-0-21" id="h8-0-21" class="d">-    ++it;
+</a><a href="#h8-0-22" id="h8-0-22" class="d">-    EXPECT_EQ(&#39;k&#39;, it-&gt;first.first);
+</a><a href="#h8-0-23" id="h8-0-23" class="d">-    EXPECT_EQ(&#39;k&#39;, it-&gt;first.second);
+</a><a href="#h8-0-24" id="h8-0-24" class="d">-    EXPECT_FALSE(it-&gt;second);
+</a><a href="#h8-0-25" id="h8-0-25" class="d">-    ++it;
+</a><a href="#h8-0-26" id="h8-0-26" class="d">-    // U+212A KELVIN SIGN aka [e2 84 aa]
+</a><a href="#h8-0-27" id="h8-0-27" class="d">-    EXPECT_EQ(0xe2, it-&gt;first.first);
+</a><a href="#h8-0-28" id="h8-0-28" class="d">-    EXPECT_EQ(0xe2, it-&gt;first.second);
+</a><a href="#h8-0-29" id="h8-0-29" class="d">-    EXPECT_TRUE(it-&gt;second);
+</a><a href="#h8-0-30" id="h8-0-30" class="d">-}
+</a><a href="#h8-0-31" id="h8-0-31" class="d">-
+</a><a href="#h8-0-32" id="h8-0-32" class="d">-TEST(IndexKeyTest, Alternate) {
+</a><a href="#h8-0-33" id="h8-0-33" class="d">-    re2::RE2::Options opts;
+</a><a href="#h8-0-34" id="h8-0-34" class="d">-    opts.set_case_sensitive(false);
+</a><a href="#h8-0-35" id="h8-0-35" class="d">-
+</a><a href="#h8-0-36" id="h8-0-36" class="d">-    re2::RE2 re(&quot;(se|in)_&quot;, opts);
+</a><a href="#h8-0-37" id="h8-0-37" class="d">-    intrusive_ptr&lt;IndexKey&gt; key = indexRE(re);
+</a><a href="#h8-0-38" id="h8-0-38" class="d">-    EXPECT_TRUE(key-&gt;anchor &amp; kAnchorRight);
+</a><a href="#h8-0-39" id="h8-0-39" class="d">-    list&lt;IndexKey::const_iterator&gt; tails;
+</a><a href="#h8-0-40" id="h8-0-40" class="d">-    key-&gt;collect_tails(tails);
+</a><a href="#h8-0-41" id="h8-0-41" class="d">-    EXPECT_EQ(1, tails.size());
+</a><a href="#h8-0-42" id="h8-0-42" class="d">-}
+</a><a href="#h8-0-43" id="h8-0-43" class="d">-
+</a><a href="#h8-0-44" id="h8-0-44" class="d">-TEST(IndexKeyTest, AlternateIndef) {
+</a><a href="#h8-0-45" id="h8-0-45" class="d">-    re2::RE2::Options opts;
+</a><a href="#h8-0-46" id="h8-0-46" class="d">-    opts.set_case_sensitive(false);
+</a><a href="#h8-0-47" id="h8-0-47" class="d">-
+</a><a href="#h8-0-48" id="h8-0-48" class="d">-    re2::RE2 re(&quot;(se|in).&quot;, opts);
+</a><a href="#h8-0-49" id="h8-0-49" class="d">-    intrusive_ptr&lt;IndexKey&gt; key = indexRE(re);
+</a><a href="#h8-0-50" id="h8-0-50" class="d">-    EXPECT_FALSE(key-&gt;anchor &amp; kAnchorRight);
+</a><a href="#h8-0-51" id="h8-0-51" class="d">-}
+</a><a href="#h8-0-52" id="h8-0-52" class="d">-
+</a><a href="#h8-0-53" id="h8-0-53" class="d">-TEST(IndexKeyTest, CaseFoldRegression) {
+</a><a href="#h8-0-54" id="h8-0-54" class="d">-    re2::RE2::Options opts;
+</a><a href="#h8-0-55" id="h8-0-55" class="d">-    opts.set_case_sensitive(false);
+</a><a href="#h8-0-56" id="h8-0-56" class="d">-
+</a><a href="#h8-0-57" id="h8-0-57" class="d">-    re2::RE2 re(&quot;ksp&quot;, opts);
+</a><a href="#h8-0-58" id="h8-0-58" class="d">-    intrusive_ptr&lt;IndexKey&gt; key = indexRE(re);
+</a><a href="#h8-0-59" id="h8-0-59" class="d">-    EXPECT_TRUE(key-&gt;anchor &amp; kAnchorLeft);
+</a><a href="#h8-0-60" id="h8-0-60" class="d">-    EXPECT_TRUE(key-&gt;anchor &amp; kAnchorRight);
+</a><a href="#h8-0-61" id="h8-0-61" class="d">-}
+</a><a href="#h8-0-62" id="h8-0-62" class="d">-
+</a><a href="#h8-0-63" id="h8-0-63" class="d">-TEST(IndexKeyTest, LongCaseFoldedLiteral) {
+</a><a href="#h8-0-64" id="h8-0-64" class="d">-    re2::RE2::Options opts;
+</a><a href="#h8-0-65" id="h8-0-65" class="d">-    default_re2_options(opts);
+</a><a href="#h8-0-66" id="h8-0-66" class="d">-    opts.set_case_sensitive(false);
+</a><a href="#h8-0-67" id="h8-0-67" class="d">-
+</a><a href="#h8-0-68" id="h8-0-68" class="d">-    re2::RE2 re(&quot;sxxxxxxxxxxxxxxxxxxxxxxxxx&quot;, opts);
+</a><a href="#h8-0-69" id="h8-0-69" class="d">-    intrusive_ptr&lt;IndexKey&gt; key = indexRE(re);
+</a><a href="#h8-0-70" id="h8-0-70" class="d">-    EXPECT_TRUE(key);
+</a><a href="#h8-0-71" id="h8-0-71" class="d">-    EXPECT_GT(key-&gt;depth(), 2);
+</a><a href="#h8-0-72" id="h8-0-72" class="d">-}
+</a><a href="#h8-0-73" id="h8-0-73" class="d">-
+</a><a href="#h8-0-74" id="h8-0-74" class="d">-TEST(IndexKeyTest, StressTest) {
+</a><a href="#h8-0-75" id="h8-0-75" class="d">-    const char *cases[] = {
+</a><a href="#h8-0-76" id="h8-0-76" class="d">-        &quot;([a-e]:)|[g-k]&quot;,
+</a><a href="#h8-0-77" id="h8-0-77" class="d">-        &quot;([a-e]:)|[a-e]&quot;,
+</a><a href="#h8-0-78" id="h8-0-78" class="d">-        &quot;(([a-e]:)|[a-e])n&quot;,
+</a><a href="#h8-0-79" id="h8-0-79" class="d">-        &quot;([a-e]:)|[d-g]&quot;,
+</a><a href="#h8-0-80" id="h8-0-80" class="d">-        &quot;([a-e]:)|([d-g];)&quot;,
+</a><a href="#h8-0-81" id="h8-0-81" class="d">-        &quot;([a-ei-lz]:)|([d-gl-oy];)&quot;,
+</a><a href="#h8-0-82" id="h8-0-82" class="d">-        &quot;\\s[0-9a-f]&quot;,
+</a><a href="#h8-0-83" id="h8-0-83" class="d">-        &quot;[a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k]&quot;,
+</a><a href="#h8-0-84" id="h8-0-84" class="d">-        &quot;([a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z])|([a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z])&quot;,
+</a><a href="#h8-0-85" id="h8-0-85" class="d">-        &quot;([acegikmoqsuwy{}][acegikmoqsuwy{}][acegikmoqsuwy{}][acegikmoqsuwy{}][acegikmoqsuwy{}][acegikmoqsuwy{}][acegikmoqsuwy{}][acegikmoqsuwy{}][acegikmoqsuwy{}][acegikmoqsuwy{}])|([acegikmoqsuwy{}][acegikmoqsuwy{}][acegikmoqsuwy{}][acegikmoqsuwy{}][acegikmoqsuwy{}][acegikmoqsuwy{}][acegikmoqsuwy{}][acegikmoqsuwy{}][acegikmoqsuwy{}][acegikmoqsuwy{}])&quot;,
+</a><a href="#h8-0-86" id="h8-0-86" class="d">-        &quot;((p((n((l((j((h((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))|(i((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))))|(k((h((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))|(i((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))))))|(m((j((h((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))|(i((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))))|(k((h((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))|(i((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))))))))|(o((l((j((h((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))|(i((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))))|(k((h((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))|(i((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))))))|(m((j((h((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))|(i((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))))|(k((h((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))|(i((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))))))))))|(q((n((l((j((h((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))|(i((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))))|(k((h((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))|(i((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))))))|(m((j((h((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))|(i((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))))|(k((h((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))|(i((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))))))))|(o((l((j((h((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))|(i((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))))|(k((h((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))|(i((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))))))|(m((j((h((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))|(i((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))))|(k((h((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))|(i((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b)))))))))))))))&quot;,
+</a><a href="#h8-0-87" id="h8-0-87" class="d">-        &quot;([aA]|[bB])cdefg&quot;,
+</a><a href="#h8-0-88" id="h8-0-88" class="d">-        &quot;[sS][tT][aA][cC][kK]_&quot;,
+</a><a href="#h8-0-89" id="h8-0-89" class="d">-    };
+</a><a href="#h8-0-90" id="h8-0-90" class="d">-    re2::RE2::Options opts;
+</a><a href="#h8-0-91" id="h8-0-91" class="d">-
+</a><a href="#h8-0-92" id="h8-0-92" class="d">-    for (unsigned int i = 0; i &lt; sizeof(cases)/sizeof(*cases); ++i) {
+</a><a href="#h8-0-93" id="h8-0-93" class="d">-        const char *pat = cases[i];
+</a><a href="#h8-0-94" id="h8-0-94" class="d">-        re2::RE2 re(pat, opts);
+</a><a href="#h8-0-95" id="h8-0-95" class="d">-        intrusive_ptr&lt;IndexKey&gt; key = indexRE(re);
+</a><a href="#h8-0-96" id="h8-0-96" class="d">-        EXPECT_TRUE(key) &lt;&lt; &quot;could not compute key for: &quot; &lt;&lt; pat;
+</a><a href="#h8-0-97" id="h8-0-97" class="d">-    }
+</a><a href="#h8-0-98" id="h8-0-98" class="d">-}
+</a><b>diff --git a/<a id="h9" href="../file/test/planner_test.cc">test/planner_test.cc</a> b/<a href="../file/test/planner_test.cc">test/planner_test.cc</a></b>
+<a href="#h9-0" id="h9-0" class="h">@@ -0,0 +1,99 @@
+</a><a href="#h9-0-0" id="h9-0-0" class="i">+#include &lt;string.h&gt;
+</a><a href="#h9-0-1" id="h9-0-1" class="i">+#include &quot;gtest/gtest.h&quot;
+</a><a href="#h9-0-2" id="h9-0-2" class="i">+
+</a><a href="#h9-0-3" id="h9-0-3" class="i">+#include &quot;re2/re2.h&quot;
+</a><a href="#h9-0-4" id="h9-0-4" class="i">+
+</a><a href="#h9-0-5" id="h9-0-5" class="i">+#include &quot;src/codesearch.h&quot;
+</a><a href="#h9-0-6" id="h9-0-6" class="i">+#include &quot;src/query_planner.h&quot;
+</a><a href="#h9-0-7" id="h9-0-7" class="i">+#include &quot;src/lib/debug.h&quot;
+</a><a href="#h9-0-8" id="h9-0-8" class="i">+
+</a><a href="#h9-0-9" id="h9-0-9" class="i">+TEST(QueryPlanTest, BasicCaseFold) {
+</a><a href="#h9-0-10" id="h9-0-10" class="i">+    re2::RE2::Options opts;
+</a><a href="#h9-0-11" id="h9-0-11" class="i">+    opts.set_case_sensitive(false);
+</a><a href="#h9-0-12" id="h9-0-12" class="i">+
+</a><a href="#h9-0-13" id="h9-0-13" class="i">+    re2::RE2 re(&quot;k&quot;, opts);
+</a><a href="#h9-0-14" id="h9-0-14" class="i">+    intrusive_ptr&lt;QueryPlan&gt; key = constructQueryPlan(re);
+</a><a href="#h9-0-15" id="h9-0-15" class="i">+
+</a><a href="#h9-0-16" id="h9-0-16" class="i">+    ASSERT_EQ(3, key-&gt;size());
+</a><a href="#h9-0-17" id="h9-0-17" class="i">+    QueryPlan::iterator it = key-&gt;begin();
+</a><a href="#h9-0-18" id="h9-0-18" class="i">+    EXPECT_EQ(&#39;K&#39;, it-&gt;first.first);
+</a><a href="#h9-0-19" id="h9-0-19" class="i">+    EXPECT_EQ(&#39;K&#39;, it-&gt;first.second);
+</a><a href="#h9-0-20" id="h9-0-20" class="i">+    EXPECT_FALSE(it-&gt;second);
+</a><a href="#h9-0-21" id="h9-0-21" class="i">+    ++it;
+</a><a href="#h9-0-22" id="h9-0-22" class="i">+    EXPECT_EQ(&#39;k&#39;, it-&gt;first.first);
+</a><a href="#h9-0-23" id="h9-0-23" class="i">+    EXPECT_EQ(&#39;k&#39;, it-&gt;first.second);
+</a><a href="#h9-0-24" id="h9-0-24" class="i">+    EXPECT_FALSE(it-&gt;second);
+</a><a href="#h9-0-25" id="h9-0-25" class="i">+    ++it;
+</a><a href="#h9-0-26" id="h9-0-26" class="i">+    // U+212A KELVIN SIGN aka [e2 84 aa]
+</a><a href="#h9-0-27" id="h9-0-27" class="i">+    EXPECT_EQ(0xe2, it-&gt;first.first);
+</a><a href="#h9-0-28" id="h9-0-28" class="i">+    EXPECT_EQ(0xe2, it-&gt;first.second);
+</a><a href="#h9-0-29" id="h9-0-29" class="i">+    EXPECT_TRUE(it-&gt;second);
+</a><a href="#h9-0-30" id="h9-0-30" class="i">+}
+</a><a href="#h9-0-31" id="h9-0-31" class="i">+
+</a><a href="#h9-0-32" id="h9-0-32" class="i">+TEST(QueryPlanTest, Alternate) {
+</a><a href="#h9-0-33" id="h9-0-33" class="i">+    re2::RE2::Options opts;
+</a><a href="#h9-0-34" id="h9-0-34" class="i">+    opts.set_case_sensitive(false);
+</a><a href="#h9-0-35" id="h9-0-35" class="i">+
+</a><a href="#h9-0-36" id="h9-0-36" class="i">+    re2::RE2 re(&quot;(se|in)_&quot;, opts);
+</a><a href="#h9-0-37" id="h9-0-37" class="i">+    intrusive_ptr&lt;QueryPlan&gt; key = constructQueryPlan(re);
+</a><a href="#h9-0-38" id="h9-0-38" class="i">+    EXPECT_TRUE(key-&gt;anchor &amp; kAnchorRight);
+</a><a href="#h9-0-39" id="h9-0-39" class="i">+    list&lt;QueryPlan::const_iterator&gt; tails;
+</a><a href="#h9-0-40" id="h9-0-40" class="i">+    key-&gt;collect_tails(tails);
+</a><a href="#h9-0-41" id="h9-0-41" class="i">+    EXPECT_EQ(1, tails.size());
+</a><a href="#h9-0-42" id="h9-0-42" class="i">+}
+</a><a href="#h9-0-43" id="h9-0-43" class="i">+
+</a><a href="#h9-0-44" id="h9-0-44" class="i">+TEST(QueryPlanTest, AlternateIndef) {
+</a><a href="#h9-0-45" id="h9-0-45" class="i">+    re2::RE2::Options opts;
+</a><a href="#h9-0-46" id="h9-0-46" class="i">+    opts.set_case_sensitive(false);
+</a><a href="#h9-0-47" id="h9-0-47" class="i">+
+</a><a href="#h9-0-48" id="h9-0-48" class="i">+    re2::RE2 re(&quot;(se|in).&quot;, opts);
+</a><a href="#h9-0-49" id="h9-0-49" class="i">+    intrusive_ptr&lt;QueryPlan&gt; key = constructQueryPlan(re);
+</a><a href="#h9-0-50" id="h9-0-50" class="i">+    EXPECT_FALSE(key-&gt;anchor &amp; kAnchorRight);
+</a><a href="#h9-0-51" id="h9-0-51" class="i">+}
+</a><a href="#h9-0-52" id="h9-0-52" class="i">+
+</a><a href="#h9-0-53" id="h9-0-53" class="i">+TEST(QueryPlanTest, CaseFoldRegression) {
+</a><a href="#h9-0-54" id="h9-0-54" class="i">+    re2::RE2::Options opts;
+</a><a href="#h9-0-55" id="h9-0-55" class="i">+    opts.set_case_sensitive(false);
+</a><a href="#h9-0-56" id="h9-0-56" class="i">+
+</a><a href="#h9-0-57" id="h9-0-57" class="i">+    re2::RE2 re(&quot;ksp&quot;, opts);
+</a><a href="#h9-0-58" id="h9-0-58" class="i">+    intrusive_ptr&lt;QueryPlan&gt; key = constructQueryPlan(re);
+</a><a href="#h9-0-59" id="h9-0-59" class="i">+    EXPECT_TRUE(key-&gt;anchor &amp; kAnchorLeft);
+</a><a href="#h9-0-60" id="h9-0-60" class="i">+    EXPECT_TRUE(key-&gt;anchor &amp; kAnchorRight);
+</a><a href="#h9-0-61" id="h9-0-61" class="i">+}
+</a><a href="#h9-0-62" id="h9-0-62" class="i">+
+</a><a href="#h9-0-63" id="h9-0-63" class="i">+TEST(QueryPlanTest, LongCaseFoldedLiteral) {
+</a><a href="#h9-0-64" id="h9-0-64" class="i">+    re2::RE2::Options opts;
+</a><a href="#h9-0-65" id="h9-0-65" class="i">+    default_re2_options(opts);
+</a><a href="#h9-0-66" id="h9-0-66" class="i">+    opts.set_case_sensitive(false);
+</a><a href="#h9-0-67" id="h9-0-67" class="i">+
+</a><a href="#h9-0-68" id="h9-0-68" class="i">+    re2::RE2 re(&quot;sxxxxxxxxxxxxxxxxxxxxxxxxx&quot;, opts);
+</a><a href="#h9-0-69" id="h9-0-69" class="i">+    intrusive_ptr&lt;QueryPlan&gt; key = constructQueryPlan(re);
+</a><a href="#h9-0-70" id="h9-0-70" class="i">+    EXPECT_TRUE(key);
+</a><a href="#h9-0-71" id="h9-0-71" class="i">+    EXPECT_GT(key-&gt;depth(), 2);
+</a><a href="#h9-0-72" id="h9-0-72" class="i">+}
+</a><a href="#h9-0-73" id="h9-0-73" class="i">+
+</a><a href="#h9-0-74" id="h9-0-74" class="i">+TEST(QueryPlanTest, StressTest) {
+</a><a href="#h9-0-75" id="h9-0-75" class="i">+    const char *cases[] = {
+</a><a href="#h9-0-76" id="h9-0-76" class="i">+        &quot;([a-e]:)|[g-k]&quot;,
+</a><a href="#h9-0-77" id="h9-0-77" class="i">+        &quot;([a-e]:)|[a-e]&quot;,
+</a><a href="#h9-0-78" id="h9-0-78" class="i">+        &quot;(([a-e]:)|[a-e])n&quot;,
+</a><a href="#h9-0-79" id="h9-0-79" class="i">+        &quot;([a-e]:)|[d-g]&quot;,
+</a><a href="#h9-0-80" id="h9-0-80" class="i">+        &quot;([a-e]:)|([d-g];)&quot;,
+</a><a href="#h9-0-81" id="h9-0-81" class="i">+        &quot;([a-ei-lz]:)|([d-gl-oy];)&quot;,
+</a><a href="#h9-0-82" id="h9-0-82" class="i">+        &quot;\\s[0-9a-f]&quot;,
+</a><a href="#h9-0-83" id="h9-0-83" class="i">+        &quot;[a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k]&quot;,
+</a><a href="#h9-0-84" id="h9-0-84" class="i">+        &quot;([a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z][a-z])|([a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z][a-fw-z])&quot;,
+</a><a href="#h9-0-85" id="h9-0-85" class="i">+        &quot;([acegikmoqsuwy{}][acegikmoqsuwy{}][acegikmoqsuwy{}][acegikmoqsuwy{}][acegikmoqsuwy{}][acegikmoqsuwy{}][acegikmoqsuwy{}][acegikmoqsuwy{}][acegikmoqsuwy{}][acegikmoqsuwy{}])|([acegikmoqsuwy{}][acegikmoqsuwy{}][acegikmoqsuwy{}][acegikmoqsuwy{}][acegikmoqsuwy{}][acegikmoqsuwy{}][acegikmoqsuwy{}][acegikmoqsuwy{}][acegikmoqsuwy{}][acegikmoqsuwy{}])&quot;,
+</a><a href="#h9-0-86" id="h9-0-86" class="i">+        &quot;((p((n((l((j((h((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))|(i((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))))|(k((h((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))|(i((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))))))|(m((j((h((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))|(i((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))))|(k((h((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))|(i((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))))))))|(o((l((j((h((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))|(i((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))))|(k((h((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))|(i((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))))))|(m((j((h((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))|(i((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))))|(k((h((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))|(i((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))))))))))|(q((n((l((j((h((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))|(i((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))))|(k((h((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))|(i((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))))))|(m((j((h((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))|(i((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))))|(k((h((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))|(i((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))))))))|(o((l((j((h((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))|(i((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))))|(k((h((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))|(i((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))))))|(m((j((h((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))|(i((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))))|(k((h((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b))))))|(i((f((d(a|b))|(e(a|b))))|(g((d(a|b))|(e(a|b)))))))))))))))&quot;,
+</a><a href="#h9-0-87" id="h9-0-87" class="i">+        &quot;([aA]|[bB])cdefg&quot;,
+</a><a href="#h9-0-88" id="h9-0-88" class="i">+        &quot;[sS][tT][aA][cC][kK]_&quot;,
+</a><a href="#h9-0-89" id="h9-0-89" class="i">+    };
+</a><a href="#h9-0-90" id="h9-0-90" class="i">+    re2::RE2::Options opts;
+</a><a href="#h9-0-91" id="h9-0-91" class="i">+
+</a><a href="#h9-0-92" id="h9-0-92" class="i">+    for (unsigned int i = 0; i &lt; sizeof(cases)/sizeof(*cases); ++i) {
+</a><a href="#h9-0-93" id="h9-0-93" class="i">+        const char *pat = cases[i];
+</a><a href="#h9-0-94" id="h9-0-94" class="i">+        re2::RE2 re(pat, opts);
+</a><a href="#h9-0-95" id="h9-0-95" class="i">+        intrusive_ptr&lt;QueryPlan&gt; key = constructQueryPlan(re);
+</a><a href="#h9-0-96" id="h9-0-96" class="i">+        EXPECT_TRUE(key) &lt;&lt; &quot;could not compute key for: &quot; &lt;&lt; pat;
+</a><a href="#h9-0-97" id="h9-0-97" class="i">+    }
+</a><a href="#h9-0-98" id="h9-0-98" class="i">+}
+</a></pre>
+</div>
+</body>
+</html>

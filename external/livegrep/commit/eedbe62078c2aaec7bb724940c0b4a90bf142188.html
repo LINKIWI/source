@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Support matching a file regex from the web API. - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/eedbe62078c2aaec7bb724940c0b4a90bf142188">eedbe62078c2aaec7bb724940c0b4a90bf142188</a>
+<b>parent</b> <a href="../commit/7ca157cba3d09c739973d422baa1d057021e3863">7ca157cba3d09c739973d422baa1d057021e3863</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Sun,  5 Feb 2012 11:31:47 -0500
+
+Support matching a file regex from the web API.
+
+No UI support yet.
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">web/appserver.js</a></td><td> | </td><td class="num">39</td><td><span class="i">+++++++++++++++++++++</span><span class="d">------------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">web/codesearch.js</a></td><td> | </td><td class="num">4</td><td><span class="i">++</span><span class="d">--</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">web/cs_server.js</a></td><td> | </td><td class="num">15</td><td><span class="i">++++++++</span><span class="d">-------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">web/grep.js</a></td><td> | </td><td class="num">4</td><td><span class="i">+++</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h4">web/static/bench.js</a></td><td> | </td><td class="num">2</td><td><span class="i">+</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h5">web/static/codesearch.js</a></td><td> | </td><td class="num">4</td><td><span class="i">++</span><span class="d">--</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h6">web/static/codesearch_ui.js</a></td><td> | </td><td class="num">2</td><td><span class="i">+</span><span class="d">-</span></td></tr>
+</table></pre><pre>7 files changed, 38 insertions(+), 32 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/web/appserver.js">web/appserver.js</a> b/<a href="../file/web/appserver.js">web/appserver.js</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -10,17 +10,21 @@ function Client(parent, sock) {
+</a>   this.parent = parent;
+   this.socket = sock;
+   this.pending_search = null;
+<a href="#h0-0-3" id="h0-0-3" class="d">-  this.pending_id = null;
+</a>   this.last_search = null;
+   this.active_search = null;
+ }
+ 
+<a href="#h0-0-8" id="h0-0-8" class="d">-Client.prototype.new_search = function (str, id) {
+</a><a href="#h0-0-9" id="h0-0-9" class="d">-  logger.debug(&#39;new search: (%s) %s&#39;, id, str);
+</a><a href="#h0-0-10" id="h0-0-10" class="d">-  if (str === this.last_search)
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+Client.prototype.new_search = function (line, file, id) {
+</a><a href="#h0-0-12" id="h0-0-12" class="i">+  logger.debug(&#39;new search: (%s) %s/%s&#39;, id, line, file);
+</a><a href="#h0-0-13" id="h0-0-13" class="i">+  if (this.last_search &amp;&amp;
+</a><a href="#h0-0-14" id="h0-0-14" class="i">+      line === this.last_search.line &amp;&amp;
+</a><a href="#h0-0-15" id="h0-0-15" class="i">+      file === this.last_search.file)
+</a>     return;
+<a href="#h0-0-17" id="h0-0-17" class="d">-  this.pending_search = str;
+</a><a href="#h0-0-18" id="h0-0-18" class="d">-  this.pending_id = id;
+</a><a href="#h0-0-19" id="h0-0-19" class="i">+  this.pending_search = {
+</a><a href="#h0-0-20" id="h0-0-20" class="i">+    line: line,
+</a><a href="#h0-0-21" id="h0-0-21" class="i">+    file: file,
+</a><a href="#h0-0-22" id="h0-0-22" class="i">+    id: id
+</a><a href="#h0-0-23" id="h0-0-23" class="i">+  };
+</a>   this.dispatch_search();
+ }
+ 
+<a href="#h0-1" id="h0-1" class="h">@@ -37,43 +41,42 @@ Client.prototype.dispatch_search = function() {
+</a>     console.assert(codesearch.cs_ready);
+     var start = new Date();
+     this.last_search = this.pending_search;
+<a href="#h0-1-3" id="h0-1-3" class="d">-    logger.debug(&#39;dispatching: (%s) %s...&#39;, this.pending_id, this.pending_search);
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+    logger.debug(&#39;dispatching: %j...&#39;, this.pending_search);
+</a> 
+     var search = this.pending_search;
+<a href="#h0-1-7" id="h0-1-7" class="d">-    var id     = this.pending_id;
+</a>     this.pending_search = null;
+     this.active_search  = search;
+     var self   = this;
+     var sock   = this.socket;
+     var batch  = new Batch(function (m) {
+<a href="#h0-1-13" id="h0-1-13" class="d">-                             sock.emit(&#39;match&#39;, id, m);
+</a><a href="#h0-1-14" id="h0-1-14" class="i">+                             sock.emit(&#39;match&#39;, search.id, m);
+</a>                            }, 50);
+     var cbs = {
+       not_ready: function() {
+<a href="#h0-1-18" id="h0-1-18" class="d">-        logger.info(&#39;Remote reports not ready for %s&#39;, search);
+</a><a href="#h0-1-19" id="h0-1-19" class="i">+        logger.info(&#39;Remote reports not ready for %j&#39;, search);
+</a>         if (self.pending_search === null)
+           self.pending_search = search;
+         self.search_done();
+       },
+       error: function (err) {
+<a href="#h0-1-25" id="h0-1-25" class="d">-        sock.emit(&#39;regex_error&#39;, id, err);
+</a><a href="#h0-1-26" id="h0-1-26" class="i">+        sock.emit(&#39;regex_error&#39;, search.id, err);
+</a>         self.search_done();
+       },
+       match: function (match) {
+         match = JSON.parse(match);
+<a href="#h0-1-31" id="h0-1-31" class="d">-        logger.trace(&quot;Reporting match %j for %s.&quot;, match, search);
+</a><a href="#h0-1-32" id="h0-1-32" class="i">+        logger.trace(&quot;Reporting match %j for %j.&quot;, match, search);
+</a>         batch.send(match);
+       },
+       done: function (stats) {
+         stats = JSON.parse(stats);
+         var time = (new Date()) - start;
+         batch.flush();
+<a href="#h0-1-39" id="h0-1-39" class="d">-        sock.emit(&#39;search_done&#39;, id, time, stats.why);
+</a><a href="#h0-1-40" id="h0-1-40" class="d">-        logger.debug(&quot;Search done: (%s) %s: %s&quot;, id, search, time);
+</a><a href="#h0-1-41" id="h0-1-41" class="i">+        sock.emit(&#39;search_done&#39;, search.id, time, stats.why);
+</a><a href="#h0-1-42" id="h0-1-42" class="i">+        logger.debug(&quot;Search done: (%s) %s: %s&quot;, search.id, search.line, time);
+</a>         self.search_done();
+       }
+     }
+<a href="#h0-1-46" id="h0-1-46" class="d">-    codesearch.try_search(search, cbs);
+</a><a href="#h0-1-47" id="h0-1-47" class="i">+    codesearch.try_search(search.line, search.file, cbs);
+</a>     codesearch.cs_ready = false;
+   }
+ }
+<a href="#h0-2" id="h0-2" class="h">@@ -121,10 +124,10 @@ function SearchServer(config, io) {
+</a> 
+   var Server = function (sock) {
+     parent.clients[sock.id] = new Client(parent, sock);
+<a href="#h0-2-3" id="h0-2-3" class="d">-    sock.on(&#39;new_search&#39;, function(str, id) {
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+    sock.on(&#39;new_search&#39;, function(line, file, id) {
+</a>               if (id == null)
+<a href="#h0-2-6" id="h0-2-6" class="d">-                id = str;
+</a><a href="#h0-2-7" id="h0-2-7" class="d">-              parent.clients[sock.id].new_search(str, id);
+</a><a href="#h0-2-8" id="h0-2-8" class="i">+                id = line;
+</a><a href="#h0-2-9" id="h0-2-9" class="i">+              parent.clients[sock.id].new_search(line, file, id);
+</a>     });
+     sock.on(&#39;disconnect&#39;, function() {
+               delete parent.clients[sock.id];
+<b>diff --git a/<a id="h1" href="../file/web/codesearch.js">web/codesearch.js</a> b/<a href="../file/web/codesearch.js">web/codesearch.js</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -72,11 +72,11 @@ function Connection(parent) {
+</a> }
+ util.inherits(Connection, events.EventEmitter);
+ 
+<a href="#h1-0-3" id="h1-0-3" class="d">-Connection.prototype.search = function(str) {
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+Connection.prototype.search = function(str, file) {
+</a>   var evt;
+   logger.debug(&quot;[cs %s] search(%s)&quot;, this.id, str);
+   console.assert(this.readyState == &#39;ready&#39;);
+<a href="#h1-0-8" id="h1-0-8" class="d">-  this.socket.write(JSON.stringify({line: str}) + &quot;\n&quot;);
+</a><a href="#h1-0-9" id="h1-0-9" class="i">+  this.socket.write(JSON.stringify({line: str, file: file}) + &quot;\n&quot;);
+</a>   this.setState(&#39;searching&#39;);
+ 
+   evt = new events.EventEmitter();
+<b>diff --git a/<a id="h2" href="../file/web/cs_server.js">web/cs_server.js</a> b/<a href="../file/web/cs_server.js">web/cs_server.js</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -17,7 +17,7 @@ function Client(parent, remote) {
+</a>                  var q;
+                  if (self.queue.length) {
+                    q = self.queue.shift();
+<a href="#h2-0-3" id="h2-0-3" class="d">-                   self.search(q.re, q.cb);
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+                   self.search(q.re, q.file, q.cb);
+</a>                  } else {
+                    self.ready();
+                  }
+<a href="#h2-1" id="h2-1" class="h">@@ -29,15 +29,16 @@ Client.prototype.ready = function() {
+</a>     util.remote_call(this.remote, &#39;ready&#39;);
+ }
+ 
+<a href="#h2-1-3" id="h2-1-3" class="d">-Client.prototype.search = function (re, cb) {
+</a><a href="#h2-1-4" id="h2-1-4" class="i">+Client.prototype.search = function (re, file, cb) {
+</a>   if (this.conn.readyState !== &#39;ready&#39;) {
+     this.queue.push({
+                       re: re,
+<a href="#h2-1-8" id="h2-1-8" class="i">+                      file: file,
+</a>                       cb: cb
+                     });
+     return;
+   }
+<a href="#h2-1-13" id="h2-1-13" class="d">-  var search = this.conn.search(re);
+</a><a href="#h2-1-14" id="h2-1-14" class="i">+  var search = this.conn.search(re, file);
+</a>   var batch  = new Batch(function (m) {
+                            util.remote_call(cb, &#39;match&#39;, m);
+                          }, 50);
+<a href="#h2-2" id="h2-2" class="h">@@ -62,15 +63,15 @@ function Server(config) {
+</a>               var client = parent.clients[conn.id];
+               delete parent.clients[conn.id];
+             });
+<a href="#h2-2-3" id="h2-2-3" class="d">-    this.try_search = function(re, cb) {
+</a><a href="#h2-2-4" id="h2-2-4" class="i">+    this.try_search = function(re, file, cb) {
+</a>       if (parent.clients[conn.id].conn.readyState !== &#39;ready&#39;) {
+         util.remote_call(cb, &#39;not_ready&#39;);
+         return;
+       }
+<a href="#h2-2-9" id="h2-2-9" class="d">-      parent.clients[conn.id].search(re, cb);
+</a><a href="#h2-2-10" id="h2-2-10" class="i">+      parent.clients[conn.id].search(re, file, cb);
+</a>     }
+<a href="#h2-2-12" id="h2-2-12" class="d">-    this.search = function(re, cb) {
+</a><a href="#h2-2-13" id="h2-2-13" class="d">-      parent.clients[conn.id].search(re, cb);
+</a><a href="#h2-2-14" id="h2-2-14" class="i">+    this.search = function(re, file, cb) {
+</a><a href="#h2-2-15" id="h2-2-15" class="i">+      parent.clients[conn.id].search(re, file, cb);
+</a>     }
+   }
+ }
+<b>diff --git a/<a id="h3" href="../file/web/grep.js">web/grep.js</a> b/<a href="../file/web/grep.js">web/grep.js</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -22,5 +22,7 @@ var delegate = {
+</a> dnode().connect(
+         &#39;localhost&#39;, config.DNODE_PORT,
+         function (remote) {
+<a href="#h3-0-3" id="h3-0-3" class="d">-          remote.search(process.argv[2], delegate);
+</a><a href="#h3-0-4" id="h3-0-4" class="i">+          remote.search(process.argv[2],
+</a><a href="#h3-0-5" id="h3-0-5" class="i">+                        process.argv[3],
+</a><a href="#h3-0-6" id="h3-0-6" class="i">+                        delegate);
+</a>         });
+<b>diff --git a/<a id="h4" href="../file/web/static/bench.js">web/static/bench.js</a> b/<a href="../file/web/static/bench.js">web/static/bench.js</a></b>
+<a href="#h4-0" id="h4-0" class="h">@@ -66,7 +66,7 @@ var Benchmark = function() {
+</a>     if (i === queries.length)
+       i = 0;
+     Benchmark.search_start[++Benchmark.search_id] = new Date();
+<a href="#h4-0-3" id="h4-0-3" class="d">-    Codesearch.new_search(queries[i], Benchmark.search_id);
+</a><a href="#h4-0-4" id="h4-0-4" class="i">+    Codesearch.new_search(queries[i], null, Benchmark.search_id);
+</a>     Benchmark.timer = setTimeout(function() {loop(i+1)}, 10);
+   }
+ 
+<b>diff --git a/<a id="h5" href="../file/web/static/codesearch.js">web/static/codesearch.js</a> b/<a href="../file/web/static/codesearch.js">web/static/codesearch.js</a></b>
+<a href="#h5-0" id="h5-0" class="h">@@ -19,9 +19,9 @@ var Codesearch = function() {
+</a>       socket.on(&#39;match&#39;, Codesearch.delegate.match);
+       socket.on(&#39;search_done&#39;, Codesearch.delegate.search_done);
+     },
+<a href="#h5-0-3" id="h5-0-3" class="d">-    new_search: function(re, id) {
+</a><a href="#h5-0-4" id="h5-0-4" class="i">+    new_search: function(re, file, id) {
+</a>       if (Codesearch.socket !== null)
+<a href="#h5-0-6" id="h5-0-6" class="d">-        Codesearch.socket.emit(&#39;new_search&#39;, re, id);
+</a><a href="#h5-0-7" id="h5-0-7" class="i">+        Codesearch.socket.emit(&#39;new_search&#39;, re, file, id);
+</a>     }
+   };
+ }();
+<b>diff --git a/<a id="h6" href="../file/web/static/codesearch_ui.js">web/static/codesearch_ui.js</a> b/<a href="../file/web/static/codesearch_ui.js">web/static/codesearch_ui.js</a></b>
+<a href="#h6-0" id="h6-0" class="h">@@ -61,7 +61,7 @@ var CodesearchUI = function() {
+</a>       setTimeout(CodesearchUI.newsearch, 0);
+     },
+     newsearch: function() {
+<a href="#h6-0-3" id="h6-0-3" class="d">-      Codesearch.new_search(CodesearchUI.input.val());
+</a><a href="#h6-0-4" id="h6-0-4" class="i">+      Codesearch.new_search(CodesearchUI.input.val(), null);
+</a>     },
+     error: function(search, error) {
+       if (search === CodesearchUI.input.val()) {
+</pre>
+</div>
+</body>
+</html>

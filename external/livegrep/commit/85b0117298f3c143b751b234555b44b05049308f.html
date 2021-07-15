@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>A first pass at more flexible indexing based on trees of ranges. - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/85b0117298f3c143b751b234555b44b05049308f">85b0117298f3c143b751b234555b44b05049308f</a>
+<b>parent</b> <a href="../commit/5e5765aed6dbd5b5072d27d3e923a02d66202590">5e5765aed6dbd5b5072d27d3e923a02d66202590</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Thu,  8 Dec 2011 00:08:52 -0500
+
+A first pass at more flexible indexing based on trees of ranges.
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">codesearch.cc</a></td><td> | </td><td class="num">104</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">---------------------</span></td></tr>
+<tr><td class="A">A</td><td><a href="#h1">common.h</a></td><td> | </td><td class="num">6</td><td><span class="i">++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">indexer.cc</a></td><td> | </td><td class="num">243</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">-------------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">indexer.h</a></td><td> | </td><td class="num">26</td><td><span class="i">+++++++++++++++++++++++++</span><span class="d">-</span></td></tr>
+<tr><td class="A">A</td><td><a href="#h4">test/index</a></td><td> | </td><td class="num">8</td><td><span class="i">++++++++</span><span class="d"></span></td></tr>
+</table></pre><pre>5 files changed, 300 insertions(+), 87 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/codesearch.cc">codesearch.cc</a> b/<a href="../file/codesearch.cc">codesearch.cc</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -81,11 +81,7 @@ public:
+</a>         {
+             run_timer run(analyze_time_);
+             index_ = indexRE(pat);
+<a href="#h0-0-3" id="h0-0-3" class="d">-            log_profile(&quot;Index(%d): \n&quot;, int(index_-&gt;keys.size()));
+</a><a href="#h0-0-4" id="h0-0-4" class="d">-            for (vector&lt;string&gt;::const_iterator it = index_-&gt;keys.begin();
+</a><a href="#h0-0-5" id="h0-0-5" class="d">-                 it != index_-&gt;keys.end(); it++) {
+</a><a href="#h0-0-6" id="h0-0-6" class="d">-                log_profile(&quot;  %s\n&quot;, it-&gt;c_str());
+</a><a href="#h0-0-7" id="h0-0-7" class="d">-            }
+</a><a href="#h0-0-8" id="h0-0-8" class="i">+            log_profile(&quot;Index: %s\n&quot;, index_-&gt;ToString().c_str());
+</a>         }
+ 
+         if (FLAGS_timeout &lt;= 0) {
+<a href="#h0-1" id="h0-1" class="h">@@ -442,7 +438,7 @@ bool searcher::operator()(const chunk *chunk)
+</a>         return true;
+     }
+ 
+<a href="#h0-1-3" id="h0-1-3" class="d">-    if (FLAGS_index &amp;&amp; index_-&gt;keys.size())
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+    if (FLAGS_index &amp;&amp; index_ &amp;&amp; index_-&gt;edges.size())
+</a>         filtered_search(chunk);
+     else
+         full_search(chunk);
+<a href="#h0-2" id="h0-2" class="h">@@ -454,35 +450,89 @@ bool searcher::operator()(const chunk *chunk)
+</a>     return false;
+ }
+ 
+<a href="#h0-2-3" id="h0-2-3" class="d">-void searcher::filtered_search(const chunk *chunk)
+</a><a href="#h0-2-4" id="h0-2-4" class="d">-{
+</a><a href="#h0-2-5" id="h0-2-5" class="d">-    log_profile(&quot;Attempting filtered search with %d filters\n&quot;,
+</a><a href="#h0-2-6" id="h0-2-6" class="d">-                int(index_-&gt;keys.size()));
+</a><a href="#h0-2-7" id="h0-2-7" class="d">-    chunk::lt_suffix lt(chunk);
+</a><a href="#h0-2-8" id="h0-2-8" class="i">+struct walk_state {
+</a><a href="#h0-2-9" id="h0-2-9" class="i">+    uint32_t *left, *right;
+</a><a href="#h0-2-10" id="h0-2-10" class="i">+    shared_ptr&lt;IndexKey&gt; key;
+</a><a href="#h0-2-11" id="h0-2-11" class="i">+    int depth;
+</a><a href="#h0-2-12" id="h0-2-12" class="i">+};
+</a><a href="#h0-2-13" id="h0-2-13" class="i">+
+</a><a href="#h0-2-14" id="h0-2-14" class="i">+struct lt_index {
+</a><a href="#h0-2-15" id="h0-2-15" class="i">+    const chunk *chunk_;
+</a><a href="#h0-2-16" id="h0-2-16" class="i">+    int idx_;
+</a> 
+<a href="#h0-2-18" id="h0-2-18" class="d">-    vector&lt;pair&lt;uint32_t*, uint32_t*&gt; &gt; ranges;
+</a><a href="#h0-2-19" id="h0-2-19" class="d">-    ranges.reserve(index_-&gt;keys.size());
+</a><a href="#h0-2-20" id="h0-2-20" class="d">-    uint32_t *indexes;
+</a><a href="#h0-2-21" id="h0-2-21" class="d">-    int count = 0, off = 0;
+</a><a href="#h0-2-22" id="h0-2-22" class="i">+    bool operator()(uint32_t lhs, unsigned char rhs) {
+</a><a href="#h0-2-23" id="h0-2-23" class="i">+        return cmp(lhs, rhs) &lt; 0;
+</a><a href="#h0-2-24" id="h0-2-24" class="i">+    }
+</a><a href="#h0-2-25" id="h0-2-25" class="i">+
+</a><a href="#h0-2-26" id="h0-2-26" class="i">+    bool operator()(unsigned char lhs, uint32_t rhs) {
+</a><a href="#h0-2-27" id="h0-2-27" class="i">+        return cmp(rhs, lhs) &gt; 0;
+</a><a href="#h0-2-28" id="h0-2-28" class="i">+    }
+</a><a href="#h0-2-29" id="h0-2-29" class="i">+
+</a><a href="#h0-2-30" id="h0-2-30" class="i">+    int cmp(uint32_t lhs, unsigned char rhs) {
+</a><a href="#h0-2-31" id="h0-2-31" class="i">+        unsigned char lc = chunk_-&gt;data[lhs + idx_];
+</a><a href="#h0-2-32" id="h0-2-32" class="i">+        if (lc == &#39;\n&#39;)
+</a><a href="#h0-2-33" id="h0-2-33" class="i">+            return -1;
+</a><a href="#h0-2-34" id="h0-2-34" class="i">+        return (int)lc - (int)rhs;
+</a><a href="#h0-2-35" id="h0-2-35" class="i">+    }
+</a><a href="#h0-2-36" id="h0-2-36" class="i">+};
+</a> 
+<a href="#h0-2-38" id="h0-2-38" class="i">+
+</a><a href="#h0-2-39" id="h0-2-39" class="i">+void searcher::filtered_search(const chunk *chunk)
+</a><a href="#h0-2-40" id="h0-2-40" class="i">+{
+</a><a href="#h0-2-41" id="h0-2-41" class="i">+    uint32_t *indexes = new uint32_t[kChunkSpace];
+</a><a href="#h0-2-42" id="h0-2-42" class="i">+    int count = 0;
+</a>     {
+         run_timer run(index_time_);
+<a href="#h0-2-45" id="h0-2-45" class="d">-        for (vector&lt;string&gt;::iterator it = index_-&gt;keys.begin();
+</a><a href="#h0-2-46" id="h0-2-46" class="d">-             it != index_-&gt;keys.end(); ++it) {
+</a><a href="#h0-2-47" id="h0-2-47" class="d">-            ranges.push_back(equal_range(chunk-&gt;suffixes,
+</a><a href="#h0-2-48" id="h0-2-48" class="d">-                                         chunk-&gt;suffixes + chunk-&gt;size,
+</a><a href="#h0-2-49" id="h0-2-49" class="d">-                                         *it, lt));
+</a><a href="#h0-2-50" id="h0-2-50" class="d">-            count += ranges.back().second - ranges.back().first;
+</a><a href="#h0-2-51" id="h0-2-51" class="d">-        }
+</a><a href="#h0-2-52" id="h0-2-52" class="d">-        indexes = new uint32_t[count];
+</a><a href="#h0-2-53" id="h0-2-53" class="d">-        for (int i = 0; i &lt; index_-&gt;keys.size(); i++) {
+</a><a href="#h0-2-54" id="h0-2-54" class="d">-            int width = ranges[i].second - ranges[i].first;
+</a><a href="#h0-2-55" id="h0-2-55" class="d">-            memcpy(&amp;indexes[off], ranges[i].first, width * sizeof(uint32_t));
+</a><a href="#h0-2-56" id="h0-2-56" class="d">-            off += width;
+</a><a href="#h0-2-57" id="h0-2-57" class="i">+        vector&lt;walk_state&gt; stack;
+</a><a href="#h0-2-58" id="h0-2-58" class="i">+        stack.push_back((walk_state){
+</a><a href="#h0-2-59" id="h0-2-59" class="i">+                chunk-&gt;suffixes, chunk-&gt;suffixes + chunk-&gt;size, index_, 0});
+</a><a href="#h0-2-60" id="h0-2-60" class="i">+
+</a><a href="#h0-2-61" id="h0-2-61" class="i">+        while (!stack.empty()) {
+</a><a href="#h0-2-62" id="h0-2-62" class="i">+            walk_state st = stack.back();
+</a><a href="#h0-2-63" id="h0-2-63" class="i">+            stack.pop_back();
+</a><a href="#h0-2-64" id="h0-2-64" class="i">+            if (!st.key) {
+</a><a href="#h0-2-65" id="h0-2-65" class="i">+                memcpy(indexes + count, st.left,
+</a><a href="#h0-2-66" id="h0-2-66" class="i">+                       (st.right - st.left) * sizeof(uint32_t));
+</a><a href="#h0-2-67" id="h0-2-67" class="i">+                count += (st.right - st.left);
+</a><a href="#h0-2-68" id="h0-2-68" class="i">+                continue;
+</a><a href="#h0-2-69" id="h0-2-69" class="i">+            }
+</a><a href="#h0-2-70" id="h0-2-70" class="i">+            lt_index lt = {chunk, st.depth};
+</a><a href="#h0-2-71" id="h0-2-71" class="i">+            for (IndexKey::iterator it = st.key-&gt;begin();
+</a><a href="#h0-2-72" id="h0-2-72" class="i">+                 it != st.key-&gt;end(); ++it) {
+</a><a href="#h0-2-73" id="h0-2-73" class="i">+                uint32_t *l, *r;
+</a><a href="#h0-2-74" id="h0-2-74" class="i">+                l = lower_bound(st.left, st.right, it-&gt;first.first, lt);
+</a><a href="#h0-2-75" id="h0-2-75" class="i">+                uint32_t *right = lower_bound(l, st.right,
+</a><a href="#h0-2-76" id="h0-2-76" class="i">+                                              (unsigned char)(it-&gt;first.second + 1),
+</a><a href="#h0-2-77" id="h0-2-77" class="i">+                                              lt);
+</a><a href="#h0-2-78" id="h0-2-78" class="i">+                if (l == right)
+</a><a href="#h0-2-79" id="h0-2-79" class="i">+                    continue;
+</a><a href="#h0-2-80" id="h0-2-80" class="i">+
+</a><a href="#h0-2-81" id="h0-2-81" class="i">+                if (st.depth)
+</a><a href="#h0-2-82" id="h0-2-82" class="i">+                    assert(chunk-&gt;data[*l + st.depth - 1] ==
+</a><a href="#h0-2-83" id="h0-2-83" class="i">+                           chunk-&gt;data[*(right - 1) + st.depth - 1]);
+</a><a href="#h0-2-84" id="h0-2-84" class="i">+
+</a><a href="#h0-2-85" id="h0-2-85" class="i">+                assert(l == st.left ||
+</a><a href="#h0-2-86" id="h0-2-86" class="i">+                       chunk-&gt;data[*(l-1) + st.depth] == &#39;\n&#39; ||
+</a><a href="#h0-2-87" id="h0-2-87" class="i">+                       chunk-&gt;data[*(l-1) + st.depth] &lt; it-&gt;first.first);
+</a><a href="#h0-2-88" id="h0-2-88" class="i">+                assert(chunk-&gt;data[*l + st.depth] &gt;= it-&gt;first.first);
+</a><a href="#h0-2-89" id="h0-2-89" class="i">+                assert(right == st.right ||
+</a><a href="#h0-2-90" id="h0-2-90" class="i">+                       chunk-&gt;data[*right + st.depth] &gt; it-&gt;first.second);
+</a><a href="#h0-2-91" id="h0-2-91" class="i">+
+</a><a href="#h0-2-92" id="h0-2-92" class="i">+                for (unsigned char ch = it-&gt;first.first; ch &lt;= it-&gt;first.second;
+</a><a href="#h0-2-93" id="h0-2-93" class="i">+                     ch++, l = r) {
+</a><a href="#h0-2-94" id="h0-2-94" class="i">+                    r = lower_bound(l, right, (unsigned char)(ch + 1), lt);
+</a><a href="#h0-2-95" id="h0-2-95" class="i">+
+</a><a href="#h0-2-96" id="h0-2-96" class="i">+                    if (r != l) {
+</a><a href="#h0-2-97" id="h0-2-97" class="i">+                        stack.push_back((walk_state){l, r, it-&gt;second, st.depth + 1});
+</a><a href="#h0-2-98" id="h0-2-98" class="i">+                    }
+</a><a href="#h0-2-99" id="h0-2-99" class="i">+                }
+</a><a href="#h0-2-100" id="h0-2-100" class="i">+            }
+</a>         }
+<a href="#h0-2-102" id="h0-2-102" class="i">+
+</a>     }
+ 
+     search_lines(indexes, count, chunk);
+<a href="#h0-2-106" id="h0-2-106" class="i">+
+</a>     delete[] indexes;
+ }
+ 
+<b>diff --git a/<a id="h1" href="../file/common.h">common.h</a> b/<a href="../file/common.h">common.h</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -0,0 +1,6 @@
+</a><a href="#h1-0-0" id="h1-0-0" class="i">+#ifndef CODESEARCH_COMMON_H
+</a><a href="#h1-0-1" id="h1-0-1" class="i">+#define CODESEARCH_COMMON_H
+</a><a href="#h1-0-2" id="h1-0-2" class="i">+
+</a><a href="#h1-0-3" id="h1-0-3" class="i">+typedef unsigned char uchar;
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+#endif
+</a><b>diff --git a/<a id="h2" href="../file/indexer.cc">indexer.cc</a> b/<a href="../file/indexer.cc">indexer.cc</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -2,9 +2,13 @@
+</a> 
+ #include &lt;gflags/gflags.h&gt;
+ 
+<a href="#h2-0-3" id="h2-0-3" class="i">+#include &lt;list&gt;
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+
+</a> #include &lt;stdarg.h&gt;
+ 
+ DEFINE_bool(debug_index, false, &quot;Debug the index query generator.&quot;);
+<a href="#h2-0-8" id="h2-0-8" class="i">+static void debug(const char *format, ...)
+</a><a href="#h2-0-9" id="h2-0-9" class="i">+    __attribute__((format (printf, 1, 2)));
+</a> 
+ static void debug(const char *format, ...) {
+     if (!FLAGS_debug_index)
+<a href="#h2-1" id="h2-1" class="h">@@ -20,31 +24,62 @@ using namespace re2;
+</a> using namespace std;
+ 
+ const unsigned kMinWeight = 16;
+<a href="#h2-1-3" id="h2-1-3" class="d">-const int kMaxFilters     = 32;
+</a><a href="#h2-1-4" id="h2-1-4" class="i">+const int kMaxWidth       = 32;
+</a> 
+ double IndexKey::selectivity() {
+<a href="#h2-1-7" id="h2-1-7" class="d">-    if (keys.size() == 0)
+</a><a href="#h2-1-8" id="h2-1-8" class="i">+    if (this == 0)
+</a><a href="#h2-1-9" id="h2-1-9" class="i">+        return 1.0;
+</a><a href="#h2-1-10" id="h2-1-10" class="i">+
+</a><a href="#h2-1-11" id="h2-1-11" class="i">+    if (edges.size() == 0)
+</a>         return 1.0;
+ 
+     double s = 0.0;
+<a href="#h2-1-15" id="h2-1-15" class="d">-    for (vector&lt;string&gt;::const_iterator it = keys.begin();
+</a><a href="#h2-1-16" id="h2-1-16" class="d">-         it != keys.end(); ++it)
+</a><a href="#h2-1-17" id="h2-1-17" class="d">-        s += pow(1./(it-&gt;size() + 1), 8);
+</a><a href="#h2-1-18" id="h2-1-18" class="i">+    for (IndexKey::iterator it = begin();
+</a><a href="#h2-1-19" id="h2-1-19" class="i">+         it != end(); ++it)
+</a><a href="#h2-1-20" id="h2-1-20" class="i">+        s += double(it-&gt;first.second - it-&gt;first.first + 1)/128 *
+</a><a href="#h2-1-21" id="h2-1-21" class="i">+            it-&gt;second-&gt;selectivity();
+</a> 
+     return s;
+ }
+ 
+ unsigned IndexKey::weight() {
+<a href="#h2-1-27" id="h2-1-27" class="i">+    if (1/selectivity() &gt; double(numeric_limits&lt;unsigned&gt;::max()))
+</a><a href="#h2-1-28" id="h2-1-28" class="i">+        return numeric_limits&lt;unsigned&gt;::max() / 2;
+</a>     return 1/selectivity();
+ }
+<a href="#h2-1-31" id="h2-1-31" class="i">+static string strprintf(const char *fmt, ...)
+</a><a href="#h2-1-32" id="h2-1-32" class="i">+    __attribute__((format (printf, 1, 2)));
+</a> 
+<a href="#h2-1-34" id="h2-1-34" class="d">-string IndexKey::ToString() {
+</a><a href="#h2-1-35" id="h2-1-35" class="i">+static string strprintf(const char *fmt, ...) {
+</a><a href="#h2-1-36" id="h2-1-36" class="i">+    char buf[4096];
+</a><a href="#h2-1-37" id="h2-1-37" class="i">+    va_list ap;
+</a><a href="#h2-1-38" id="h2-1-38" class="i">+    va_start(ap, fmt);
+</a><a href="#h2-1-39" id="h2-1-39" class="i">+    vsnprintf(buf, sizeof buf, fmt, ap);
+</a><a href="#h2-1-40" id="h2-1-40" class="i">+    va_end(ap);
+</a><a href="#h2-1-41" id="h2-1-41" class="i">+
+</a><a href="#h2-1-42" id="h2-1-42" class="i">+    return string(buf);
+</a><a href="#h2-1-43" id="h2-1-43" class="i">+}
+</a><a href="#h2-1-44" id="h2-1-44" class="i">+
+</a><a href="#h2-1-45" id="h2-1-45" class="i">+static string ToString(IndexKey *k, int indent = 0) {
+</a>     string out;
+<a href="#h2-1-47" id="h2-1-47" class="d">-    for (vector&lt;string&gt;::const_iterator it = keys.begin();
+</a><a href="#h2-1-48" id="h2-1-48" class="d">-         it != keys.end(); ++it) {
+</a><a href="#h2-1-49" id="h2-1-49" class="d">-        out += *it;
+</a><a href="#h2-1-50" id="h2-1-50" class="d">-        out += &quot;,&quot;;
+</a><a href="#h2-1-51" id="h2-1-51" class="i">+    if (k == 0)
+</a><a href="#h2-1-52" id="h2-1-52" class="i">+        return strprintf(&quot;%*.s[]\n&quot;, indent, &quot;&quot;);
+</a><a href="#h2-1-53" id="h2-1-53" class="i">+
+</a><a href="#h2-1-54" id="h2-1-54" class="i">+    for (IndexKey::iterator it = k-&gt;begin(); it != k-&gt;end(); ++it) {
+</a><a href="#h2-1-55" id="h2-1-55" class="i">+        out += strprintf(&quot;%*.s[%c-%c] -&gt; \n&quot;,
+</a><a href="#h2-1-56" id="h2-1-56" class="i">+                         indent, &quot;&quot;,
+</a><a href="#h2-1-57" id="h2-1-57" class="i">+                         it-&gt;first.first,
+</a><a href="#h2-1-58" id="h2-1-58" class="i">+                         it-&gt;first.second);
+</a><a href="#h2-1-59" id="h2-1-59" class="i">+        out += ToString(it-&gt;second.get(), indent + 1);
+</a>     }
+<a href="#h2-1-61" id="h2-1-61" class="i">+    return out;
+</a><a href="#h2-1-62" id="h2-1-62" class="i">+}
+</a><a href="#h2-1-63" id="h2-1-63" class="i">+
+</a><a href="#h2-1-64" id="h2-1-64" class="i">+string IndexKey::ToString() {
+</a><a href="#h2-1-65" id="h2-1-65" class="i">+    string out = ::ToString(this, 0);
+</a><a href="#h2-1-66" id="h2-1-66" class="i">+    if (this == 0)
+</a><a href="#h2-1-67" id="h2-1-67" class="i">+        return out;
+</a><a href="#h2-1-68" id="h2-1-68" class="i">+
+</a>     out += &quot;|&quot;;
+     if (anchor &amp; kAnchorLeft)
+         out += &quot;&lt;&quot;;
+<a href="#h2-2" id="h2-2" class="h">@@ -80,81 +115,99 @@ namespace {
+</a>     }
+ 
+     shared_ptr&lt;IndexKey&gt; Any() {
+<a href="#h2-2-3" id="h2-2-3" class="d">-        return shared_ptr&lt;IndexKey&gt;(new IndexKey(kAnchorNone));
+</a><a href="#h2-2-4" id="h2-2-4" class="i">+        return shared_ptr&lt;IndexKey&gt;(0);
+</a>     }
+ 
+     shared_ptr&lt;IndexKey&gt; Empty() {
+         return shared_ptr&lt;IndexKey&gt;(new IndexKey(kAnchorBoth));
+     }
+ 
+<a href="#h2-2-11" id="h2-2-11" class="d">-
+</a><a href="#h2-2-12" id="h2-2-12" class="d">-    shared_ptr&lt;IndexKey&gt; Literal(Rune r) {
+</a><a href="#h2-2-13" id="h2-2-13" class="d">-        shared_ptr&lt;IndexKey&gt; k(new IndexKey);
+</a><a href="#h2-2-14" id="h2-2-14" class="d">-        k-&gt;keys.push_back(RuneToString(r));
+</a><a href="#h2-2-15" id="h2-2-15" class="i">+    shared_ptr&lt;IndexKey&gt; Literal(string s) {
+</a><a href="#h2-2-16" id="h2-2-16" class="i">+        shared_ptr&lt;IndexKey&gt; k = 0;
+</a><a href="#h2-2-17" id="h2-2-17" class="i">+        for (string::reverse_iterator it = s.rbegin();
+</a><a href="#h2-2-18" id="h2-2-18" class="i">+             it != s.rend(); ++it) {
+</a><a href="#h2-2-19" id="h2-2-19" class="i">+            k = shared_ptr&lt;IndexKey&gt;(new IndexKey(pair&lt;uchar, uchar&gt;(*it, *it), k));
+</a><a href="#h2-2-20" id="h2-2-20" class="i">+        }
+</a>         k-&gt;anchor = kAnchorBoth;
+         return k;
+     }
+ 
+<a href="#h2-2-25" id="h2-2-25" class="i">+    shared_ptr&lt;IndexKey&gt; Literal(Rune r) {
+</a><a href="#h2-2-26" id="h2-2-26" class="i">+        return Literal(RuneToString(r));
+</a><a href="#h2-2-27" id="h2-2-27" class="i">+    }
+</a><a href="#h2-2-28" id="h2-2-28" class="i">+
+</a>     shared_ptr&lt;IndexKey&gt; Literal(Rune *runes, int nrunes) {
+<a href="#h2-2-30" id="h2-2-30" class="d">-        shared_ptr&lt;IndexKey&gt; k(new IndexKey);
+</a>         string lit;
+ 
+         for (int i = 0; i &lt; nrunes; i++) {
+             lit.append(RuneToString(runes[i]));
+         }
+ 
+<a href="#h2-2-37" id="h2-2-37" class="d">-        k-&gt;keys.push_back(lit);
+</a><a href="#h2-2-38" id="h2-2-38" class="d">-        k-&gt;anchor = kAnchorBoth;
+</a><a href="#h2-2-39" id="h2-2-39" class="d">-
+</a><a href="#h2-2-40" id="h2-2-40" class="d">-        return k;
+</a><a href="#h2-2-41" id="h2-2-41" class="i">+        return Literal(lit);
+</a>     }
+ 
+     shared_ptr&lt;IndexKey&gt; CClass(CharClass *cc) {
+<a href="#h2-2-45" id="h2-2-45" class="d">-        if (cc-&gt;size() &gt; kMaxFilters)
+</a><a href="#h2-2-46" id="h2-2-46" class="i">+        if (cc-&gt;size() &gt; kMaxWidth)
+</a>             return Any();
+ 
+<a href="#h2-2-49" id="h2-2-49" class="d">-        shared_ptr&lt;IndexKey&gt; k(new IndexKey());
+</a><a href="#h2-2-50" id="h2-2-50" class="i">+        shared_ptr&lt;IndexKey&gt; k(new IndexKey(kAnchorBoth));
+</a> 
+<a href="#h2-2-52" id="h2-2-52" class="d">-        for (CharClass::iterator i = cc-&gt;begin(); i != cc-&gt;end(); ++i)
+</a><a href="#h2-2-53" id="h2-2-53" class="d">-            for (Rune r = i-&gt;lo; r &lt;= i-&gt;hi; r++)
+</a><a href="#h2-2-54" id="h2-2-54" class="d">-                k-&gt;keys.push_back(RuneToString(r));
+</a><a href="#h2-2-55" id="h2-2-55" class="d">-
+</a><a href="#h2-2-56" id="h2-2-56" class="d">-        k-&gt;anchor = kAnchorBoth;
+</a><a href="#h2-2-57" id="h2-2-57" class="i">+        for (CharClass::iterator i = cc-&gt;begin(); i != cc-&gt;end(); ++i) {
+</a><a href="#h2-2-58" id="h2-2-58" class="i">+            /* TODO: Handle arbitrary unicode ranges. Probably have to
+</a><a href="#h2-2-59" id="h2-2-59" class="i">+               convert to UTF-8 ranges ourselves.*/
+</a><a href="#h2-2-60" id="h2-2-60" class="i">+            assert (i-&gt;lo &lt; Runeself);
+</a><a href="#h2-2-61" id="h2-2-61" class="i">+            assert (i-&gt;hi &lt; Runeself);
+</a><a href="#h2-2-62" id="h2-2-62" class="i">+            k-&gt;edges.insert(IndexKey::value_type
+</a><a href="#h2-2-63" id="h2-2-63" class="i">+                            (pair&lt;uchar, uchar&gt;(i-&gt;lo, i-&gt;hi),
+</a><a href="#h2-2-64" id="h2-2-64" class="i">+                             0));
+</a><a href="#h2-2-65" id="h2-2-65" class="i">+        }
+</a> 
+         return k;
+     }
+ 
+<a href="#h2-2-70" id="h2-2-70" class="i">+    void CollectTails(list&lt;IndexKey::iterator&gt;&amp; tails, shared_ptr&lt;IndexKey&gt; key) {
+</a><a href="#h2-2-71" id="h2-2-71" class="i">+        if (key == 0)
+</a><a href="#h2-2-72" id="h2-2-72" class="i">+            return;
+</a><a href="#h2-2-73" id="h2-2-73" class="i">+
+</a><a href="#h2-2-74" id="h2-2-74" class="i">+        for (IndexKey::iterator it = key-&gt;begin();
+</a><a href="#h2-2-75" id="h2-2-75" class="i">+             it != key-&gt;end(); ++it) {
+</a><a href="#h2-2-76" id="h2-2-76" class="i">+            if (!it-&gt;second)
+</a><a href="#h2-2-77" id="h2-2-77" class="i">+                tails.push_back(it);
+</a><a href="#h2-2-78" id="h2-2-78" class="i">+            else
+</a><a href="#h2-2-79" id="h2-2-79" class="i">+                CollectTails(tails, it-&gt;second);
+</a><a href="#h2-2-80" id="h2-2-80" class="i">+        }
+</a><a href="#h2-2-81" id="h2-2-81" class="i">+    }
+</a><a href="#h2-2-82" id="h2-2-82" class="i">+
+</a>     shared_ptr&lt;IndexKey&gt; Concat(shared_ptr&lt;IndexKey&gt; lhs, shared_ptr&lt;IndexKey&gt; rhs) {
+<a href="#h2-2-84" id="h2-2-84" class="d">-        shared_ptr&lt;IndexKey&gt; out = 0;
+</a><a href="#h2-2-85" id="h2-2-85" class="i">+        shared_ptr&lt;IndexKey&gt; out = lhs;
+</a> 
+         debug(&quot;Concat([%s](%d), [%s](%d)) = &quot;,
+<a href="#h2-2-88" id="h2-2-88" class="d">-               lhs-&gt;ToString().c_str(),
+</a><a href="#h2-2-89" id="h2-2-89" class="d">-               lhs-&gt;weight(),
+</a><a href="#h2-2-90" id="h2-2-90" class="d">-               rhs-&gt;ToString().c_str(),
+</a><a href="#h2-2-91" id="h2-2-91" class="d">-               rhs-&gt;weight());
+</a><a href="#h2-2-92" id="h2-2-92" class="i">+              lhs-&gt;ToString().c_str(),
+</a><a href="#h2-2-93" id="h2-2-93" class="i">+              lhs-&gt;weight(),
+</a><a href="#h2-2-94" id="h2-2-94" class="i">+              rhs-&gt;ToString().c_str(),
+</a><a href="#h2-2-95" id="h2-2-95" class="i">+              rhs-&gt;weight());
+</a> 
+<a href="#h2-2-97" id="h2-2-97" class="d">-        if ((lhs-&gt;anchor &amp; kAnchorRight) &amp;&amp;
+</a><a href="#h2-2-98" id="h2-2-98" class="i">+        if (lhs &amp;&amp; rhs &amp;&amp;
+</a><a href="#h2-2-99" id="h2-2-99" class="i">+            (lhs-&gt;anchor &amp; kAnchorRight) &amp;&amp;
+</a>             (rhs-&gt;anchor &amp; kAnchorLeft) &amp;&amp;
+<a href="#h2-2-101" id="h2-2-101" class="d">-            lhs-&gt;keys.size() &amp;&amp; rhs-&gt;keys.size() &amp;&amp;
+</a><a href="#h2-2-102" id="h2-2-102" class="d">-            lhs-&gt;keys.size() * rhs-&gt;keys.size() &lt;= kMaxFilters) {
+</a><a href="#h2-2-103" id="h2-2-103" class="d">-            out = shared_ptr&lt;IndexKey&gt;(new IndexKey);
+</a><a href="#h2-2-104" id="h2-2-104" class="d">-            for (vector&lt;string&gt;::iterator lit = lhs-&gt;keys.begin();
+</a><a href="#h2-2-105" id="h2-2-105" class="d">-                 lit != lhs-&gt;keys.end(); ++lit)
+</a><a href="#h2-2-106" id="h2-2-106" class="d">-                for (vector&lt;string&gt;::iterator rit = rhs-&gt;keys.begin();
+</a><a href="#h2-2-107" id="h2-2-107" class="d">-                     rit != rhs-&gt;keys.end(); ++rit)
+</a><a href="#h2-2-108" id="h2-2-108" class="d">-                    out-&gt;keys.push_back(*lit + *rit);
+</a><a href="#h2-2-109" id="h2-2-109" class="d">-            if ((lhs-&gt;anchor &amp; (kAnchorRepeat|kAnchorLeft)) == kAnchorLeft)
+</a><a href="#h2-2-110" id="h2-2-110" class="d">-                out-&gt;anchor |= kAnchorLeft;
+</a><a href="#h2-2-111" id="h2-2-111" class="d">-            if ((rhs-&gt;anchor &amp; (kAnchorRepeat|kAnchorRight)) == kAnchorRight)
+</a><a href="#h2-2-112" id="h2-2-112" class="d">-                out-&gt;anchor |= kAnchorRight;
+</a><a href="#h2-2-113" id="h2-2-113" class="d">-        }
+</a><a href="#h2-2-114" id="h2-2-114" class="i">+            lhs-&gt;edges.size() &amp;&amp; rhs-&gt;edges.size()) {
+</a><a href="#h2-2-115" id="h2-2-115" class="i">+            list&lt;IndexKey::iterator&gt; tails;
+</a><a href="#h2-2-116" id="h2-2-116" class="i">+            CollectTails(tails, lhs);
+</a><a href="#h2-2-117" id="h2-2-117" class="i">+            for (auto it = tails.begin(); it != tails.end(); ++it) {
+</a><a href="#h2-2-118" id="h2-2-118" class="i">+                if (!(*it)-&gt;second)
+</a><a href="#h2-2-119" id="h2-2-119" class="i">+                    (*it)-&gt;second = rhs;
+</a><a href="#h2-2-120" id="h2-2-120" class="i">+            }
+</a><a href="#h2-2-121" id="h2-2-121" class="i">+            if (lhs-&gt;anchor &amp; kAnchorRepeat)
+</a><a href="#h2-2-122" id="h2-2-122" class="i">+                lhs-&gt;anchor &amp;= ~kAnchorLeft;
+</a><a href="#h2-2-123" id="h2-2-123" class="i">+            if ((rhs-&gt;anchor &amp; (kAnchorRepeat|kAnchorRight)) != kAnchorRight)
+</a><a href="#h2-2-124" id="h2-2-124" class="i">+                lhs-&gt;anchor &amp;= ~kAnchorRight;
+</a> 
+<a href="#h2-2-126" id="h2-2-126" class="d">-        if (!out || lhs-&gt;weight() &gt; out-&gt;weight()) {
+</a>             out = lhs;
+<a href="#h2-2-128" id="h2-2-128" class="d">-            out-&gt;anchor &amp;= ~kAnchorRight;
+</a><a href="#h2-2-129" id="h2-2-129" class="i">+        } else if (lhs) {
+</a><a href="#h2-2-130" id="h2-2-130" class="i">+            lhs-&gt;anchor &amp;= ~kAnchorRight;
+</a>         }
+ 
+<a href="#h2-2-133" id="h2-2-133" class="d">-        if (rhs-&gt;weight() &gt; out-&gt;weight()) {
+</a><a href="#h2-2-134" id="h2-2-134" class="i">+        if (rhs &amp;&amp; rhs-&gt;weight() &gt; out-&gt;weight()) {
+</a>             out = rhs;
+             out-&gt;anchor &amp;= ~kAnchorLeft;
+         }
+<a href="#h2-3" id="h2-3" class="h">@@ -164,17 +217,89 @@ namespace {
+</a>         return out;
+     }
+ 
+<a href="#h2-3-3" id="h2-3-3" class="d">-    shared_ptr&lt;IndexKey&gt; Alternate(shared_ptr&lt;IndexKey&gt; lhs, shared_ptr&lt;IndexKey&gt; rhs) {
+</a><a href="#h2-3-4" id="h2-3-4" class="d">-        if (lhs-&gt;keys.size() &amp;&amp; rhs-&gt;keys.size() &amp;&amp;
+</a><a href="#h2-3-5" id="h2-3-5" class="d">-            lhs-&gt;keys.size() + rhs-&gt;keys.size() &lt; kMaxFilters) {
+</a><a href="#h2-3-6" id="h2-3-6" class="d">-            lhs-&gt;keys.insert(lhs-&gt;keys.end(), rhs-&gt;keys.begin(), rhs-&gt;keys.end());
+</a><a href="#h2-3-7" id="h2-3-7" class="d">-            lhs-&gt;anchor = (lhs-&gt;anchor &amp; rhs-&gt;anchor) |
+</a><a href="#h2-3-8" id="h2-3-8" class="d">-                ((lhs-&gt;anchor | lhs-&gt;anchor) &amp; kAnchorRepeat);
+</a><a href="#h2-3-9" id="h2-3-9" class="i">+    bool intersects(const pair&lt;uchar, uchar&gt;&amp; left,
+</a><a href="#h2-3-10" id="h2-3-10" class="i">+                    const pair&lt;uchar, uchar&gt;&amp; right) {
+</a><a href="#h2-3-11" id="h2-3-11" class="i">+        if (left.first &lt;= right.first)
+</a><a href="#h2-3-12" id="h2-3-12" class="i">+            return left.second &gt;= right.first;
+</a><a href="#h2-3-13" id="h2-3-13" class="i">+        else
+</a><a href="#h2-3-14" id="h2-3-14" class="i">+            return right.second &gt;= left.first;
+</a><a href="#h2-3-15" id="h2-3-15" class="i">+    }
+</a> 
+<a href="#h2-3-17" id="h2-3-17" class="i">+    shared_ptr&lt;IndexKey&gt; Alternate(shared_ptr&lt;IndexKey&gt; lhs, shared_ptr&lt;IndexKey&gt; rhs) {
+</a><a href="#h2-3-18" id="h2-3-18" class="i">+        if (lhs == rhs)
+</a>             return lhs;
+<a href="#h2-3-20" id="h2-3-20" class="i">+        if (lhs == 0 || rhs == 0 ||
+</a><a href="#h2-3-21" id="h2-3-21" class="i">+            lhs-&gt;edges.size() + rhs-&gt;edges.size() &gt;= kMaxWidth)
+</a><a href="#h2-3-22" id="h2-3-22" class="i">+            return Any();
+</a><a href="#h2-3-23" id="h2-3-23" class="i">+
+</a><a href="#h2-3-24" id="h2-3-24" class="i">+        shared_ptr&lt;IndexKey&gt; out(new IndexKey
+</a><a href="#h2-3-25" id="h2-3-25" class="i">+                                 ((lhs-&gt;anchor &amp; rhs-&gt;anchor) |
+</a><a href="#h2-3-26" id="h2-3-26" class="i">+                                  ((lhs-&gt;anchor | lhs-&gt;anchor) &amp; kAnchorRepeat)));
+</a><a href="#h2-3-27" id="h2-3-27" class="i">+        IndexKey::const_iterator lit, rit;
+</a><a href="#h2-3-28" id="h2-3-28" class="i">+        for (lit = lhs-&gt;begin(), rit = rhs-&gt;begin();
+</a><a href="#h2-3-29" id="h2-3-29" class="i">+             lit != lhs-&gt;end() &amp;&amp; rit != rhs-&gt;end();) {
+</a><a href="#h2-3-30" id="h2-3-30" class="i">+            pair&lt;uchar, uchar&gt; left = lit-&gt;first;
+</a><a href="#h2-3-31" id="h2-3-31" class="i">+            pair&lt;uchar, uchar&gt; right = rit-&gt;first;
+</a><a href="#h2-3-32" id="h2-3-32" class="i">+
+</a><a href="#h2-3-33" id="h2-3-33" class="i">+            while (intersects(left, right)) {
+</a><a href="#h2-3-34" id="h2-3-34" class="i">+                debug(&quot;Processing intersection: &lt;%hhx,%hhx&gt; vs. &lt;%hhx,%hhx&gt;\n&quot;,
+</a><a href="#h2-3-35" id="h2-3-35" class="i">+                      left.first, left.second, right.first, right.second);
+</a><a href="#h2-3-36" id="h2-3-36" class="i">+                if (left.first &lt; right.first) {
+</a><a href="#h2-3-37" id="h2-3-37" class="i">+                    out-&gt;edges.insert
+</a><a href="#h2-3-38" id="h2-3-38" class="i">+                        (make_pair(make_pair(left.first,
+</a><a href="#h2-3-39" id="h2-3-39" class="i">+                                             right.first - 1),
+</a><a href="#h2-3-40" id="h2-3-40" class="i">+                                   lit-&gt;second));
+</a><a href="#h2-3-41" id="h2-3-41" class="i">+                    left.first = right.first;
+</a><a href="#h2-3-42" id="h2-3-42" class="i">+                } else if (rit-&gt;first.first &lt; lit-&gt;first.first) {
+</a><a href="#h2-3-43" id="h2-3-43" class="i">+                    out-&gt;edges.insert
+</a><a href="#h2-3-44" id="h2-3-44" class="i">+                        (make_pair(make_pair(right.first,
+</a><a href="#h2-3-45" id="h2-3-45" class="i">+                                             left.first - 1),
+</a><a href="#h2-3-46" id="h2-3-46" class="i">+                                   rit-&gt;second));
+</a><a href="#h2-3-47" id="h2-3-47" class="i">+                    right.first = left.first;
+</a><a href="#h2-3-48" id="h2-3-48" class="i">+                }
+</a><a href="#h2-3-49" id="h2-3-49" class="i">+                /* left and right now start at the same location */
+</a><a href="#h2-3-50" id="h2-3-50" class="i">+                assert(left.first == right.first);
+</a><a href="#h2-3-51" id="h2-3-51" class="i">+
+</a><a href="#h2-3-52" id="h2-3-52" class="i">+                uchar end = min(left.second, right.second);
+</a><a href="#h2-3-53" id="h2-3-53" class="i">+                out-&gt;edges.insert
+</a><a href="#h2-3-54" id="h2-3-54" class="i">+                    (make_pair(make_pair(left.first, end),
+</a><a href="#h2-3-55" id="h2-3-55" class="i">+                               Alternate(lit-&gt;second, rit-&gt;second)));
+</a><a href="#h2-3-56" id="h2-3-56" class="i">+                if (left.second &gt; end) {
+</a><a href="#h2-3-57" id="h2-3-57" class="i">+                    left.first = end+1;
+</a><a href="#h2-3-58" id="h2-3-58" class="i">+                    if (++rit == rhs-&gt;edges.end()) {
+</a><a href="#h2-3-59" id="h2-3-59" class="i">+                        out-&gt;edges.insert(make_pair(left, (lit++)-&gt;second));
+</a><a href="#h2-3-60" id="h2-3-60" class="i">+                        break;
+</a><a href="#h2-3-61" id="h2-3-61" class="i">+                    }
+</a><a href="#h2-3-62" id="h2-3-62" class="i">+                    right = rit-&gt;first;
+</a><a href="#h2-3-63" id="h2-3-63" class="i">+                } else if (right.second &gt; end) {
+</a><a href="#h2-3-64" id="h2-3-64" class="i">+                    right.first = end+1;
+</a><a href="#h2-3-65" id="h2-3-65" class="i">+                    if (++lit == lhs-&gt;edges.end()) {
+</a><a href="#h2-3-66" id="h2-3-66" class="i">+                        out-&gt;edges.insert(make_pair(right, (rit++)-&gt;second));
+</a><a href="#h2-3-67" id="h2-3-67" class="i">+                        break;
+</a><a href="#h2-3-68" id="h2-3-68" class="i">+                    }
+</a><a href="#h2-3-69" id="h2-3-69" class="i">+                    left = lit-&gt;first;
+</a><a href="#h2-3-70" id="h2-3-70" class="i">+                } else {
+</a><a href="#h2-3-71" id="h2-3-71" class="i">+                    left  = (++lit)-&gt;first;
+</a><a href="#h2-3-72" id="h2-3-72" class="i">+                    right = (++rit)-&gt;first;
+</a><a href="#h2-3-73" id="h2-3-73" class="i">+                    break;
+</a><a href="#h2-3-74" id="h2-3-74" class="i">+                }
+</a><a href="#h2-3-75" id="h2-3-75" class="i">+            }
+</a><a href="#h2-3-76" id="h2-3-76" class="i">+
+</a><a href="#h2-3-77" id="h2-3-77" class="i">+            if (lit == lhs-&gt;edges.end() || rit == rhs-&gt;edges.end())
+</a><a href="#h2-3-78" id="h2-3-78" class="i">+                break;
+</a><a href="#h2-3-79" id="h2-3-79" class="i">+
+</a><a href="#h2-3-80" id="h2-3-80" class="i">+            if (left.first &lt; right.first)
+</a><a href="#h2-3-81" id="h2-3-81" class="i">+                out-&gt;edges.insert(make_pair(left, (lit++)-&gt;second));
+</a><a href="#h2-3-82" id="h2-3-82" class="i">+            else if (right.first &lt; left.first)
+</a><a href="#h2-3-83" id="h2-3-83" class="i">+                out-&gt;edges.insert(make_pair(right, (rit++)-&gt;second));
+</a><a href="#h2-3-84" id="h2-3-84" class="i">+            continue;
+</a>         }
+<a href="#h2-3-86" id="h2-3-86" class="i">+        for (; lit != lhs-&gt;edges.end(); ++lit)
+</a><a href="#h2-3-87" id="h2-3-87" class="i">+            out-&gt;edges.insert(*lit);
+</a><a href="#h2-3-88" id="h2-3-88" class="i">+        for (; rit != rhs-&gt;edges.end(); ++rit)
+</a><a href="#h2-3-89" id="h2-3-89" class="i">+            out-&gt;edges.insert(*rit);
+</a> 
+<a href="#h2-3-91" id="h2-3-91" class="d">-        return Any();
+</a><a href="#h2-3-92" id="h2-3-92" class="i">+        return out;
+</a>     }
+ 
+ };
+<a href="#h2-4" id="h2-4" class="h">@@ -184,8 +309,8 @@ shared_ptr&lt;IndexKey&gt; indexRE(const re2::RE2 &amp;re) {
+</a> 
+     shared_ptr&lt;IndexKey&gt; key = walk.Walk(re.Regexp(), 0);
+ 
+<a href="#h2-4-3" id="h2-4-3" class="d">-    if (key-&gt;weight() &lt; kMinWeight)
+</a><a href="#h2-4-4" id="h2-4-4" class="d">-        key-&gt;keys.clear();
+</a><a href="#h2-4-5" id="h2-4-5" class="i">+    if (key &amp;&amp; key-&gt;weight() &lt; kMinWeight)
+</a><a href="#h2-4-6" id="h2-4-6" class="i">+        key-&gt;edges.clear();
+</a>     return key;
+ }
+ 
+<a href="#h2-5" id="h2-5" class="h">@@ -259,7 +384,7 @@ IndexWalker::PostVisit(Regexp* re, shared_ptr&lt;IndexKey&gt; parent_arg,
+</a>         assert(false);
+     }
+ 
+<a href="#h2-5-3" id="h2-5-3" class="d">-    debug(&quot; %s -&gt; [%s](%d)\n&quot;,
+</a><a href="#h2-5-4" id="h2-5-4" class="i">+    debug(&quot;* INDEX %s ==&gt; [%s](%d)\n&quot;,
+</a>           re-&gt;ToString().c_str(),
+           key-&gt;ToString().c_str(),
+           key-&gt;weight());
+<b>diff --git a/<a id="h3" href="../file/indexer.h">indexer.h</a> b/<a href="../file/indexer.h">indexer.h</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -8,6 +8,8 @@
+</a> #include &quot;re2/re2.h&quot;
+ #include &quot;re2/walker-inl.h&quot;
+ 
+<a href="#h3-0-3" id="h3-0-3" class="i">+#include &quot;common.h&quot;
+</a><a href="#h3-0-4" id="h3-0-4" class="i">+
+</a> using std::string;
+ using std::vector;
+ using std::shared_ptr;
+<a href="#h3-1" id="h3-1" class="h">@@ -21,11 +23,29 @@ enum {
+</a> };
+ 
+ struct IndexKey {
+<a href="#h3-1-3" id="h3-1-3" class="d">-    vector&lt;string&gt; keys;
+</a><a href="#h3-1-4" id="h3-1-4" class="i">+    map&lt;pair&lt;uchar, uchar&gt;, shared_ptr&lt;IndexKey&gt; &gt; edges;
+</a>     int anchor;
+ 
+<a href="#h3-1-7" id="h3-1-7" class="i">+    typedef map&lt;pair&lt;uchar, uchar&gt;, shared_ptr&lt;IndexKey&gt; &gt;::iterator iterator;
+</a><a href="#h3-1-8" id="h3-1-8" class="i">+    typedef map&lt;pair&lt;uchar, uchar&gt;, shared_ptr&lt;IndexKey&gt; &gt;::const_iterator const_iterator;
+</a><a href="#h3-1-9" id="h3-1-9" class="i">+    typedef pair&lt;pair&lt;uchar, uchar&gt;, shared_ptr&lt;IndexKey&gt; &gt; value_type;
+</a><a href="#h3-1-10" id="h3-1-10" class="i">+
+</a><a href="#h3-1-11" id="h3-1-11" class="i">+    iterator begin() {
+</a><a href="#h3-1-12" id="h3-1-12" class="i">+        return edges.begin();
+</a><a href="#h3-1-13" id="h3-1-13" class="i">+    }
+</a><a href="#h3-1-14" id="h3-1-14" class="i">+
+</a><a href="#h3-1-15" id="h3-1-15" class="i">+    iterator end() {
+</a><a href="#h3-1-16" id="h3-1-16" class="i">+        return edges.end();
+</a><a href="#h3-1-17" id="h3-1-17" class="i">+    }
+</a><a href="#h3-1-18" id="h3-1-18" class="i">+
+</a>     IndexKey(int anchor = kAnchorNone) : anchor(anchor) { }
+ 
+<a href="#h3-1-21" id="h3-1-21" class="i">+    IndexKey(pair&lt;uchar, uchar&gt; p,
+</a><a href="#h3-1-22" id="h3-1-22" class="i">+             shared_ptr&lt;IndexKey&gt; next,
+</a><a href="#h3-1-23" id="h3-1-23" class="i">+             int anchor = kAnchorNone) : anchor(anchor) {
+</a><a href="#h3-1-24" id="h3-1-24" class="i">+        edges.insert(value_type(p, next));
+</a><a href="#h3-1-25" id="h3-1-25" class="i">+    }
+</a><a href="#h3-1-26" id="h3-1-26" class="i">+
+</a>     /*
+      * Returns an approximation of the fraction of the input corpus
+      * that this index key will reduce the search space to.
+<a href="#h3-2" id="h3-2" class="h">@@ -51,6 +71,10 @@ struct IndexKey {
+</a>     unsigned weight();
+ 
+     string ToString();
+<a href="#h3-2-3" id="h3-2-3" class="i">+
+</a><a href="#h3-2-4" id="h3-2-4" class="i">+private:
+</a><a href="#h3-2-5" id="h3-2-5" class="i">+    IndexKey(const IndexKey&amp;);
+</a><a href="#h3-2-6" id="h3-2-6" class="i">+    void operator=(const IndexKey&amp;);
+</a> };
+ 
+ shared_ptr&lt;IndexKey&gt; indexRE(const re2::RE2 &amp;pat);
+<b>diff --git a/<a id="h4" href="../file/test/index">test/index</a> b/<a href="../file/test/index">test/index</a></b>
+<a href="#h4-0" id="h4-0" class="h">@@ -0,0 +1,8 @@
+</a><a href="#h4-0-0" id="h4-0-0" class="i">+([a-e]:)|[g-k]
+</a><a href="#h4-0-1" id="h4-0-1" class="i">+([a-e0-9]:)|[g-kw-z]
+</a><a href="#h4-0-2" id="h4-0-2" class="i">+([a-e]:)|[a-e]
+</a><a href="#h4-0-3" id="h4-0-3" class="i">+([a-e]:)|[d-g]
+</a><a href="#h4-0-4" id="h4-0-4" class="i">+([a-e]:)|([d-g];)
+</a><a href="#h4-0-5" id="h4-0-5" class="i">+([a-ei-lz]:)|([d-gl-oy];)
+</a><a href="#h4-0-6" id="h4-0-6" class="i">+\s[0-9a-f]
+</a><a href="#h4-0-7" id="h4-0-7" class="i">+[a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k][a-bd-eg-hj-k]
+</a></pre>
+</div>
+</body>
+</html>

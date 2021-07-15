@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Actually reify the concept of a repo/ref in the index. - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/22e835df51cbb6594fba7deef5e3c38faa646855">22e835df51cbb6594fba7deef5e3c38faa646855</a>
+<b>parent</b> <a href="../commit/71849224eb2e6ca0e26d0d4bc9548fef0982390d">71849224eb2e6ca0e26d0d4bc9548fef0982390d</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Fri,  7 Mar 2014 09:26:57 -0800
+
+Actually reify the concept of a repo/ref in the index.
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">src/codesearch.cc</a></td><td> | </td><td class="num">42</td><td><span class="i">+++++++++++++++++++++++</span><span class="d">-------------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">src/codesearch.h</a></td><td> | </td><td class="num">18</td><td><span class="i">+++++++++++++</span><span class="d">-----</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">src/dump_load.cc</a></td><td> | </td><td class="num">51</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++</span><span class="d">---------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">src/dump_load.h</a></td><td> | </td><td class="num">5</td><td><span class="i">++++</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h4">src/git_indexer.cc</a></td><td> | </td><td class="num">6</td><td><span class="i">++++</span><span class="d">--</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h5">src/git_indexer.h</a></td><td> | </td><td class="num">4</td><td><span class="i">++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h6">src/tools/interface.cc</a></td><td> | </td><td class="num">5</td><td><span class="i">+++</span><span class="d">--</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h7">src/tools/json_interface.cc</a></td><td> | </td><td class="num">12</td><td><span class="i">++</span><span class="d">----------</span></td></tr>
+</table></pre><pre>8 files changed, 95 insertions(+), 48 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/src/codesearch.cc">src/codesearch.cc</a> b/<a href="../file/src/codesearch.cc">src/codesearch.cc</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -174,7 +174,8 @@ protected:
+</a>                                            RE2::UNANCHORED, 0, 0))
+             return false;
+ 
+<a href="#h0-0-3" id="h0-0-3" class="d">-        if (tree_pat_ &amp;&amp; !tree_pat_-&gt;Match(path.tree-&gt;name, 0, path.tree-&gt;name.size(),
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+        if (tree_pat_ &amp;&amp; !tree_pat_-&gt;Match(path.tree-&gt;repo-&gt;name, 0,
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+                                           path.tree-&gt;repo-&gt;name.size(),
+</a>                                            RE2::UNANCHORED, 0, 0))
+             return false;
+ 
+<a href="#h0-1" id="h0-1" class="h">@@ -384,11 +385,28 @@ void code_searcher::finalize() {
+</a> vector&lt;string&gt; code_searcher::tree_names() const {
+     vector&lt;string&gt; out;
+     for (auto it = trees_.begin(); it != trees_.end(); ++it)
+<a href="#h0-1-3" id="h0-1-3" class="d">-        out.push_back((*it)-&gt;name);
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+        out.push_back((*it)-&gt;repo-&gt;name + &quot;:&quot; + (*it)-&gt;revision);
+</a>     return out;
+ }
+ 
+<a href="#h0-1-8" id="h0-1-8" class="d">-void code_searcher::index_file(const string&amp; tree_name,
+</a><a href="#h0-1-9" id="h0-1-9" class="i">+const indexed_repo* code_searcher::open_repo(const string &amp;name, json_object *metadata) {
+</a><a href="#h0-1-10" id="h0-1-10" class="i">+    indexed_repo *repo = new indexed_repo;
+</a><a href="#h0-1-11" id="h0-1-11" class="i">+    repo-&gt;name = name;
+</a><a href="#h0-1-12" id="h0-1-12" class="i">+    repo-&gt;metadata = metadata;
+</a><a href="#h0-1-13" id="h0-1-13" class="i">+    repos_.push_back(repo);
+</a><a href="#h0-1-14" id="h0-1-14" class="i">+    return repo;
+</a><a href="#h0-1-15" id="h0-1-15" class="i">+}
+</a><a href="#h0-1-16" id="h0-1-16" class="i">+
+</a><a href="#h0-1-17" id="h0-1-17" class="i">+const indexed_tree* code_searcher::open_revision(const indexed_repo *repo,
+</a><a href="#h0-1-18" id="h0-1-18" class="i">+                                                 const string &amp;rev) {
+</a><a href="#h0-1-19" id="h0-1-19" class="i">+    indexed_tree *tree = new indexed_tree;
+</a><a href="#h0-1-20" id="h0-1-20" class="i">+    tree-&gt;repo = repo;
+</a><a href="#h0-1-21" id="h0-1-21" class="i">+    tree-&gt;revision = rev;
+</a><a href="#h0-1-22" id="h0-1-22" class="i">+    trees_.push_back(tree);
+</a><a href="#h0-1-23" id="h0-1-23" class="i">+    return tree;
+</a><a href="#h0-1-24" id="h0-1-24" class="i">+}
+</a><a href="#h0-1-25" id="h0-1-25" class="i">+
+</a><a href="#h0-1-26" id="h0-1-26" class="i">+void code_searcher::index_file(const indexed_tree *tree,
+</a>                                const string&amp; path,
+                                StringPiece contents) {
+     assert(!finalized_);
+<a href="#h0-2" id="h0-2" class="h">@@ -403,20 +421,6 @@ void code_searcher::index_file(const string&amp; tree_name,
+</a>     if (memchr(p, 0, len) != NULL)
+         return;
+ 
+<a href="#h0-2-3" id="h0-2-3" class="d">-    indexed_tree *tree;
+</a><a href="#h0-2-4" id="h0-2-4" class="d">-    {
+</a><a href="#h0-2-5" id="h0-2-5" class="d">-        auto it = tree_map_.find(tree_name);
+</a><a href="#h0-2-6" id="h0-2-6" class="d">-        if (it == tree_map_.end()) {
+</a><a href="#h0-2-7" id="h0-2-7" class="d">-            tree = new indexed_tree;
+</a><a href="#h0-2-8" id="h0-2-8" class="d">-            tree-&gt;name = tree_name;
+</a><a href="#h0-2-9" id="h0-2-9" class="d">-            tree-&gt;id = trees_.size();
+</a><a href="#h0-2-10" id="h0-2-10" class="d">-            trees_.push_back(tree);
+</a><a href="#h0-2-11" id="h0-2-11" class="d">-            tree_map_[tree_name] = tree;
+</a><a href="#h0-2-12" id="h0-2-12" class="d">-        } else {
+</a><a href="#h0-2-13" id="h0-2-13" class="d">-            tree = it-&gt;second;
+</a><a href="#h0-2-14" id="h0-2-14" class="d">-        }
+</a><a href="#h0-2-15" id="h0-2-15" class="d">-    }
+</a><a href="#h0-2-16" id="h0-2-16" class="d">-
+</a>     stats_.bytes += len;
+     stats_.files++;
+ 
+<a href="#h0-3" id="h0-3" class="h">@@ -473,8 +477,8 @@ void code_searcher::index_file(const string&amp; tree_name,
+</a> 
+     sf-&gt;content = content.build(alloc_);
+     if (sf-&gt;content == 0) {
+<a href="#h0-3-3" id="h0-3-3" class="d">-        fprintf(stderr, &quot;WARN: %s:%s is too large to be indexed.\n&quot;,
+</a><a href="#h0-3-4" id="h0-3-4" class="d">-                tree_name.c_str(), path.c_str());
+</a><a href="#h0-3-5" id="h0-3-5" class="i">+        fprintf(stderr, &quot;WARN: %s:%s:%s is too large to be indexed.\n&quot;,
+</a><a href="#h0-3-6" id="h0-3-6" class="i">+                tree-&gt;repo-&gt;name.c_str(), tree-&gt;revision.c_str(), path.c_str());
+</a>         file_contents_builder dummy;
+         sf-&gt;content = dummy.build(alloc_);
+     }
+<b>diff --git a/<a id="h1" href="../file/src/codesearch.h">src/codesearch.h</a> b/<a href="../file/src/codesearch.h">src/codesearch.h</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -101,14 +101,20 @@ struct index_stats {
+</a> 
+ struct chunk;
+ struct chunk_file;
+<a href="#h1-0-3" id="h1-0-3" class="i">+struct json_object;
+</a> 
+<a href="#h1-0-5" id="h1-0-5" class="d">-struct indexed_tree {
+</a><a href="#h1-0-6" id="h1-0-6" class="i">+struct indexed_repo {
+</a>     string name;
+<a href="#h1-0-8" id="h1-0-8" class="d">-    int id;
+</a><a href="#h1-0-9" id="h1-0-9" class="i">+    json_object *metadata;
+</a><a href="#h1-0-10" id="h1-0-10" class="i">+};
+</a><a href="#h1-0-11" id="h1-0-11" class="i">+
+</a><a href="#h1-0-12" id="h1-0-12" class="i">+struct indexed_tree {
+</a><a href="#h1-0-13" id="h1-0-13" class="i">+    const indexed_repo *repo;
+</a><a href="#h1-0-14" id="h1-0-14" class="i">+    string revision;
+</a> };
+ 
+ struct indexed_path {
+<a href="#h1-0-18" id="h1-0-18" class="d">-    indexed_tree *tree;
+</a><a href="#h1-0-19" id="h1-0-19" class="i">+    const indexed_tree *tree;
+</a>     string path;
+ };
+ 
+<a href="#h1-1" id="h1-1" class="h">@@ -141,7 +147,9 @@ public:
+</a>     void dump_index(const string&amp; path);
+     void load_index(const string&amp; path);
+ 
+<a href="#h1-1-3" id="h1-1-3" class="d">-    void index_file(const string&amp; tree,
+</a><a href="#h1-1-4" id="h1-1-4" class="i">+    const indexed_repo *open_repo(const string &amp;name, json_object *meta);
+</a><a href="#h1-1-5" id="h1-1-5" class="i">+    const indexed_tree *open_revision(const indexed_repo *repo, const string&amp; rev);
+</a><a href="#h1-1-6" id="h1-1-6" class="i">+    void index_file(const indexed_tree *tree,
+</a>                     const string&amp; path,
+                     StringPiece contents);
+     void finalize();
+<a href="#h1-2" id="h1-2" class="h">@@ -192,8 +200,8 @@ protected:
+</a>     index_stats stats_;
+     chunk_allocator *alloc_;
+     bool finalized_;
+<a href="#h1-2-3" id="h1-2-3" class="i">+    vector&lt;indexed_repo*&gt; repos_;
+</a>     vector&lt;indexed_tree*&gt; trees_;
+<a href="#h1-2-5" id="h1-2-5" class="d">-    map&lt;string, indexed_tree*&gt; tree_map_;
+</a>     vector&lt;indexed_file*&gt; files_;
+     google::sparse_hash_map&lt;sha1_buf, indexed_file*, hash_sha1&gt; file_map_;
+ 
+<b>diff --git a/<a id="h2" href="../file/src/dump_load.cc">src/dump_load.cc</a> b/<a href="../file/src/dump_load.cc">src/dump_load.cc</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -20,6 +20,8 @@
+</a> #include &lt;sys/stat.h&gt;
+ #include &lt;unistd.h&gt;
+ 
+<a href="#h2-0-3" id="h2-0-3" class="i">+#include &lt;json/json.h&gt;
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+
+</a> class codesearch_index {
+ public:
+     codesearch_index(code_searcher *cs, string path) :
+<a href="#h2-1" id="h2-1" class="h">@@ -43,7 +45,7 @@ public:
+</a> protected:
+     void dump_chunk_data();
+     void dump_metadata();
+<a href="#h2-1-3" id="h2-1-3" class="d">-    void dump_file(indexed_file *);
+</a><a href="#h2-1-4" id="h2-1-4" class="i">+    void dump_file(map&lt;const indexed_tree*, int&gt;&amp; ids, indexed_file *sf);
+</a>     void dump_chunk_file(chunk_file *cf);
+     void dump_chunk_files(chunk *, chunk_header *);
+     void dump_chunk_data(chunk *);
+<a href="#h2-2" id="h2-2" class="h">@@ -234,11 +236,11 @@ chunk_allocator *make_dump_allocator(code_searcher *search, const string&amp; path) 
+</a>     return new dump_allocator(search, path.c_str());
+ }
+ 
+<a href="#h2-2-3" id="h2-2-3" class="d">-void codesearch_index::dump_file(indexed_file *sf) {
+</a><a href="#h2-2-4" id="h2-2-4" class="i">+void codesearch_index::dump_file(map&lt;const indexed_tree*, int&gt;&amp; ids, indexed_file *sf) {
+</a>     dump(&amp;sf-&gt;hash);
+     dump_int32(sf-&gt;paths.size());
+     for (auto it = sf-&gt;paths.begin(); it != sf-&gt;paths.end(); ++it) {
+<a href="#h2-2-8" id="h2-2-8" class="d">-        dump_int32(it-&gt;tree-&gt;id);
+</a><a href="#h2-2-9" id="h2-2-9" class="i">+        dump_int32(ids[it-&gt;tree]);
+</a>         dump_string(it-&gt;path.c_str());
+     }
+ }
+<a href="#h2-3" id="h2-3" class="h">@@ -280,20 +282,36 @@ void codesearch_index::dump_chunk_data(chunk *chunk) {
+</a> }
+ 
+ void codesearch_index::dump_metadata() {
+<a href="#h2-3-3" id="h2-3-3" class="i">+    hdr_.nrepos   = cs_-&gt;repos_.size();
+</a>     hdr_.ntrees   = cs_-&gt;trees_.size();
+     hdr_.nfiles   = cs_-&gt;files_.size();
+     hdr_.nchunks  = cs_-&gt;alloc_-&gt;size();
+     hdr_.ncontent = content_.size();
+ 
+<a href="#h2-3-9" id="h2-3-9" class="i">+    map&lt;const indexed_repo*, int&gt; repo_ids;
+</a><a href="#h2-3-10" id="h2-3-10" class="i">+    map&lt;const indexed_tree*, int&gt; tree_ids;
+</a><a href="#h2-3-11" id="h2-3-11" class="i">+
+</a><a href="#h2-3-12" id="h2-3-12" class="i">+    hdr_.repos_off = stream_.tellp();
+</a><a href="#h2-3-13" id="h2-3-13" class="i">+    for (auto it = cs_-&gt;repos_.begin();
+</a><a href="#h2-3-14" id="h2-3-14" class="i">+         it != cs_-&gt;repos_.end(); ++it) {
+</a><a href="#h2-3-15" id="h2-3-15" class="i">+        dump_string((*it)-&gt;name);
+</a><a href="#h2-3-16" id="h2-3-16" class="i">+        if ((*it)-&gt;metadata)
+</a><a href="#h2-3-17" id="h2-3-17" class="i">+            dump_string(json_object_to_json_string((*it)-&gt;metadata));
+</a><a href="#h2-3-18" id="h2-3-18" class="i">+        else
+</a><a href="#h2-3-19" id="h2-3-19" class="i">+            dump_string(&quot;&quot;);
+</a><a href="#h2-3-20" id="h2-3-20" class="i">+        repo_ids[*it] = it - cs_-&gt;repos_.begin();
+</a><a href="#h2-3-21" id="h2-3-21" class="i">+    }
+</a>     hdr_.refs_off = stream_.tellp();
+     for (auto it = cs_-&gt;trees_.begin();
+<a href="#h2-3-24" id="h2-3-24" class="d">-         it != cs_-&gt;trees_.end(); ++it)
+</a><a href="#h2-3-25" id="h2-3-25" class="d">-        dump_string((*it)-&gt;name);
+</a><a href="#h2-3-26" id="h2-3-26" class="d">-
+</a><a href="#h2-3-27" id="h2-3-27" class="i">+         it != cs_-&gt;trees_.end(); ++it) {
+</a><a href="#h2-3-28" id="h2-3-28" class="i">+        dump_int32(repo_ids[(*it)-&gt;repo]);
+</a><a href="#h2-3-29" id="h2-3-29" class="i">+        dump_string((*it)-&gt;revision);
+</a><a href="#h2-3-30" id="h2-3-30" class="i">+        tree_ids[*it] = it - cs_-&gt;trees_.begin();
+</a><a href="#h2-3-31" id="h2-3-31" class="i">+    }
+</a>     hdr_.files_off = stream_.tellp();
+     for (vector&lt;indexed_file*&gt;::iterator it = cs_-&gt;files_.begin();
+          it != cs_-&gt;files_.end(); ++it)
+<a href="#h2-3-35" id="h2-3-35" class="d">-        dump_file(*it);
+</a><a href="#h2-3-36" id="h2-3-36" class="i">+        dump_file(tree_ids, *it);
+</a> 
+     auto hdr = chunks_.begin();
+     for (auto it = cs_-&gt;alloc_-&gt;begin();
+<a href="#h2-4" id="h2-4" class="h">@@ -413,11 +431,26 @@ void load_allocator::load(code_searcher *cs) {
+</a> 
+     set_chunk_size(hdr_-&gt;chunk_size);
+ 
+<a href="#h2-4-3" id="h2-4-3" class="i">+    p_ = ptr&lt;uint8_t&gt;(hdr_-&gt;repos_off);
+</a><a href="#h2-4-4" id="h2-4-4" class="i">+    for (int i = 0; i &lt; hdr_-&gt;nrepos; i++) {
+</a><a href="#h2-4-5" id="h2-4-5" class="i">+        indexed_repo *repo = new indexed_repo;
+</a><a href="#h2-4-6" id="h2-4-6" class="i">+        repo-&gt;name = load_string();
+</a><a href="#h2-4-7" id="h2-4-7" class="i">+        string metadata = load_string();
+</a><a href="#h2-4-8" id="h2-4-8" class="i">+        if (metadata.size() == 0) {
+</a><a href="#h2-4-9" id="h2-4-9" class="i">+            repo-&gt;metadata = NULL;
+</a><a href="#h2-4-10" id="h2-4-10" class="i">+        } else {
+</a><a href="#h2-4-11" id="h2-4-11" class="i">+            json_object *js = json_tokener_parse(metadata.c_str());
+</a><a href="#h2-4-12" id="h2-4-12" class="i">+            assert(!is_error(js));
+</a><a href="#h2-4-13" id="h2-4-13" class="i">+            repo-&gt;metadata = js;
+</a><a href="#h2-4-14" id="h2-4-14" class="i">+        }
+</a><a href="#h2-4-15" id="h2-4-15" class="i">+        cs-&gt;repos_.push_back(repo);
+</a><a href="#h2-4-16" id="h2-4-16" class="i">+    }
+</a><a href="#h2-4-17" id="h2-4-17" class="i">+
+</a>     p_ = ptr&lt;uint8_t&gt;(hdr_-&gt;refs_off);
+     for (int i = 0; i &lt; hdr_-&gt;ntrees; i++) {
+         indexed_tree *tree = new indexed_tree;
+<a href="#h2-4-21" id="h2-4-21" class="d">-        tree-&gt;name = load_string();
+</a><a href="#h2-4-22" id="h2-4-22" class="d">-        tree-&gt;id = i;
+</a><a href="#h2-4-23" id="h2-4-23" class="i">+        tree-&gt;repo = cs-&gt;repos_[load_int32()];
+</a><a href="#h2-4-24" id="h2-4-24" class="i">+        tree-&gt;revision = load_string();
+</a>         cs-&gt;trees_.push_back(tree);
+     }
+ 
+<b>diff --git a/<a id="h3" href="../file/src/dump_load.h">src/dump_load.h</a> b/<a href="../file/src/dump_load.h">src/dump_load.h</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -9,7 +9,7 @@
+</a> #define CODESEARCH_DUMP_LOAD_H
+ 
+ const uint32_t kIndexMagic   = 0xc0d35eac;
+<a href="#h3-0-3" id="h3-0-3" class="d">-const uint32_t kIndexVersion = 10;
+</a><a href="#h3-0-4" id="h3-0-4" class="i">+const uint32_t kIndexVersion = 11;
+</a> const uint32_t kPageSize     = (1 &lt;&lt; 12);
+ 
+ struct index_header {
+<a href="#h3-1" id="h3-1" class="h">@@ -17,6 +17,9 @@ struct index_header {
+</a>     uint32_t version;
+     uint32_t chunk_size;
+ 
+<a href="#h3-1-3" id="h3-1-3" class="i">+    uint32_t nrepos;
+</a><a href="#h3-1-4" id="h3-1-4" class="i">+    uint64_t repos_off;
+</a><a href="#h3-1-5" id="h3-1-5" class="i">+
+</a>     uint32_t ntrees;
+     uint64_t refs_off;
+ 
+<b>diff --git a/<a id="h4" href="../file/src/git_indexer.cc">src/git_indexer.cc</a> b/<a href="../file/src/git_indexer.cc">src/git_indexer.cc</a></b>
+<a href="#h4-0" id="h4-0" class="h">@@ -16,6 +16,7 @@ git_indexer::git_indexer(code_searcher *cs,
+</a>     : cs_(cs), repo_(0), name_(name) {
+     git_repository_open(&amp;repo_, repopath.c_str());
+     assert(repo_);
+<a href="#h4-0-3" id="h4-0-3" class="i">+    idx_repo_ = cs_-&gt;open_repo(name, 0);
+</a> }
+ 
+ git_indexer::~git_indexer() {
+<a href="#h4-1" id="h4-1" class="h">@@ -34,6 +35,7 @@ void git_indexer::walk(const string&amp; ref) {
+</a>     if (name_.size())
+         name = name_ + &quot;:&quot; + name;
+ 
+<a href="#h4-1-3" id="h4-1-3" class="i">+    idx_tree_ = cs_-&gt;open_revision(idx_repo_, ref);
+</a>     walk_root(name, tree);
+ }
+ 
+<a href="#h4-2" id="h4-2" class="h">@@ -68,7 +70,7 @@ void git_indexer::walk_root(const string&amp; ref, git_tree *tree) {
+</a>             walk_tree(ref, path + &quot;/&quot;, obj);
+         } else if (git_tree_entry_type(*it) == GIT_OBJ_BLOB) {
+             const char *data = static_cast&lt;const char*&gt;(git_blob_rawcontent(obj));
+<a href="#h4-2-3" id="h4-2-3" class="d">-            cs_-&gt;index_file(ref, path, StringPiece(data, git_blob_rawsize(obj)));
+</a><a href="#h4-2-4" id="h4-2-4" class="i">+            cs_-&gt;index_file(idx_tree_, path, StringPiece(data, git_blob_rawsize(obj)));
+</a>         }
+     }
+ }
+<a href="#h4-3" id="h4-3" class="h">@@ -88,7 +90,7 @@ void git_indexer::walk_tree(const string&amp; ref,
+</a>             walk_tree(ref, path + &quot;/&quot;, obj);
+         } else if (git_tree_entry_type(ent) == GIT_OBJ_BLOB) {
+             const char *data = static_cast&lt;const char*&gt;(git_blob_rawcontent(obj));
+<a href="#h4-3-3" id="h4-3-3" class="d">-            cs_-&gt;index_file(ref, path, StringPiece(data, git_blob_rawsize(obj)));
+</a><a href="#h4-3-4" id="h4-3-4" class="i">+            cs_-&gt;index_file(idx_tree_, path, StringPiece(data, git_blob_rawsize(obj)));
+</a>         }
+     }
+ }
+<b>diff --git a/<a id="h5" href="../file/src/git_indexer.h">src/git_indexer.h</a> b/<a href="../file/src/git_indexer.h">src/git_indexer.h</a></b>
+<a href="#h5-0" id="h5-0" class="h">@@ -13,6 +13,8 @@
+</a> class code_searcher;
+ class git_repository;
+ class git_tree;
+<a href="#h5-0-3" id="h5-0-3" class="i">+struct indexed_repo;
+</a><a href="#h5-0-4" id="h5-0-4" class="i">+struct indexed_tree;
+</a> 
+ class git_indexer {
+ public:
+<a href="#h5-1" id="h5-1" class="h">@@ -28,6 +30,8 @@ protected:
+</a> 
+     code_searcher *cs_;
+     git_repository *repo_;
+<a href="#h5-1-3" id="h5-1-3" class="i">+    const indexed_repo *idx_repo_;
+</a><a href="#h5-1-4" id="h5-1-4" class="i">+    const indexed_tree *idx_tree_;
+</a>     std::string name_;
+ };
+ 
+<b>diff --git a/<a id="h6" href="../file/src/tools/interface.cc">src/tools/interface.cc</a> b/<a href="../file/src/tools/interface.cc">src/tools/interface.cc</a></b>
+<a href="#h6-0" id="h6-0" class="h">@@ -29,8 +29,9 @@ public:
+</a>              ctx != m-&gt;context.end(); ++ctx) {
+             for (auto it = ctx-&gt;paths.begin(); it != ctx-&gt;paths.end(); ++it) {
+                 fprintf(out_,
+<a href="#h6-0-3" id="h6-0-3" class="d">-                        &quot;%s:%s:%d:%d-%d: %.*s\n&quot;,
+</a><a href="#h6-0-4" id="h6-0-4" class="d">-                        it-&gt;tree-&gt;name.c_str(),
+</a><a href="#h6-0-5" id="h6-0-5" class="i">+                        &quot;%s:%s:%s:%d:%d-%d: %.*s\n&quot;,
+</a><a href="#h6-0-6" id="h6-0-6" class="i">+                        it-&gt;tree-&gt;repo-&gt;name.c_str(),
+</a><a href="#h6-0-7" id="h6-0-7" class="i">+                        it-&gt;tree-&gt;revision.c_str(),
+</a>                         it-&gt;path.c_str(),
+                         ctx-&gt;lno,
+                         m-&gt;matchleft, m-&gt;matchright,
+<b>diff --git a/<a id="h7" href="../file/src/tools/json_interface.cc">src/tools/json_interface.cc</a> b/<a href="../file/src/tools/json_interface.cc">src/tools/json_interface.cc</a></b>
+<a href="#h7-0" id="h7-0" class="h">@@ -25,7 +25,8 @@ json_object *to_json(int i) {
+</a> 
+ static json_object *to_json(const indexed_path &amp;path) {
+     json_object *out = json_object_new_object();
+<a href="#h7-0-3" id="h7-0-3" class="d">-    json_object_object_add(out, &quot;ref&quot;,  to_json(path.tree-&gt;name));
+</a><a href="#h7-0-4" id="h7-0-4" class="i">+    std::string name = path.tree-&gt;repo-&gt;name + &quot;:&quot; + path.tree-&gt;revision;
+</a><a href="#h7-0-5" id="h7-0-5" class="i">+    json_object_object_add(out, &quot;ref&quot;,  to_json(name));
+</a>     json_object_object_add(out, &quot;path&quot;, to_json(path.path));
+     return out;
+ }
+<a href="#h7-1" id="h7-1" class="h">@@ -55,10 +56,6 @@ public:
+</a> 
+     virtual void print_match(const match_result *m) {
+         json_object *obj = json_object_new_object();
+<a href="#h7-1-3" id="h7-1-3" class="d">-        json_object_object_add(obj, &quot;ref&quot;,
+</a><a href="#h7-1-4" id="h7-1-4" class="d">-                               to_json(m-&gt;context[0].paths[0].tree-&gt;name));
+</a><a href="#h7-1-5" id="h7-1-5" class="d">-        json_object_object_add(obj, &quot;file&quot;,
+</a><a href="#h7-1-6" id="h7-1-6" class="d">-                               to_json(m-&gt;context[0].paths[0].path));
+</a>         json_object *contexts = json_object_new_array();
+         for (auto ctx = m-&gt;context.begin();
+              ctx != m-&gt;context.end(); ++ctx) {
+<a href="#h7-2" id="h7-2" class="h">@@ -72,16 +69,11 @@ public:
+</a>             json_object_array_add(contexts, jctx);
+         }
+         json_object_object_add(obj, &quot;contexts&quot;, contexts);
+<a href="#h7-2-3" id="h7-2-3" class="d">-        json_object_object_add(obj, &quot;lno&quot;,  json_object_new_int(m-&gt;context[0].lno));
+</a>         json_object *bounds = json_object_new_array();
+         json_object_array_add(bounds, to_json(m-&gt;matchleft));
+         json_object_array_add(bounds, to_json(m-&gt;matchright));
+         json_object_object_add(obj, &quot;bounds&quot;, bounds);
+         json_object_object_add(obj, &quot;line&quot;, to_json(m-&gt;line));
+<a href="#h7-2-9" id="h7-2-9" class="d">-        json_object_object_add(obj, &quot;context_before&quot;,
+</a><a href="#h7-2-10" id="h7-2-10" class="d">-                               to_json(m-&gt;context[0].context_before));
+</a><a href="#h7-2-11" id="h7-2-11" class="d">-        json_object_object_add(obj, &quot;context_after&quot;,
+</a><a href="#h7-2-12" id="h7-2-12" class="d">-                               to_json(m-&gt;context[0].context_after));
+</a>         fprintf(out_, &quot;%s\n&quot;, json_object_to_json_string(obj));
+         json_object_put(obj);
+     }
+</pre>
+</div>
+</body>
+</html>

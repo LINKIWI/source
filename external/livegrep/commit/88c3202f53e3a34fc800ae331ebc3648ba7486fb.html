@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Introduce some generic debug infrastructure, and port index debugging to it. - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/88c3202f53e3a34fc800ae331ebc3648ba7486fb">88c3202f53e3a34fc800ae331ebc3648ba7486fb</a>
+<b>parent</b> <a href="../commit/8d694f7c3e6c929941f8b4e4442f24a3b8a95b2a">8d694f7c3e6c929941f8b4e4442f24a3b8a95b2a</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Sat, 21 Jul 2012 14:21:30 -0400
+
+Introduce some generic debug infrastructure, and port index debugging to it.
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">Makefile</a></td><td> | </td><td class="num">6</td><td><span class="i">++</span><span class="d">----</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">codesearch.cc</a></td><td> | </td><td class="num">4</td><td><span class="i"></span><span class="d">----</span></td></tr>
+<tr><td class="A">A</td><td><a href="#h2">debug.cc</a></td><td> | </td><td class="num">88</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="A">A</td><td><a href="#h3">debug.h</a></td><td> | </td><td class="num">21</td><td><span class="i">+++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h4">indexer.cc</a></td><td> | </td><td class="num">50</td><td><span class="i">+++++++++++++++++</span><span class="d">---------------------------------</span></td></tr>
+</table></pre><pre>5 files changed, 128 insertions(+), 41 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/Makefile">Makefile</a> b/<a href="../file/Makefile">Makefile</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -19,9 +19,6 @@ endif
+</a> ifneq ($(densehash),)
+ override CXXFLAGS+=-DUSE_DENSE_HASH_SET
+ endif
+<a href="#h0-0-3" id="h0-0-3" class="d">-ifneq ($(profile),)
+</a><a href="#h0-0-4" id="h0-0-4" class="d">-override CXXFLAGS+=-DPROFILE_CODESEARCH
+</a><a href="#h0-0-5" id="h0-0-5" class="d">-endif
+</a> ifneq ($(slowgtod),)
+ override CXXFLAGS+=-DCODESEARCH_SLOWGTOD
+ endif
+<a href="#h0-1" id="h0-1" class="h">@@ -31,7 +28,8 @@ endif
+</a> 
+ OBJECTS = codesearch.o main.o chunk.o \
+           chunk_allocator.o radix_sort.o \
+<a href="#h0-1-3" id="h0-1-3" class="d">-          dump_load.o indexer.o re_width.o
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+          dump_load.o indexer.o re_width.o \
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+          debug.o
+</a> DEPFILES = $(OBJECTS:%.o=.%.d)
+ 
+ all: codesearch $(DEPFILES)
+<b>diff --git a/<a id="h1" href="../file/codesearch.cc">codesearch.cc</a> b/<a href="../file/codesearch.cc">codesearch.cc</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -38,15 +38,11 @@ const size_t kMinSkip = 250;
+</a> const int kMinFilterRatio = 50;
+ const int kMaxScan        = (1 &lt;&lt; 20);
+ 
+<a href="#h1-0-3" id="h1-0-3" class="d">-#ifdef PROFILE_CODESEARCH
+</a> DEFINE_bool(debug_search, false, &quot;Produce debugging output about the search process&quot;);
+ #define log_profile(format, ...) do {                   \
+         if (FLAGS_debug_search)                         \
+             fprintf(stderr, format, ## __VA_ARGS__);    \
+     } while(0)
+<a href="#h1-0-9" id="h1-0-9" class="d">-#else
+</a><a href="#h1-0-10" id="h1-0-10" class="d">-#define log_profile(...)
+</a><a href="#h1-0-11" id="h1-0-11" class="d">-#endif
+</a> 
+ DEFINE_bool(index, true, &quot;Create a suffix-array index to speed searches.&quot;);
+ DEFINE_bool(drop_cache, false, &quot;Drop caches before each search&quot;);
+<b>diff --git a/<a id="h2" href="../file/debug.cc">debug.cc</a> b/<a href="../file/debug.cc">debug.cc</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -0,0 +1,88 @@
+</a><a href="#h2-0-0" id="h2-0-0" class="i">+#include &quot;debug.h&quot;
+</a><a href="#h2-0-1" id="h2-0-1" class="i">+
+</a><a href="#h2-0-2" id="h2-0-2" class="i">+#include &lt;gflags/gflags.h&gt;
+</a><a href="#h2-0-3" id="h2-0-3" class="i">+
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+#include &lt;string&gt;
+</a><a href="#h2-0-5" id="h2-0-5" class="i">+#include &lt;stdlib.h&gt;
+</a><a href="#h2-0-6" id="h2-0-6" class="i">+#include &lt;stdarg.h&gt;
+</a><a href="#h2-0-7" id="h2-0-7" class="i">+#include &lt;stdio.h&gt;
+</a><a href="#h2-0-8" id="h2-0-8" class="i">+#include &lt;assert.h&gt;
+</a><a href="#h2-0-9" id="h2-0-9" class="i">+
+</a><a href="#h2-0-10" id="h2-0-10" class="i">+using std::string;
+</a><a href="#h2-0-11" id="h2-0-11" class="i">+
+</a><a href="#h2-0-12" id="h2-0-12" class="i">+debug_mode debug_enabled;
+</a><a href="#h2-0-13" id="h2-0-13" class="i">+
+</a><a href="#h2-0-14" id="h2-0-14" class="i">+DEFINE_string(debug, &quot;&quot;, &quot;Enable debugging for selected subsystems&quot;);
+</a><a href="#h2-0-15" id="h2-0-15" class="i">+
+</a><a href="#h2-0-16" id="h2-0-16" class="i">+struct debug_flag {
+</a><a href="#h2-0-17" id="h2-0-17" class="i">+    const char *flag;
+</a><a href="#h2-0-18" id="h2-0-18" class="i">+    debug_mode bits;
+</a><a href="#h2-0-19" id="h2-0-19" class="i">+} debug_flags[] = {
+</a><a href="#h2-0-20" id="h2-0-20" class="i">+    {&quot;search&quot;,    kDebugSearch},
+</a><a href="#h2-0-21" id="h2-0-21" class="i">+    {&quot;profile&quot;,   kDebugProfile},
+</a><a href="#h2-0-22" id="h2-0-22" class="i">+    {&quot;index&quot;,     kDebugIndex},
+</a><a href="#h2-0-23" id="h2-0-23" class="i">+    {&quot;indexall&quot;,  kDebugIndexAll},
+</a><a href="#h2-0-24" id="h2-0-24" class="i">+    {&quot;all&quot;,       (debug_mode)-1}
+</a><a href="#h2-0-25" id="h2-0-25" class="i">+};
+</a><a href="#h2-0-26" id="h2-0-26" class="i">+
+</a><a href="#h2-0-27" id="h2-0-27" class="i">+static bool validate_debug(const char *flagname, const string&amp; value) {
+</a><a href="#h2-0-28" id="h2-0-28" class="i">+    off_t off = 0;
+</a><a href="#h2-0-29" id="h2-0-29" class="i">+    while (off &lt; value.size()) {
+</a><a href="#h2-0-30" id="h2-0-30" class="i">+        string opt;
+</a><a href="#h2-0-31" id="h2-0-31" class="i">+        off_t comma = value.find(&#39;,&#39;, off);
+</a><a href="#h2-0-32" id="h2-0-32" class="i">+        if (comma == string::npos)
+</a><a href="#h2-0-33" id="h2-0-33" class="i">+            comma = value.size();
+</a><a href="#h2-0-34" id="h2-0-34" class="i">+        opt = value.substr(off, comma - off);
+</a><a href="#h2-0-35" id="h2-0-35" class="i">+        off = comma + 1;
+</a><a href="#h2-0-36" id="h2-0-36" class="i">+
+</a><a href="#h2-0-37" id="h2-0-37" class="i">+        bool found = false;
+</a><a href="#h2-0-38" id="h2-0-38" class="i">+        for (int i = 0; i &lt; sizeof(debug_flags)/sizeof(*debug_flags); ++i) {
+</a><a href="#h2-0-39" id="h2-0-39" class="i">+            if (opt == debug_flags[i].flag) {
+</a><a href="#h2-0-40" id="h2-0-40" class="i">+                found = true;
+</a><a href="#h2-0-41" id="h2-0-41" class="i">+                debug_enabled = static_cast&lt;debug_mode&gt;(debug_enabled | debug_flags[i].bits);
+</a><a href="#h2-0-42" id="h2-0-42" class="i">+                break;
+</a><a href="#h2-0-43" id="h2-0-43" class="i">+            }
+</a><a href="#h2-0-44" id="h2-0-44" class="i">+        }
+</a><a href="#h2-0-45" id="h2-0-45" class="i">+
+</a><a href="#h2-0-46" id="h2-0-46" class="i">+        if (!found) {
+</a><a href="#h2-0-47" id="h2-0-47" class="i">+            return false;
+</a><a href="#h2-0-48" id="h2-0-48" class="i">+        }
+</a><a href="#h2-0-49" id="h2-0-49" class="i">+    }
+</a><a href="#h2-0-50" id="h2-0-50" class="i">+
+</a><a href="#h2-0-51" id="h2-0-51" class="i">+    return true;
+</a><a href="#h2-0-52" id="h2-0-52" class="i">+}
+</a><a href="#h2-0-53" id="h2-0-53" class="i">+
+</a><a href="#h2-0-54" id="h2-0-54" class="i">+static const bool dummy = google::RegisterFlagValidator(&amp;FLAGS_debug,
+</a><a href="#h2-0-55" id="h2-0-55" class="i">+                                                        validate_debug);
+</a><a href="#h2-0-56" id="h2-0-56" class="i">+
+</a><a href="#h2-0-57" id="h2-0-57" class="i">+
+</a><a href="#h2-0-58" id="h2-0-58" class="i">+static string vstrprintf(const char *fmt, va_list ap) {
+</a><a href="#h2-0-59" id="h2-0-59" class="i">+    char *buf = NULL;
+</a><a href="#h2-0-60" id="h2-0-60" class="i">+    assert(vasprintf(&amp;buf, fmt, ap) &gt; 0);
+</a><a href="#h2-0-61" id="h2-0-61" class="i">+
+</a><a href="#h2-0-62" id="h2-0-62" class="i">+    string out = buf;
+</a><a href="#h2-0-63" id="h2-0-63" class="i">+    free(buf);
+</a><a href="#h2-0-64" id="h2-0-64" class="i">+    return out;
+</a><a href="#h2-0-65" id="h2-0-65" class="i">+}
+</a><a href="#h2-0-66" id="h2-0-66" class="i">+
+</a><a href="#h2-0-67" id="h2-0-67" class="i">+static string strprintf(const char *fmt, ...)
+</a><a href="#h2-0-68" id="h2-0-68" class="i">+    __attribute__((format (printf, 1, 2)));
+</a><a href="#h2-0-69" id="h2-0-69" class="i">+
+</a><a href="#h2-0-70" id="h2-0-70" class="i">+static string strprintf(const char *fmt, ...) {
+</a><a href="#h2-0-71" id="h2-0-71" class="i">+    va_list ap;
+</a><a href="#h2-0-72" id="h2-0-72" class="i">+    va_start(ap, fmt);
+</a><a href="#h2-0-73" id="h2-0-73" class="i">+    return vstrprintf(fmt, ap);
+</a><a href="#h2-0-74" id="h2-0-74" class="i">+    va_end(ap);
+</a><a href="#h2-0-75" id="h2-0-75" class="i">+}
+</a><a href="#h2-0-76" id="h2-0-76" class="i">+
+</a><a href="#h2-0-77" id="h2-0-77" class="i">+void cs_debug(const char *file, int lno, const char *fmt, ...) {
+</a><a href="#h2-0-78" id="h2-0-78" class="i">+    va_list ap;
+</a><a href="#h2-0-79" id="h2-0-79" class="i">+    va_start(ap, fmt);
+</a><a href="#h2-0-80" id="h2-0-80" class="i">+
+</a><a href="#h2-0-81" id="h2-0-81" class="i">+    string buf = strprintf(&quot;[%s:%d] %s\n&quot;,
+</a><a href="#h2-0-82" id="h2-0-82" class="i">+                           file, lno, vstrprintf(fmt, ap).c_str());
+</a><a href="#h2-0-83" id="h2-0-83" class="i">+
+</a><a href="#h2-0-84" id="h2-0-84" class="i">+    va_end(ap);
+</a><a href="#h2-0-85" id="h2-0-85" class="i">+
+</a><a href="#h2-0-86" id="h2-0-86" class="i">+    fputs(buf.c_str(), stderr);
+</a><a href="#h2-0-87" id="h2-0-87" class="i">+}
+</a><b>diff --git a/<a id="h3" href="../file/debug.h">debug.h</a> b/<a href="../file/debug.h">debug.h</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -0,0 +1,21 @@
+</a><a href="#h3-0-0" id="h3-0-0" class="i">+#ifndef CODESEARCH_DEBUG_H
+</a><a href="#h3-0-1" id="h3-0-1" class="i">+#define CODESEARCH_DEBUG_H
+</a><a href="#h3-0-2" id="h3-0-2" class="i">+
+</a><a href="#h3-0-3" id="h3-0-3" class="i">+enum debug_mode {
+</a><a href="#h3-0-4" id="h3-0-4" class="i">+    kDebugSearch        = 0x0001,
+</a><a href="#h3-0-5" id="h3-0-5" class="i">+    kDebugProfile       = 0x0002,
+</a><a href="#h3-0-6" id="h3-0-6" class="i">+    kDebugIndex         = 0x0004,
+</a><a href="#h3-0-7" id="h3-0-7" class="i">+    kDebugIndexAll      = 0x0008,
+</a><a href="#h3-0-8" id="h3-0-8" class="i">+};
+</a><a href="#h3-0-9" id="h3-0-9" class="i">+
+</a><a href="#h3-0-10" id="h3-0-10" class="i">+extern debug_mode debug_enabled;
+</a><a href="#h3-0-11" id="h3-0-11" class="i">+
+</a><a href="#h3-0-12" id="h3-0-12" class="i">+#define debug(which, ...) do {                          \
+</a><a href="#h3-0-13" id="h3-0-13" class="i">+    if (debug_enabled &amp; (which))                        \
+</a><a href="#h3-0-14" id="h3-0-14" class="i">+        cs_debug(__FILE__, __LINE__, ##__VA_ARGS__);    \
+</a><a href="#h3-0-15" id="h3-0-15" class="i">+    } while (0)                                         \
+</a><a href="#h3-0-16" id="h3-0-16" class="i">+
+</a><a href="#h3-0-17" id="h3-0-17" class="i">+void cs_debug(const char *file, int lno, const char *fmt, ...)
+</a><a href="#h3-0-18" id="h3-0-18" class="i">+    __attribute__((format (printf, 3, 4)));
+</a><a href="#h3-0-19" id="h3-0-19" class="i">+
+</a><a href="#h3-0-20" id="h3-0-20" class="i">+#endif
+</a><b>diff --git a/<a id="h4" href="../file/indexer.cc">indexer.cc</a> b/<a href="../file/indexer.cc">indexer.cc</a></b>
+<a href="#h4-0" id="h4-0" class="h">@@ -1,5 +1,6 @@
+</a> #include &quot;indexer.h&quot;
+ #include &quot;recursion.h&quot;
+<a href="#h4-0-2" id="h4-0-2" class="i">+#include &quot;debug.h&quot;
+</a> 
+ #include &lt;gflags/gflags.h&gt;
+ 
+<a href="#h4-1" id="h4-1" class="h">@@ -8,25 +9,6 @@
+</a> 
+ #include &lt;stdarg.h&gt;
+ 
+<a href="#h4-1-3" id="h4-1-3" class="d">-DEFINE_int32(debug_index, 0, &quot;Debug the index query generator.&quot;);
+</a><a href="#h4-1-4" id="h4-1-4" class="d">-static void __index_debug(const char *format, ...)
+</a><a href="#h4-1-5" id="h4-1-5" class="d">-    __attribute__((format (printf, 1, 2)));
+</a><a href="#h4-1-6" id="h4-1-6" class="d">-
+</a><a href="#h4-1-7" id="h4-1-7" class="d">-#define debug(lvl, fmt, ...) do {                \
+</a><a href="#h4-1-8" id="h4-1-8" class="d">-        if (FLAGS_debug_index &gt;= lvl)            \
+</a><a href="#h4-1-9" id="h4-1-9" class="d">-            __index_debug(fmt, ## __VA_ARGS__);  \
+</a><a href="#h4-1-10" id="h4-1-10" class="d">-    } while(0)
+</a><a href="#h4-1-11" id="h4-1-11" class="d">-
+</a><a href="#h4-1-12" id="h4-1-12" class="d">-static void __index_debug(const char *format, ...) {
+</a><a href="#h4-1-13" id="h4-1-13" class="d">-    if (!FLAGS_debug_index)
+</a><a href="#h4-1-14" id="h4-1-14" class="d">-        return;
+</a><a href="#h4-1-15" id="h4-1-15" class="d">-    va_list ap;
+</a><a href="#h4-1-16" id="h4-1-16" class="d">-
+</a><a href="#h4-1-17" id="h4-1-17" class="d">-    va_start(ap, format);
+</a><a href="#h4-1-18" id="h4-1-18" class="d">-    vprintf(format, ap);
+</a><a href="#h4-1-19" id="h4-1-19" class="d">-    va_end(ap);
+</a><a href="#h4-1-20" id="h4-1-20" class="d">-}
+</a><a href="#h4-1-21" id="h4-1-21" class="d">-
+</a> using namespace re2;
+ using namespace std;
+ 
+<a href="#h4-2" id="h4-2" class="h">@@ -317,7 +299,8 @@ namespace {
+</a>         assert(lhs);
+         intrusive_ptr&lt;IndexKey&gt; out = lhs;
+ 
+<a href="#h4-2-3" id="h4-2-3" class="d">-        debug(2, &quot;Concat([%s](%ld), [%s](%ld)) = &quot;,
+</a><a href="#h4-2-4" id="h4-2-4" class="i">+        debug(kDebugIndexAll,
+</a><a href="#h4-2-5" id="h4-2-5" class="i">+              &quot;Concat([%s](%ld), [%s](%ld)) = &quot;,
+</a>               lhs ? lhs-&gt;ToString().c_str() : &quot;&quot;,
+               lhs-&gt;nodes(),
+               rhs ? rhs-&gt;ToString().c_str() : &quot;&quot;,
+<a href="#h4-3" id="h4-3" class="h">@@ -329,7 +312,7 @@ namespace {
+</a>             out-&gt;anchor &amp;= ~kAnchorRight;
+         }
+ 
+<a href="#h4-3-3" id="h4-3-3" class="d">-        debug(2, &quot;[%s]\n&quot;, out-&gt;ToString().c_str());
+</a><a href="#h4-3-4" id="h4-3-4" class="i">+        debug(kDebugIndexAll, &quot;[%s]\n&quot;, out-&gt;ToString().c_str());
+</a> 
+         return out;
+     }
+<a href="#h4-4" id="h4-4" class="h">@@ -337,10 +320,10 @@ namespace {
+</a>     IndexKey::Stats TryConcat(intrusive_ptr&lt;IndexKey&gt; *start,
+                               intrusive_ptr&lt;IndexKey&gt; *end) {
+         IndexKey::Stats st = (*start)-&gt;stats();
+<a href="#h4-4-3" id="h4-4-3" class="d">-        debug(4, &quot;TryConcat: Searching suffix of length %d\n&quot;,
+</a><a href="#h4-4-4" id="h4-4-4" class="i">+        debug(kDebugIndexAll, &quot;TryConcat: Searching suffix of length %d\n&quot;,
+</a>               int(end - start));
+         if (!*start || !((*start)-&gt;anchor &amp; kAnchorRight) || (*start)-&gt;empty()) {
+<a href="#h4-4-7" id="h4-4-7" class="d">-            debug(4, &quot;!ConcatRight, returning early.\n&quot;);
+</a><a href="#h4-4-8" id="h4-4-8" class="i">+            debug(kDebugIndexAll, &quot;!ConcatRight, returning early.\n&quot;);
+</a>             return st;
+         }
+         for (intrusive_ptr&lt;IndexKey&gt; *ptr = start + 1; ptr != end; ptr++) {
+<a href="#h4-5" id="h4-5" class="h">@@ -354,7 +337,7 @@ namespace {
+</a>             if (((*ptr)-&gt;anchor &amp; (kAnchorRepeat|kAnchorRight)) != kAnchorRight)
+                 break;
+         }
+<a href="#h4-5-3" id="h4-5-3" class="d">-        debug(4, &quot;TryConcat: nodes=%ld, selectivity=%f\n&quot;,
+</a><a href="#h4-5-4" id="h4-5-4" class="i">+        debug(kDebugIndexAll, &quot;TryConcat: nodes=%ld, selectivity=%f\n&quot;,
+</a>               st.nodes_, st.selectivity_);
+         return st;
+     }
+<a href="#h4-6" id="h4-6" class="h">@@ -373,11 +356,11 @@ namespace {
+</a>         intrusive_ptr&lt;IndexKey&gt; *end = children + nchildren, *best_start = 0, *ptr;
+         IndexKey::Stats best_stats;
+ 
+<a href="#h4-6-3" id="h4-6-3" class="d">-        debug(3, &quot;Concat: Searching %d positions\n&quot;, nchildren);
+</a><a href="#h4-6-4" id="h4-6-4" class="i">+        debug(kDebugIndexAll, &quot;Concat: Searching %d positions\n&quot;, nchildren);
+</a>         for (ptr = children; ptr != end; ptr++) {
+             IndexKey::Stats st = TryConcat(ptr, end);
+             if (st.nodes_ &gt; 1 &amp;&amp; Prefer(st, best_stats)) {
+<a href="#h4-6-8" id="h4-6-8" class="d">-                debug(3, &quot;Concat: Found new best: %d: %f\n&quot;,
+</a><a href="#h4-6-9" id="h4-6-9" class="i">+                debug(kDebugIndexAll, &quot;Concat: Found new best: %d: %f\n&quot;,
+</a>                       int(ptr - children), st.selectivity_);
+                 best_start = ptr;
+                 best_stats = st;
+<a href="#h4-7" id="h4-7" class="h">@@ -385,7 +368,7 @@ namespace {
+</a>         }
+ 
+         if (best_start == 0) {
+<a href="#h4-7-3" id="h4-7-3" class="d">-            debug(3, &quot;Concat: No good results found.\n&quot;);
+</a><a href="#h4-7-4" id="h4-7-4" class="i">+            debug(kDebugIndexAll, &quot;Concat: No good results found.\n&quot;);
+</a>             return Any();
+         }
+ 
+<a href="#h4-8" id="h4-8" class="h">@@ -417,7 +400,8 @@ namespace {
+</a>               pair&lt;uchar, uchar&gt;&amp; right,
+               intrusive_ptr&lt;IndexKey&gt; rnext) {
+         if (intersects(left, right)) {
+<a href="#h4-8-3" id="h4-8-3" class="d">-            debug(3, &quot;Processing intersection: &lt;%hhx,%hhx&gt; vs. &lt;%hhx,%hhx&gt;\n&quot;,
+</a><a href="#h4-8-4" id="h4-8-4" class="i">+            debug(kDebugIndexAll,
+</a><a href="#h4-8-5" id="h4-8-5" class="i">+                  &quot;Processing intersection: &lt;%hhx,%hhx&gt; vs. &lt;%hhx,%hhx&gt;\n&quot;,
+</a>                   left.first, left.second, right.first, right.second);
+             if (left.first &lt; right.first) {
+                 out-&gt;insert
+<a href="#h4-9" id="h4-9" class="h">@@ -618,17 +602,17 @@ IndexWalker::PostVisit(Regexp* re, intrusive_ptr&lt;IndexKey&gt; parent_arg,
+</a> 
+     assert(key);
+ 
+<a href="#h4-9-3" id="h4-9-3" class="d">-    debug(1, &quot;* INDEX %s ==&gt; &quot;, re-&gt;ToString().c_str());
+</a><a href="#h4-9-4" id="h4-9-4" class="i">+    debug(kDebugIndex, &quot;* INDEX %s ==&gt; &quot;, re-&gt;ToString().c_str());
+</a>     if (key)
+<a href="#h4-9-6" id="h4-9-6" class="d">-        debug(1, &quot;[weight %d, nodes %ld, depth %d]\n&quot;,
+</a><a href="#h4-9-7" id="h4-9-7" class="i">+        debug(kDebugIndex, &quot;[weight %d, nodes %ld, depth %d]\n&quot;,
+</a>               key-&gt;weight(), key-&gt;nodes(), key-&gt;depth());
+     else
+<a href="#h4-9-10" id="h4-9-10" class="d">-        debug(1, &quot;nul\n&quot;);
+</a><a href="#h4-9-11" id="h4-9-11" class="i">+        debug(kDebugIndex, &quot;nul\n&quot;);
+</a> 
+<a href="#h4-9-13" id="h4-9-13" class="d">-    debug(2, &quot;           ==&gt; [%s]\n&quot;,
+</a><a href="#h4-9-14" id="h4-9-14" class="i">+    debug(kDebugIndexAll, &quot;           ==&gt; [%s]\n&quot;,
+</a>           key ? key-&gt;ToString().c_str() : &quot;nul&quot;);
+ 
+<a href="#h4-9-17" id="h4-9-17" class="d">-    if (FLAGS_debug_index &amp;&amp; key)
+</a><a href="#h4-9-18" id="h4-9-18" class="i">+    if ((debug_enabled &amp; kDebugIndex) &amp;&amp; key)
+</a>         key-&gt;check_rep();
+ 
+     return key;
+</pre>
+</div>
+</body>
+</html>

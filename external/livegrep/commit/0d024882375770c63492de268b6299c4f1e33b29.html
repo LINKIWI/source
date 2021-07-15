@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sort suffixes using a radix sort instead of std::sort. - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/0d024882375770c63492de268b6299c4f1e33b29">0d024882375770c63492de268b6299c4f1e33b29</a>
+<b>parent</b> <a href="../commit/2aa4ed2aefdb108375dcd79022e9eb65a40456a0">2aa4ed2aefdb108375dcd79022e9eb65a40456a0</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Mon,  7 Nov 2011 21:13:36 -0500
+
+Sort suffixes using a radix sort instead of std::sort.
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">codesearch.cc</a></td><td> | </td><td class="num">111</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">---</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">codesearch.h</a></td><td> | </td><td class="num">2</td><td><span class="i">++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">main.cc</a></td><td> | </td><td class="num">1</td><td><span class="i">+</span><span class="d"></span></td></tr>
+</table></pre><pre>3 files changed, 111 insertions(+), 3 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/codesearch.cc">codesearch.cc</a> b/<a href="../file/codesearch.cc">codesearch.cc</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -151,15 +151,106 @@ private:
+</a>     chunk operator=(const chunk&amp;);
+ };
+ 
+<a href="#h0-0-3" id="h0-0-3" class="i">+class radix_sorter {
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+public:
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+    radix_sorter(chunk *chunk) : chunk_(chunk), cmp(*this) {
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+        lengths = new uint32_t[chunk_-&gt;size];
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+        for (int i = 0; i &lt; chunk_-&gt;size; i ++)
+</a><a href="#h0-0-8" id="h0-0-8" class="i">+            lengths[i] = static_cast&lt;char*&gt;
+</a><a href="#h0-0-9" id="h0-0-9" class="i">+                (memchr(&amp;chunk_-&gt;data[i], &#39;\n&#39;, chunk_-&gt;size - i)) -
+</a><a href="#h0-0-10" id="h0-0-10" class="i">+                (chunk_-&gt;data + i);
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+    }
+</a><a href="#h0-0-12" id="h0-0-12" class="i">+
+</a><a href="#h0-0-13" id="h0-0-13" class="i">+    ~radix_sorter() {
+</a><a href="#h0-0-14" id="h0-0-14" class="i">+        delete lengths;
+</a><a href="#h0-0-15" id="h0-0-15" class="i">+    }
+</a><a href="#h0-0-16" id="h0-0-16" class="i">+
+</a><a href="#h0-0-17" id="h0-0-17" class="i">+    void sort();
+</a><a href="#h0-0-18" id="h0-0-18" class="i">+
+</a><a href="#h0-0-19" id="h0-0-19" class="i">+    struct cmp_suffix {
+</a><a href="#h0-0-20" id="h0-0-20" class="i">+        radix_sorter &amp;sort;
+</a><a href="#h0-0-21" id="h0-0-21" class="i">+        cmp_suffix(radix_sorter &amp;s) : sort(s) {
+</a><a href="#h0-0-22" id="h0-0-22" class="i">+        }
+</a><a href="#h0-0-23" id="h0-0-23" class="i">+        bool operator()(uint32_t lhs, uint32_t rhs) {
+</a><a href="#h0-0-24" id="h0-0-24" class="i">+            char *l = &amp;sort.chunk_-&gt;data[lhs];
+</a><a href="#h0-0-25" id="h0-0-25" class="i">+            char *r = &amp;sort.chunk_-&gt;data[rhs];
+</a><a href="#h0-0-26" id="h0-0-26" class="i">+            unsigned ll = sort.lengths[lhs];
+</a><a href="#h0-0-27" id="h0-0-27" class="i">+            unsigned rl = sort.lengths[rhs];
+</a><a href="#h0-0-28" id="h0-0-28" class="i">+            int cmp = memcmp(l, r, min(ll, rl));
+</a><a href="#h0-0-29" id="h0-0-29" class="i">+            if (cmp &lt; 0)
+</a><a href="#h0-0-30" id="h0-0-30" class="i">+                return true;
+</a><a href="#h0-0-31" id="h0-0-31" class="i">+            if (cmp &gt; 0)
+</a><a href="#h0-0-32" id="h0-0-32" class="i">+                return false;
+</a><a href="#h0-0-33" id="h0-0-33" class="i">+            return ll &lt; rl;
+</a><a href="#h0-0-34" id="h0-0-34" class="i">+        }
+</a><a href="#h0-0-35" id="h0-0-35" class="i">+    };
+</a><a href="#h0-0-36" id="h0-0-36" class="i">+private:
+</a><a href="#h0-0-37" id="h0-0-37" class="i">+    void radix_sort(uint32_t *, uint32_t *, int);
+</a><a href="#h0-0-38" id="h0-0-38" class="i">+
+</a><a href="#h0-0-39" id="h0-0-39" class="i">+    unsigned index(uint32_t off, int i) {
+</a><a href="#h0-0-40" id="h0-0-40" class="i">+        if (i &gt;= lengths[off]) return 0;
+</a><a href="#h0-0-41" id="h0-0-41" class="i">+        return (unsigned)(unsigned char)chunk_-&gt;data[off + i];
+</a><a href="#h0-0-42" id="h0-0-42" class="i">+    }
+</a><a href="#h0-0-43" id="h0-0-43" class="i">+
+</a><a href="#h0-0-44" id="h0-0-44" class="i">+    chunk *chunk_;
+</a><a href="#h0-0-45" id="h0-0-45" class="i">+    unsigned *lengths;
+</a><a href="#h0-0-46" id="h0-0-46" class="i">+    cmp_suffix cmp;
+</a><a href="#h0-0-47" id="h0-0-47" class="i">+
+</a><a href="#h0-0-48" id="h0-0-48" class="i">+    radix_sorter(const radix_sorter&amp;);
+</a><a href="#h0-0-49" id="h0-0-49" class="i">+    radix_sorter operator=(const radix_sorter&amp;);
+</a><a href="#h0-0-50" id="h0-0-50" class="i">+};
+</a><a href="#h0-0-51" id="h0-0-51" class="i">+
+</a> int chunk::chunk_files = 0;
+ const size_t kChunkSpace = kChunkSize - sizeof(chunk);
+<a href="#h0-0-54" id="h0-0-54" class="i">+const size_t kRadixCutoff = 128;
+</a><a href="#h0-0-55" id="h0-0-55" class="i">+
+</a><a href="#h0-0-56" id="h0-0-56" class="i">+void radix_sorter::sort() {
+</a><a href="#h0-0-57" id="h0-0-57" class="i">+    radix_sort(chunk_-&gt;suffixes, chunk_-&gt;suffixes + chunk_-&gt;size, 0);
+</a><a href="#h0-0-58" id="h0-0-58" class="i">+    assert(is_sorted(chunk_-&gt;suffixes, chunk_-&gt;suffixes + chunk_-&gt;size, cmp));
+</a><a href="#h0-0-59" id="h0-0-59" class="i">+}
+</a><a href="#h0-0-60" id="h0-0-60" class="i">+
+</a><a href="#h0-0-61" id="h0-0-61" class="i">+void radix_sorter::radix_sort(uint32_t *left, uint32_t *right, int level) {
+</a><a href="#h0-0-62" id="h0-0-62" class="i">+    if (right - left &lt; kRadixCutoff) {
+</a><a href="#h0-0-63" id="h0-0-63" class="i">+        std::sort(left, right, cmp);
+</a><a href="#h0-0-64" id="h0-0-64" class="i">+        return;
+</a><a href="#h0-0-65" id="h0-0-65" class="i">+    }
+</a><a href="#h0-0-66" id="h0-0-66" class="i">+    unsigned counts[256] = {};
+</a><a href="#h0-0-67" id="h0-0-67" class="i">+    unsigned dest[256];
+</a><a href="#h0-0-68" id="h0-0-68" class="i">+    uint32_t *p;
+</a><a href="#h0-0-69" id="h0-0-69" class="i">+    for (p = left; p != right; p++)
+</a><a href="#h0-0-70" id="h0-0-70" class="i">+        counts[index(*p, level)]++;
+</a><a href="#h0-0-71" id="h0-0-71" class="i">+    for (int i = 0, total = 0; i &lt; 256; i++) {
+</a><a href="#h0-0-72" id="h0-0-72" class="i">+        int tmp = counts[i];
+</a><a href="#h0-0-73" id="h0-0-73" class="i">+        counts[i] = total;
+</a><a href="#h0-0-74" id="h0-0-74" class="i">+        total += tmp;
+</a><a href="#h0-0-75" id="h0-0-75" class="i">+    }
+</a><a href="#h0-0-76" id="h0-0-76" class="i">+    memcpy(dest, counts, sizeof counts);
+</a><a href="#h0-0-77" id="h0-0-77" class="i">+    int this_chunk;
+</a><a href="#h0-0-78" id="h0-0-78" class="i">+    for (p = left, this_chunk = 0; this_chunk &lt; 255;) {
+</a><a href="#h0-0-79" id="h0-0-79" class="i">+        if (p - left == counts[this_chunk + 1]) {
+</a><a href="#h0-0-80" id="h0-0-80" class="i">+            this_chunk++;
+</a><a href="#h0-0-81" id="h0-0-81" class="i">+            continue;
+</a><a href="#h0-0-82" id="h0-0-82" class="i">+        }
+</a><a href="#h0-0-83" id="h0-0-83" class="i">+        int target = index(*p, level);
+</a><a href="#h0-0-84" id="h0-0-84" class="i">+        if (target == this_chunk) {
+</a><a href="#h0-0-85" id="h0-0-85" class="i">+            p++;
+</a><a href="#h0-0-86" id="h0-0-86" class="i">+            continue;
+</a><a href="#h0-0-87" id="h0-0-87" class="i">+        }
+</a><a href="#h0-0-88" id="h0-0-88" class="i">+        assert(dest[target] &lt; (right - left));
+</a><a href="#h0-0-89" id="h0-0-89" class="i">+        swap(left[dest[target]++], *p);
+</a><a href="#h0-0-90" id="h0-0-90" class="i">+    }
+</a><a href="#h0-0-91" id="h0-0-91" class="i">+    for (int i = 1; i &lt; 256; i++) {
+</a><a href="#h0-0-92" id="h0-0-92" class="i">+        uint32_t *r = (i == 255) ? right : left + counts[i+1];
+</a><a href="#h0-0-93" id="h0-0-93" class="i">+        radix_sort(left + counts[i], r, level + 1);
+</a><a href="#h0-0-94" id="h0-0-94" class="i">+    }
+</a><a href="#h0-0-95" id="h0-0-95" class="i">+}
+</a> 
+ void chunk::finalize() {
+     suffixes = new uint32_t[size];
+     for (int i = 0; i &lt; size; i++)
+         suffixes[i] = i;
+<a href="#h0-0-101" id="h0-0-101" class="d">-    chunk::lt_suffix lt(this);
+</a><a href="#h0-0-102" id="h0-0-102" class="d">-    sort(suffixes, suffixes + size, lt);
+</a><a href="#h0-0-103" id="h0-0-103" class="i">+    radix_sorter sort(this);
+</a><a href="#h0-0-104" id="h0-0-104" class="i">+    sort.sort();
+</a> }
+ 
+ chunk *alloc_chunk() {
+<a href="#h0-1" id="h0-1" class="h">@@ -368,7 +459,7 @@ protected:
+</a> };
+ 
+ code_searcher::code_searcher(git_repository *repo)
+<a href="#h0-1-3" id="h0-1-3" class="d">-    : repo_(repo), stats_(), output_json_(false)
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+    : repo_(repo), stats_(), output_json_(false), finalized_(false)
+</a> {
+ #ifdef USE_DENSE_HASH_SET
+     lines_.set_empty_key(empty_string);
+<a href="#h0-2" id="h0-2" class="h">@@ -381,6 +472,7 @@ code_searcher::~code_searcher() {
+</a> }
+ 
+ void code_searcher::walk_ref(const char *ref) {
+<a href="#h0-2-3" id="h0-2-3" class="i">+    assert(!finalized_);
+</a>     smart_object&lt;git_commit&gt; commit;
+     smart_object&lt;git_tree&gt; tree;
+     resolve_ref(commit, ref);
+<a href="#h0-3" id="h0-3" class="h">@@ -401,6 +493,8 @@ int code_searcher::match(RE2&amp; pat) {
+</a>     int matches = 0;
+     int threads = 4;
+ 
+<a href="#h0-3-3" id="h0-3-3" class="i">+    assert(finalized_);
+</a><a href="#h0-3-4" id="h0-3-4" class="i">+
+</a>     thread_queue&lt;match_result*&gt; results;
+     searcher search(this, results, pat);
+     thread_pool&lt;chunk*, searcher, searcher::thread_state&gt; pool(threads, search);
+<a href="#h0-4" id="h0-4" class="h">@@ -424,6 +518,14 @@ int code_searcher::match(RE2&amp; pat) {
+</a>     return matches;
+ }
+ 
+<a href="#h0-4-3" id="h0-4-3" class="i">+void code_searcher::finalize() {
+</a><a href="#h0-4-4" id="h0-4-4" class="i">+    assert(!finalized_);
+</a><a href="#h0-4-5" id="h0-4-5" class="i">+    finalized_ = true;
+</a><a href="#h0-4-6" id="h0-4-6" class="i">+    list&lt;chunk*&gt;::iterator it = alloc_-&gt;end();
+</a><a href="#h0-4-7" id="h0-4-7" class="i">+    it--;
+</a><a href="#h0-4-8" id="h0-4-8" class="i">+    (*it)-&gt;finalize();
+</a><a href="#h0-4-9" id="h0-4-9" class="i">+}
+</a><a href="#h0-4-10" id="h0-4-10" class="i">+
+</a> void code_searcher::print_match(const match_result *m) {
+     if (output_json_)
+         print_match_json(m);
+<a href="#h0-5" id="h0-5" class="h">@@ -492,6 +594,9 @@ void code_searcher::update_stats(const char *ref, const string&amp; path, git_blob *
+</a>     chunk *c;
+     StringPiece line;
+ 
+<a href="#h0-5-3" id="h0-5-3" class="i">+    if (memchr(p, 0, len) != NULL)
+</a><a href="#h0-5-4" id="h0-5-4" class="i">+        return;
+</a><a href="#h0-5-5" id="h0-5-5" class="i">+
+</a>     while ((f = static_cast&lt;const char*&gt;(memchr(p, &#39;\n&#39;, end - p))) != 0) {
+         string_hash::iterator it = lines_.find(StringPiece(p, f - p));
+         if (it == lines_.end()) {
+<b>diff --git a/<a id="h1" href="../file/codesearch.h">codesearch.h</a> b/<a href="../file/codesearch.h">codesearch.h</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -58,6 +58,7 @@ public:
+</a>     int match(RE2&amp; pat);
+ 
+     void set_output_json(bool j) { output_json_ = j; }
+<a href="#h1-0-3" id="h1-0-3" class="i">+    void finalize();
+</a> protected:
+     void print_match(const match_result *m);
+     void print_match_json(const match_result *m);
+<a href="#h1-1" id="h1-1" class="h">@@ -73,6 +74,7 @@ protected:
+</a>     } stats_;
+     chunk_allocator *alloc_;
+     bool output_json_;
+<a href="#h1-1-3" id="h1-1-3" class="i">+    bool finalized_;
+</a> 
+     friend class searcher;
+ };
+<b>diff --git a/<a id="h2" href="../file/main.cc">main.cc</a> b/<a href="../file/main.cc">main.cc</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -33,6 +33,7 @@ int main(int argc, char **argv) {
+</a>             printf(&quot; done in %d.%06ds\n&quot;,
+                    (int)elapsed.tv_sec, (int)elapsed.tv_usec);
+     }
+<a href="#h2-0-3" id="h2-0-3" class="i">+    counter.finalize();
+</a>     if (!FLAGS_json)
+         counter.dump_stats();
+     RE2::Options opts;
+</pre>
+</div>
+</body>
+</html>

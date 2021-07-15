@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>main.go - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../../../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../../../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../../../log">Log</a> | <a href="../../../files">Files</a> | <a href="../../../refs">Refs</a> | <a href="../../../file/README.md">README</a> | <a href="../../../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<p> main.go (10859B) (<a href="../../../raw/cmd/livegrep-github-reindex/main.go">raw</a>)</p><hr/><pre id="blob">
+<a href="#l1" class="line" id="l1">      1</a> package main
+<a href="#l2" class="line" id="l2">      2</a> 
+<a href="#l3" class="line" id="l3">      3</a> import (
+<a href="#l4" class="line" id="l4">      4</a> 	&quot;encoding/json&quot;
+<a href="#l5" class="line" id="l5">      5</a> 	&quot;flag&quot;
+<a href="#l6" class="line" id="l6">      6</a> 	&quot;fmt&quot;
+<a href="#l7" class="line" id="l7">      7</a> 	&quot;io/ioutil&quot;
+<a href="#l8" class="line" id="l8">      8</a> 	&quot;log&quot;
+<a href="#l9" class="line" id="l9">      9</a> 	&quot;net/http&quot;
+<a href="#l10" class="line" id="l10">     10</a> 	&quot;net/url&quot;
+<a href="#l11" class="line" id="l11">     11</a> 	&quot;os&quot;
+<a href="#l12" class="line" id="l12">     12</a> 	&quot;os/exec&quot;
+<a href="#l13" class="line" id="l13">     13</a> 	&quot;path&quot;
+<a href="#l14" class="line" id="l14">     14</a> 	&quot;sort&quot;
+<a href="#l15" class="line" id="l15">     15</a> 	&quot;strings&quot;
+<a href="#l16" class="line" id="l16">     16</a> 	&quot;sync&quot;
+<a href="#l17" class="line" id="l17">     17</a> 
+<a href="#l18" class="line" id="l18">     18</a> 	&quot;github.com/google/go-github/github&quot;
+<a href="#l19" class="line" id="l19">     19</a> 	&quot;github.com/livegrep/livegrep/src/proto/config&quot;
+<a href="#l20" class="line" id="l20">     20</a> 
+<a href="#l21" class="line" id="l21">     21</a> 	&quot;golang.org/x/net/context&quot;
+<a href="#l22" class="line" id="l22">     22</a> 	&quot;golang.org/x/oauth2&quot;
+<a href="#l23" class="line" id="l23">     23</a> )
+<a href="#l24" class="line" id="l24">     24</a> 
+<a href="#l25" class="line" id="l25">     25</a> const BLDeprecatedMessage = &quot;This flag has been deprecated and will be removed in a future release. Please switch to the &#39;-ignorelist&#39; option.&quot;
+<a href="#l26" class="line" id="l26">     26</a> 
+<a href="#l27" class="line" id="l27">     27</a> var (
+<a href="#l28" class="line" id="l28">     28</a> 	flagCodesearch   = flag.String(&quot;codesearch&quot;, &quot;&quot;, &quot;Path to the `codesearch` binary&quot;)
+<a href="#l29" class="line" id="l29">     29</a> 	flagFetchReindex = flag.String(&quot;fetch-reindex&quot;, &quot;&quot;, &quot;Path to the `livegrep-fetch-reindex` binary&quot;)
+<a href="#l30" class="line" id="l30">     30</a> 	flagApiBaseUrl   = flag.String(&quot;api-base-url&quot;, &quot;https://api.github.com/&quot;, &quot;Github API base url&quot;)
+<a href="#l31" class="line" id="l31">     31</a> 	flagGithubKey    = flag.String(&quot;github-key&quot;, os.Getenv(&quot;GITHUB_KEY&quot;), &quot;Github API key&quot;)
+<a href="#l32" class="line" id="l32">     32</a> 	flagRepoDir      = flag.String(&quot;dir&quot;, &quot;repos&quot;, &quot;Directory to store repos&quot;)
+<a href="#l33" class="line" id="l33">     33</a> 	flagIgnorelist   = flag.String(&quot;ignorelist&quot;, &quot;&quot;, &quot;File containing a list of repositories to ignore when indexing&quot;)
+<a href="#l34" class="line" id="l34">     34</a> 	flagDeprecatedBL = flag.String(&quot;blacklist&quot;, &quot;&quot;, &quot;[DEPRECATED] &quot;+BLDeprecatedMessage)
+<a href="#l35" class="line" id="l35">     35</a> 	flagIndexPath    = dynamicDefault{
+<a href="#l36" class="line" id="l36">     36</a> 		display: &quot;${dir}/livegrep.idx&quot;,
+<a href="#l37" class="line" id="l37">     37</a> 		fn:      func() string { return path.Join(*flagRepoDir, &quot;livegrep.idx&quot;) },
+<a href="#l38" class="line" id="l38">     38</a> 	}
+<a href="#l39" class="line" id="l39">     39</a> 	flagRevision     = flag.String(&quot;revision&quot;, &quot;HEAD&quot;, &quot;git revision to index&quot;)
+<a href="#l40" class="line" id="l40">     40</a> 	flagRevparse     = flag.Bool(&quot;revparse&quot;, true, &quot;whether to `git rev-parse` the provided revision in generated links&quot;)
+<a href="#l41" class="line" id="l41">     41</a> 	flagName         = flag.String(&quot;name&quot;, &quot;livegrep index&quot;, &quot;The name to be stored in the index file&quot;)
+<a href="#l42" class="line" id="l42">     42</a> 	flagForks        = flag.Bool(&quot;forks&quot;, true, &quot;whether to index repositories that are github forks, and not original repos&quot;)
+<a href="#l43" class="line" id="l43">     43</a> 	flagArchived     = flag.Bool(&quot;archived&quot;, false, &quot;whether to index repositories that are archived on github&quot;)
+<a href="#l44" class="line" id="l44">     44</a> 	flagHTTP         = flag.Bool(&quot;http&quot;, false, &quot;clone repositories over HTTPS instead of SSH&quot;)
+<a href="#l45" class="line" id="l45">     45</a> 	flagHTTPUsername = flag.String(&quot;http-user&quot;, &quot;git&quot;, &quot;Override the username to use when cloning over https&quot;)
+<a href="#l46" class="line" id="l46">     46</a> 	flagInstallation = flag.Bool(&quot;installation-token&quot;, false, &quot;Treat the API key as a Github Application Installation Key when cloning&quot;)
+<a href="#l47" class="line" id="l47">     47</a> 	flagDepth        = flag.Int(&quot;depth&quot;, 0, &quot;clone repository with specify --depth=N depth.&quot;)
+<a href="#l48" class="line" id="l48">     48</a> 	flagSkipMissing  = flag.Bool(&quot;skip-missing&quot;, false, &quot;skip repositories where the specified revision is missing&quot;)
+<a href="#l49" class="line" id="l49">     49</a> 	flagRepos        = stringList{}
+<a href="#l50" class="line" id="l50">     50</a> 	flagOrgs         = stringList{}
+<a href="#l51" class="line" id="l51">     51</a> 	flagUsers        = stringList{}
+<a href="#l52" class="line" id="l52">     52</a> )
+<a href="#l53" class="line" id="l53">     53</a> 
+<a href="#l54" class="line" id="l54">     54</a> func init() {
+<a href="#l55" class="line" id="l55">     55</a> 	flag.Var(&amp;flagIndexPath, &quot;out&quot;, &quot;Path to write the index&quot;)
+<a href="#l56" class="line" id="l56">     56</a> 	flag.Var(&amp;flagRepos, &quot;repo&quot;, &quot;Specify a repo to index (may be passed multiple times)&quot;)
+<a href="#l57" class="line" id="l57">     57</a> 	flag.Var(&amp;flagOrgs, &quot;org&quot;, &quot;Specify a github organization to index (may be passed multiple times)&quot;)
+<a href="#l58" class="line" id="l58">     58</a> 	flag.Var(&amp;flagUsers, &quot;user&quot;, &quot;Specify a github user to index (may be passed multiple times)&quot;)
+<a href="#l59" class="line" id="l59">     59</a> }
+<a href="#l60" class="line" id="l60">     60</a> 
+<a href="#l61" class="line" id="l61">     61</a> const Workers = 8
+<a href="#l62" class="line" id="l62">     62</a> 
+<a href="#l63" class="line" id="l63">     63</a> func main() {
+<a href="#l64" class="line" id="l64">     64</a> 	flag.Parse()
+<a href="#l65" class="line" id="l65">     65</a> 	log.SetFlags(0)
+<a href="#l66" class="line" id="l66">     66</a> 
+<a href="#l67" class="line" id="l67">     67</a> 	if *flagDeprecatedBL != &quot;&quot; {
+<a href="#l68" class="line" id="l68">     68</a> 		log.Fatalln(BLDeprecatedMessage)
+<a href="#l69" class="line" id="l69">     69</a> 	}
+<a href="#l70" class="line" id="l70">     70</a> 
+<a href="#l71" class="line" id="l71">     71</a> 	if flagRepos.strings == nil &amp;&amp;
+<a href="#l72" class="line" id="l72">     72</a> 		flagOrgs.strings == nil &amp;&amp;
+<a href="#l73" class="line" id="l73">     73</a> 		flagUsers.strings == nil {
+<a href="#l74" class="line" id="l74">     74</a> 		log.Fatal(&quot;You must specify at least one repo or organization to index&quot;)
+<a href="#l75" class="line" id="l75">     75</a> 	}
+<a href="#l76" class="line" id="l76">     76</a> 
+<a href="#l77" class="line" id="l77">     77</a> 	if *flagInstallation {
+<a href="#l78" class="line" id="l78">     78</a> 		if *flagGithubKey == &quot;&quot; {
+<a href="#l79" class="line" id="l79">     79</a> 			log.Fatal(&quot;-installation-key requires passing a github key, via either -github-key or $GITHUB_KEY&quot;)
+<a href="#l80" class="line" id="l80">     80</a> 		}
+<a href="#l81" class="line" id="l81">     81</a> 		*flagHTTP = true
+<a href="#l82" class="line" id="l82">     82</a> 		*flagHTTPUsername = &quot;x-access-token&quot;
+<a href="#l83" class="line" id="l83">     83</a> 	}
+<a href="#l84" class="line" id="l84">     84</a> 
+<a href="#l85" class="line" id="l85">     85</a> 	var ignorelist map[string]struct{}
+<a href="#l86" class="line" id="l86">     86</a> 	if *flagIgnorelist != &quot;&quot; {
+<a href="#l87" class="line" id="l87">     87</a> 		var err error
+<a href="#l88" class="line" id="l88">     88</a> 		ignorelist, err = loadIgnorelist(*flagIgnorelist)
+<a href="#l89" class="line" id="l89">     89</a> 		if err != nil {
+<a href="#l90" class="line" id="l90">     90</a> 			log.Fatalf(&quot;loading %s: %s&quot;, *flagIgnorelist, err)
+<a href="#l91" class="line" id="l91">     91</a> 		}
+<a href="#l92" class="line" id="l92">     92</a> 	}
+<a href="#l93" class="line" id="l93">     93</a> 
+<a href="#l94" class="line" id="l94">     94</a> 	var h *http.Client
+<a href="#l95" class="line" id="l95">     95</a> 	if *flagGithubKey == &quot;&quot; {
+<a href="#l96" class="line" id="l96">     96</a> 		h = http.DefaultClient
+<a href="#l97" class="line" id="l97">     97</a> 	} else {
+<a href="#l98" class="line" id="l98">     98</a> 		tok := &amp;oauth2.Token{AccessToken: *flagGithubKey}
+<a href="#l99" class="line" id="l99">     99</a> 		h = oauth2.NewClient(
+<a href="#l100" class="line" id="l100">    100</a> 			context.Background(),
+<a href="#l101" class="line" id="l101">    101</a> 			oauth2.StaticTokenSource(tok),
+<a href="#l102" class="line" id="l102">    102</a> 		)
+<a href="#l103" class="line" id="l103">    103</a> 	}
+<a href="#l104" class="line" id="l104">    104</a> 
+<a href="#l105" class="line" id="l105">    105</a> 	gh := github.NewClient(h)
+<a href="#l106" class="line" id="l106">    106</a> 
+<a href="#l107" class="line" id="l107">    107</a> 	if *flagApiBaseUrl != &quot;&quot; {
+<a href="#l108" class="line" id="l108">    108</a> 		if !strings.HasSuffix(*flagApiBaseUrl, &quot;/&quot;) {
+<a href="#l109" class="line" id="l109">    109</a> 			log.Fatalf(&quot;API base URL must include trailing slash: %s&quot;, *flagApiBaseUrl)
+<a href="#l110" class="line" id="l110">    110</a> 		}
+<a href="#l111" class="line" id="l111">    111</a> 		baseURL, err := url.Parse(*flagApiBaseUrl)
+<a href="#l112" class="line" id="l112">    112</a> 		if err != nil {
+<a href="#l113" class="line" id="l113">    113</a> 			log.Fatalf(&quot;parsing base url %s: %v&quot;, *flagApiBaseUrl, err)
+<a href="#l114" class="line" id="l114">    114</a> 		}
+<a href="#l115" class="line" id="l115">    115</a> 		gh.BaseURL = baseURL
+<a href="#l116" class="line" id="l116">    116</a> 	}
+<a href="#l117" class="line" id="l117">    117</a> 
+<a href="#l118" class="line" id="l118">    118</a> 	repos, err := loadRepos(gh,
+<a href="#l119" class="line" id="l119">    119</a> 		flagRepos.strings,
+<a href="#l120" class="line" id="l120">    120</a> 		flagOrgs.strings,
+<a href="#l121" class="line" id="l121">    121</a> 		flagUsers.strings)
+<a href="#l122" class="line" id="l122">    122</a> 	if err != nil {
+<a href="#l123" class="line" id="l123">    123</a> 		log.Fatalln(err.Error())
+<a href="#l124" class="line" id="l124">    124</a> 	}
+<a href="#l125" class="line" id="l125">    125</a> 
+<a href="#l126" class="line" id="l126">    126</a> 	repos = filterRepos(repos, ignorelist, !*flagForks, !*flagArchived)
+<a href="#l127" class="line" id="l127">    127</a> 
+<a href="#l128" class="line" id="l128">    128</a> 	sort.Sort(ReposByName(repos))
+<a href="#l129" class="line" id="l129">    129</a> 
+<a href="#l130" class="line" id="l130">    130</a> 	config, err := buildConfig(*flagName, *flagRepoDir, repos, *flagRevision)
+<a href="#l131" class="line" id="l131">    131</a> 	if err != nil {
+<a href="#l132" class="line" id="l132">    132</a> 		log.Fatalln(err.Error())
+<a href="#l133" class="line" id="l133">    133</a> 	}
+<a href="#l134" class="line" id="l134">    134</a> 	configPath := path.Join(*flagRepoDir, &quot;livegrep.json&quot;)
+<a href="#l135" class="line" id="l135">    135</a> 	if err := writeConfig(config, configPath); err != nil {
+<a href="#l136" class="line" id="l136">    136</a> 		log.Fatalln(err.Error())
+<a href="#l137" class="line" id="l137">    137</a> 	}
+<a href="#l138" class="line" id="l138">    138</a> 
+<a href="#l139" class="line" id="l139">    139</a> 	index := flagIndexPath.Get().(string)
+<a href="#l140" class="line" id="l140">    140</a> 
+<a href="#l141" class="line" id="l141">    141</a> 	args := []string{
+<a href="#l142" class="line" id="l142">    142</a> 		&quot;--out&quot;, index,
+<a href="#l143" class="line" id="l143">    143</a> 		&quot;--codesearch&quot;, *flagCodesearch,
+<a href="#l144" class="line" id="l144">    144</a> 	}
+<a href="#l145" class="line" id="l145">    145</a> 	if *flagRevparse {
+<a href="#l146" class="line" id="l146">    146</a> 		args = append(args, &quot;--revparse&quot;)
+<a href="#l147" class="line" id="l147">    147</a> 	}
+<a href="#l148" class="line" id="l148">    148</a> 	if *flagSkipMissing {
+<a href="#l149" class="line" id="l149">    149</a> 		args = append(args, &quot;--skip-missing&quot;)
+<a href="#l150" class="line" id="l150">    150</a> 	}
+<a href="#l151" class="line" id="l151">    151</a> 	args = append(args, configPath)
+<a href="#l152" class="line" id="l152">    152</a> 
+<a href="#l153" class="line" id="l153">    153</a> 	if *flagFetchReindex == &quot;&quot; {
+<a href="#l154" class="line" id="l154">    154</a> 		fr := findBinary(&quot;livegrep-fetch-reindex&quot;)
+<a href="#l155" class="line" id="l155">    155</a> 		flagFetchReindex = &amp;fr
+<a href="#l156" class="line" id="l156">    156</a> 	}
+<a href="#l157" class="line" id="l157">    157</a> 
+<a href="#l158" class="line" id="l158">    158</a> 	log.Printf(&quot;Running: %s %v\n&quot;, *flagFetchReindex, args)
+<a href="#l159" class="line" id="l159">    159</a> 	cmd := exec.Command(*flagFetchReindex, args...)
+<a href="#l160" class="line" id="l160">    160</a> 	cmd.Stdout = os.Stdout
+<a href="#l161" class="line" id="l161">    161</a> 	cmd.Stderr = os.Stderr
+<a href="#l162" class="line" id="l162">    162</a> 	if *flagGithubKey != &quot;&quot; {
+<a href="#l163" class="line" id="l163">    163</a> 		cmd.Env = append(os.Environ(), fmt.Sprintf(&quot;GITHUB_KEY=%s&quot;, *flagGithubKey))
+<a href="#l164" class="line" id="l164">    164</a> 	}
+<a href="#l165" class="line" id="l165">    165</a> 	if err := cmd.Run(); err != nil {
+<a href="#l166" class="line" id="l166">    166</a> 		log.Fatalln(&quot;livegrep-fetch-reindex: &quot;, err)
+<a href="#l167" class="line" id="l167">    167</a> 	}
+<a href="#l168" class="line" id="l168">    168</a> }
+<a href="#l169" class="line" id="l169">    169</a> 
+<a href="#l170" class="line" id="l170">    170</a> func findBinary(name string) string {
+<a href="#l171" class="line" id="l171">    171</a> 	paths := []string{
+<a href="#l172" class="line" id="l172">    172</a> 		path.Join(path.Dir(os.Args[0]), name),
+<a href="#l173" class="line" id="l173">    173</a> 		strings.Replace(os.Args[0], path.Base(os.Args[0]), name, -1),
+<a href="#l174" class="line" id="l174">    174</a> 	}
+<a href="#l175" class="line" id="l175">    175</a> 	for _, try := range paths {
+<a href="#l176" class="line" id="l176">    176</a> 		if st, err := os.Stat(try); err == nil &amp;&amp; (st.Mode()&amp;os.ModeDir) == 0 {
+<a href="#l177" class="line" id="l177">    177</a> 			return try
+<a href="#l178" class="line" id="l178">    178</a> 		}
+<a href="#l179" class="line" id="l179">    179</a> 	}
+<a href="#l180" class="line" id="l180">    180</a> 	return name
+<a href="#l181" class="line" id="l181">    181</a> }
+<a href="#l182" class="line" id="l182">    182</a> 
+<a href="#l183" class="line" id="l183">    183</a> type ReposByName []*github.Repository
+<a href="#l184" class="line" id="l184">    184</a> 
+<a href="#l185" class="line" id="l185">    185</a> func (r ReposByName) Len() int           { return len(r) }
+<a href="#l186" class="line" id="l186">    186</a> func (r ReposByName) Swap(i, j int)      { r[i], r[j] = r[j], r[i] }
+<a href="#l187" class="line" id="l187">    187</a> func (r ReposByName) Less(i, j int) bool { return *r[i].FullName &lt; *r[j].FullName }
+<a href="#l188" class="line" id="l188">    188</a> 
+<a href="#l189" class="line" id="l189">    189</a> func loadIgnorelist(path string) (map[string]struct{}, error) {
+<a href="#l190" class="line" id="l190">    190</a> 	data, err := ioutil.ReadFile(path)
+<a href="#l191" class="line" id="l191">    191</a> 	if err != nil {
+<a href="#l192" class="line" id="l192">    192</a> 		return nil, err
+<a href="#l193" class="line" id="l193">    193</a> 	}
+<a href="#l194" class="line" id="l194">    194</a> 
+<a href="#l195" class="line" id="l195">    195</a> 	lines := strings.Split(string(data), &quot;\n&quot;)
+<a href="#l196" class="line" id="l196">    196</a> 	out := make(map[string]struct{}, len(lines))
+<a href="#l197" class="line" id="l197">    197</a> 	for _, l := range lines {
+<a href="#l198" class="line" id="l198">    198</a> 		out[l] = struct{}{}
+<a href="#l199" class="line" id="l199">    199</a> 	}
+<a href="#l200" class="line" id="l200">    200</a> 	return out, nil
+<a href="#l201" class="line" id="l201">    201</a> }
+<a href="#l202" class="line" id="l202">    202</a> 
+<a href="#l203" class="line" id="l203">    203</a> type loadJob struct {
+<a href="#l204" class="line" id="l204">    204</a> 	obj string
+<a href="#l205" class="line" id="l205">    205</a> 	get func(*github.Client, string) ([]*github.Repository, error)
+<a href="#l206" class="line" id="l206">    206</a> }
+<a href="#l207" class="line" id="l207">    207</a> 
+<a href="#l208" class="line" id="l208">    208</a> type maybeRepo struct {
+<a href="#l209" class="line" id="l209">    209</a> 	repos []*github.Repository
+<a href="#l210" class="line" id="l210">    210</a> 	err   error
+<a href="#l211" class="line" id="l211">    211</a> }
+<a href="#l212" class="line" id="l212">    212</a> 
+<a href="#l213" class="line" id="l213">    213</a> func loadRepos(
+<a href="#l214" class="line" id="l214">    214</a> 	client *github.Client,
+<a href="#l215" class="line" id="l215">    215</a> 	repos []string,
+<a href="#l216" class="line" id="l216">    216</a> 	orgs []string,
+<a href="#l217" class="line" id="l217">    217</a> 	users []string) ([]*github.Repository, error) {
+<a href="#l218" class="line" id="l218">    218</a> 
+<a href="#l219" class="line" id="l219">    219</a> 	jobc := make(chan loadJob)
+<a href="#l220" class="line" id="l220">    220</a> 	done := make(chan struct{})
+<a href="#l221" class="line" id="l221">    221</a> 	repoc := make(chan maybeRepo)
+<a href="#l222" class="line" id="l222">    222</a> 
+<a href="#l223" class="line" id="l223">    223</a> 	var jobs []loadJob
+<a href="#l224" class="line" id="l224">    224</a> 	for _, repo := range repos {
+<a href="#l225" class="line" id="l225">    225</a> 		jobs = append(jobs, loadJob{repo, getOneRepo})
+<a href="#l226" class="line" id="l226">    226</a> 	}
+<a href="#l227" class="line" id="l227">    227</a> 	for _, org := range orgs {
+<a href="#l228" class="line" id="l228">    228</a> 		jobs = append(jobs, loadJob{org, getOrgRepos})
+<a href="#l229" class="line" id="l229">    229</a> 	}
+<a href="#l230" class="line" id="l230">    230</a> 	for _, user := range users {
+<a href="#l231" class="line" id="l231">    231</a> 		jobs = append(jobs, loadJob{user, getUserRepos})
+<a href="#l232" class="line" id="l232">    232</a> 	}
+<a href="#l233" class="line" id="l233">    233</a> 	go func() {
+<a href="#l234" class="line" id="l234">    234</a> 		defer close(jobc)
+<a href="#l235" class="line" id="l235">    235</a> 		for _, j := range jobs {
+<a href="#l236" class="line" id="l236">    236</a> 			select {
+<a href="#l237" class="line" id="l237">    237</a> 			case jobc &lt;- j:
+<a href="#l238" class="line" id="l238">    238</a> 			case &lt;-done:
+<a href="#l239" class="line" id="l239">    239</a> 				return
+<a href="#l240" class="line" id="l240">    240</a> 			}
+<a href="#l241" class="line" id="l241">    241</a> 		}
+<a href="#l242" class="line" id="l242">    242</a> 	}()
+<a href="#l243" class="line" id="l243">    243</a> 	var wg sync.WaitGroup
+<a href="#l244" class="line" id="l244">    244</a> 	wg.Add(Workers)
+<a href="#l245" class="line" id="l245">    245</a> 	for i := 0; i &lt; Workers; i++ {
+<a href="#l246" class="line" id="l246">    246</a> 		go func() {
+<a href="#l247" class="line" id="l247">    247</a> 			runJobs(client, jobc, done, repoc)
+<a href="#l248" class="line" id="l248">    248</a> 			wg.Done()
+<a href="#l249" class="line" id="l249">    249</a> 		}()
+<a href="#l250" class="line" id="l250">    250</a> 	}
+<a href="#l251" class="line" id="l251">    251</a> 	go func() {
+<a href="#l252" class="line" id="l252">    252</a> 		wg.Wait()
+<a href="#l253" class="line" id="l253">    253</a> 		close(repoc)
+<a href="#l254" class="line" id="l254">    254</a> 	}()
+<a href="#l255" class="line" id="l255">    255</a> 	var out []*github.Repository
+<a href="#l256" class="line" id="l256">    256</a> 	for repo := range repoc {
+<a href="#l257" class="line" id="l257">    257</a> 		if repo.err != nil {
+<a href="#l258" class="line" id="l258">    258</a> 			close(done)
+<a href="#l259" class="line" id="l259">    259</a> 			return nil, repo.err
+<a href="#l260" class="line" id="l260">    260</a> 		}
+<a href="#l261" class="line" id="l261">    261</a> 		out = append(out, repo.repos...)
+<a href="#l262" class="line" id="l262">    262</a> 	}
+<a href="#l263" class="line" id="l263">    263</a> 
+<a href="#l264" class="line" id="l264">    264</a> 	return out, nil
+<a href="#l265" class="line" id="l265">    265</a> }
+<a href="#l266" class="line" id="l266">    266</a> 
+<a href="#l267" class="line" id="l267">    267</a> func runJobs(client *github.Client, jobc &lt;-chan loadJob, done &lt;-chan struct{}, out chan&lt;- maybeRepo) {
+<a href="#l268" class="line" id="l268">    268</a> 	for {
+<a href="#l269" class="line" id="l269">    269</a> 		var job loadJob
+<a href="#l270" class="line" id="l270">    270</a> 		var ok bool
+<a href="#l271" class="line" id="l271">    271</a> 		select {
+<a href="#l272" class="line" id="l272">    272</a> 		case job, ok = &lt;-jobc:
+<a href="#l273" class="line" id="l273">    273</a> 			if !ok {
+<a href="#l274" class="line" id="l274">    274</a> 				return
+<a href="#l275" class="line" id="l275">    275</a> 			}
+<a href="#l276" class="line" id="l276">    276</a> 		case &lt;-done:
+<a href="#l277" class="line" id="l277">    277</a> 			return
+<a href="#l278" class="line" id="l278">    278</a> 		}
+<a href="#l279" class="line" id="l279">    279</a> 		var res maybeRepo
+<a href="#l280" class="line" id="l280">    280</a> 		res.repos, res.err = job.get(client, job.obj)
+<a href="#l281" class="line" id="l281">    281</a> 		select {
+<a href="#l282" class="line" id="l282">    282</a> 		case out &lt;- res:
+<a href="#l283" class="line" id="l283">    283</a> 		case &lt;-done:
+<a href="#l284" class="line" id="l284">    284</a> 			return
+<a href="#l285" class="line" id="l285">    285</a> 		}
+<a href="#l286" class="line" id="l286">    286</a> 	}
+<a href="#l287" class="line" id="l287">    287</a> }
+<a href="#l288" class="line" id="l288">    288</a> 
+<a href="#l289" class="line" id="l289">    289</a> func filterRepos(repos []*github.Repository,
+<a href="#l290" class="line" id="l290">    290</a> 	ignorelist map[string]struct{},
+<a href="#l291" class="line" id="l291">    291</a> 	excludeForks bool, excludeArchived bool) []*github.Repository {
+<a href="#l292" class="line" id="l292">    292</a> 	var out []*github.Repository
+<a href="#l293" class="line" id="l293">    293</a> 
+<a href="#l294" class="line" id="l294">    294</a> 	for _, r := range repos {
+<a href="#l295" class="line" id="l295">    295</a> 		if excludeForks &amp;&amp; r.Fork != nil &amp;&amp; *r.Fork {
+<a href="#l296" class="line" id="l296">    296</a> 			log.Printf(&quot;Excluding fork %s...&quot;, *r.FullName)
+<a href="#l297" class="line" id="l297">    297</a> 			continue
+<a href="#l298" class="line" id="l298">    298</a> 		}
+<a href="#l299" class="line" id="l299">    299</a> 		if excludeArchived &amp;&amp; r.Archived != nil &amp;&amp; *r.Archived {
+<a href="#l300" class="line" id="l300">    300</a> 			log.Printf(&quot;Excluding archived %s...&quot;, *r.FullName)
+<a href="#l301" class="line" id="l301">    301</a> 			continue
+<a href="#l302" class="line" id="l302">    302</a> 		}
+<a href="#l303" class="line" id="l303">    303</a> 		if ignorelist != nil {
+<a href="#l304" class="line" id="l304">    304</a> 			if _, ok := ignorelist[*r.FullName]; ok {
+<a href="#l305" class="line" id="l305">    305</a> 				continue
+<a href="#l306" class="line" id="l306">    306</a> 			}
+<a href="#l307" class="line" id="l307">    307</a> 		}
+<a href="#l308" class="line" id="l308">    308</a> 		out = append(out, r)
+<a href="#l309" class="line" id="l309">    309</a> 	}
+<a href="#l310" class="line" id="l310">    310</a> 
+<a href="#l311" class="line" id="l311">    311</a> 	return out
+<a href="#l312" class="line" id="l312">    312</a> }
+<a href="#l313" class="line" id="l313">    313</a> 
+<a href="#l314" class="line" id="l314">    314</a> func getOneRepo(client *github.Client, repo string) ([]*github.Repository, error) {
+<a href="#l315" class="line" id="l315">    315</a> 	bits := strings.SplitN(repo, &quot;/&quot;, 2)
+<a href="#l316" class="line" id="l316">    316</a> 	if len(bits) != 2 {
+<a href="#l317" class="line" id="l317">    317</a> 		return nil, fmt.Errorf(&quot;Bad repository: %s&quot;, repo)
+<a href="#l318" class="line" id="l318">    318</a> 	}
+<a href="#l319" class="line" id="l319">    319</a> 
+<a href="#l320" class="line" id="l320">    320</a> 	ghRepo, _, err := client.Repositories.Get(context.TODO(), bits[0], bits[1])
+<a href="#l321" class="line" id="l321">    321</a> 	if err != nil {
+<a href="#l322" class="line" id="l322">    322</a> 		return nil, err
+<a href="#l323" class="line" id="l323">    323</a> 	}
+<a href="#l324" class="line" id="l324">    324</a> 	return []*github.Repository{ghRepo}, nil
+<a href="#l325" class="line" id="l325">    325</a> }
+<a href="#l326" class="line" id="l326">    326</a> 
+<a href="#l327" class="line" id="l327">    327</a> func getOrgRepos(client *github.Client, org string) ([]*github.Repository, error) {
+<a href="#l328" class="line" id="l328">    328</a> 	var buf []*github.Repository
+<a href="#l329" class="line" id="l329">    329</a> 	opt := &amp;github.RepositoryListByOrgOptions{
+<a href="#l330" class="line" id="l330">    330</a> 		ListOptions: github.ListOptions{PerPage: 50},
+<a href="#l331" class="line" id="l331">    331</a> 	}
+<a href="#l332" class="line" id="l332">    332</a> 	for {
+<a href="#l333" class="line" id="l333">    333</a> 		repos, resp, err := client.Repositories.ListByOrg(context.TODO(), org, opt)
+<a href="#l334" class="line" id="l334">    334</a> 		if err != nil {
+<a href="#l335" class="line" id="l335">    335</a> 			return nil, err
+<a href="#l336" class="line" id="l336">    336</a> 		}
+<a href="#l337" class="line" id="l337">    337</a> 		buf = append(buf, repos...)
+<a href="#l338" class="line" id="l338">    338</a> 		if resp.NextPage == 0 {
+<a href="#l339" class="line" id="l339">    339</a> 			break
+<a href="#l340" class="line" id="l340">    340</a> 		}
+<a href="#l341" class="line" id="l341">    341</a> 		opt.ListOptions.Page = resp.NextPage
+<a href="#l342" class="line" id="l342">    342</a> 	}
+<a href="#l343" class="line" id="l343">    343</a> 	return buf, nil
+<a href="#l344" class="line" id="l344">    344</a> }
+<a href="#l345" class="line" id="l345">    345</a> 
+<a href="#l346" class="line" id="l346">    346</a> func getUserRepos(client *github.Client, user string) ([]*github.Repository, error) {
+<a href="#l347" class="line" id="l347">    347</a> 	var buf []*github.Repository
+<a href="#l348" class="line" id="l348">    348</a> 	opt := &amp;github.RepositoryListOptions{
+<a href="#l349" class="line" id="l349">    349</a> 		ListOptions: github.ListOptions{PerPage: 50},
+<a href="#l350" class="line" id="l350">    350</a> 	}
+<a href="#l351" class="line" id="l351">    351</a> 	for {
+<a href="#l352" class="line" id="l352">    352</a> 		repos, resp, err := client.Repositories.List(context.TODO(), user, opt)
+<a href="#l353" class="line" id="l353">    353</a> 		if err != nil {
+<a href="#l354" class="line" id="l354">    354</a> 			return nil, err
+<a href="#l355" class="line" id="l355">    355</a> 		}
+<a href="#l356" class="line" id="l356">    356</a> 		buf = append(buf, repos...)
+<a href="#l357" class="line" id="l357">    357</a> 		if resp.NextPage == 0 {
+<a href="#l358" class="line" id="l358">    358</a> 			break
+<a href="#l359" class="line" id="l359">    359</a> 		}
+<a href="#l360" class="line" id="l360">    360</a> 		opt.ListOptions.Page = resp.NextPage
+<a href="#l361" class="line" id="l361">    361</a> 	}
+<a href="#l362" class="line" id="l362">    362</a> 	return buf, nil
+<a href="#l363" class="line" id="l363">    363</a> }
+<a href="#l364" class="line" id="l364">    364</a> 
+<a href="#l365" class="line" id="l365">    365</a> func writeConfig(config []byte, file string) error {
+<a href="#l366" class="line" id="l366">    366</a> 	dir := path.Dir(file)
+<a href="#l367" class="line" id="l367">    367</a> 	if err := os.MkdirAll(dir, 0755); err != nil {
+<a href="#l368" class="line" id="l368">    368</a> 		return err
+<a href="#l369" class="line" id="l369">    369</a> 	}
+<a href="#l370" class="line" id="l370">    370</a> 	return ioutil.WriteFile(file, config, 0644)
+<a href="#l371" class="line" id="l371">    371</a> }
+<a href="#l372" class="line" id="l372">    372</a> 
+<a href="#l373" class="line" id="l373">    373</a> func buildConfig(name string,
+<a href="#l374" class="line" id="l374">    374</a> 	dir string,
+<a href="#l375" class="line" id="l375">    375</a> 	repos []*github.Repository,
+<a href="#l376" class="line" id="l376">    376</a> 	revision string) ([]byte, error) {
+<a href="#l377" class="line" id="l377">    377</a> 	cfg := config.IndexSpec{
+<a href="#l378" class="line" id="l378">    378</a> 		Name: name,
+<a href="#l379" class="line" id="l379">    379</a> 	}
+<a href="#l380" class="line" id="l380">    380</a> 
+<a href="#l381" class="line" id="l381">    381</a> 	for _, r := range repos {
+<a href="#l382" class="line" id="l382">    382</a> 		if *flagSkipMissing {
+<a href="#l383" class="line" id="l383">    383</a> 			cmd := exec.Command(&quot;git&quot;,
+<a href="#l384" class="line" id="l384">    384</a> 				&quot;--git-dir&quot;,
+<a href="#l385" class="line" id="l385">    385</a> 				path.Join(dir, *r.FullName),
+<a href="#l386" class="line" id="l386">    386</a> 				&quot;rev-parse&quot;,
+<a href="#l387" class="line" id="l387">    387</a> 				&quot;--verify&quot;,
+<a href="#l388" class="line" id="l388">    388</a> 				revision,
+<a href="#l389" class="line" id="l389">    389</a> 			)
+<a href="#l390" class="line" id="l390">    390</a> 			if e := cmd.Run(); e != nil {
+<a href="#l391" class="line" id="l391">    391</a> 				log.Printf(&quot;Skipping missing revision repo=%s rev=%s&quot;,
+<a href="#l392" class="line" id="l392">    392</a> 					*r.FullName, revision,
+<a href="#l393" class="line" id="l393">    393</a> 				)
+<a href="#l394" class="line" id="l394">    394</a> 				continue
+<a href="#l395" class="line" id="l395">    395</a> 			}
+<a href="#l396" class="line" id="l396">    396</a> 		}
+<a href="#l397" class="line" id="l397">    397</a> 		var remote string
+<a href="#l398" class="line" id="l398">    398</a> 		if *flagHTTP {
+<a href="#l399" class="line" id="l399">    399</a> 			remote = *r.CloneURL
+<a href="#l400" class="line" id="l400">    400</a> 		} else {
+<a href="#l401" class="line" id="l401">    401</a> 			remote = *r.SSHURL
+<a href="#l402" class="line" id="l402">    402</a> 		}
+<a href="#l403" class="line" id="l403">    403</a> 
+<a href="#l404" class="line" id="l404">    404</a> 		var password_env string
+<a href="#l405" class="line" id="l405">    405</a> 		if *flagGithubKey != &quot;&quot; {
+<a href="#l406" class="line" id="l406">    406</a> 			password_env = &quot;GITHUB_KEY&quot;
+<a href="#l407" class="line" id="l407">    407</a> 		}
+<a href="#l408" class="line" id="l408">    408</a> 
+<a href="#l409" class="line" id="l409">    409</a> 		cfg.Repos = append(cfg.Repos, &amp;config.RepoSpec{
+<a href="#l410" class="line" id="l410">    410</a> 			Path:      path.Join(dir, *r.FullName),
+<a href="#l411" class="line" id="l411">    411</a> 			Name:      *r.FullName,
+<a href="#l412" class="line" id="l412">    412</a> 			Revisions: []string{revision},
+<a href="#l413" class="line" id="l413">    413</a> 			Metadata: &amp;config.Metadata{
+<a href="#l414" class="line" id="l414">    414</a> 				Github: *r.HTMLURL,
+<a href="#l415" class="line" id="l415">    415</a> 				Remote: remote,
+<a href="#l416" class="line" id="l416">    416</a> 			},
+<a href="#l417" class="line" id="l417">    417</a> 			CloneOptions: &amp;config.CloneOptions{
+<a href="#l418" class="line" id="l418">    418</a> 				Depth:       int32(*flagDepth),
+<a href="#l419" class="line" id="l419">    419</a> 				Username:    *flagHTTPUsername,
+<a href="#l420" class="line" id="l420">    420</a> 				PasswordEnv: password_env,
+<a href="#l421" class="line" id="l421">    421</a> 			},
+<a href="#l422" class="line" id="l422">    422</a> 		})
+<a href="#l423" class="line" id="l423">    423</a> 	}
+<a href="#l424" class="line" id="l424">    424</a> 
+<a href="#l425" class="line" id="l425">    425</a> 	return json.MarshalIndent(cfg, &quot;&quot;, &quot;  &quot;)
+<a href="#l426" class="line" id="l426">    426</a> }
+</pre>
+</div>
+</body>
+</html>

@@ -1,0 +1,1120 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Only print matches that are valid UTF-8. - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/3d3a1710647329b0873d55f63024a0113dbfafa5">3d3a1710647329b0873d55f63024a0113dbfafa5</a>
+<b>parent</b> <a href="../commit/7d90010c7edda0cb76987c395354130348d450b0">7d90010c7edda0cb76987c395354130348d450b0</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Wed, 26 Oct 2011 13:21:17 -0700
+
+Only print matches that are valid UTF-8.
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">codesearch.cc</a></td><td> | </td><td class="num">5</td><td><span class="i">+++++</span><span class="d"></span></td></tr>
+<tr><td class="A">A</td><td><a href="#h1">utf8.h</a></td><td> | </td><td class="num">34</td><td><span class="i">++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="A">A</td><td><a href="#h2">utf8/checked.h</a></td><td> | </td><td class="num">327</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="A">A</td><td><a href="#h3">utf8/core.h</a></td><td> | </td><td class="num">358</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="A">A</td><td><a href="#h4">utf8/unchecked.h</a></td><td> | </td><td class="num">228</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+</table></pre><pre>5 files changed, 952 insertions(+), 0 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/codesearch.cc">codesearch.cc</a> b/<a href="../file/codesearch.cc">codesearch.cc</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -17,6 +17,8 @@
+</a> #include &quot;thread_pool.h&quot;
+ #include &quot;codesearch.h&quot;
+ 
+<a href="#h0-0-3" id="h0-0-3" class="i">+#include &quot;utf8.h&quot;
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+
+</a> using google::dense_hash_set;
+ using re2::RE2;
+ using re2::StringPiece;
+<a href="#h0-1" id="h0-1" class="h">@@ -312,6 +314,9 @@ int code_searcher::match(RE2&amp; pat) {
+</a> }
+ 
+ void code_searcher::print_match(const match_result *m) {
+<a href="#h0-1-3" id="h0-1-3" class="i">+    if (!utf8::is_valid(m-&gt;line.data(),
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+                        m-&gt;line.data() + m-&gt;line.size()))
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+        return;
+</a>     printf(&quot;%s:%s:%d: %.*s\n&quot;,
+            m-&gt;file-&gt;ref,
+            m-&gt;file-&gt;path.c_str(),
+<b>diff --git a/<a id="h1" href="../file/utf8.h">utf8.h</a> b/<a href="../file/utf8.h">utf8.h</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -0,0 +1,34 @@
+</a><a href="#h1-0-0" id="h1-0-0" class="i">+// Copyright 2006 Nemanja Trifunovic
+</a><a href="#h1-0-1" id="h1-0-1" class="i">+
+</a><a href="#h1-0-2" id="h1-0-2" class="i">+/*
+</a><a href="#h1-0-3" id="h1-0-3" class="i">+Permission is hereby granted, free of charge, to any person or organization
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+obtaining a copy of the software and accompanying documentation covered by
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+this license (the &quot;Software&quot;) to use, reproduce, display, distribute,
+</a><a href="#h1-0-6" id="h1-0-6" class="i">+execute, and transmit the Software, and to prepare derivative works of the
+</a><a href="#h1-0-7" id="h1-0-7" class="i">+Software, and to permit third-parties to whom the Software is furnished to
+</a><a href="#h1-0-8" id="h1-0-8" class="i">+do so, all subject to the following:
+</a><a href="#h1-0-9" id="h1-0-9" class="i">+
+</a><a href="#h1-0-10" id="h1-0-10" class="i">+The copyright notices in the Software and this entire statement, including
+</a><a href="#h1-0-11" id="h1-0-11" class="i">+the above license grant, this restriction and the following disclaimer,
+</a><a href="#h1-0-12" id="h1-0-12" class="i">+must be included in all copies of the Software, in whole or in part, and
+</a><a href="#h1-0-13" id="h1-0-13" class="i">+all derivative works of the Software, unless such copies or derivative
+</a><a href="#h1-0-14" id="h1-0-14" class="i">+works are solely in the form of machine-executable object code generated by
+</a><a href="#h1-0-15" id="h1-0-15" class="i">+a source language processor.
+</a><a href="#h1-0-16" id="h1-0-16" class="i">+
+</a><a href="#h1-0-17" id="h1-0-17" class="i">+THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+</a><a href="#h1-0-18" id="h1-0-18" class="i">+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+</a><a href="#h1-0-19" id="h1-0-19" class="i">+FITNESS FOR A PARTICULAR PURPOSE, TITLE AND NON-INFRINGEMENT. IN NO EVENT
+</a><a href="#h1-0-20" id="h1-0-20" class="i">+SHALL THE COPYRIGHT HOLDERS OR ANYONE DISTRIBUTING THE SOFTWARE BE LIABLE
+</a><a href="#h1-0-21" id="h1-0-21" class="i">+FOR ANY DAMAGES OR OTHER LIABILITY, WHETHER IN CONTRACT, TORT OR OTHERWISE,
+</a><a href="#h1-0-22" id="h1-0-22" class="i">+ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+</a><a href="#h1-0-23" id="h1-0-23" class="i">+DEALINGS IN THE SOFTWARE.
+</a><a href="#h1-0-24" id="h1-0-24" class="i">+*/
+</a><a href="#h1-0-25" id="h1-0-25" class="i">+
+</a><a href="#h1-0-26" id="h1-0-26" class="i">+
+</a><a href="#h1-0-27" id="h1-0-27" class="i">+#ifndef UTF8_FOR_CPP_2675DCD0_9480_4c0c_B92A_CC14C027B731
+</a><a href="#h1-0-28" id="h1-0-28" class="i">+#define UTF8_FOR_CPP_2675DCD0_9480_4c0c_B92A_CC14C027B731
+</a><a href="#h1-0-29" id="h1-0-29" class="i">+
+</a><a href="#h1-0-30" id="h1-0-30" class="i">+#include &quot;utf8/checked.h&quot;
+</a><a href="#h1-0-31" id="h1-0-31" class="i">+#include &quot;utf8/unchecked.h&quot;
+</a><a href="#h1-0-32" id="h1-0-32" class="i">+
+</a><a href="#h1-0-33" id="h1-0-33" class="i">+#endif // header guard
+</a><b>diff --git a/<a id="h2" href="../file/utf8/checked.h">utf8/checked.h</a> b/<a href="../file/utf8/checked.h">utf8/checked.h</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -0,0 +1,327 @@
+</a><a href="#h2-0-0" id="h2-0-0" class="i">+// Copyright 2006 Nemanja Trifunovic
+</a><a href="#h2-0-1" id="h2-0-1" class="i">+
+</a><a href="#h2-0-2" id="h2-0-2" class="i">+/*
+</a><a href="#h2-0-3" id="h2-0-3" class="i">+Permission is hereby granted, free of charge, to any person or organization
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+obtaining a copy of the software and accompanying documentation covered by
+</a><a href="#h2-0-5" id="h2-0-5" class="i">+this license (the &quot;Software&quot;) to use, reproduce, display, distribute,
+</a><a href="#h2-0-6" id="h2-0-6" class="i">+execute, and transmit the Software, and to prepare derivative works of the
+</a><a href="#h2-0-7" id="h2-0-7" class="i">+Software, and to permit third-parties to whom the Software is furnished to
+</a><a href="#h2-0-8" id="h2-0-8" class="i">+do so, all subject to the following:
+</a><a href="#h2-0-9" id="h2-0-9" class="i">+
+</a><a href="#h2-0-10" id="h2-0-10" class="i">+The copyright notices in the Software and this entire statement, including
+</a><a href="#h2-0-11" id="h2-0-11" class="i">+the above license grant, this restriction and the following disclaimer,
+</a><a href="#h2-0-12" id="h2-0-12" class="i">+must be included in all copies of the Software, in whole or in part, and
+</a><a href="#h2-0-13" id="h2-0-13" class="i">+all derivative works of the Software, unless such copies or derivative
+</a><a href="#h2-0-14" id="h2-0-14" class="i">+works are solely in the form of machine-executable object code generated by
+</a><a href="#h2-0-15" id="h2-0-15" class="i">+a source language processor.
+</a><a href="#h2-0-16" id="h2-0-16" class="i">+
+</a><a href="#h2-0-17" id="h2-0-17" class="i">+THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+</a><a href="#h2-0-18" id="h2-0-18" class="i">+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+</a><a href="#h2-0-19" id="h2-0-19" class="i">+FITNESS FOR A PARTICULAR PURPOSE, TITLE AND NON-INFRINGEMENT. IN NO EVENT
+</a><a href="#h2-0-20" id="h2-0-20" class="i">+SHALL THE COPYRIGHT HOLDERS OR ANYONE DISTRIBUTING THE SOFTWARE BE LIABLE
+</a><a href="#h2-0-21" id="h2-0-21" class="i">+FOR ANY DAMAGES OR OTHER LIABILITY, WHETHER IN CONTRACT, TORT OR OTHERWISE,
+</a><a href="#h2-0-22" id="h2-0-22" class="i">+ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+</a><a href="#h2-0-23" id="h2-0-23" class="i">+DEALINGS IN THE SOFTWARE.
+</a><a href="#h2-0-24" id="h2-0-24" class="i">+*/
+</a><a href="#h2-0-25" id="h2-0-25" class="i">+
+</a><a href="#h2-0-26" id="h2-0-26" class="i">+
+</a><a href="#h2-0-27" id="h2-0-27" class="i">+#ifndef UTF8_FOR_CPP_CHECKED_H_2675DCD0_9480_4c0c_B92A_CC14C027B731
+</a><a href="#h2-0-28" id="h2-0-28" class="i">+#define UTF8_FOR_CPP_CHECKED_H_2675DCD0_9480_4c0c_B92A_CC14C027B731
+</a><a href="#h2-0-29" id="h2-0-29" class="i">+
+</a><a href="#h2-0-30" id="h2-0-30" class="i">+#include &quot;core.h&quot;
+</a><a href="#h2-0-31" id="h2-0-31" class="i">+#include &lt;stdexcept&gt;
+</a><a href="#h2-0-32" id="h2-0-32" class="i">+
+</a><a href="#h2-0-33" id="h2-0-33" class="i">+namespace utf8
+</a><a href="#h2-0-34" id="h2-0-34" class="i">+{
+</a><a href="#h2-0-35" id="h2-0-35" class="i">+    // Base for the exceptions that may be thrown from the library
+</a><a href="#h2-0-36" id="h2-0-36" class="i">+    class exception : public std::exception {
+</a><a href="#h2-0-37" id="h2-0-37" class="i">+    };
+</a><a href="#h2-0-38" id="h2-0-38" class="i">+
+</a><a href="#h2-0-39" id="h2-0-39" class="i">+    // Exceptions that may be thrown from the library functions.
+</a><a href="#h2-0-40" id="h2-0-40" class="i">+    class invalid_code_point : public exception {
+</a><a href="#h2-0-41" id="h2-0-41" class="i">+        uint32_t cp;
+</a><a href="#h2-0-42" id="h2-0-42" class="i">+    public:
+</a><a href="#h2-0-43" id="h2-0-43" class="i">+        invalid_code_point(uint32_t cp) : cp(cp) {}
+</a><a href="#h2-0-44" id="h2-0-44" class="i">+        virtual const char* what() const throw() { return &quot;Invalid code point&quot;; }
+</a><a href="#h2-0-45" id="h2-0-45" class="i">+        uint32_t code_point() const {return cp;}
+</a><a href="#h2-0-46" id="h2-0-46" class="i">+    };
+</a><a href="#h2-0-47" id="h2-0-47" class="i">+
+</a><a href="#h2-0-48" id="h2-0-48" class="i">+    class invalid_utf8 : public exception {
+</a><a href="#h2-0-49" id="h2-0-49" class="i">+        uint8_t u8;
+</a><a href="#h2-0-50" id="h2-0-50" class="i">+    public:
+</a><a href="#h2-0-51" id="h2-0-51" class="i">+        invalid_utf8 (uint8_t u) : u8(u) {}
+</a><a href="#h2-0-52" id="h2-0-52" class="i">+        virtual const char* what() const throw() { return &quot;Invalid UTF-8&quot;; }
+</a><a href="#h2-0-53" id="h2-0-53" class="i">+        uint8_t utf8_octet() const {return u8;}
+</a><a href="#h2-0-54" id="h2-0-54" class="i">+    };
+</a><a href="#h2-0-55" id="h2-0-55" class="i">+
+</a><a href="#h2-0-56" id="h2-0-56" class="i">+    class invalid_utf16 : public exception {
+</a><a href="#h2-0-57" id="h2-0-57" class="i">+        uint16_t u16;
+</a><a href="#h2-0-58" id="h2-0-58" class="i">+    public:
+</a><a href="#h2-0-59" id="h2-0-59" class="i">+        invalid_utf16 (uint16_t u) : u16(u) {}
+</a><a href="#h2-0-60" id="h2-0-60" class="i">+        virtual const char* what() const throw() { return &quot;Invalid UTF-16&quot;; }
+</a><a href="#h2-0-61" id="h2-0-61" class="i">+        uint16_t utf16_word() const {return u16;}
+</a><a href="#h2-0-62" id="h2-0-62" class="i">+    };
+</a><a href="#h2-0-63" id="h2-0-63" class="i">+
+</a><a href="#h2-0-64" id="h2-0-64" class="i">+    class not_enough_room : public exception {
+</a><a href="#h2-0-65" id="h2-0-65" class="i">+    public:
+</a><a href="#h2-0-66" id="h2-0-66" class="i">+        virtual const char* what() const throw() { return &quot;Not enough space&quot;; }
+</a><a href="#h2-0-67" id="h2-0-67" class="i">+    };
+</a><a href="#h2-0-68" id="h2-0-68" class="i">+
+</a><a href="#h2-0-69" id="h2-0-69" class="i">+    /// The library API - functions intended to be called by the users
+</a><a href="#h2-0-70" id="h2-0-70" class="i">+
+</a><a href="#h2-0-71" id="h2-0-71" class="i">+    template &lt;typename octet_iterator, typename output_iterator&gt;
+</a><a href="#h2-0-72" id="h2-0-72" class="i">+    output_iterator replace_invalid(octet_iterator start, octet_iterator end, output_iterator out, uint32_t replacement)
+</a><a href="#h2-0-73" id="h2-0-73" class="i">+    {
+</a><a href="#h2-0-74" id="h2-0-74" class="i">+        while (start != end) {
+</a><a href="#h2-0-75" id="h2-0-75" class="i">+            octet_iterator sequence_start = start;
+</a><a href="#h2-0-76" id="h2-0-76" class="i">+            internal::utf_error err_code = internal::validate_next(start, end);
+</a><a href="#h2-0-77" id="h2-0-77" class="i">+            switch (err_code) {
+</a><a href="#h2-0-78" id="h2-0-78" class="i">+                case internal::UTF8_OK :
+</a><a href="#h2-0-79" id="h2-0-79" class="i">+                    for (octet_iterator it = sequence_start; it != start; ++it)
+</a><a href="#h2-0-80" id="h2-0-80" class="i">+                        *out++ = *it;
+</a><a href="#h2-0-81" id="h2-0-81" class="i">+                    break;
+</a><a href="#h2-0-82" id="h2-0-82" class="i">+                case internal::NOT_ENOUGH_ROOM:
+</a><a href="#h2-0-83" id="h2-0-83" class="i">+                    throw not_enough_room();
+</a><a href="#h2-0-84" id="h2-0-84" class="i">+                case internal::INVALID_LEAD:
+</a><a href="#h2-0-85" id="h2-0-85" class="i">+                    append (replacement, out);
+</a><a href="#h2-0-86" id="h2-0-86" class="i">+                    ++start;
+</a><a href="#h2-0-87" id="h2-0-87" class="i">+                    break;
+</a><a href="#h2-0-88" id="h2-0-88" class="i">+                case internal::INCOMPLETE_SEQUENCE:
+</a><a href="#h2-0-89" id="h2-0-89" class="i">+                case internal::OVERLONG_SEQUENCE:
+</a><a href="#h2-0-90" id="h2-0-90" class="i">+                case internal::INVALID_CODE_POINT:
+</a><a href="#h2-0-91" id="h2-0-91" class="i">+                    append (replacement, out);
+</a><a href="#h2-0-92" id="h2-0-92" class="i">+                    ++start;
+</a><a href="#h2-0-93" id="h2-0-93" class="i">+                    // just one replacement mark for the sequence
+</a><a href="#h2-0-94" id="h2-0-94" class="i">+                    while (internal::is_trail(*start) &amp;&amp; start != end)
+</a><a href="#h2-0-95" id="h2-0-95" class="i">+                        ++start;
+</a><a href="#h2-0-96" id="h2-0-96" class="i">+                    break;
+</a><a href="#h2-0-97" id="h2-0-97" class="i">+            }
+</a><a href="#h2-0-98" id="h2-0-98" class="i">+        }
+</a><a href="#h2-0-99" id="h2-0-99" class="i">+        return out;
+</a><a href="#h2-0-100" id="h2-0-100" class="i">+    }
+</a><a href="#h2-0-101" id="h2-0-101" class="i">+
+</a><a href="#h2-0-102" id="h2-0-102" class="i">+    template &lt;typename octet_iterator, typename output_iterator&gt;
+</a><a href="#h2-0-103" id="h2-0-103" class="i">+    inline output_iterator replace_invalid(octet_iterator start, octet_iterator end, output_iterator out)
+</a><a href="#h2-0-104" id="h2-0-104" class="i">+    {
+</a><a href="#h2-0-105" id="h2-0-105" class="i">+        static const uint32_t replacement_marker = internal::mask16(0xfffd);
+</a><a href="#h2-0-106" id="h2-0-106" class="i">+        return replace_invalid(start, end, out, replacement_marker);
+</a><a href="#h2-0-107" id="h2-0-107" class="i">+    }
+</a><a href="#h2-0-108" id="h2-0-108" class="i">+
+</a><a href="#h2-0-109" id="h2-0-109" class="i">+    template &lt;typename octet_iterator&gt;
+</a><a href="#h2-0-110" id="h2-0-110" class="i">+    octet_iterator append(uint32_t cp, octet_iterator result)
+</a><a href="#h2-0-111" id="h2-0-111" class="i">+    {
+</a><a href="#h2-0-112" id="h2-0-112" class="i">+        if (!internal::is_code_point_valid(cp))
+</a><a href="#h2-0-113" id="h2-0-113" class="i">+            throw invalid_code_point(cp);
+</a><a href="#h2-0-114" id="h2-0-114" class="i">+
+</a><a href="#h2-0-115" id="h2-0-115" class="i">+        if (cp &lt; 0x80)                        // one octet
+</a><a href="#h2-0-116" id="h2-0-116" class="i">+            *(result++) = static_cast&lt;uint8_t&gt;(cp);
+</a><a href="#h2-0-117" id="h2-0-117" class="i">+        else if (cp &lt; 0x800) {                // two octets
+</a><a href="#h2-0-118" id="h2-0-118" class="i">+            *(result++) = static_cast&lt;uint8_t&gt;((cp &gt;&gt; 6)            | 0xc0);
+</a><a href="#h2-0-119" id="h2-0-119" class="i">+            *(result++) = static_cast&lt;uint8_t&gt;((cp &amp; 0x3f)          | 0x80);
+</a><a href="#h2-0-120" id="h2-0-120" class="i">+        }
+</a><a href="#h2-0-121" id="h2-0-121" class="i">+        else if (cp &lt; 0x10000) {              // three octets
+</a><a href="#h2-0-122" id="h2-0-122" class="i">+            *(result++) = static_cast&lt;uint8_t&gt;((cp &gt;&gt; 12)           | 0xe0);
+</a><a href="#h2-0-123" id="h2-0-123" class="i">+            *(result++) = static_cast&lt;uint8_t&gt;(((cp &gt;&gt; 6) &amp; 0x3f)   | 0x80);
+</a><a href="#h2-0-124" id="h2-0-124" class="i">+            *(result++) = static_cast&lt;uint8_t&gt;((cp &amp; 0x3f)          | 0x80);
+</a><a href="#h2-0-125" id="h2-0-125" class="i">+        }
+</a><a href="#h2-0-126" id="h2-0-126" class="i">+        else {      // four octets
+</a><a href="#h2-0-127" id="h2-0-127" class="i">+            *(result++) = static_cast&lt;uint8_t&gt;((cp &gt;&gt; 18)           | 0xf0);
+</a><a href="#h2-0-128" id="h2-0-128" class="i">+            *(result++) = static_cast&lt;uint8_t&gt;(((cp &gt;&gt; 12) &amp; 0x3f)  | 0x80);
+</a><a href="#h2-0-129" id="h2-0-129" class="i">+            *(result++) = static_cast&lt;uint8_t&gt;(((cp &gt;&gt; 6) &amp; 0x3f)   | 0x80);
+</a><a href="#h2-0-130" id="h2-0-130" class="i">+            *(result++) = static_cast&lt;uint8_t&gt;((cp &amp; 0x3f)          | 0x80);
+</a><a href="#h2-0-131" id="h2-0-131" class="i">+        }
+</a><a href="#h2-0-132" id="h2-0-132" class="i">+        return result;
+</a><a href="#h2-0-133" id="h2-0-133" class="i">+    }
+</a><a href="#h2-0-134" id="h2-0-134" class="i">+
+</a><a href="#h2-0-135" id="h2-0-135" class="i">+    template &lt;typename octet_iterator&gt;
+</a><a href="#h2-0-136" id="h2-0-136" class="i">+    uint32_t next(octet_iterator&amp; it, octet_iterator end)
+</a><a href="#h2-0-137" id="h2-0-137" class="i">+    {
+</a><a href="#h2-0-138" id="h2-0-138" class="i">+        uint32_t cp = 0;
+</a><a href="#h2-0-139" id="h2-0-139" class="i">+        internal::utf_error err_code = internal::validate_next(it, end, &amp;cp);
+</a><a href="#h2-0-140" id="h2-0-140" class="i">+        switch (err_code) {
+</a><a href="#h2-0-141" id="h2-0-141" class="i">+            case internal::UTF8_OK :
+</a><a href="#h2-0-142" id="h2-0-142" class="i">+                break;
+</a><a href="#h2-0-143" id="h2-0-143" class="i">+            case internal::NOT_ENOUGH_ROOM :
+</a><a href="#h2-0-144" id="h2-0-144" class="i">+                throw not_enough_room();
+</a><a href="#h2-0-145" id="h2-0-145" class="i">+            case internal::INVALID_LEAD :
+</a><a href="#h2-0-146" id="h2-0-146" class="i">+            case internal::INCOMPLETE_SEQUENCE :
+</a><a href="#h2-0-147" id="h2-0-147" class="i">+            case internal::OVERLONG_SEQUENCE :
+</a><a href="#h2-0-148" id="h2-0-148" class="i">+                throw invalid_utf8(*it);
+</a><a href="#h2-0-149" id="h2-0-149" class="i">+            case internal::INVALID_CODE_POINT :
+</a><a href="#h2-0-150" id="h2-0-150" class="i">+                throw invalid_code_point(cp);
+</a><a href="#h2-0-151" id="h2-0-151" class="i">+        }
+</a><a href="#h2-0-152" id="h2-0-152" class="i">+        return cp;
+</a><a href="#h2-0-153" id="h2-0-153" class="i">+    }
+</a><a href="#h2-0-154" id="h2-0-154" class="i">+
+</a><a href="#h2-0-155" id="h2-0-155" class="i">+    template &lt;typename octet_iterator&gt;
+</a><a href="#h2-0-156" id="h2-0-156" class="i">+    uint32_t peek_next(octet_iterator it, octet_iterator end)
+</a><a href="#h2-0-157" id="h2-0-157" class="i">+    {
+</a><a href="#h2-0-158" id="h2-0-158" class="i">+        return next(it, end);
+</a><a href="#h2-0-159" id="h2-0-159" class="i">+    }
+</a><a href="#h2-0-160" id="h2-0-160" class="i">+
+</a><a href="#h2-0-161" id="h2-0-161" class="i">+    template &lt;typename octet_iterator&gt;
+</a><a href="#h2-0-162" id="h2-0-162" class="i">+    uint32_t prior(octet_iterator&amp; it, octet_iterator start)
+</a><a href="#h2-0-163" id="h2-0-163" class="i">+    {
+</a><a href="#h2-0-164" id="h2-0-164" class="i">+        // can&#39;t do much if it == start
+</a><a href="#h2-0-165" id="h2-0-165" class="i">+        if (it == start)
+</a><a href="#h2-0-166" id="h2-0-166" class="i">+            throw not_enough_room();
+</a><a href="#h2-0-167" id="h2-0-167" class="i">+
+</a><a href="#h2-0-168" id="h2-0-168" class="i">+        octet_iterator end = it;
+</a><a href="#h2-0-169" id="h2-0-169" class="i">+        // Go back until we hit either a lead octet or start
+</a><a href="#h2-0-170" id="h2-0-170" class="i">+        while (internal::is_trail(*(--it)))
+</a><a href="#h2-0-171" id="h2-0-171" class="i">+            if (it == start)
+</a><a href="#h2-0-172" id="h2-0-172" class="i">+                throw invalid_utf8(*it); // error - no lead byte in the sequence
+</a><a href="#h2-0-173" id="h2-0-173" class="i">+        return peek_next(it, end);
+</a><a href="#h2-0-174" id="h2-0-174" class="i">+    }
+</a><a href="#h2-0-175" id="h2-0-175" class="i">+
+</a><a href="#h2-0-176" id="h2-0-176" class="i">+    /// Deprecated in versions that include &quot;prior&quot;
+</a><a href="#h2-0-177" id="h2-0-177" class="i">+    template &lt;typename octet_iterator&gt;
+</a><a href="#h2-0-178" id="h2-0-178" class="i">+    uint32_t previous(octet_iterator&amp; it, octet_iterator pass_start)
+</a><a href="#h2-0-179" id="h2-0-179" class="i">+    {
+</a><a href="#h2-0-180" id="h2-0-180" class="i">+        octet_iterator end = it;
+</a><a href="#h2-0-181" id="h2-0-181" class="i">+        while (internal::is_trail(*(--it)))
+</a><a href="#h2-0-182" id="h2-0-182" class="i">+            if (it == pass_start)
+</a><a href="#h2-0-183" id="h2-0-183" class="i">+                throw invalid_utf8(*it); // error - no lead byte in the sequence
+</a><a href="#h2-0-184" id="h2-0-184" class="i">+        octet_iterator temp = it;
+</a><a href="#h2-0-185" id="h2-0-185" class="i">+        return next(temp, end);
+</a><a href="#h2-0-186" id="h2-0-186" class="i">+    }
+</a><a href="#h2-0-187" id="h2-0-187" class="i">+
+</a><a href="#h2-0-188" id="h2-0-188" class="i">+    template &lt;typename octet_iterator, typename distance_type&gt;
+</a><a href="#h2-0-189" id="h2-0-189" class="i">+    void advance (octet_iterator&amp; it, distance_type n, octet_iterator end)
+</a><a href="#h2-0-190" id="h2-0-190" class="i">+    {
+</a><a href="#h2-0-191" id="h2-0-191" class="i">+        for (distance_type i = 0; i &lt; n; ++i)
+</a><a href="#h2-0-192" id="h2-0-192" class="i">+            next(it, end);
+</a><a href="#h2-0-193" id="h2-0-193" class="i">+    }
+</a><a href="#h2-0-194" id="h2-0-194" class="i">+
+</a><a href="#h2-0-195" id="h2-0-195" class="i">+    template &lt;typename octet_iterator&gt;
+</a><a href="#h2-0-196" id="h2-0-196" class="i">+    typename std::iterator_traits&lt;octet_iterator&gt;::difference_type
+</a><a href="#h2-0-197" id="h2-0-197" class="i">+    distance (octet_iterator first, octet_iterator last)
+</a><a href="#h2-0-198" id="h2-0-198" class="i">+    {
+</a><a href="#h2-0-199" id="h2-0-199" class="i">+        typename std::iterator_traits&lt;octet_iterator&gt;::difference_type dist;
+</a><a href="#h2-0-200" id="h2-0-200" class="i">+        for (dist = 0; first &lt; last; ++dist)
+</a><a href="#h2-0-201" id="h2-0-201" class="i">+            next(first, last);
+</a><a href="#h2-0-202" id="h2-0-202" class="i">+        return dist;
+</a><a href="#h2-0-203" id="h2-0-203" class="i">+    }
+</a><a href="#h2-0-204" id="h2-0-204" class="i">+
+</a><a href="#h2-0-205" id="h2-0-205" class="i">+    template &lt;typename u16bit_iterator, typename octet_iterator&gt;
+</a><a href="#h2-0-206" id="h2-0-206" class="i">+    octet_iterator utf16to8 (u16bit_iterator start, u16bit_iterator end, octet_iterator result)
+</a><a href="#h2-0-207" id="h2-0-207" class="i">+    {
+</a><a href="#h2-0-208" id="h2-0-208" class="i">+        while (start != end) {
+</a><a href="#h2-0-209" id="h2-0-209" class="i">+            uint32_t cp = internal::mask16(*start++);
+</a><a href="#h2-0-210" id="h2-0-210" class="i">+            // Take care of surrogate pairs first
+</a><a href="#h2-0-211" id="h2-0-211" class="i">+            if (internal::is_lead_surrogate(cp)) {
+</a><a href="#h2-0-212" id="h2-0-212" class="i">+                if (start != end) {
+</a><a href="#h2-0-213" id="h2-0-213" class="i">+                    uint32_t trail_surrogate = internal::mask16(*start++);
+</a><a href="#h2-0-214" id="h2-0-214" class="i">+                    if (internal::is_trail_surrogate(trail_surrogate))
+</a><a href="#h2-0-215" id="h2-0-215" class="i">+                        cp = (cp &lt;&lt; 10) + trail_surrogate + internal::SURROGATE_OFFSET;
+</a><a href="#h2-0-216" id="h2-0-216" class="i">+                    else
+</a><a href="#h2-0-217" id="h2-0-217" class="i">+                        throw invalid_utf16(static_cast&lt;uint16_t&gt;(trail_surrogate));
+</a><a href="#h2-0-218" id="h2-0-218" class="i">+                }
+</a><a href="#h2-0-219" id="h2-0-219" class="i">+                else
+</a><a href="#h2-0-220" id="h2-0-220" class="i">+                    throw invalid_utf16(static_cast&lt;uint16_t&gt;(cp));
+</a><a href="#h2-0-221" id="h2-0-221" class="i">+
+</a><a href="#h2-0-222" id="h2-0-222" class="i">+            }
+</a><a href="#h2-0-223" id="h2-0-223" class="i">+            // Lone trail surrogate
+</a><a href="#h2-0-224" id="h2-0-224" class="i">+            else if (internal::is_trail_surrogate(cp))
+</a><a href="#h2-0-225" id="h2-0-225" class="i">+                throw invalid_utf16(static_cast&lt;uint16_t&gt;(cp));
+</a><a href="#h2-0-226" id="h2-0-226" class="i">+
+</a><a href="#h2-0-227" id="h2-0-227" class="i">+            result = append(cp, result);
+</a><a href="#h2-0-228" id="h2-0-228" class="i">+        }
+</a><a href="#h2-0-229" id="h2-0-229" class="i">+        return result;
+</a><a href="#h2-0-230" id="h2-0-230" class="i">+    }
+</a><a href="#h2-0-231" id="h2-0-231" class="i">+
+</a><a href="#h2-0-232" id="h2-0-232" class="i">+    template &lt;typename u16bit_iterator, typename octet_iterator&gt;
+</a><a href="#h2-0-233" id="h2-0-233" class="i">+    u16bit_iterator utf8to16 (octet_iterator start, octet_iterator end, u16bit_iterator result)
+</a><a href="#h2-0-234" id="h2-0-234" class="i">+    {
+</a><a href="#h2-0-235" id="h2-0-235" class="i">+        while (start != end) {
+</a><a href="#h2-0-236" id="h2-0-236" class="i">+            uint32_t cp = next(start, end);
+</a><a href="#h2-0-237" id="h2-0-237" class="i">+            if (cp &gt; 0xffff) { //make a surrogate pair
+</a><a href="#h2-0-238" id="h2-0-238" class="i">+                *result++ = static_cast&lt;uint16_t&gt;((cp &gt;&gt; 10)   + internal::LEAD_OFFSET);
+</a><a href="#h2-0-239" id="h2-0-239" class="i">+                *result++ = static_cast&lt;uint16_t&gt;((cp &amp; 0x3ff) + internal::TRAIL_SURROGATE_MIN);
+</a><a href="#h2-0-240" id="h2-0-240" class="i">+            }
+</a><a href="#h2-0-241" id="h2-0-241" class="i">+            else
+</a><a href="#h2-0-242" id="h2-0-242" class="i">+                *result++ = static_cast&lt;uint16_t&gt;(cp);
+</a><a href="#h2-0-243" id="h2-0-243" class="i">+        }
+</a><a href="#h2-0-244" id="h2-0-244" class="i">+        return result;
+</a><a href="#h2-0-245" id="h2-0-245" class="i">+    }
+</a><a href="#h2-0-246" id="h2-0-246" class="i">+
+</a><a href="#h2-0-247" id="h2-0-247" class="i">+    template &lt;typename octet_iterator, typename u32bit_iterator&gt;
+</a><a href="#h2-0-248" id="h2-0-248" class="i">+    octet_iterator utf32to8 (u32bit_iterator start, u32bit_iterator end, octet_iterator result)
+</a><a href="#h2-0-249" id="h2-0-249" class="i">+    {
+</a><a href="#h2-0-250" id="h2-0-250" class="i">+        while (start != end)
+</a><a href="#h2-0-251" id="h2-0-251" class="i">+            result = append(*(start++), result);
+</a><a href="#h2-0-252" id="h2-0-252" class="i">+
+</a><a href="#h2-0-253" id="h2-0-253" class="i">+        return result;
+</a><a href="#h2-0-254" id="h2-0-254" class="i">+    }
+</a><a href="#h2-0-255" id="h2-0-255" class="i">+
+</a><a href="#h2-0-256" id="h2-0-256" class="i">+    template &lt;typename octet_iterator, typename u32bit_iterator&gt;
+</a><a href="#h2-0-257" id="h2-0-257" class="i">+    u32bit_iterator utf8to32 (octet_iterator start, octet_iterator end, u32bit_iterator result)
+</a><a href="#h2-0-258" id="h2-0-258" class="i">+    {
+</a><a href="#h2-0-259" id="h2-0-259" class="i">+        while (start != end)
+</a><a href="#h2-0-260" id="h2-0-260" class="i">+            (*result++) = next(start, end);
+</a><a href="#h2-0-261" id="h2-0-261" class="i">+
+</a><a href="#h2-0-262" id="h2-0-262" class="i">+        return result;
+</a><a href="#h2-0-263" id="h2-0-263" class="i">+    }
+</a><a href="#h2-0-264" id="h2-0-264" class="i">+
+</a><a href="#h2-0-265" id="h2-0-265" class="i">+    // The iterator class
+</a><a href="#h2-0-266" id="h2-0-266" class="i">+    template &lt;typename octet_iterator&gt;
+</a><a href="#h2-0-267" id="h2-0-267" class="i">+    class iterator : public std::iterator &lt;std::bidirectional_iterator_tag, uint32_t&gt; {
+</a><a href="#h2-0-268" id="h2-0-268" class="i">+      octet_iterator it;
+</a><a href="#h2-0-269" id="h2-0-269" class="i">+      octet_iterator range_start;
+</a><a href="#h2-0-270" id="h2-0-270" class="i">+      octet_iterator range_end;
+</a><a href="#h2-0-271" id="h2-0-271" class="i">+      public:
+</a><a href="#h2-0-272" id="h2-0-272" class="i">+      iterator () {};
+</a><a href="#h2-0-273" id="h2-0-273" class="i">+      explicit iterator (const octet_iterator&amp; octet_it,
+</a><a href="#h2-0-274" id="h2-0-274" class="i">+                         const octet_iterator&amp; range_start,
+</a><a href="#h2-0-275" id="h2-0-275" class="i">+                         const octet_iterator&amp; range_end) :
+</a><a href="#h2-0-276" id="h2-0-276" class="i">+               it(octet_it), range_start(range_start), range_end(range_end)
+</a><a href="#h2-0-277" id="h2-0-277" class="i">+      {
+</a><a href="#h2-0-278" id="h2-0-278" class="i">+          if (it &lt; range_start || it &gt; range_end)
+</a><a href="#h2-0-279" id="h2-0-279" class="i">+              throw std::out_of_range(&quot;Invalid utf-8 iterator position&quot;);
+</a><a href="#h2-0-280" id="h2-0-280" class="i">+      }
+</a><a href="#h2-0-281" id="h2-0-281" class="i">+      // the default &quot;big three&quot; are OK
+</a><a href="#h2-0-282" id="h2-0-282" class="i">+      octet_iterator base () const { return it; }
+</a><a href="#h2-0-283" id="h2-0-283" class="i">+      uint32_t operator * () const
+</a><a href="#h2-0-284" id="h2-0-284" class="i">+      {
+</a><a href="#h2-0-285" id="h2-0-285" class="i">+          octet_iterator temp = it;
+</a><a href="#h2-0-286" id="h2-0-286" class="i">+          return next(temp, range_end);
+</a><a href="#h2-0-287" id="h2-0-287" class="i">+      }
+</a><a href="#h2-0-288" id="h2-0-288" class="i">+      bool operator == (const iterator&amp; rhs) const
+</a><a href="#h2-0-289" id="h2-0-289" class="i">+      {
+</a><a href="#h2-0-290" id="h2-0-290" class="i">+          if (range_start != rhs.range_start || range_end != rhs.range_end)
+</a><a href="#h2-0-291" id="h2-0-291" class="i">+              throw std::logic_error(&quot;Comparing utf-8 iterators defined with different ranges&quot;);
+</a><a href="#h2-0-292" id="h2-0-292" class="i">+          return (it == rhs.it);
+</a><a href="#h2-0-293" id="h2-0-293" class="i">+      }
+</a><a href="#h2-0-294" id="h2-0-294" class="i">+      bool operator != (const iterator&amp; rhs) const
+</a><a href="#h2-0-295" id="h2-0-295" class="i">+      {
+</a><a href="#h2-0-296" id="h2-0-296" class="i">+          return !(operator == (rhs));
+</a><a href="#h2-0-297" id="h2-0-297" class="i">+      }
+</a><a href="#h2-0-298" id="h2-0-298" class="i">+      iterator&amp; operator ++ ()
+</a><a href="#h2-0-299" id="h2-0-299" class="i">+      {
+</a><a href="#h2-0-300" id="h2-0-300" class="i">+          next(it, range_end);
+</a><a href="#h2-0-301" id="h2-0-301" class="i">+          return *this;
+</a><a href="#h2-0-302" id="h2-0-302" class="i">+      }
+</a><a href="#h2-0-303" id="h2-0-303" class="i">+      iterator operator ++ (int)
+</a><a href="#h2-0-304" id="h2-0-304" class="i">+      {
+</a><a href="#h2-0-305" id="h2-0-305" class="i">+          iterator temp = *this;
+</a><a href="#h2-0-306" id="h2-0-306" class="i">+          next(it, range_end);
+</a><a href="#h2-0-307" id="h2-0-307" class="i">+          return temp;
+</a><a href="#h2-0-308" id="h2-0-308" class="i">+      }
+</a><a href="#h2-0-309" id="h2-0-309" class="i">+      iterator&amp; operator -- ()
+</a><a href="#h2-0-310" id="h2-0-310" class="i">+      {
+</a><a href="#h2-0-311" id="h2-0-311" class="i">+          prior(it, range_start);
+</a><a href="#h2-0-312" id="h2-0-312" class="i">+          return *this;
+</a><a href="#h2-0-313" id="h2-0-313" class="i">+      }
+</a><a href="#h2-0-314" id="h2-0-314" class="i">+      iterator operator -- (int)
+</a><a href="#h2-0-315" id="h2-0-315" class="i">+      {
+</a><a href="#h2-0-316" id="h2-0-316" class="i">+          iterator temp = *this;
+</a><a href="#h2-0-317" id="h2-0-317" class="i">+          prior(it, range_start);
+</a><a href="#h2-0-318" id="h2-0-318" class="i">+          return temp;
+</a><a href="#h2-0-319" id="h2-0-319" class="i">+      }
+</a><a href="#h2-0-320" id="h2-0-320" class="i">+    }; // class iterator
+</a><a href="#h2-0-321" id="h2-0-321" class="i">+
+</a><a href="#h2-0-322" id="h2-0-322" class="i">+} // namespace utf8
+</a><a href="#h2-0-323" id="h2-0-323" class="i">+
+</a><a href="#h2-0-324" id="h2-0-324" class="i">+#endif //header guard
+</a><a href="#h2-0-325" id="h2-0-325" class="i">+
+</a><a href="#h2-0-326" id="h2-0-326" class="i">+
+</a><b>diff --git a/<a id="h3" href="../file/utf8/core.h">utf8/core.h</a> b/<a href="../file/utf8/core.h">utf8/core.h</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -0,0 +1,358 @@
+</a><a href="#h3-0-0" id="h3-0-0" class="i">+// Copyright 2006 Nemanja Trifunovic
+</a><a href="#h3-0-1" id="h3-0-1" class="i">+
+</a><a href="#h3-0-2" id="h3-0-2" class="i">+/*
+</a><a href="#h3-0-3" id="h3-0-3" class="i">+Permission is hereby granted, free of charge, to any person or organization
+</a><a href="#h3-0-4" id="h3-0-4" class="i">+obtaining a copy of the software and accompanying documentation covered by
+</a><a href="#h3-0-5" id="h3-0-5" class="i">+this license (the &quot;Software&quot;) to use, reproduce, display, distribute,
+</a><a href="#h3-0-6" id="h3-0-6" class="i">+execute, and transmit the Software, and to prepare derivative works of the
+</a><a href="#h3-0-7" id="h3-0-7" class="i">+Software, and to permit third-parties to whom the Software is furnished to
+</a><a href="#h3-0-8" id="h3-0-8" class="i">+do so, all subject to the following:
+</a><a href="#h3-0-9" id="h3-0-9" class="i">+
+</a><a href="#h3-0-10" id="h3-0-10" class="i">+The copyright notices in the Software and this entire statement, including
+</a><a href="#h3-0-11" id="h3-0-11" class="i">+the above license grant, this restriction and the following disclaimer,
+</a><a href="#h3-0-12" id="h3-0-12" class="i">+must be included in all copies of the Software, in whole or in part, and
+</a><a href="#h3-0-13" id="h3-0-13" class="i">+all derivative works of the Software, unless such copies or derivative
+</a><a href="#h3-0-14" id="h3-0-14" class="i">+works are solely in the form of machine-executable object code generated by
+</a><a href="#h3-0-15" id="h3-0-15" class="i">+a source language processor.
+</a><a href="#h3-0-16" id="h3-0-16" class="i">+
+</a><a href="#h3-0-17" id="h3-0-17" class="i">+THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+</a><a href="#h3-0-18" id="h3-0-18" class="i">+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+</a><a href="#h3-0-19" id="h3-0-19" class="i">+FITNESS FOR A PARTICULAR PURPOSE, TITLE AND NON-INFRINGEMENT. IN NO EVENT
+</a><a href="#h3-0-20" id="h3-0-20" class="i">+SHALL THE COPYRIGHT HOLDERS OR ANYONE DISTRIBUTING THE SOFTWARE BE LIABLE
+</a><a href="#h3-0-21" id="h3-0-21" class="i">+FOR ANY DAMAGES OR OTHER LIABILITY, WHETHER IN CONTRACT, TORT OR OTHERWISE,
+</a><a href="#h3-0-22" id="h3-0-22" class="i">+ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+</a><a href="#h3-0-23" id="h3-0-23" class="i">+DEALINGS IN THE SOFTWARE.
+</a><a href="#h3-0-24" id="h3-0-24" class="i">+*/
+</a><a href="#h3-0-25" id="h3-0-25" class="i">+
+</a><a href="#h3-0-26" id="h3-0-26" class="i">+
+</a><a href="#h3-0-27" id="h3-0-27" class="i">+#ifndef UTF8_FOR_CPP_CORE_H_2675DCD0_9480_4c0c_B92A_CC14C027B731
+</a><a href="#h3-0-28" id="h3-0-28" class="i">+#define UTF8_FOR_CPP_CORE_H_2675DCD0_9480_4c0c_B92A_CC14C027B731
+</a><a href="#h3-0-29" id="h3-0-29" class="i">+
+</a><a href="#h3-0-30" id="h3-0-30" class="i">+#include &lt;iterator&gt;
+</a><a href="#h3-0-31" id="h3-0-31" class="i">+
+</a><a href="#h3-0-32" id="h3-0-32" class="i">+namespace utf8
+</a><a href="#h3-0-33" id="h3-0-33" class="i">+{
+</a><a href="#h3-0-34" id="h3-0-34" class="i">+    // The typedefs for 8-bit, 16-bit and 32-bit unsigned integers
+</a><a href="#h3-0-35" id="h3-0-35" class="i">+    // You may need to change them to match your system.
+</a><a href="#h3-0-36" id="h3-0-36" class="i">+    // These typedefs have the same names as ones from cstdint, or boost/cstdint
+</a><a href="#h3-0-37" id="h3-0-37" class="i">+    typedef unsigned char   uint8_t;
+</a><a href="#h3-0-38" id="h3-0-38" class="i">+    typedef unsigned short  uint16_t;
+</a><a href="#h3-0-39" id="h3-0-39" class="i">+    typedef unsigned int    uint32_t;
+</a><a href="#h3-0-40" id="h3-0-40" class="i">+
+</a><a href="#h3-0-41" id="h3-0-41" class="i">+// Helper code - not intended to be directly called by the library users. May be changed at any time
+</a><a href="#h3-0-42" id="h3-0-42" class="i">+namespace internal
+</a><a href="#h3-0-43" id="h3-0-43" class="i">+{
+</a><a href="#h3-0-44" id="h3-0-44" class="i">+    // Unicode constants
+</a><a href="#h3-0-45" id="h3-0-45" class="i">+    // Leading (high) surrogates: 0xd800 - 0xdbff
+</a><a href="#h3-0-46" id="h3-0-46" class="i">+    // Trailing (low) surrogates: 0xdc00 - 0xdfff
+</a><a href="#h3-0-47" id="h3-0-47" class="i">+    const uint16_t LEAD_SURROGATE_MIN  = 0xd800u;
+</a><a href="#h3-0-48" id="h3-0-48" class="i">+    const uint16_t LEAD_SURROGATE_MAX  = 0xdbffu;
+</a><a href="#h3-0-49" id="h3-0-49" class="i">+    const uint16_t TRAIL_SURROGATE_MIN = 0xdc00u;
+</a><a href="#h3-0-50" id="h3-0-50" class="i">+    const uint16_t TRAIL_SURROGATE_MAX = 0xdfffu;
+</a><a href="#h3-0-51" id="h3-0-51" class="i">+    const uint16_t LEAD_OFFSET         = LEAD_SURROGATE_MIN - (0x10000 &gt;&gt; 10);
+</a><a href="#h3-0-52" id="h3-0-52" class="i">+    const uint32_t SURROGATE_OFFSET    = 0x10000u - (LEAD_SURROGATE_MIN &lt;&lt; 10) - TRAIL_SURROGATE_MIN;
+</a><a href="#h3-0-53" id="h3-0-53" class="i">+
+</a><a href="#h3-0-54" id="h3-0-54" class="i">+    // Maximum valid value for a Unicode code point
+</a><a href="#h3-0-55" id="h3-0-55" class="i">+    const uint32_t CODE_POINT_MAX      = 0x0010ffffu;
+</a><a href="#h3-0-56" id="h3-0-56" class="i">+
+</a><a href="#h3-0-57" id="h3-0-57" class="i">+    template&lt;typename octet_type&gt;
+</a><a href="#h3-0-58" id="h3-0-58" class="i">+    inline uint8_t mask8(octet_type oc)
+</a><a href="#h3-0-59" id="h3-0-59" class="i">+    {
+</a><a href="#h3-0-60" id="h3-0-60" class="i">+        return static_cast&lt;uint8_t&gt;(0xff &amp; oc);
+</a><a href="#h3-0-61" id="h3-0-61" class="i">+    }
+</a><a href="#h3-0-62" id="h3-0-62" class="i">+    template&lt;typename u16_type&gt;
+</a><a href="#h3-0-63" id="h3-0-63" class="i">+    inline uint16_t mask16(u16_type oc)
+</a><a href="#h3-0-64" id="h3-0-64" class="i">+    {
+</a><a href="#h3-0-65" id="h3-0-65" class="i">+        return static_cast&lt;uint16_t&gt;(0xffff &amp; oc);
+</a><a href="#h3-0-66" id="h3-0-66" class="i">+    }
+</a><a href="#h3-0-67" id="h3-0-67" class="i">+    template&lt;typename octet_type&gt;
+</a><a href="#h3-0-68" id="h3-0-68" class="i">+    inline bool is_trail(octet_type oc)
+</a><a href="#h3-0-69" id="h3-0-69" class="i">+    {
+</a><a href="#h3-0-70" id="h3-0-70" class="i">+        return ((mask8(oc) &gt;&gt; 6) == 0x2);
+</a><a href="#h3-0-71" id="h3-0-71" class="i">+    }
+</a><a href="#h3-0-72" id="h3-0-72" class="i">+
+</a><a href="#h3-0-73" id="h3-0-73" class="i">+    template &lt;typename u16&gt;
+</a><a href="#h3-0-74" id="h3-0-74" class="i">+    inline bool is_lead_surrogate(u16 cp)
+</a><a href="#h3-0-75" id="h3-0-75" class="i">+    {
+</a><a href="#h3-0-76" id="h3-0-76" class="i">+        return (cp &gt;= LEAD_SURROGATE_MIN &amp;&amp; cp &lt;= LEAD_SURROGATE_MAX);
+</a><a href="#h3-0-77" id="h3-0-77" class="i">+    }
+</a><a href="#h3-0-78" id="h3-0-78" class="i">+
+</a><a href="#h3-0-79" id="h3-0-79" class="i">+    template &lt;typename u16&gt;
+</a><a href="#h3-0-80" id="h3-0-80" class="i">+    inline bool is_trail_surrogate(u16 cp)
+</a><a href="#h3-0-81" id="h3-0-81" class="i">+    {
+</a><a href="#h3-0-82" id="h3-0-82" class="i">+        return (cp &gt;= TRAIL_SURROGATE_MIN &amp;&amp; cp &lt;= TRAIL_SURROGATE_MAX);
+</a><a href="#h3-0-83" id="h3-0-83" class="i">+    }
+</a><a href="#h3-0-84" id="h3-0-84" class="i">+
+</a><a href="#h3-0-85" id="h3-0-85" class="i">+    template &lt;typename u16&gt;
+</a><a href="#h3-0-86" id="h3-0-86" class="i">+    inline bool is_surrogate(u16 cp)
+</a><a href="#h3-0-87" id="h3-0-87" class="i">+    {
+</a><a href="#h3-0-88" id="h3-0-88" class="i">+        return (cp &gt;= LEAD_SURROGATE_MIN &amp;&amp; cp &lt;= TRAIL_SURROGATE_MAX);
+</a><a href="#h3-0-89" id="h3-0-89" class="i">+    }
+</a><a href="#h3-0-90" id="h3-0-90" class="i">+
+</a><a href="#h3-0-91" id="h3-0-91" class="i">+    template &lt;typename u32&gt;
+</a><a href="#h3-0-92" id="h3-0-92" class="i">+    inline bool is_code_point_valid(u32 cp)
+</a><a href="#h3-0-93" id="h3-0-93" class="i">+    {
+</a><a href="#h3-0-94" id="h3-0-94" class="i">+        return (cp &lt;= CODE_POINT_MAX &amp;&amp; !is_surrogate(cp));
+</a><a href="#h3-0-95" id="h3-0-95" class="i">+    }
+</a><a href="#h3-0-96" id="h3-0-96" class="i">+
+</a><a href="#h3-0-97" id="h3-0-97" class="i">+    template &lt;typename octet_iterator&gt;
+</a><a href="#h3-0-98" id="h3-0-98" class="i">+    inline typename std::iterator_traits&lt;octet_iterator&gt;::difference_type
+</a><a href="#h3-0-99" id="h3-0-99" class="i">+    sequence_length(octet_iterator lead_it)
+</a><a href="#h3-0-100" id="h3-0-100" class="i">+    {
+</a><a href="#h3-0-101" id="h3-0-101" class="i">+        uint8_t lead = mask8(*lead_it);
+</a><a href="#h3-0-102" id="h3-0-102" class="i">+        if (lead &lt; 0x80)
+</a><a href="#h3-0-103" id="h3-0-103" class="i">+            return 1;
+</a><a href="#h3-0-104" id="h3-0-104" class="i">+        else if ((lead &gt;&gt; 5) == 0x6)
+</a><a href="#h3-0-105" id="h3-0-105" class="i">+            return 2;
+</a><a href="#h3-0-106" id="h3-0-106" class="i">+        else if ((lead &gt;&gt; 4) == 0xe)
+</a><a href="#h3-0-107" id="h3-0-107" class="i">+            return 3;
+</a><a href="#h3-0-108" id="h3-0-108" class="i">+        else if ((lead &gt;&gt; 3) == 0x1e)
+</a><a href="#h3-0-109" id="h3-0-109" class="i">+            return 4;
+</a><a href="#h3-0-110" id="h3-0-110" class="i">+        else
+</a><a href="#h3-0-111" id="h3-0-111" class="i">+            return 0;
+</a><a href="#h3-0-112" id="h3-0-112" class="i">+    }
+</a><a href="#h3-0-113" id="h3-0-113" class="i">+
+</a><a href="#h3-0-114" id="h3-0-114" class="i">+    template &lt;typename octet_difference_type&gt;
+</a><a href="#h3-0-115" id="h3-0-115" class="i">+    inline bool is_overlong_sequence(uint32_t cp, octet_difference_type length)
+</a><a href="#h3-0-116" id="h3-0-116" class="i">+    {
+</a><a href="#h3-0-117" id="h3-0-117" class="i">+        if (cp &lt; 0x80) {
+</a><a href="#h3-0-118" id="h3-0-118" class="i">+            if (length != 1) 
+</a><a href="#h3-0-119" id="h3-0-119" class="i">+                return true;
+</a><a href="#h3-0-120" id="h3-0-120" class="i">+        }
+</a><a href="#h3-0-121" id="h3-0-121" class="i">+        else if (cp &lt; 0x800) {
+</a><a href="#h3-0-122" id="h3-0-122" class="i">+            if (length != 2) 
+</a><a href="#h3-0-123" id="h3-0-123" class="i">+                return true;
+</a><a href="#h3-0-124" id="h3-0-124" class="i">+        }
+</a><a href="#h3-0-125" id="h3-0-125" class="i">+        else if (cp &lt; 0x10000) {
+</a><a href="#h3-0-126" id="h3-0-126" class="i">+            if (length != 3) 
+</a><a href="#h3-0-127" id="h3-0-127" class="i">+                return true;
+</a><a href="#h3-0-128" id="h3-0-128" class="i">+        }
+</a><a href="#h3-0-129" id="h3-0-129" class="i">+
+</a><a href="#h3-0-130" id="h3-0-130" class="i">+        return false;
+</a><a href="#h3-0-131" id="h3-0-131" class="i">+    }
+</a><a href="#h3-0-132" id="h3-0-132" class="i">+
+</a><a href="#h3-0-133" id="h3-0-133" class="i">+    enum utf_error {UTF8_OK, NOT_ENOUGH_ROOM, INVALID_LEAD, INCOMPLETE_SEQUENCE, OVERLONG_SEQUENCE, INVALID_CODE_POINT};
+</a><a href="#h3-0-134" id="h3-0-134" class="i">+
+</a><a href="#h3-0-135" id="h3-0-135" class="i">+    /// get_sequence_x functions decode utf-8 sequences of the length x
+</a><a href="#h3-0-136" id="h3-0-136" class="i">+
+</a><a href="#h3-0-137" id="h3-0-137" class="i">+    template &lt;typename octet_iterator&gt;
+</a><a href="#h3-0-138" id="h3-0-138" class="i">+    utf_error get_sequence_1(octet_iterator&amp; it, octet_iterator end, uint32_t* code_point)
+</a><a href="#h3-0-139" id="h3-0-139" class="i">+    {
+</a><a href="#h3-0-140" id="h3-0-140" class="i">+        if (it != end) {
+</a><a href="#h3-0-141" id="h3-0-141" class="i">+            if (code_point)
+</a><a href="#h3-0-142" id="h3-0-142" class="i">+                *code_point = mask8(*it);
+</a><a href="#h3-0-143" id="h3-0-143" class="i">+            return UTF8_OK;
+</a><a href="#h3-0-144" id="h3-0-144" class="i">+        }
+</a><a href="#h3-0-145" id="h3-0-145" class="i">+        return NOT_ENOUGH_ROOM;
+</a><a href="#h3-0-146" id="h3-0-146" class="i">+    }
+</a><a href="#h3-0-147" id="h3-0-147" class="i">+
+</a><a href="#h3-0-148" id="h3-0-148" class="i">+    template &lt;typename octet_iterator&gt;
+</a><a href="#h3-0-149" id="h3-0-149" class="i">+    utf_error get_sequence_2(octet_iterator&amp; it, octet_iterator end, uint32_t* code_point)
+</a><a href="#h3-0-150" id="h3-0-150" class="i">+    {
+</a><a href="#h3-0-151" id="h3-0-151" class="i">+        utf_error ret_code = NOT_ENOUGH_ROOM;
+</a><a href="#h3-0-152" id="h3-0-152" class="i">+
+</a><a href="#h3-0-153" id="h3-0-153" class="i">+        if (it != end) {
+</a><a href="#h3-0-154" id="h3-0-154" class="i">+            uint32_t cp = mask8(*it);
+</a><a href="#h3-0-155" id="h3-0-155" class="i">+            if (++it != end) {
+</a><a href="#h3-0-156" id="h3-0-156" class="i">+                if (is_trail(*it)) {
+</a><a href="#h3-0-157" id="h3-0-157" class="i">+                    cp = ((cp &lt;&lt; 6) &amp; 0x7ff) + ((*it) &amp; 0x3f);
+</a><a href="#h3-0-158" id="h3-0-158" class="i">+
+</a><a href="#h3-0-159" id="h3-0-159" class="i">+                    if (code_point)
+</a><a href="#h3-0-160" id="h3-0-160" class="i">+                        *code_point = cp;
+</a><a href="#h3-0-161" id="h3-0-161" class="i">+                    ret_code = UTF8_OK;
+</a><a href="#h3-0-162" id="h3-0-162" class="i">+                }
+</a><a href="#h3-0-163" id="h3-0-163" class="i">+                else
+</a><a href="#h3-0-164" id="h3-0-164" class="i">+                    ret_code = INCOMPLETE_SEQUENCE;
+</a><a href="#h3-0-165" id="h3-0-165" class="i">+            }
+</a><a href="#h3-0-166" id="h3-0-166" class="i">+            else
+</a><a href="#h3-0-167" id="h3-0-167" class="i">+                ret_code = NOT_ENOUGH_ROOM;
+</a><a href="#h3-0-168" id="h3-0-168" class="i">+        }
+</a><a href="#h3-0-169" id="h3-0-169" class="i">+
+</a><a href="#h3-0-170" id="h3-0-170" class="i">+        return ret_code;
+</a><a href="#h3-0-171" id="h3-0-171" class="i">+    }
+</a><a href="#h3-0-172" id="h3-0-172" class="i">+
+</a><a href="#h3-0-173" id="h3-0-173" class="i">+    template &lt;typename octet_iterator&gt;
+</a><a href="#h3-0-174" id="h3-0-174" class="i">+    utf_error get_sequence_3(octet_iterator&amp; it, octet_iterator end, uint32_t* code_point)
+</a><a href="#h3-0-175" id="h3-0-175" class="i">+    {
+</a><a href="#h3-0-176" id="h3-0-176" class="i">+        utf_error ret_code = NOT_ENOUGH_ROOM;
+</a><a href="#h3-0-177" id="h3-0-177" class="i">+
+</a><a href="#h3-0-178" id="h3-0-178" class="i">+        if (it != end) {
+</a><a href="#h3-0-179" id="h3-0-179" class="i">+            uint32_t cp = mask8(*it);
+</a><a href="#h3-0-180" id="h3-0-180" class="i">+            if (++it != end) {
+</a><a href="#h3-0-181" id="h3-0-181" class="i">+                if (is_trail(*it)) {
+</a><a href="#h3-0-182" id="h3-0-182" class="i">+                    cp = ((cp &lt;&lt; 12) &amp; 0xffff) + ((mask8(*it) &lt;&lt; 6) &amp; 0xfff);
+</a><a href="#h3-0-183" id="h3-0-183" class="i">+                    if (++it != end) {
+</a><a href="#h3-0-184" id="h3-0-184" class="i">+                        if (is_trail(*it)) {
+</a><a href="#h3-0-185" id="h3-0-185" class="i">+                            cp += (*it) &amp; 0x3f;
+</a><a href="#h3-0-186" id="h3-0-186" class="i">+
+</a><a href="#h3-0-187" id="h3-0-187" class="i">+                            if (code_point)
+</a><a href="#h3-0-188" id="h3-0-188" class="i">+                                *code_point = cp;
+</a><a href="#h3-0-189" id="h3-0-189" class="i">+                            ret_code = UTF8_OK;
+</a><a href="#h3-0-190" id="h3-0-190" class="i">+                        }
+</a><a href="#h3-0-191" id="h3-0-191" class="i">+                        else 
+</a><a href="#h3-0-192" id="h3-0-192" class="i">+                            ret_code = INCOMPLETE_SEQUENCE;
+</a><a href="#h3-0-193" id="h3-0-193" class="i">+                    }
+</a><a href="#h3-0-194" id="h3-0-194" class="i">+                    else
+</a><a href="#h3-0-195" id="h3-0-195" class="i">+                        ret_code = NOT_ENOUGH_ROOM;
+</a><a href="#h3-0-196" id="h3-0-196" class="i">+                }
+</a><a href="#h3-0-197" id="h3-0-197" class="i">+                else
+</a><a href="#h3-0-198" id="h3-0-198" class="i">+                    ret_code = INCOMPLETE_SEQUENCE;
+</a><a href="#h3-0-199" id="h3-0-199" class="i">+            }
+</a><a href="#h3-0-200" id="h3-0-200" class="i">+            else
+</a><a href="#h3-0-201" id="h3-0-201" class="i">+                ret_code = NOT_ENOUGH_ROOM;
+</a><a href="#h3-0-202" id="h3-0-202" class="i">+        }
+</a><a href="#h3-0-203" id="h3-0-203" class="i">+
+</a><a href="#h3-0-204" id="h3-0-204" class="i">+        return ret_code;
+</a><a href="#h3-0-205" id="h3-0-205" class="i">+    }
+</a><a href="#h3-0-206" id="h3-0-206" class="i">+
+</a><a href="#h3-0-207" id="h3-0-207" class="i">+    template &lt;typename octet_iterator&gt;
+</a><a href="#h3-0-208" id="h3-0-208" class="i">+    utf_error get_sequence_4(octet_iterator&amp; it, octet_iterator end, uint32_t* code_point)
+</a><a href="#h3-0-209" id="h3-0-209" class="i">+    {
+</a><a href="#h3-0-210" id="h3-0-210" class="i">+        utf_error ret_code = NOT_ENOUGH_ROOM;
+</a><a href="#h3-0-211" id="h3-0-211" class="i">+
+</a><a href="#h3-0-212" id="h3-0-212" class="i">+        if (it != end) {
+</a><a href="#h3-0-213" id="h3-0-213" class="i">+            uint32_t cp = mask8(*it);
+</a><a href="#h3-0-214" id="h3-0-214" class="i">+            if (++it != end) {
+</a><a href="#h3-0-215" id="h3-0-215" class="i">+                if (is_trail(*it)) {
+</a><a href="#h3-0-216" id="h3-0-216" class="i">+                    cp = ((cp &lt;&lt; 18) &amp; 0x1fffff) + ((mask8(*it) &lt;&lt; 12) &amp; 0x3ffff);
+</a><a href="#h3-0-217" id="h3-0-217" class="i">+                    if (++it != end) {
+</a><a href="#h3-0-218" id="h3-0-218" class="i">+                        if (is_trail(*it)) {
+</a><a href="#h3-0-219" id="h3-0-219" class="i">+                            cp += (mask8(*it) &lt;&lt; 6) &amp; 0xfff;
+</a><a href="#h3-0-220" id="h3-0-220" class="i">+                            if (++it != end) {
+</a><a href="#h3-0-221" id="h3-0-221" class="i">+                                if (is_trail(*it)) {
+</a><a href="#h3-0-222" id="h3-0-222" class="i">+                                    cp += (*it) &amp; 0x3f;
+</a><a href="#h3-0-223" id="h3-0-223" class="i">+
+</a><a href="#h3-0-224" id="h3-0-224" class="i">+                                    if (code_point)
+</a><a href="#h3-0-225" id="h3-0-225" class="i">+                                        *code_point = cp;
+</a><a href="#h3-0-226" id="h3-0-226" class="i">+                                    ret_code = UTF8_OK;
+</a><a href="#h3-0-227" id="h3-0-227" class="i">+                                }
+</a><a href="#h3-0-228" id="h3-0-228" class="i">+                                else
+</a><a href="#h3-0-229" id="h3-0-229" class="i">+                                    ret_code = INCOMPLETE_SEQUENCE;
+</a><a href="#h3-0-230" id="h3-0-230" class="i">+                            }
+</a><a href="#h3-0-231" id="h3-0-231" class="i">+                            else
+</a><a href="#h3-0-232" id="h3-0-232" class="i">+                                ret_code = NOT_ENOUGH_ROOM;
+</a><a href="#h3-0-233" id="h3-0-233" class="i">+                        }
+</a><a href="#h3-0-234" id="h3-0-234" class="i">+                        else
+</a><a href="#h3-0-235" id="h3-0-235" class="i">+                            ret_code = INCOMPLETE_SEQUENCE;
+</a><a href="#h3-0-236" id="h3-0-236" class="i">+                    }
+</a><a href="#h3-0-237" id="h3-0-237" class="i">+                    else
+</a><a href="#h3-0-238" id="h3-0-238" class="i">+                        ret_code = NOT_ENOUGH_ROOM;
+</a><a href="#h3-0-239" id="h3-0-239" class="i">+                }
+</a><a href="#h3-0-240" id="h3-0-240" class="i">+                else 
+</a><a href="#h3-0-241" id="h3-0-241" class="i">+                    ret_code = INCOMPLETE_SEQUENCE;
+</a><a href="#h3-0-242" id="h3-0-242" class="i">+            }
+</a><a href="#h3-0-243" id="h3-0-243" class="i">+            else
+</a><a href="#h3-0-244" id="h3-0-244" class="i">+                ret_code = NOT_ENOUGH_ROOM;
+</a><a href="#h3-0-245" id="h3-0-245" class="i">+        }
+</a><a href="#h3-0-246" id="h3-0-246" class="i">+
+</a><a href="#h3-0-247" id="h3-0-247" class="i">+        return ret_code;
+</a><a href="#h3-0-248" id="h3-0-248" class="i">+    }
+</a><a href="#h3-0-249" id="h3-0-249" class="i">+
+</a><a href="#h3-0-250" id="h3-0-250" class="i">+    template &lt;typename octet_iterator&gt;
+</a><a href="#h3-0-251" id="h3-0-251" class="i">+    utf_error validate_next(octet_iterator&amp; it, octet_iterator end, uint32_t* code_point)
+</a><a href="#h3-0-252" id="h3-0-252" class="i">+    {
+</a><a href="#h3-0-253" id="h3-0-253" class="i">+        // Save the original value of it so we can go back in case of failure
+</a><a href="#h3-0-254" id="h3-0-254" class="i">+        // Of course, it does not make much sense with i.e. stream iterators
+</a><a href="#h3-0-255" id="h3-0-255" class="i">+        octet_iterator original_it = it;
+</a><a href="#h3-0-256" id="h3-0-256" class="i">+
+</a><a href="#h3-0-257" id="h3-0-257" class="i">+        uint32_t cp = 0;
+</a><a href="#h3-0-258" id="h3-0-258" class="i">+        // Determine the sequence length based on the lead octet
+</a><a href="#h3-0-259" id="h3-0-259" class="i">+        typedef typename std::iterator_traits&lt;octet_iterator&gt;::difference_type octet_difference_type;
+</a><a href="#h3-0-260" id="h3-0-260" class="i">+        octet_difference_type length = sequence_length(it);
+</a><a href="#h3-0-261" id="h3-0-261" class="i">+        if (length == 0)
+</a><a href="#h3-0-262" id="h3-0-262" class="i">+            return INVALID_LEAD;
+</a><a href="#h3-0-263" id="h3-0-263" class="i">+
+</a><a href="#h3-0-264" id="h3-0-264" class="i">+        // Now that we have a valid sequence length, get trail octets and calculate the code point
+</a><a href="#h3-0-265" id="h3-0-265" class="i">+        utf_error err = UTF8_OK;
+</a><a href="#h3-0-266" id="h3-0-266" class="i">+        switch (length) {
+</a><a href="#h3-0-267" id="h3-0-267" class="i">+            case 1:
+</a><a href="#h3-0-268" id="h3-0-268" class="i">+                err = get_sequence_1(it, end, &amp;cp);
+</a><a href="#h3-0-269" id="h3-0-269" class="i">+                break;
+</a><a href="#h3-0-270" id="h3-0-270" class="i">+            case 2:
+</a><a href="#h3-0-271" id="h3-0-271" class="i">+                err = get_sequence_2(it, end, &amp;cp);
+</a><a href="#h3-0-272" id="h3-0-272" class="i">+            break;
+</a><a href="#h3-0-273" id="h3-0-273" class="i">+            case 3:
+</a><a href="#h3-0-274" id="h3-0-274" class="i">+                err = get_sequence_3(it, end, &amp;cp);
+</a><a href="#h3-0-275" id="h3-0-275" class="i">+            break;
+</a><a href="#h3-0-276" id="h3-0-276" class="i">+            case 4:
+</a><a href="#h3-0-277" id="h3-0-277" class="i">+                err = get_sequence_4(it, end, &amp;cp);
+</a><a href="#h3-0-278" id="h3-0-278" class="i">+            break;
+</a><a href="#h3-0-279" id="h3-0-279" class="i">+        }
+</a><a href="#h3-0-280" id="h3-0-280" class="i">+
+</a><a href="#h3-0-281" id="h3-0-281" class="i">+        if (err == UTF8_OK) {
+</a><a href="#h3-0-282" id="h3-0-282" class="i">+            // Decoding succeeded. Now, security checks...
+</a><a href="#h3-0-283" id="h3-0-283" class="i">+            if (is_code_point_valid(cp)) {
+</a><a href="#h3-0-284" id="h3-0-284" class="i">+                if (!is_overlong_sequence(cp, length)){
+</a><a href="#h3-0-285" id="h3-0-285" class="i">+                    // Passed! Return here.
+</a><a href="#h3-0-286" id="h3-0-286" class="i">+                    if (code_point)
+</a><a href="#h3-0-287" id="h3-0-287" class="i">+                        *code_point = cp;
+</a><a href="#h3-0-288" id="h3-0-288" class="i">+                    ++it;
+</a><a href="#h3-0-289" id="h3-0-289" class="i">+                    return UTF8_OK;
+</a><a href="#h3-0-290" id="h3-0-290" class="i">+                }
+</a><a href="#h3-0-291" id="h3-0-291" class="i">+                else
+</a><a href="#h3-0-292" id="h3-0-292" class="i">+                    err = OVERLONG_SEQUENCE;
+</a><a href="#h3-0-293" id="h3-0-293" class="i">+            }
+</a><a href="#h3-0-294" id="h3-0-294" class="i">+            else 
+</a><a href="#h3-0-295" id="h3-0-295" class="i">+                err = INVALID_CODE_POINT;
+</a><a href="#h3-0-296" id="h3-0-296" class="i">+        }
+</a><a href="#h3-0-297" id="h3-0-297" class="i">+
+</a><a href="#h3-0-298" id="h3-0-298" class="i">+        // Failure branch - restore the original value of the iterator
+</a><a href="#h3-0-299" id="h3-0-299" class="i">+        it = original_it;
+</a><a href="#h3-0-300" id="h3-0-300" class="i">+        return err;
+</a><a href="#h3-0-301" id="h3-0-301" class="i">+    }
+</a><a href="#h3-0-302" id="h3-0-302" class="i">+
+</a><a href="#h3-0-303" id="h3-0-303" class="i">+    template &lt;typename octet_iterator&gt;
+</a><a href="#h3-0-304" id="h3-0-304" class="i">+    inline utf_error validate_next(octet_iterator&amp; it, octet_iterator end) {
+</a><a href="#h3-0-305" id="h3-0-305" class="i">+        return validate_next(it, end, 0);
+</a><a href="#h3-0-306" id="h3-0-306" class="i">+    }
+</a><a href="#h3-0-307" id="h3-0-307" class="i">+
+</a><a href="#h3-0-308" id="h3-0-308" class="i">+} // namespace internal
+</a><a href="#h3-0-309" id="h3-0-309" class="i">+
+</a><a href="#h3-0-310" id="h3-0-310" class="i">+    /// The library API - functions intended to be called by the users
+</a><a href="#h3-0-311" id="h3-0-311" class="i">+
+</a><a href="#h3-0-312" id="h3-0-312" class="i">+    // Byte order mark
+</a><a href="#h3-0-313" id="h3-0-313" class="i">+    const uint8_t bom[] = {0xef, 0xbb, 0xbf};
+</a><a href="#h3-0-314" id="h3-0-314" class="i">+
+</a><a href="#h3-0-315" id="h3-0-315" class="i">+    template &lt;typename octet_iterator&gt;
+</a><a href="#h3-0-316" id="h3-0-316" class="i">+    octet_iterator find_invalid(octet_iterator start, octet_iterator end)
+</a><a href="#h3-0-317" id="h3-0-317" class="i">+    {
+</a><a href="#h3-0-318" id="h3-0-318" class="i">+        octet_iterator result = start;
+</a><a href="#h3-0-319" id="h3-0-319" class="i">+        while (result != end) {
+</a><a href="#h3-0-320" id="h3-0-320" class="i">+            internal::utf_error err_code = internal::validate_next(result, end);
+</a><a href="#h3-0-321" id="h3-0-321" class="i">+            if (err_code != internal::UTF8_OK)
+</a><a href="#h3-0-322" id="h3-0-322" class="i">+                return result;
+</a><a href="#h3-0-323" id="h3-0-323" class="i">+        }
+</a><a href="#h3-0-324" id="h3-0-324" class="i">+        return result;
+</a><a href="#h3-0-325" id="h3-0-325" class="i">+    }
+</a><a href="#h3-0-326" id="h3-0-326" class="i">+
+</a><a href="#h3-0-327" id="h3-0-327" class="i">+    template &lt;typename octet_iterator&gt;
+</a><a href="#h3-0-328" id="h3-0-328" class="i">+    inline bool is_valid(octet_iterator start, octet_iterator end)
+</a><a href="#h3-0-329" id="h3-0-329" class="i">+    {
+</a><a href="#h3-0-330" id="h3-0-330" class="i">+        return (find_invalid(start, end) == end);
+</a><a href="#h3-0-331" id="h3-0-331" class="i">+    }
+</a><a href="#h3-0-332" id="h3-0-332" class="i">+
+</a><a href="#h3-0-333" id="h3-0-333" class="i">+    template &lt;typename octet_iterator&gt;
+</a><a href="#h3-0-334" id="h3-0-334" class="i">+    inline bool starts_with_bom (octet_iterator it, octet_iterator end)
+</a><a href="#h3-0-335" id="h3-0-335" class="i">+    {
+</a><a href="#h3-0-336" id="h3-0-336" class="i">+        return (
+</a><a href="#h3-0-337" id="h3-0-337" class="i">+            ((it != end) &amp;&amp; (internal::mask8(*it++)) == bom[0]) &amp;&amp;
+</a><a href="#h3-0-338" id="h3-0-338" class="i">+            ((it != end) &amp;&amp; (internal::mask8(*it++)) == bom[1]) &amp;&amp;
+</a><a href="#h3-0-339" id="h3-0-339" class="i">+            ((it != end) &amp;&amp; (internal::mask8(*it))   == bom[2])
+</a><a href="#h3-0-340" id="h3-0-340" class="i">+           );
+</a><a href="#h3-0-341" id="h3-0-341" class="i">+    }
+</a><a href="#h3-0-342" id="h3-0-342" class="i">+	
+</a><a href="#h3-0-343" id="h3-0-343" class="i">+	//Deprecated in release 2.3 
+</a><a href="#h3-0-344" id="h3-0-344" class="i">+    template &lt;typename octet_iterator&gt;
+</a><a href="#h3-0-345" id="h3-0-345" class="i">+    inline bool is_bom (octet_iterator it)
+</a><a href="#h3-0-346" id="h3-0-346" class="i">+    {
+</a><a href="#h3-0-347" id="h3-0-347" class="i">+        return (
+</a><a href="#h3-0-348" id="h3-0-348" class="i">+            (internal::mask8(*it++)) == bom[0] &amp;&amp;
+</a><a href="#h3-0-349" id="h3-0-349" class="i">+            (internal::mask8(*it++)) == bom[1] &amp;&amp;
+</a><a href="#h3-0-350" id="h3-0-350" class="i">+            (internal::mask8(*it))   == bom[2]
+</a><a href="#h3-0-351" id="h3-0-351" class="i">+           );
+</a><a href="#h3-0-352" id="h3-0-352" class="i">+    }
+</a><a href="#h3-0-353" id="h3-0-353" class="i">+} // namespace utf8
+</a><a href="#h3-0-354" id="h3-0-354" class="i">+
+</a><a href="#h3-0-355" id="h3-0-355" class="i">+#endif // header guard
+</a><a href="#h3-0-356" id="h3-0-356" class="i">+
+</a><a href="#h3-0-357" id="h3-0-357" class="i">+
+</a><b>diff --git a/<a id="h4" href="../file/utf8/unchecked.h">utf8/unchecked.h</a> b/<a href="../file/utf8/unchecked.h">utf8/unchecked.h</a></b>
+<a href="#h4-0" id="h4-0" class="h">@@ -0,0 +1,228 @@
+</a><a href="#h4-0-0" id="h4-0-0" class="i">+// Copyright 2006 Nemanja Trifunovic
+</a><a href="#h4-0-1" id="h4-0-1" class="i">+
+</a><a href="#h4-0-2" id="h4-0-2" class="i">+/*
+</a><a href="#h4-0-3" id="h4-0-3" class="i">+Permission is hereby granted, free of charge, to any person or organization
+</a><a href="#h4-0-4" id="h4-0-4" class="i">+obtaining a copy of the software and accompanying documentation covered by
+</a><a href="#h4-0-5" id="h4-0-5" class="i">+this license (the &quot;Software&quot;) to use, reproduce, display, distribute,
+</a><a href="#h4-0-6" id="h4-0-6" class="i">+execute, and transmit the Software, and to prepare derivative works of the
+</a><a href="#h4-0-7" id="h4-0-7" class="i">+Software, and to permit third-parties to whom the Software is furnished to
+</a><a href="#h4-0-8" id="h4-0-8" class="i">+do so, all subject to the following:
+</a><a href="#h4-0-9" id="h4-0-9" class="i">+
+</a><a href="#h4-0-10" id="h4-0-10" class="i">+The copyright notices in the Software and this entire statement, including
+</a><a href="#h4-0-11" id="h4-0-11" class="i">+the above license grant, this restriction and the following disclaimer,
+</a><a href="#h4-0-12" id="h4-0-12" class="i">+must be included in all copies of the Software, in whole or in part, and
+</a><a href="#h4-0-13" id="h4-0-13" class="i">+all derivative works of the Software, unless such copies or derivative
+</a><a href="#h4-0-14" id="h4-0-14" class="i">+works are solely in the form of machine-executable object code generated by
+</a><a href="#h4-0-15" id="h4-0-15" class="i">+a source language processor.
+</a><a href="#h4-0-16" id="h4-0-16" class="i">+
+</a><a href="#h4-0-17" id="h4-0-17" class="i">+THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+</a><a href="#h4-0-18" id="h4-0-18" class="i">+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+</a><a href="#h4-0-19" id="h4-0-19" class="i">+FITNESS FOR A PARTICULAR PURPOSE, TITLE AND NON-INFRINGEMENT. IN NO EVENT
+</a><a href="#h4-0-20" id="h4-0-20" class="i">+SHALL THE COPYRIGHT HOLDERS OR ANYONE DISTRIBUTING THE SOFTWARE BE LIABLE
+</a><a href="#h4-0-21" id="h4-0-21" class="i">+FOR ANY DAMAGES OR OTHER LIABILITY, WHETHER IN CONTRACT, TORT OR OTHERWISE,
+</a><a href="#h4-0-22" id="h4-0-22" class="i">+ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+</a><a href="#h4-0-23" id="h4-0-23" class="i">+DEALINGS IN THE SOFTWARE.
+</a><a href="#h4-0-24" id="h4-0-24" class="i">+*/
+</a><a href="#h4-0-25" id="h4-0-25" class="i">+
+</a><a href="#h4-0-26" id="h4-0-26" class="i">+
+</a><a href="#h4-0-27" id="h4-0-27" class="i">+#ifndef UTF8_FOR_CPP_UNCHECKED_H_2675DCD0_9480_4c0c_B92A_CC14C027B731
+</a><a href="#h4-0-28" id="h4-0-28" class="i">+#define UTF8_FOR_CPP_UNCHECKED_H_2675DCD0_9480_4c0c_B92A_CC14C027B731
+</a><a href="#h4-0-29" id="h4-0-29" class="i">+
+</a><a href="#h4-0-30" id="h4-0-30" class="i">+#include &quot;core.h&quot;
+</a><a href="#h4-0-31" id="h4-0-31" class="i">+
+</a><a href="#h4-0-32" id="h4-0-32" class="i">+namespace utf8
+</a><a href="#h4-0-33" id="h4-0-33" class="i">+{
+</a><a href="#h4-0-34" id="h4-0-34" class="i">+    namespace unchecked 
+</a><a href="#h4-0-35" id="h4-0-35" class="i">+    {
+</a><a href="#h4-0-36" id="h4-0-36" class="i">+        template &lt;typename octet_iterator&gt;
+</a><a href="#h4-0-37" id="h4-0-37" class="i">+        octet_iterator append(uint32_t cp, octet_iterator result)
+</a><a href="#h4-0-38" id="h4-0-38" class="i">+        {
+</a><a href="#h4-0-39" id="h4-0-39" class="i">+            if (cp &lt; 0x80)                        // one octet
+</a><a href="#h4-0-40" id="h4-0-40" class="i">+                *(result++) = static_cast&lt;uint8_t&gt;(cp);  
+</a><a href="#h4-0-41" id="h4-0-41" class="i">+            else if (cp &lt; 0x800) {                // two octets
+</a><a href="#h4-0-42" id="h4-0-42" class="i">+                *(result++) = static_cast&lt;uint8_t&gt;((cp &gt;&gt; 6)          | 0xc0);
+</a><a href="#h4-0-43" id="h4-0-43" class="i">+                *(result++) = static_cast&lt;uint8_t&gt;((cp &amp; 0x3f)        | 0x80);
+</a><a href="#h4-0-44" id="h4-0-44" class="i">+            }
+</a><a href="#h4-0-45" id="h4-0-45" class="i">+            else if (cp &lt; 0x10000) {              // three octets
+</a><a href="#h4-0-46" id="h4-0-46" class="i">+                *(result++) = static_cast&lt;uint8_t&gt;((cp &gt;&gt; 12)         | 0xe0);
+</a><a href="#h4-0-47" id="h4-0-47" class="i">+                *(result++) = static_cast&lt;uint8_t&gt;(((cp &gt;&gt; 6) &amp; 0x3f) | 0x80);
+</a><a href="#h4-0-48" id="h4-0-48" class="i">+                *(result++) = static_cast&lt;uint8_t&gt;((cp &amp; 0x3f)        | 0x80);
+</a><a href="#h4-0-49" id="h4-0-49" class="i">+            }
+</a><a href="#h4-0-50" id="h4-0-50" class="i">+            else {                                // four octets
+</a><a href="#h4-0-51" id="h4-0-51" class="i">+                *(result++) = static_cast&lt;uint8_t&gt;((cp &gt;&gt; 18)         | 0xf0);
+</a><a href="#h4-0-52" id="h4-0-52" class="i">+                *(result++) = static_cast&lt;uint8_t&gt;(((cp &gt;&gt; 12) &amp; 0x3f)| 0x80);
+</a><a href="#h4-0-53" id="h4-0-53" class="i">+                *(result++) = static_cast&lt;uint8_t&gt;(((cp &gt;&gt; 6) &amp; 0x3f) | 0x80);
+</a><a href="#h4-0-54" id="h4-0-54" class="i">+                *(result++) = static_cast&lt;uint8_t&gt;((cp &amp; 0x3f)        | 0x80);
+</a><a href="#h4-0-55" id="h4-0-55" class="i">+            }
+</a><a href="#h4-0-56" id="h4-0-56" class="i">+            return result;
+</a><a href="#h4-0-57" id="h4-0-57" class="i">+        }
+</a><a href="#h4-0-58" id="h4-0-58" class="i">+
+</a><a href="#h4-0-59" id="h4-0-59" class="i">+        template &lt;typename octet_iterator&gt;
+</a><a href="#h4-0-60" id="h4-0-60" class="i">+        uint32_t next(octet_iterator&amp; it)
+</a><a href="#h4-0-61" id="h4-0-61" class="i">+        {
+</a><a href="#h4-0-62" id="h4-0-62" class="i">+            uint32_t cp = internal::mask8(*it);
+</a><a href="#h4-0-63" id="h4-0-63" class="i">+            typename std::iterator_traits&lt;octet_iterator&gt;::difference_type length = utf8::internal::sequence_length(it);
+</a><a href="#h4-0-64" id="h4-0-64" class="i">+            switch (length) {
+</a><a href="#h4-0-65" id="h4-0-65" class="i">+                case 1:
+</a><a href="#h4-0-66" id="h4-0-66" class="i">+                    break;
+</a><a href="#h4-0-67" id="h4-0-67" class="i">+                case 2:
+</a><a href="#h4-0-68" id="h4-0-68" class="i">+                    it++;
+</a><a href="#h4-0-69" id="h4-0-69" class="i">+                    cp = ((cp &lt;&lt; 6) &amp; 0x7ff) + ((*it) &amp; 0x3f);
+</a><a href="#h4-0-70" id="h4-0-70" class="i">+                    break;
+</a><a href="#h4-0-71" id="h4-0-71" class="i">+                case 3:
+</a><a href="#h4-0-72" id="h4-0-72" class="i">+                    ++it; 
+</a><a href="#h4-0-73" id="h4-0-73" class="i">+                    cp = ((cp &lt;&lt; 12) &amp; 0xffff) + ((internal::mask8(*it) &lt;&lt; 6) &amp; 0xfff);
+</a><a href="#h4-0-74" id="h4-0-74" class="i">+                    ++it;
+</a><a href="#h4-0-75" id="h4-0-75" class="i">+                    cp += (*it) &amp; 0x3f;
+</a><a href="#h4-0-76" id="h4-0-76" class="i">+                    break;
+</a><a href="#h4-0-77" id="h4-0-77" class="i">+                case 4:
+</a><a href="#h4-0-78" id="h4-0-78" class="i">+                    ++it;
+</a><a href="#h4-0-79" id="h4-0-79" class="i">+                    cp = ((cp &lt;&lt; 18) &amp; 0x1fffff) + ((internal::mask8(*it) &lt;&lt; 12) &amp; 0x3ffff);                
+</a><a href="#h4-0-80" id="h4-0-80" class="i">+                    ++it;
+</a><a href="#h4-0-81" id="h4-0-81" class="i">+                    cp += (internal::mask8(*it) &lt;&lt; 6) &amp; 0xfff;
+</a><a href="#h4-0-82" id="h4-0-82" class="i">+                    ++it;
+</a><a href="#h4-0-83" id="h4-0-83" class="i">+                    cp += (*it) &amp; 0x3f; 
+</a><a href="#h4-0-84" id="h4-0-84" class="i">+                    break;
+</a><a href="#h4-0-85" id="h4-0-85" class="i">+            }
+</a><a href="#h4-0-86" id="h4-0-86" class="i">+            ++it;
+</a><a href="#h4-0-87" id="h4-0-87" class="i">+            return cp;        
+</a><a href="#h4-0-88" id="h4-0-88" class="i">+        }
+</a><a href="#h4-0-89" id="h4-0-89" class="i">+
+</a><a href="#h4-0-90" id="h4-0-90" class="i">+        template &lt;typename octet_iterator&gt;
+</a><a href="#h4-0-91" id="h4-0-91" class="i">+        uint32_t peek_next(octet_iterator it)
+</a><a href="#h4-0-92" id="h4-0-92" class="i">+        {
+</a><a href="#h4-0-93" id="h4-0-93" class="i">+            return next(it);    
+</a><a href="#h4-0-94" id="h4-0-94" class="i">+        }
+</a><a href="#h4-0-95" id="h4-0-95" class="i">+
+</a><a href="#h4-0-96" id="h4-0-96" class="i">+        template &lt;typename octet_iterator&gt;
+</a><a href="#h4-0-97" id="h4-0-97" class="i">+        uint32_t prior(octet_iterator&amp; it)
+</a><a href="#h4-0-98" id="h4-0-98" class="i">+        {
+</a><a href="#h4-0-99" id="h4-0-99" class="i">+            while (internal::is_trail(*(--it))) ;
+</a><a href="#h4-0-100" id="h4-0-100" class="i">+            octet_iterator temp = it;
+</a><a href="#h4-0-101" id="h4-0-101" class="i">+            return next(temp);
+</a><a href="#h4-0-102" id="h4-0-102" class="i">+        }
+</a><a href="#h4-0-103" id="h4-0-103" class="i">+
+</a><a href="#h4-0-104" id="h4-0-104" class="i">+        // Deprecated in versions that include prior, but only for the sake of consistency (see utf8::previous)
+</a><a href="#h4-0-105" id="h4-0-105" class="i">+        template &lt;typename octet_iterator&gt;
+</a><a href="#h4-0-106" id="h4-0-106" class="i">+        inline uint32_t previous(octet_iterator&amp; it)
+</a><a href="#h4-0-107" id="h4-0-107" class="i">+        {
+</a><a href="#h4-0-108" id="h4-0-108" class="i">+            return prior(it);
+</a><a href="#h4-0-109" id="h4-0-109" class="i">+        }
+</a><a href="#h4-0-110" id="h4-0-110" class="i">+
+</a><a href="#h4-0-111" id="h4-0-111" class="i">+        template &lt;typename octet_iterator, typename distance_type&gt;
+</a><a href="#h4-0-112" id="h4-0-112" class="i">+        void advance (octet_iterator&amp; it, distance_type n)
+</a><a href="#h4-0-113" id="h4-0-113" class="i">+        {
+</a><a href="#h4-0-114" id="h4-0-114" class="i">+            for (distance_type i = 0; i &lt; n; ++i)
+</a><a href="#h4-0-115" id="h4-0-115" class="i">+                next(it);
+</a><a href="#h4-0-116" id="h4-0-116" class="i">+        }
+</a><a href="#h4-0-117" id="h4-0-117" class="i">+
+</a><a href="#h4-0-118" id="h4-0-118" class="i">+        template &lt;typename octet_iterator&gt;
+</a><a href="#h4-0-119" id="h4-0-119" class="i">+        typename std::iterator_traits&lt;octet_iterator&gt;::difference_type
+</a><a href="#h4-0-120" id="h4-0-120" class="i">+        distance (octet_iterator first, octet_iterator last)
+</a><a href="#h4-0-121" id="h4-0-121" class="i">+        {
+</a><a href="#h4-0-122" id="h4-0-122" class="i">+            typename std::iterator_traits&lt;octet_iterator&gt;::difference_type dist;
+</a><a href="#h4-0-123" id="h4-0-123" class="i">+            for (dist = 0; first &lt; last; ++dist) 
+</a><a href="#h4-0-124" id="h4-0-124" class="i">+                next(first);
+</a><a href="#h4-0-125" id="h4-0-125" class="i">+            return dist;
+</a><a href="#h4-0-126" id="h4-0-126" class="i">+        }
+</a><a href="#h4-0-127" id="h4-0-127" class="i">+
+</a><a href="#h4-0-128" id="h4-0-128" class="i">+        template &lt;typename u16bit_iterator, typename octet_iterator&gt;
+</a><a href="#h4-0-129" id="h4-0-129" class="i">+        octet_iterator utf16to8 (u16bit_iterator start, u16bit_iterator end, octet_iterator result)
+</a><a href="#h4-0-130" id="h4-0-130" class="i">+        {       
+</a><a href="#h4-0-131" id="h4-0-131" class="i">+            while (start != end) {
+</a><a href="#h4-0-132" id="h4-0-132" class="i">+                uint32_t cp = internal::mask16(*start++);
+</a><a href="#h4-0-133" id="h4-0-133" class="i">+            // Take care of surrogate pairs first
+</a><a href="#h4-0-134" id="h4-0-134" class="i">+                if (internal::is_lead_surrogate(cp)) {
+</a><a href="#h4-0-135" id="h4-0-135" class="i">+                    uint32_t trail_surrogate = internal::mask16(*start++);
+</a><a href="#h4-0-136" id="h4-0-136" class="i">+                    cp = (cp &lt;&lt; 10) + trail_surrogate + internal::SURROGATE_OFFSET;
+</a><a href="#h4-0-137" id="h4-0-137" class="i">+                }
+</a><a href="#h4-0-138" id="h4-0-138" class="i">+                result = append(cp, result);
+</a><a href="#h4-0-139" id="h4-0-139" class="i">+            }
+</a><a href="#h4-0-140" id="h4-0-140" class="i">+            return result;         
+</a><a href="#h4-0-141" id="h4-0-141" class="i">+        }
+</a><a href="#h4-0-142" id="h4-0-142" class="i">+
+</a><a href="#h4-0-143" id="h4-0-143" class="i">+        template &lt;typename u16bit_iterator, typename octet_iterator&gt;
+</a><a href="#h4-0-144" id="h4-0-144" class="i">+        u16bit_iterator utf8to16 (octet_iterator start, octet_iterator end, u16bit_iterator result)
+</a><a href="#h4-0-145" id="h4-0-145" class="i">+        {
+</a><a href="#h4-0-146" id="h4-0-146" class="i">+            while (start &lt; end) {
+</a><a href="#h4-0-147" id="h4-0-147" class="i">+                uint32_t cp = next(start);
+</a><a href="#h4-0-148" id="h4-0-148" class="i">+                if (cp &gt; 0xffff) { //make a surrogate pair
+</a><a href="#h4-0-149" id="h4-0-149" class="i">+                    *result++ = static_cast&lt;uint16_t&gt;((cp &gt;&gt; 10)   + internal::LEAD_OFFSET);
+</a><a href="#h4-0-150" id="h4-0-150" class="i">+                    *result++ = static_cast&lt;uint16_t&gt;((cp &amp; 0x3ff) + internal::TRAIL_SURROGATE_MIN);
+</a><a href="#h4-0-151" id="h4-0-151" class="i">+                }
+</a><a href="#h4-0-152" id="h4-0-152" class="i">+                else
+</a><a href="#h4-0-153" id="h4-0-153" class="i">+                    *result++ = static_cast&lt;uint16_t&gt;(cp);
+</a><a href="#h4-0-154" id="h4-0-154" class="i">+            }
+</a><a href="#h4-0-155" id="h4-0-155" class="i">+            return result;
+</a><a href="#h4-0-156" id="h4-0-156" class="i">+        }
+</a><a href="#h4-0-157" id="h4-0-157" class="i">+
+</a><a href="#h4-0-158" id="h4-0-158" class="i">+        template &lt;typename octet_iterator, typename u32bit_iterator&gt;
+</a><a href="#h4-0-159" id="h4-0-159" class="i">+        octet_iterator utf32to8 (u32bit_iterator start, u32bit_iterator end, octet_iterator result)
+</a><a href="#h4-0-160" id="h4-0-160" class="i">+        {
+</a><a href="#h4-0-161" id="h4-0-161" class="i">+            while (start != end)
+</a><a href="#h4-0-162" id="h4-0-162" class="i">+                result = append(*(start++), result);
+</a><a href="#h4-0-163" id="h4-0-163" class="i">+
+</a><a href="#h4-0-164" id="h4-0-164" class="i">+            return result;
+</a><a href="#h4-0-165" id="h4-0-165" class="i">+        }
+</a><a href="#h4-0-166" id="h4-0-166" class="i">+
+</a><a href="#h4-0-167" id="h4-0-167" class="i">+        template &lt;typename octet_iterator, typename u32bit_iterator&gt;
+</a><a href="#h4-0-168" id="h4-0-168" class="i">+        u32bit_iterator utf8to32 (octet_iterator start, octet_iterator end, u32bit_iterator result)
+</a><a href="#h4-0-169" id="h4-0-169" class="i">+        {
+</a><a href="#h4-0-170" id="h4-0-170" class="i">+            while (start &lt; end)
+</a><a href="#h4-0-171" id="h4-0-171" class="i">+                (*result++) = next(start);
+</a><a href="#h4-0-172" id="h4-0-172" class="i">+
+</a><a href="#h4-0-173" id="h4-0-173" class="i">+            return result;
+</a><a href="#h4-0-174" id="h4-0-174" class="i">+        }
+</a><a href="#h4-0-175" id="h4-0-175" class="i">+
+</a><a href="#h4-0-176" id="h4-0-176" class="i">+        // The iterator class
+</a><a href="#h4-0-177" id="h4-0-177" class="i">+        template &lt;typename octet_iterator&gt;
+</a><a href="#h4-0-178" id="h4-0-178" class="i">+          class iterator : public std::iterator &lt;std::bidirectional_iterator_tag, uint32_t&gt; { 
+</a><a href="#h4-0-179" id="h4-0-179" class="i">+            octet_iterator it;
+</a><a href="#h4-0-180" id="h4-0-180" class="i">+            public:
+</a><a href="#h4-0-181" id="h4-0-181" class="i">+            iterator () {};
+</a><a href="#h4-0-182" id="h4-0-182" class="i">+            explicit iterator (const octet_iterator&amp; octet_it): it(octet_it) {}
+</a><a href="#h4-0-183" id="h4-0-183" class="i">+            // the default &quot;big three&quot; are OK
+</a><a href="#h4-0-184" id="h4-0-184" class="i">+            octet_iterator base () const { return it; }
+</a><a href="#h4-0-185" id="h4-0-185" class="i">+            uint32_t operator * () const
+</a><a href="#h4-0-186" id="h4-0-186" class="i">+            {
+</a><a href="#h4-0-187" id="h4-0-187" class="i">+                octet_iterator temp = it;
+</a><a href="#h4-0-188" id="h4-0-188" class="i">+                return next(temp);
+</a><a href="#h4-0-189" id="h4-0-189" class="i">+            }
+</a><a href="#h4-0-190" id="h4-0-190" class="i">+            bool operator == (const iterator&amp; rhs) const 
+</a><a href="#h4-0-191" id="h4-0-191" class="i">+            { 
+</a><a href="#h4-0-192" id="h4-0-192" class="i">+                return (it == rhs.it);
+</a><a href="#h4-0-193" id="h4-0-193" class="i">+            }
+</a><a href="#h4-0-194" id="h4-0-194" class="i">+            bool operator != (const iterator&amp; rhs) const
+</a><a href="#h4-0-195" id="h4-0-195" class="i">+            {
+</a><a href="#h4-0-196" id="h4-0-196" class="i">+                return !(operator == (rhs));
+</a><a href="#h4-0-197" id="h4-0-197" class="i">+            }
+</a><a href="#h4-0-198" id="h4-0-198" class="i">+            iterator&amp; operator ++ () 
+</a><a href="#h4-0-199" id="h4-0-199" class="i">+            {
+</a><a href="#h4-0-200" id="h4-0-200" class="i">+                std::advance(it, internal::sequence_length(it));
+</a><a href="#h4-0-201" id="h4-0-201" class="i">+                return *this;
+</a><a href="#h4-0-202" id="h4-0-202" class="i">+            }
+</a><a href="#h4-0-203" id="h4-0-203" class="i">+            iterator operator ++ (int)
+</a><a href="#h4-0-204" id="h4-0-204" class="i">+            {
+</a><a href="#h4-0-205" id="h4-0-205" class="i">+                iterator temp = *this;
+</a><a href="#h4-0-206" id="h4-0-206" class="i">+                std::advance(it, internal::sequence_length(it));
+</a><a href="#h4-0-207" id="h4-0-207" class="i">+                return temp;
+</a><a href="#h4-0-208" id="h4-0-208" class="i">+            }  
+</a><a href="#h4-0-209" id="h4-0-209" class="i">+            iterator&amp; operator -- ()
+</a><a href="#h4-0-210" id="h4-0-210" class="i">+            {
+</a><a href="#h4-0-211" id="h4-0-211" class="i">+                prior(it);
+</a><a href="#h4-0-212" id="h4-0-212" class="i">+                return *this;
+</a><a href="#h4-0-213" id="h4-0-213" class="i">+            }
+</a><a href="#h4-0-214" id="h4-0-214" class="i">+            iterator operator -- (int)
+</a><a href="#h4-0-215" id="h4-0-215" class="i">+            {
+</a><a href="#h4-0-216" id="h4-0-216" class="i">+                iterator temp = *this;
+</a><a href="#h4-0-217" id="h4-0-217" class="i">+                prior(it);
+</a><a href="#h4-0-218" id="h4-0-218" class="i">+                return temp;
+</a><a href="#h4-0-219" id="h4-0-219" class="i">+            }
+</a><a href="#h4-0-220" id="h4-0-220" class="i">+          }; // class iterator
+</a><a href="#h4-0-221" id="h4-0-221" class="i">+
+</a><a href="#h4-0-222" id="h4-0-222" class="i">+    } // namespace utf8::unchecked
+</a><a href="#h4-0-223" id="h4-0-223" class="i">+} // namespace utf8 
+</a><a href="#h4-0-224" id="h4-0-224" class="i">+
+</a><a href="#h4-0-225" id="h4-0-225" class="i">+
+</a><a href="#h4-0-226" id="h4-0-226" class="i">+#endif // header guard
+</a><a href="#h4-0-227" id="h4-0-227" class="i">+
+</a></pre>
+</div>
+</body>
+</html>

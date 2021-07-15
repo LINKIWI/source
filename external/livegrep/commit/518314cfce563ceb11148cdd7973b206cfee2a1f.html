@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Port indexing to std::thread - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/518314cfce563ceb11148cdd7973b206cfee2a1f">518314cfce563ceb11148cdd7973b206cfee2a1f</a>
+<b>parent</b> <a href="../commit/c9bc9d1bee55d6135462d2dd42af3ef7436db345">c9bc9d1bee55d6135462d2dd42af3ef7436db345</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Sun,  8 Jun 2014 13:54:40 -0400
+
+Port indexing to std::thread
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">src/chunk_allocator.cc</a></td><td> | </td><td class="num">19</td><td><span class="i">++++++</span><span class="d">-------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">src/chunk_allocator.h</a></td><td> | </td><td class="num">5</td><td><span class="i">+++</span><span class="d">--</span></td></tr>
+</table></pre><pre>2 files changed, 9 insertions(+), 15 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/src/chunk_allocator.cc">src/chunk_allocator.cc</a> b/<a href="../file/src/chunk_allocator.cc">src/chunk_allocator.cc</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -12,7 +12,7 @@
+</a> #include &lt;gflags/gflags.h&gt;
+ 
+ #include &lt;sys/mman.h&gt;
+<a href="#h0-0-3" id="h0-0-3" class="d">-#include &lt;pthread.h&gt;
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+#include &lt;thread&gt;
+</a> 
+ DECLARE_int32(threads);
+ DECLARE_bool(index);
+<a href="#h0-1" id="h0-1" class="h">@@ -30,23 +30,17 @@ static bool validate_chunk_power(const char* flagname, int32_t value) {
+</a> static const bool dummy = google::RegisterFlagValidator(&amp;FLAGS_chunk_power,
+                                                         validate_chunk_power);
+ 
+<a href="#h0-1-3" id="h0-1-3" class="d">-void *chunk_allocator::finalize_worker(void *p) {
+</a><a href="#h0-1-4" id="h0-1-4" class="d">-    chunk_allocator *alloc = static_cast&lt;chunk_allocator*&gt;(p);
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+void chunk_allocator::finalize_worker(chunk_allocator *alloc) {
+</a>     chunk *c;
+     while (alloc-&gt;finalize_queue_.pop(&amp;c)) {
+         c-&gt;finalize();
+     }
+<a href="#h0-1-10" id="h0-1-10" class="d">-
+</a><a href="#h0-1-11" id="h0-1-11" class="d">-    return 0;
+</a> }
+ 
+ chunk_allocator::chunk_allocator()  :
+<a href="#h0-1-15" id="h0-1-15" class="d">-    chunk_size_(kChunkSize), content_finger_(0), current_(0),
+</a><a href="#h0-1-16" id="h0-1-16" class="d">-    threads_(new pthread_t[FLAGS_threads]) {
+</a><a href="#h0-1-17" id="h0-1-17" class="d">-    int err;
+</a><a href="#h0-1-18" id="h0-1-18" class="i">+    chunk_size_(kChunkSize), content_finger_(0), current_(0) {
+</a>     for (int i = 0; i &lt; FLAGS_threads; ++i)
+<a href="#h0-1-20" id="h0-1-20" class="d">-        if ((err = pthread_create(&amp;threads_[i], NULL, finalize_worker, this)) != 0)
+</a><a href="#h0-1-21" id="h0-1-21" class="d">-            die(&quot;pthread_create: %s&quot;, strerror(err));
+</a><a href="#h0-1-22" id="h0-1-22" class="i">+        threads_.push_back(std::move(std::thread(finalize_worker, this)));
+</a> }
+ 
+ chunk_allocator::~chunk_allocator() {
+<a href="#h0-2" id="h0-2" class="h">@@ -109,9 +103,8 @@ void chunk_allocator::finalize()  {
+</a>         return;
+     finish_chunk();
+     finalize_queue_.close();
+<a href="#h0-2-3" id="h0-2-3" class="d">-    for (int i = 0; i &lt; FLAGS_threads; i++)
+</a><a href="#h0-2-4" id="h0-2-4" class="d">-        pthread_join(threads_[i], 0);
+</a><a href="#h0-2-5" id="h0-2-5" class="d">-    delete[] threads_;
+</a><a href="#h0-2-6" id="h0-2-6" class="i">+    for (auto it = threads_.begin(); it != threads_.end(); ++it)
+</a><a href="#h0-2-7" id="h0-2-7" class="i">+        it-&gt;join();
+</a>     for (auto it = begin(); it != end(); ++it)
+         (*it)-&gt;finalize_files();
+     if (content_finger_)
+<b>diff --git a/<a id="h1" href="../file/src/chunk_allocator.h">src/chunk_allocator.h</a> b/<a href="../file/src/chunk_allocator.h">src/chunk_allocator.h</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -11,6 +11,7 @@
+</a> #include &lt;vector&gt;
+ #include &lt;map&gt;
+ #include &lt;string&gt;
+<a href="#h1-0-3" id="h1-0-3" class="i">+#include &lt;thread&gt;
+</a> #include &lt;assert.h&gt;
+ 
+ #include &quot;thread_queue.h&quot;
+<a href="#h1-1" id="h1-1" class="h">@@ -74,7 +75,7 @@ public:
+</a> 
+     virtual void drop_caches();
+ protected:
+<a href="#h1-1-3" id="h1-1-3" class="d">-    static void *finalize_worker(void *);
+</a><a href="#h1-1-4" id="h1-1-4" class="i">+    static void finalize_worker(chunk_allocator *);
+</a> 
+     virtual chunk *alloc_chunk() = 0;
+     virtual void free_chunk(chunk *chunk) = 0;
+<a href="#h1-2" id="h1-2" class="h">@@ -88,7 +89,7 @@ protected:
+</a>     uint8_t *content_finger_;
+     chunk *current_;
+     thread_queue&lt;chunk*&gt; finalize_queue_;
+<a href="#h1-2-3" id="h1-2-3" class="d">-    pthread_t *threads_;
+</a><a href="#h1-2-4" id="h1-2-4" class="i">+    vector&lt;std::thread&gt; threads_;
+</a>     map&lt;const unsigned char*, chunk*&gt; by_data_;
+ };
+ 
+</pre>
+</div>
+</body>
+</html>

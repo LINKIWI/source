@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Refactor out the API response types. - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/309309bd381404e078555faf8d167b2120891036">309309bd381404e078555faf8d167b2120891036</a>
+<b>parent</b> <a href="../commit/186fc2913deed8efc3001be3f9faff4ed9b0222d">186fc2913deed8efc3001be3f9faff4ed9b0222d</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Thu,  3 Apr 2014 09:39:41 -0700
+
+Refactor out the API response types.
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">server/api.go</a></td><td> | </td><td class="num">19</td><td><span class="i">+++</span><span class="d">----------------</span></td></tr>
+<tr><td class="A">A</td><td><a href="#h1">server/api/types.go</a></td><td> | </td><td class="num">19</td><td><span class="i">+++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">server/server.go</a></td><td> | </td><td class="num">2</td><td><span class="i">+</span><span class="d">-</span></td></tr>
+</table></pre><pre>3 files changed, 23 insertions(+), 17 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/server/api.go">server/api.go</a> b/<a href="../file/server/api.go">server/api.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -5,18 +5,10 @@ import (
+</a> 	&quot;fmt&quot;
+ 	&quot;github.com/golang/glog&quot;
+ 	&quot;github.com/nelhage/livegrep/client&quot;
+<a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;github.com/nelhage/livegrep/server/api&quot;
+</a> 	&quot;net/http&quot;
+ )
+ 
+<a href="#h0-0-7" id="h0-0-7" class="d">-type innerError struct {
+</a><a href="#h0-0-8" id="h0-0-8" class="d">-	Code    string `json:&quot;code&quot;`
+</a><a href="#h0-0-9" id="h0-0-9" class="d">-	Message string `json:&quot;message&quot;`
+</a><a href="#h0-0-10" id="h0-0-10" class="d">-}
+</a><a href="#h0-0-11" id="h0-0-11" class="d">-
+</a><a href="#h0-0-12" id="h0-0-12" class="d">-type replyError struct {
+</a><a href="#h0-0-13" id="h0-0-13" class="d">-	Err innerError `json:&quot;error&quot;`
+</a><a href="#h0-0-14" id="h0-0-14" class="d">-}
+</a><a href="#h0-0-15" id="h0-0-15" class="d">-
+</a> func replyJson(w http.ResponseWriter, status int, obj interface{}) {
+ 	w.WriteHeader(status)
+ 	enc := json.NewEncoder(w)
+<a href="#h0-1" id="h0-1" class="h">@@ -28,7 +20,7 @@ func replyJson(w http.ResponseWriter, status int, obj interface{}) {
+</a> }
+ 
+ func writeError(w http.ResponseWriter, status int, code, message string) {
+<a href="#h0-1-3" id="h0-1-3" class="d">-	replyJson(w, status, &amp;replyError{Err: innerError{code, message}})
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+	replyJson(w, status, &amp;api.ReplyError{Err: api.InnerError{code, message}})
+</a> }
+ 
+ func parseQuery(r *http.Request) client.Query {
+<a href="#h0-2" id="h0-2" class="h">@@ -40,11 +32,6 @@ func parseQuery(r *http.Request) client.Query {
+</a> 	}
+ }
+ 
+<a href="#h0-2-3" id="h0-2-3" class="d">-type replySearch struct {
+</a><a href="#h0-2-4" id="h0-2-4" class="d">-	Info    *client.Stats    `json:&quot;info&quot;`
+</a><a href="#h0-2-5" id="h0-2-5" class="d">-	Results []*client.Result `json:&quot;results&quot;`
+</a><a href="#h0-2-6" id="h0-2-6" class="d">-}
+</a><a href="#h0-2-7" id="h0-2-7" class="d">-
+</a> func (s *server) ServeAPISearch(w http.ResponseWriter, r *http.Request) {
+ 	backendName := r.URL.Query().Get(&quot;:backend&quot;)
+ 	backend := s.bk[backendName]
+<a href="#h0-3" id="h0-3" class="h">@@ -70,7 +57,7 @@ func (s *server) ServeAPISearch(w http.ResponseWriter, r *http.Request) {
+</a> 		return
+ 	}
+ 
+<a href="#h0-3-3" id="h0-3-3" class="d">-	reply := &amp;replySearch{}
+</a><a href="#h0-3-4" id="h0-3-4" class="i">+	reply := &amp;api.ReplySearch{}
+</a> 
+ 	for r := range search.Results() {
+ 		reply.Results = append(reply.Results, r)
+<b>diff --git a/<a id="h1" href="../file/server/api/types.go">server/api/types.go</a> b/<a href="../file/server/api/types.go">server/api/types.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -0,0 +1,19 @@
+</a><a href="#h1-0-0" id="h1-0-0" class="i">+package api
+</a><a href="#h1-0-1" id="h1-0-1" class="i">+
+</a><a href="#h1-0-2" id="h1-0-2" class="i">+import &quot;github.com/nelhage/livegrep/client&quot;
+</a><a href="#h1-0-3" id="h1-0-3" class="i">+
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+type InnerError struct {
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+	Code    string `json:&quot;code&quot;`
+</a><a href="#h1-0-6" id="h1-0-6" class="i">+	Message string `json:&quot;message&quot;`
+</a><a href="#h1-0-7" id="h1-0-7" class="i">+}
+</a><a href="#h1-0-8" id="h1-0-8" class="i">+
+</a><a href="#h1-0-9" id="h1-0-9" class="i">+// ReplyError is returned along with any non-200 status reply
+</a><a href="#h1-0-10" id="h1-0-10" class="i">+type ReplyError struct {
+</a><a href="#h1-0-11" id="h1-0-11" class="i">+	Err InnerError `json:&quot;error&quot;`
+</a><a href="#h1-0-12" id="h1-0-12" class="i">+}
+</a><a href="#h1-0-13" id="h1-0-13" class="i">+
+</a><a href="#h1-0-14" id="h1-0-14" class="i">+// ReplySearch is returned to /api/v1/search/:backend
+</a><a href="#h1-0-15" id="h1-0-15" class="i">+type ReplySearch struct {
+</a><a href="#h1-0-16" id="h1-0-16" class="i">+	Info    *client.Stats    `json:&quot;info&quot;`
+</a><a href="#h1-0-17" id="h1-0-17" class="i">+	Results []*client.Result `json:&quot;results&quot;`
+</a><a href="#h1-0-18" id="h1-0-18" class="i">+}
+</a><b>diff --git a/<a id="h2" href="../file/server/server.go">server/server.go</a> b/<a href="../file/server/server.go">server/server.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -110,7 +110,7 @@ func New(cfg *config.Config) (http.Handler, error) {
+</a> 	m.Add(&quot;GET&quot;, &quot;/about&quot;, http.HandlerFunc(srv.ServeAbout))
+ 	m.Add(&quot;GET&quot;, &quot;/opensearch.xml&quot;, http.HandlerFunc(srv.ServeOpensearch))
+ 
+<a href="#h2-0-3" id="h2-0-3" class="d">-	m.Add(&quot;GET&quot;, &quot;/api/1/search/:backend&quot;, http.HandlerFunc(srv.ServeAPISearch))
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+	m.Add(&quot;GET&quot;, &quot;/api/v1/search/:backend&quot;, http.HandlerFunc(srv.ServeAPISearch))
+</a> 
+ 	mux := http.NewServeMux()
+ 	mux.Handle(&quot;/assets/&quot;, http.FileServer(http.Dir(path.Join(cfg.DocRoot, &quot;htdocs&quot;))))
+</pre>
+</div>
+</body>
+</html>

@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Display one match per identical (file, matched line). - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/280445156c4020965ea6dadc9098f1835f1d1276">280445156c4020965ea6dadc9098f1835f1d1276</a>
+<b>parent</b> <a href="../commit/399c808f6ed7600e7028c52c5994bf01622f422f">399c808f6ed7600e7028c52c5994bf01622f422f</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Sun,  3 Jun 2012 18:11:02 -0400
+
+Display one match per identical (file, matched line).
+
+todo: UI for showing other files.
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">codesearch.cc</a></td><td> | </td><td class="num">68</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">----------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">codesearch.h</a></td><td> | </td><td class="num">2</td><td><span class="i">+</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">main.cc</a></td><td> | </td><td class="num">90</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">---------------------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">web/htdocs/codesearch_ui.js</a></td><td> | </td><td class="num">9</td><td><span class="i">++++++</span><span class="d">---</span></td></tr>
+</table></pre><pre>4 files changed, 118 insertions(+), 51 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/codesearch.cc">codesearch.cc</a> b/<a href="../file/codesearch.cc">codesearch.cc</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -88,6 +88,7 @@ const StringPiece empty_string(NULL, 0);
+</a> 
+ class code_searcher;
+ struct match_finger;
+<a href="#h0-0-3" id="h0-0-3" class="i">+struct match_group;
+</a> 
+ class searcher {
+ public:
+<a href="#h0-1" id="h0-1" class="h">@@ -229,10 +230,13 @@ protected:
+</a>      * file, determine whether that file actually contains that line,
+      * and if so, post a match to the result queue.
+      */
+<a href="#h0-1-3" id="h0-1-3" class="d">-    void try_match(const StringPiece&amp;,
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+    void try_match(match_group *,
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+                   const StringPiece&amp;,
+</a>                    const StringPiece&amp;,
+                    search_file *);
+ 
+<a href="#h0-1-9" id="h0-1-9" class="i">+    void finish_group(match_group *);
+</a><a href="#h0-1-10" id="h0-1-10" class="i">+
+</a>     static int line_start(const chunk *chunk, int pos) {
+         const unsigned char *start = static_cast&lt;const unsigned char*&gt;
+             (memrchr(chunk-&gt;data, &#39;\n&#39;, pos));
+<a href="#h0-2" id="h0-2" class="h">@@ -607,7 +611,6 @@ void searcher::filtered_search(const chunk *chunk)
+</a>     search_lines(&amp;(*indexes)[0], count, chunk);
+ }
+ 
+<a href="#h0-2-3" id="h0-2-3" class="d">-
+</a> struct match_finger {
+     const chunk *chunk_;
+     vector&lt;chunk_file&gt;::const_iterator it_;
+<a href="#h0-3" id="h0-3" class="h">@@ -754,6 +757,19 @@ void searcher::full_search(match_finger *finger,
+</a>     }
+ }
+ 
+<a href="#h0-3-3" id="h0-3-3" class="i">+struct match_group {
+</a><a href="#h0-3-4" id="h0-3-4" class="i">+    StringPiece match, line;
+</a><a href="#h0-3-5" id="h0-3-5" class="i">+    int left, right;
+</a><a href="#h0-3-6" id="h0-3-6" class="i">+    map&lt;string, vector&lt;match_context&gt; &gt; matches;
+</a><a href="#h0-3-7" id="h0-3-7" class="i">+
+</a><a href="#h0-3-8" id="h0-3-8" class="i">+    match_group(const StringPiece&amp; match, const StringPiece &amp;line)
+</a><a href="#h0-3-9" id="h0-3-9" class="i">+        : match(match), line(line) {
+</a><a href="#h0-3-10" id="h0-3-10" class="i">+        left = utf8::distance(line.data(), match.data());
+</a><a href="#h0-3-11" id="h0-3-11" class="i">+        right = left +
+</a><a href="#h0-3-12" id="h0-3-12" class="i">+            utf8::distance(match.data(), match.data() + match.size());
+</a><a href="#h0-3-13" id="h0-3-13" class="i">+    }
+</a><a href="#h0-3-14" id="h0-3-14" class="i">+};
+</a><a href="#h0-3-15" id="h0-3-15" class="i">+
+</a> void searcher::find_match_brute(const chunk *chunk,
+                                 const StringPiece&amp; match,
+                                 const StringPiece&amp; line) {
+<a href="#h0-4" id="h0-4" class="h">@@ -761,6 +777,7 @@ void searcher::find_match_brute(const chunk *chunk,
+</a>     timer tm;
+     int off = (unsigned char*)line.data() - chunk-&gt;data;
+     int searched = 0;
+<a href="#h0-4-3" id="h0-4-3" class="i">+    match_group group(match, line);
+</a> 
+     for(vector&lt;chunk_file&gt;::const_iterator it = chunk-&gt;files.begin();
+         it != chunk-&gt;files.end(); it++) {
+<a href="#h0-5" id="h0-5" class="h">@@ -772,11 +789,13 @@ void searcher::find_match_brute(const chunk *chunk,
+</a>                 searched++;
+                 if (exit_early())
+                     break;
+<a href="#h0-5-3" id="h0-5-3" class="d">-                try_match(line, match, *fit);
+</a><a href="#h0-5-4" id="h0-5-4" class="i">+                try_match(&amp;group, line, match, *fit);
+</a>             }
+         }
+     }
+ 
+<a href="#h0-5-9" id="h0-5-9" class="i">+    finish_group(&amp;group);
+</a><a href="#h0-5-10" id="h0-5-10" class="i">+
+</a>     tm.pause();
+     log_profile(&quot;Searched %d files in %d.%06ds\n&quot;,
+                 searched,
+<a href="#h0-6" id="h0-6" class="h">@@ -794,6 +813,7 @@ void searcher::find_match(const chunk *chunk,
+</a> 
+     run_timer run(git_time_);
+     int loff = (unsigned char*)line.data() - chunk-&gt;data;
+<a href="#h0-6-3" id="h0-6-3" class="i">+    match_group group(match, line);
+</a> 
+     /*
+      * We use an explicit stack instead of direct recursion. We
+<a href="#h0-7" id="h0-7" class="h">@@ -837,7 +857,7 @@ void searcher::find_match(const chunk *chunk,
+</a>                     continue;
+                 if (exit_early())
+                     break;
+<a href="#h0-7-3" id="h0-7-3" class="d">-                try_match(line, match, *it);
+</a><a href="#h0-7-4" id="h0-7-4" class="i">+                try_match(&amp;group, line, match, *it);
+</a>             }
+             continue;
+         }
+<a href="#h0-8" id="h0-8" class="h">@@ -856,10 +876,12 @@ void searcher::find_match(const chunk *chunk,
+</a>         if (n-&gt;left)
+             stack.push_back((frame){n-&gt;left, false});
+     }
+<a href="#h0-8-3" id="h0-8-3" class="i">+    finish_group(&amp;group);
+</a> }
+ 
+ 
+<a href="#h0-8-7" id="h0-8-7" class="d">-void searcher::try_match(const StringPiece&amp; line,
+</a><a href="#h0-8-8" id="h0-8-8" class="i">+void searcher::try_match(match_group *group,
+</a><a href="#h0-8-9" id="h0-8-9" class="i">+                         const StringPiece&amp; line,
+</a>                          const StringPiece&amp; match,
+                          search_file *sf) {
+ 
+<a href="#h0-9" id="h0-9" class="h">@@ -879,16 +901,8 @@ void searcher::try_match(const StringPiece&amp; line,
+</a>     if (it == sf-&gt;content.end())
+         return;
+ 
+<a href="#h0-9-3" id="h0-9-3" class="d">-    match_result *m = new match_result;
+</a><a href="#h0-9-4" id="h0-9-4" class="d">-    m-&gt;line = line;
+</a><a href="#h0-9-5" id="h0-9-5" class="d">-    m-&gt;matchleft = utf8::distance(line.data(), match.data());
+</a><a href="#h0-9-6" id="h0-9-6" class="d">-    m-&gt;matchright = m-&gt;matchleft +
+</a><a href="#h0-9-7" id="h0-9-7" class="d">-        utf8::distance(match.data(), match.data() + match.size());
+</a><a href="#h0-9-8" id="h0-9-8" class="d">-    match_context &amp;ctx = m-&gt;context;
+</a><a href="#h0-9-9" id="h0-9-9" class="i">+    match_context ctx;
+</a> 
+<a href="#h0-9-11" id="h0-9-11" class="d">-    for (auto it = sf-&gt;paths.begin(); it != sf-&gt;paths.end(); ++it)
+</a><a href="#h0-9-12" id="h0-9-12" class="d">-        if (accept(*it))
+</a><a href="#h0-9-13" id="h0-9-13" class="d">-            ctx.paths.push_back(*it);
+</a>     ctx.file = sf;
+     ctx.lno  = lno;
+ 
+<a href="#h0-10" id="h0-10" class="h">@@ -919,8 +933,30 @@ void searcher::try_match(const StringPiece&amp; line,
+</a>         ctx.context_after.push_back(l);
+     }
+ 
+<a href="#h0-10-3" id="h0-10-3" class="d">-    queue_.push(m);
+</a><a href="#h0-10-4" id="h0-10-4" class="d">-    ++matches_;
+</a><a href="#h0-10-5" id="h0-10-5" class="i">+    for (auto it = sf-&gt;paths.begin(); it != sf-&gt;paths.end(); ++it) {
+</a><a href="#h0-10-6" id="h0-10-6" class="i">+        if (!accept(*it))
+</a><a href="#h0-10-7" id="h0-10-7" class="i">+            continue;
+</a><a href="#h0-10-8" id="h0-10-8" class="i">+        auto git = group-&gt;matches.find(it-&gt;path);
+</a><a href="#h0-10-9" id="h0-10-9" class="i">+        if (git == group-&gt;matches.end()) {
+</a><a href="#h0-10-10" id="h0-10-10" class="i">+            ++matches_;
+</a><a href="#h0-10-11" id="h0-10-11" class="i">+            group-&gt;matches[it-&gt;path] = vector&lt;match_context&gt;();
+</a><a href="#h0-10-12" id="h0-10-12" class="i">+            group-&gt;matches[it-&gt;path].push_back(ctx);
+</a><a href="#h0-10-13" id="h0-10-13" class="i">+        } else if (git-&gt;second.back().file != sf) {
+</a><a href="#h0-10-14" id="h0-10-14" class="i">+            git-&gt;second.push_back(ctx);
+</a><a href="#h0-10-15" id="h0-10-15" class="i">+        }
+</a><a href="#h0-10-16" id="h0-10-16" class="i">+        group-&gt;matches[it-&gt;path].back().paths.push_back(*it);
+</a><a href="#h0-10-17" id="h0-10-17" class="i">+    }
+</a><a href="#h0-10-18" id="h0-10-18" class="i">+}
+</a><a href="#h0-10-19" id="h0-10-19" class="i">+
+</a><a href="#h0-10-20" id="h0-10-20" class="i">+void searcher::finish_group(match_group *group) {
+</a><a href="#h0-10-21" id="h0-10-21" class="i">+    for (auto it = group-&gt;matches.begin(); it != group-&gt;matches.end(); ++it) {
+</a><a href="#h0-10-22" id="h0-10-22" class="i">+        match_result *m = new match_result;
+</a><a href="#h0-10-23" id="h0-10-23" class="i">+        m-&gt;line       = group-&gt;line;
+</a><a href="#h0-10-24" id="h0-10-24" class="i">+        m-&gt;matchleft  = group-&gt;left;
+</a><a href="#h0-10-25" id="h0-10-25" class="i">+        m-&gt;matchright = group-&gt;right;
+</a><a href="#h0-10-26" id="h0-10-26" class="i">+        m-&gt;context.swap(it-&gt;second);
+</a><a href="#h0-10-27" id="h0-10-27" class="i">+        queue_.push(m);
+</a><a href="#h0-10-28" id="h0-10-28" class="i">+    }
+</a> }
+ 
+ code_searcher::search_thread::search_thread(code_searcher *cs)
+<b>diff --git a/<a id="h1" href="../file/codesearch.h">codesearch.h</a> b/<a href="../file/codesearch.h">codesearch.h</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -103,7 +103,7 @@ struct match_context {
+</a> };
+ 
+ struct match_result {
+<a href="#h1-0-3" id="h1-0-3" class="d">-    match_context context;
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+    vector&lt;match_context&gt; context;
+</a>     StringPiece line;
+     int matchleft, matchright;
+ };
+<b>diff --git a/<a id="h2" href="../file/main.cc">main.cc</a> b/<a href="../file/main.cc">main.cc</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -41,12 +41,35 @@ long timeval_ms (struct timeval tv) {
+</a>     return tv.tv_sec * 1000 + tv.tv_usec / 1000;
+ }
+ 
+<a href="#h2-0-3" id="h2-0-3" class="d">-static json_object *to_json(vector&lt;StringPiece&gt; vec) {
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+json_object *to_json(const char *str) {
+</a><a href="#h2-0-5" id="h2-0-5" class="i">+    return json_object_new_string(str);
+</a><a href="#h2-0-6" id="h2-0-6" class="i">+}
+</a><a href="#h2-0-7" id="h2-0-7" class="i">+
+</a><a href="#h2-0-8" id="h2-0-8" class="i">+json_object *to_json(const string &amp;str) {
+</a><a href="#h2-0-9" id="h2-0-9" class="i">+    return json_object_new_string(str.c_str());
+</a><a href="#h2-0-10" id="h2-0-10" class="i">+}
+</a><a href="#h2-0-11" id="h2-0-11" class="i">+
+</a><a href="#h2-0-12" id="h2-0-12" class="i">+json_object *to_json(const StringPiece &amp;str) {
+</a><a href="#h2-0-13" id="h2-0-13" class="i">+    return json_object_new_string_len(str.data(),
+</a><a href="#h2-0-14" id="h2-0-14" class="i">+                                      str.size());
+</a><a href="#h2-0-15" id="h2-0-15" class="i">+}
+</a><a href="#h2-0-16" id="h2-0-16" class="i">+
+</a><a href="#h2-0-17" id="h2-0-17" class="i">+json_object *to_json(int i) {
+</a><a href="#h2-0-18" id="h2-0-18" class="i">+    return json_object_new_int(i);
+</a><a href="#h2-0-19" id="h2-0-19" class="i">+}
+</a><a href="#h2-0-20" id="h2-0-20" class="i">+
+</a><a href="#h2-0-21" id="h2-0-21" class="i">+template &lt;class T&gt;
+</a><a href="#h2-0-22" id="h2-0-22" class="i">+json_object *to_json(vector&lt;T&gt; vec) {
+</a>     json_object *out = json_object_new_array();
+     for (auto it = vec.begin(); it != vec.end(); it++)
+<a href="#h2-0-25" id="h2-0-25" class="d">-        json_object_array_add(out,
+</a><a href="#h2-0-26" id="h2-0-26" class="d">-                              json_object_new_string_len(it-&gt;data(),
+</a><a href="#h2-0-27" id="h2-0-27" class="d">-                                                         it-&gt;size()));
+</a><a href="#h2-0-28" id="h2-0-28" class="i">+        json_object_array_add(out, to_json(*it));
+</a><a href="#h2-0-29" id="h2-0-29" class="i">+    return out;
+</a><a href="#h2-0-30" id="h2-0-30" class="i">+}
+</a><a href="#h2-0-31" id="h2-0-31" class="i">+
+</a><a href="#h2-0-32" id="h2-0-32" class="i">+static json_object *to_json(const git_path &amp;path) {
+</a><a href="#h2-0-33" id="h2-0-33" class="i">+    json_object *out = json_object_new_object();
+</a><a href="#h2-0-34" id="h2-0-34" class="i">+    json_object_object_add(out, &quot;ref&quot;,  to_json(path.ref));
+</a><a href="#h2-0-35" id="h2-0-35" class="i">+    json_object_object_add(out, &quot;path&quot;, to_json(path.path));
+</a>     return out;
+ }
+ 
+<a href="#h2-1" id="h2-1" class="h">@@ -54,44 +77,49 @@ struct print_match {
+</a>     print_match(FILE *out) : out_(out) {}
+ 
+     void print(const match_result *m) const {
+<a href="#h2-1-3" id="h2-1-3" class="d">-        for (auto it = m-&gt;context.paths.begin();
+</a><a href="#h2-1-4" id="h2-1-4" class="d">-             it != m-&gt;context.paths.end(); ++it)
+</a><a href="#h2-1-5" id="h2-1-5" class="d">-            fprintf(out_,
+</a><a href="#h2-1-6" id="h2-1-6" class="d">-                    &quot;%s:%s:%d:%d-%d: %.*s\n&quot;,
+</a><a href="#h2-1-7" id="h2-1-7" class="d">-                    it-&gt;ref,
+</a><a href="#h2-1-8" id="h2-1-8" class="d">-                    it-&gt;path.c_str(),
+</a><a href="#h2-1-9" id="h2-1-9" class="d">-                    m-&gt;context.lno,
+</a><a href="#h2-1-10" id="h2-1-10" class="d">-                    m-&gt;matchleft, m-&gt;matchright,
+</a><a href="#h2-1-11" id="h2-1-11" class="d">-                    m-&gt;line.size(), m-&gt;line.data());
+</a><a href="#h2-1-12" id="h2-1-12" class="i">+        for (auto ctx = m-&gt;context.begin();
+</a><a href="#h2-1-13" id="h2-1-13" class="i">+             ctx != m-&gt;context.end(); ++ctx) {
+</a><a href="#h2-1-14" id="h2-1-14" class="i">+            for (auto it = ctx-&gt;paths.begin(); it != ctx-&gt;paths.end(); ++it) {
+</a><a href="#h2-1-15" id="h2-1-15" class="i">+                fprintf(out_,
+</a><a href="#h2-1-16" id="h2-1-16" class="i">+                        &quot;%s:%s:%d:%d-%d: %.*s\n&quot;,
+</a><a href="#h2-1-17" id="h2-1-17" class="i">+                        it-&gt;ref,
+</a><a href="#h2-1-18" id="h2-1-18" class="i">+                        it-&gt;path.c_str(),
+</a><a href="#h2-1-19" id="h2-1-19" class="i">+                        ctx-&gt;lno,
+</a><a href="#h2-1-20" id="h2-1-20" class="i">+                        m-&gt;matchleft, m-&gt;matchright,
+</a><a href="#h2-1-21" id="h2-1-21" class="i">+                        m-&gt;line.size(), m-&gt;line.data());
+</a><a href="#h2-1-22" id="h2-1-22" class="i">+            }
+</a><a href="#h2-1-23" id="h2-1-23" class="i">+        }
+</a>     }
+ 
+     void print_json(const match_result *m) const {
+         json_object *obj = json_object_new_object();
+         json_object_object_add(obj, &quot;ref&quot;,
+<a href="#h2-1-29" id="h2-1-29" class="d">-                               json_object_new_string(m-&gt;context.paths[0].ref));
+</a><a href="#h2-1-30" id="h2-1-30" class="i">+                               to_json(m-&gt;context[0].paths[0].ref));
+</a>         json_object_object_add(obj, &quot;file&quot;,
+<a href="#h2-1-32" id="h2-1-32" class="d">-                               json_object_new_string(m-&gt;context.paths[0].path.c_str()));
+</a><a href="#h2-1-33" id="h2-1-33" class="d">-        json_object *paths = json_object_new_array();
+</a><a href="#h2-1-34" id="h2-1-34" class="d">-        for (auto it = m-&gt;context.paths.begin();
+</a><a href="#h2-1-35" id="h2-1-35" class="d">-             it != m-&gt;context.paths.end(); ++it) {
+</a><a href="#h2-1-36" id="h2-1-36" class="d">-            json_object *path = json_object_new_object();
+</a><a href="#h2-1-37" id="h2-1-37" class="d">-            json_object_object_add(path, &quot;ref&quot;,  json_object_new_string(it-&gt;ref));
+</a><a href="#h2-1-38" id="h2-1-38" class="d">-            json_object_object_add(path, &quot;path&quot;, json_object_new_string(it-&gt;path.c_str()));
+</a><a href="#h2-1-39" id="h2-1-39" class="d">-            json_object_array_add(paths, path);
+</a><a href="#h2-1-40" id="h2-1-40" class="i">+                               to_json(m-&gt;context[0].paths[0].path));
+</a><a href="#h2-1-41" id="h2-1-41" class="i">+        json_object *contexts = json_object_new_array();
+</a><a href="#h2-1-42" id="h2-1-42" class="i">+        for (auto ctx = m-&gt;context.begin();
+</a><a href="#h2-1-43" id="h2-1-43" class="i">+             ctx != m-&gt;context.end(); ++ctx) {
+</a><a href="#h2-1-44" id="h2-1-44" class="i">+            json_object *jctx = json_object_new_object();
+</a><a href="#h2-1-45" id="h2-1-45" class="i">+            json_object_object_add(jctx, &quot;paths&quot;,  to_json(ctx-&gt;paths));
+</a><a href="#h2-1-46" id="h2-1-46" class="i">+            json_object_object_add(jctx, &quot;lno&quot;, to_json(ctx-&gt;lno));
+</a><a href="#h2-1-47" id="h2-1-47" class="i">+            json_object_object_add(jctx, &quot;context_before&quot;,
+</a><a href="#h2-1-48" id="h2-1-48" class="i">+                                   to_json(ctx-&gt;context_before));
+</a><a href="#h2-1-49" id="h2-1-49" class="i">+            json_object_object_add(jctx, &quot;context_after&quot;,
+</a><a href="#h2-1-50" id="h2-1-50" class="i">+                                   to_json(ctx-&gt;context_after));
+</a><a href="#h2-1-51" id="h2-1-51" class="i">+            json_object_array_add(contexts, jctx);
+</a>         }
+<a href="#h2-1-53" id="h2-1-53" class="d">-        json_object_object_add(obj, &quot;paths&quot;, paths);
+</a><a href="#h2-1-54" id="h2-1-54" class="d">-        json_object_object_add(obj, &quot;lno&quot;,  json_object_new_int(m-&gt;context.lno));
+</a><a href="#h2-1-55" id="h2-1-55" class="i">+        json_object_object_add(obj, &quot;contexts&quot;, contexts);
+</a><a href="#h2-1-56" id="h2-1-56" class="i">+        json_object_object_add(obj, &quot;lno&quot;,  json_object_new_int(m-&gt;context[0].lno));
+</a>         json_object *bounds = json_object_new_array();
+<a href="#h2-1-58" id="h2-1-58" class="d">-        json_object_array_add(bounds, json_object_new_int(m-&gt;matchleft));
+</a><a href="#h2-1-59" id="h2-1-59" class="d">-        json_object_array_add(bounds, json_object_new_int(m-&gt;matchright));
+</a><a href="#h2-1-60" id="h2-1-60" class="i">+        json_object_array_add(bounds, to_json(m-&gt;matchleft));
+</a><a href="#h2-1-61" id="h2-1-61" class="i">+        json_object_array_add(bounds, to_json(m-&gt;matchright));
+</a>         json_object_object_add(obj, &quot;bounds&quot;, bounds);
+<a href="#h2-1-63" id="h2-1-63" class="d">-        json_object_object_add(obj, &quot;line&quot;,
+</a><a href="#h2-1-64" id="h2-1-64" class="d">-                               json_object_new_string_len(m-&gt;line.data(),
+</a><a href="#h2-1-65" id="h2-1-65" class="d">-                                                          m-&gt;line.size()));
+</a><a href="#h2-1-66" id="h2-1-66" class="i">+        json_object_object_add(obj, &quot;line&quot;, to_json(m-&gt;line));
+</a>         json_object_object_add(obj, &quot;context_before&quot;,
+<a href="#h2-1-68" id="h2-1-68" class="d">-                               to_json(m-&gt;context.context_before));
+</a><a href="#h2-1-69" id="h2-1-69" class="i">+                               to_json(m-&gt;context[0].context_before));
+</a>         json_object_object_add(obj, &quot;context_after&quot;,
+<a href="#h2-1-71" id="h2-1-71" class="d">-                               to_json(m-&gt;context.context_after));
+</a><a href="#h2-1-72" id="h2-1-72" class="i">+                               to_json(m-&gt;context[0].context_after));
+</a>         fprintf(out_, &quot;%s\n&quot;, json_object_to_json_string(obj));
+         json_object_put(obj);
+     }
+<b>diff --git a/<a id="h3" href="../file/web/htdocs/codesearch_ui.js">web/htdocs/codesearch_ui.js</a> b/<a href="../file/web/htdocs/codesearch_ui.js">web/htdocs/codesearch_ui.js</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -29,6 +29,8 @@ var CodesearchUI = function() {
+</a>                              match.context_after[i]
+                            ]));
+     }
+<a href="#h3-0-3" id="h3-0-3" class="i">+    var count = 0;
+</a><a href="#h3-0-4" id="h3-0-4" class="i">+    match.contexts.forEach(function (ctx) {count += ctx.paths.length;});
+</a>     return h.div({cls: &#39;match&#39;},
+                  [
+                    h.div({},
+<a href="#h3-1" id="h3-1" class="h">@@ -38,9 +40,10 @@ var CodesearchUI = function() {
+</a>                                          href: url_for(match)
+                                        }, [shorten(match.ref), &quot;:&quot;, match.file]),
+                                  ])
+<a href="#h3-1-3" id="h3-1-3" class="d">-                         ].concat((match.paths.length &gt; 1) ?
+</a><a href="#h3-1-4" id="h3-1-4" class="d">-                         [h.span({cls: &quot;more&quot;},
+</a><a href="#h3-1-5" id="h3-1-5" class="d">-                                 [&quot; (+&quot;, &quot;&quot; + (match.paths.length - 1), &quot; identical)&quot;])] : [])
+</a><a href="#h3-1-6" id="h3-1-6" class="i">+                         ].concat(count &gt; 1 ?
+</a><a href="#h3-1-7" id="h3-1-7" class="i">+                                  [h.span({cls: &quot;more&quot;},
+</a><a href="#h3-1-8" id="h3-1-8" class="i">+                                          [&quot; (+&quot;, &quot;&quot; + (count - 1), &quot; identical)&quot;])] :
+</a><a href="#h3-1-9" id="h3-1-9" class="i">+                                  [])
+</a>                         ),
+                    h.div({cls: &#39;contents&#39;},
+                          [
+</pre>
+</div>
+</body>
+</html>

@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>client tests no longer rely on an external server! - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/9ff9060607e0ff5e00dee5e9932ef4981b798858">9ff9060607e0ff5e00dee5e9932ef4981b798858</a>
+<b>parent</b> <a href="../commit/a8929b42b1883945627e5f629d1f91080c805824">a8929b42b1883945627e5f629d1f91080c805824</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Sat,  5 Apr 2014 11:20:23 -0700
+
+client tests no longer rely on an external server!
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">client/client_test.go</a></td><td> | </td><td class="num">124</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">---------------</span></td></tr>
+</table></pre><pre>1 file changed, 101 insertions(+), 23 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/client/client_test.go">client/client_test.go</a> b/<a href="../file/client/client_test.go">client/client_test.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -1,10 +1,11 @@
+</a> package client_test
+ 
+ import (
+<a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;encoding/json&quot;
+</a> 	&quot;github.com/nelhage/livegrep/client&quot;
+<a href="#h0-0-5" id="h0-0-5" class="i">+	&quot;io&quot;
+</a> 	. &quot;launchpad.net/gocheck&quot;
+ 	&quot;net&quot;
+<a href="#h0-0-8" id="h0-0-8" class="d">-	&quot;strings&quot;
+</a> 	&quot;testing&quot;
+ )
+ 
+<a href="#h0-1" id="h0-1" class="h">@@ -17,9 +18,60 @@ type ClientSuite struct {
+</a> 	client client.Client
+ }
+ 
+<a href="#h0-1-3" id="h0-1-3" class="i">+func (c *ClientSuite) TearDownTest(*C) {
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+	if c.client != nil {
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+		c.client.Close()
+</a><a href="#h0-1-6" id="h0-1-6" class="i">+	}
+</a><a href="#h0-1-7" id="h0-1-7" class="i">+}
+</a><a href="#h0-1-8" id="h0-1-8" class="i">+
+</a> var _ = Suite(&amp;ClientSuite{})
+ 
+ type MockServer struct {
+<a href="#h0-1-12" id="h0-1-12" class="i">+	Info    *client.ServerInfo
+</a><a href="#h0-1-13" id="h0-1-13" class="i">+	Results []*client.Result
+</a><a href="#h0-1-14" id="h0-1-14" class="i">+}
+</a><a href="#h0-1-15" id="h0-1-15" class="i">+
+</a><a href="#h0-1-16" id="h0-1-16" class="i">+func (m *MockServer) handle(conn net.Conn) {
+</a><a href="#h0-1-17" id="h0-1-17" class="i">+	defer conn.Close()
+</a><a href="#h0-1-18" id="h0-1-18" class="i">+
+</a><a href="#h0-1-19" id="h0-1-19" class="i">+	encoder := json.NewEncoder(conn)
+</a><a href="#h0-1-20" id="h0-1-20" class="i">+	reader := json.NewDecoder(conn)
+</a><a href="#h0-1-21" id="h0-1-21" class="i">+	for {
+</a><a href="#h0-1-22" id="h0-1-22" class="i">+		io.WriteString(conn, &quot;READY &quot;)
+</a><a href="#h0-1-23" id="h0-1-23" class="i">+		encoder.Encode(m.Info)
+</a><a href="#h0-1-24" id="h0-1-24" class="i">+
+</a><a href="#h0-1-25" id="h0-1-25" class="i">+		var q client.Query
+</a><a href="#h0-1-26" id="h0-1-26" class="i">+		if err := reader.Decode(&amp;q); err != nil {
+</a><a href="#h0-1-27" id="h0-1-27" class="i">+			if err == io.EOF {
+</a><a href="#h0-1-28" id="h0-1-28" class="i">+				return
+</a><a href="#h0-1-29" id="h0-1-29" class="i">+			}
+</a><a href="#h0-1-30" id="h0-1-30" class="i">+			panic(err.Error())
+</a><a href="#h0-1-31" id="h0-1-31" class="i">+		}
+</a><a href="#h0-1-32" id="h0-1-32" class="i">+
+</a><a href="#h0-1-33" id="h0-1-33" class="i">+		for _, r := range m.Results {
+</a><a href="#h0-1-34" id="h0-1-34" class="i">+			encoder.Encode(r)
+</a><a href="#h0-1-35" id="h0-1-35" class="i">+		}
+</a><a href="#h0-1-36" id="h0-1-36" class="i">+		io.WriteString(conn, &quot;DONE &quot;)
+</a><a href="#h0-1-37" id="h0-1-37" class="i">+		encoder.Encode(&amp;client.Stats{})
+</a><a href="#h0-1-38" id="h0-1-38" class="i">+	}
+</a><a href="#h0-1-39" id="h0-1-39" class="i">+}
+</a><a href="#h0-1-40" id="h0-1-40" class="i">+
+</a><a href="#h0-1-41" id="h0-1-41" class="i">+func runMockServer(handle func(net.Conn)) &lt;-chan string {
+</a><a href="#h0-1-42" id="h0-1-42" class="i">+	ready := make(chan string, 1)
+</a><a href="#h0-1-43" id="h0-1-43" class="i">+	go func() {
+</a><a href="#h0-1-44" id="h0-1-44" class="i">+		ln, err := net.Listen(&quot;tcp&quot;, &quot;:0&quot;)
+</a><a href="#h0-1-45" id="h0-1-45" class="i">+		if err != nil {
+</a><a href="#h0-1-46" id="h0-1-46" class="i">+			panic(err.Error())
+</a><a href="#h0-1-47" id="h0-1-47" class="i">+		}
+</a><a href="#h0-1-48" id="h0-1-48" class="i">+		defer ln.Close()
+</a><a href="#h0-1-49" id="h0-1-49" class="i">+		ready &lt;- ln.Addr().String()
+</a><a href="#h0-1-50" id="h0-1-50" class="i">+		conn, err := ln.Accept()
+</a><a href="#h0-1-51" id="h0-1-51" class="i">+		if err != nil {
+</a><a href="#h0-1-52" id="h0-1-52" class="i">+			panic(err.Error())
+</a><a href="#h0-1-53" id="h0-1-53" class="i">+		}
+</a><a href="#h0-1-54" id="h0-1-54" class="i">+		handle(conn)
+</a><a href="#h0-1-55" id="h0-1-55" class="i">+	}()
+</a><a href="#h0-1-56" id="h0-1-56" class="i">+	return ready
+</a> }
+ 
+ func (s *ClientSuite) connect(c *C, addr string) {
+<a href="#h0-2" id="h0-2" class="h">@@ -31,7 +83,11 @@ func (s *ClientSuite) connect(c *C, addr string) {
+</a> }
+ 
+ func (s *ClientSuite) TestQuery(c *C) {
+<a href="#h0-2-3" id="h0-2-3" class="d">-	s.connect(c, &quot;localhost:9999&quot;)
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+	s.connect(c, &lt;-runMockServer((&amp;MockServer{
+</a><a href="#h0-2-5" id="h0-2-5" class="i">+		Results: []*client.Result{
+</a><a href="#h0-2-6" id="h0-2-6" class="i">+			{Line: &quot;match line 1&quot;},
+</a><a href="#h0-2-7" id="h0-2-7" class="i">+		},
+</a><a href="#h0-2-8" id="h0-2-8" class="i">+	}).handle))
+</a> 	search, err := s.client.Query(&amp;client.Query{&quot;.&quot;, &quot;&quot;, &quot;&quot;})
+ 	c.Assert(err, IsNil)
+ 	var n int
+<a href="#h0-3" id="h0-3" class="h">@@ -39,14 +95,19 @@ func (s *ClientSuite) TestQuery(c *C) {
+</a> 		n++
+ 		c.Assert(r.Line, Not(Equals), &quot;&quot;)
+ 	}
+<a href="#h0-3-3" id="h0-3-3" class="d">-	c.Assert(n, Not(Equals), 0)
+</a><a href="#h0-3-4" id="h0-3-4" class="i">+	c.Assert(n, Equals, 1)
+</a> 	st, e := search.Close()
+<a href="#h0-3-6" id="h0-3-6" class="d">-	c.Assert(st, Not(IsNil))
+</a> 	c.Assert(e, IsNil)
+<a href="#h0-3-8" id="h0-3-8" class="i">+	c.Assert(st, Not(IsNil))
+</a> }
+ 
+ func (s *ClientSuite) TestTwoQueries(c *C) {
+<a href="#h0-3-12" id="h0-3-12" class="d">-	s.connect(c, &quot;localhost:9999&quot;)
+</a><a href="#h0-3-13" id="h0-3-13" class="i">+	s.connect(c, &lt;-runMockServer((&amp;MockServer{
+</a><a href="#h0-3-14" id="h0-3-14" class="i">+		Results: []*client.Result{
+</a><a href="#h0-3-15" id="h0-3-15" class="i">+			{Line: &quot;match line 1&quot;},
+</a><a href="#h0-3-16" id="h0-3-16" class="i">+		},
+</a><a href="#h0-3-17" id="h0-3-17" class="i">+	}).handle))
+</a><a href="#h0-3-18" id="h0-3-18" class="i">+
+</a> 	search, err := s.client.Query(&amp;client.Query{&quot;.&quot;, &quot;&quot;, &quot;&quot;})
+ 	c.Assert(err, IsNil)
+ 	_, err = search.Close()
+<a href="#h0-4" id="h0-4" class="h">@@ -65,8 +126,39 @@ func (s *ClientSuite) TestTwoQueries(c *C) {
+</a> 	c.Assert(n, Not(Equals), 0)
+ }
+ 
+<a href="#h0-4-3" id="h0-4-3" class="i">+type MockServerQueryError struct {
+</a><a href="#h0-4-4" id="h0-4-4" class="i">+	Info *client.ServerInfo
+</a><a href="#h0-4-5" id="h0-4-5" class="i">+	Err  string
+</a><a href="#h0-4-6" id="h0-4-6" class="i">+}
+</a><a href="#h0-4-7" id="h0-4-7" class="i">+
+</a><a href="#h0-4-8" id="h0-4-8" class="i">+func (m *MockServerQueryError) handle(conn net.Conn) {
+</a><a href="#h0-4-9" id="h0-4-9" class="i">+	defer conn.Close()
+</a><a href="#h0-4-10" id="h0-4-10" class="i">+	encoder := json.NewEncoder(conn)
+</a><a href="#h0-4-11" id="h0-4-11" class="i">+	reader := json.NewDecoder(conn)
+</a><a href="#h0-4-12" id="h0-4-12" class="i">+	for {
+</a><a href="#h0-4-13" id="h0-4-13" class="i">+		io.WriteString(conn, &quot;READY &quot;)
+</a><a href="#h0-4-14" id="h0-4-14" class="i">+		encoder.Encode(m.Info)
+</a><a href="#h0-4-15" id="h0-4-15" class="i">+
+</a><a href="#h0-4-16" id="h0-4-16" class="i">+		var q client.Query
+</a><a href="#h0-4-17" id="h0-4-17" class="i">+		if err := reader.Decode(&amp;q); err != nil {
+</a><a href="#h0-4-18" id="h0-4-18" class="i">+			if err == io.EOF {
+</a><a href="#h0-4-19" id="h0-4-19" class="i">+				return
+</a><a href="#h0-4-20" id="h0-4-20" class="i">+			}
+</a><a href="#h0-4-21" id="h0-4-21" class="i">+			panic(err.Error())
+</a><a href="#h0-4-22" id="h0-4-22" class="i">+		}
+</a><a href="#h0-4-23" id="h0-4-23" class="i">+
+</a><a href="#h0-4-24" id="h0-4-24" class="i">+		io.WriteString(conn, &quot;FATAL &quot;)
+</a><a href="#h0-4-25" id="h0-4-25" class="i">+		io.WriteString(conn, m.Err)
+</a><a href="#h0-4-26" id="h0-4-26" class="i">+		io.WriteString(conn, &quot;\n&quot;)
+</a><a href="#h0-4-27" id="h0-4-27" class="i">+	}
+</a><a href="#h0-4-28" id="h0-4-28" class="i">+}
+</a><a href="#h0-4-29" id="h0-4-29" class="i">+
+</a> func (s *ClientSuite) TestBadRegex(c *C) {
+<a href="#h0-4-31" id="h0-4-31" class="d">-	s.connect(c, &quot;localhost:9999&quot;)
+</a><a href="#h0-4-32" id="h0-4-32" class="i">+	errStr := &quot;Invalid query: (&quot;
+</a><a href="#h0-4-33" id="h0-4-33" class="i">+	s.connect(c, &lt;-runMockServer((&amp;MockServerQueryError{
+</a><a href="#h0-4-34" id="h0-4-34" class="i">+		Err: errStr,
+</a><a href="#h0-4-35" id="h0-4-35" class="i">+	}).handle))
+</a><a href="#h0-4-36" id="h0-4-36" class="i">+
+</a> 	search, err := s.client.Query(&amp;client.Query{&quot;(&quot;, &quot;&quot;, &quot;&quot;})
+ 	c.Assert(err, IsNil)
+ 	for _ = range search.Results() {
+<a href="#h0-5" id="h0-5" class="h">@@ -79,31 +171,17 @@ func (s *ClientSuite) TestBadRegex(c *C) {
+</a> 	}
+ 	if q, ok := e.(client.QueryError); ok {
+ 		c.Assert(q.Query.Line, Equals, &quot;(&quot;)
+<a href="#h0-5-3" id="h0-5-3" class="d">-		if strings.HasPrefix(q.Err, &quot;FATAL&quot;) {
+</a><a href="#h0-5-4" id="h0-5-4" class="d">-			c.Errorf(&quot;Error includes FATAL prefix: %s&quot;, q.Err)
+</a><a href="#h0-5-5" id="h0-5-5" class="d">-		}
+</a><a href="#h0-5-6" id="h0-5-6" class="i">+		c.Assert(q.Err, Equals, errStr)
+</a> 	} else {
+ 		c.Fatalf(&quot;Error %v wasn&#39;t a QueryError&quot;, e)
+ 	}
+ }
+ 
+ func mockServerShutdown() &lt;-chan string {
+<a href="#h0-5-13" id="h0-5-13" class="d">-	ready := make(chan string, 1)
+</a><a href="#h0-5-14" id="h0-5-14" class="d">-	go func() {
+</a><a href="#h0-5-15" id="h0-5-15" class="d">-		ln, err := net.Listen(&quot;tcp&quot;, &quot;:0&quot;)
+</a><a href="#h0-5-16" id="h0-5-16" class="d">-		if err != nil {
+</a><a href="#h0-5-17" id="h0-5-17" class="d">-			panic(err.Error())
+</a><a href="#h0-5-18" id="h0-5-18" class="d">-		}
+</a><a href="#h0-5-19" id="h0-5-19" class="d">-		defer ln.Close()
+</a><a href="#h0-5-20" id="h0-5-20" class="d">-		ready &lt;- ln.Addr().String()
+</a><a href="#h0-5-21" id="h0-5-21" class="d">-		conn, err := ln.Accept()
+</a><a href="#h0-5-22" id="h0-5-22" class="d">-		if err != nil {
+</a><a href="#h0-5-23" id="h0-5-23" class="d">-			panic(err.Error())
+</a><a href="#h0-5-24" id="h0-5-24" class="d">-		}
+</a><a href="#h0-5-25" id="h0-5-25" class="i">+	return runMockServer(func(conn net.Conn) {
+</a> 		conn.Write([]byte(&quot;READY {}\n&quot;))
+ 		conn.Close()
+<a href="#h0-5-28" id="h0-5-28" class="d">-	}()
+</a><a href="#h0-5-29" id="h0-5-29" class="d">-	return ready
+</a><a href="#h0-5-30" id="h0-5-30" class="i">+	})
+</a> }
+ 
+ func (s *ClientSuite) TestShutdown(c *C) {
+</pre>
+</div>
+</body>
+</html>

@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Add the option to listen on a UNIX socket for multiple concurrent clients. - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/9bcde85231b192e506d096679ff8187e591f4d57">9bcde85231b192e506d096679ff8187e591f4d57</a>
+<b>parent</b> <a href="../commit/e68fd2a554ad5669bc52955b14a12fc361bf062b">e68fd2a554ad5669bc52955b14a12fc361bf062b</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Sun,  8 Jan 2012 16:54:04 -0500
+
+Add the option to listen on a UNIX socket for multiple concurrent clients.
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">main.cc</a></td><td> | </td><td class="num">85</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">------------</span></td></tr>
+</table></pre><pre>1 file changed, 73 insertions(+), 12 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/main.cc">main.cc</a> b/<a href="../file/main.cc">main.cc</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -4,6 +4,9 @@
+</a> #include &quot;re_width.h&quot;
+ 
+ #include &lt;stdio.h&gt;
+<a href="#h0-0-3" id="h0-0-3" class="i">+#include &lt;sys/socket.h&gt;
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+#include &lt;sys/un.h&gt;
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+#include &lt;sys/wait.h&gt;
+</a> #include &lt;iostream&gt;
+ 
+ #include &lt;gflags/gflags.h&gt;
+<a href="#h0-1" id="h0-1" class="h">@@ -19,10 +22,16 @@ DEFINE_string(dump_index, &quot;&quot;, &quot;Dump the produced index to a specified file&quot;);
+</a> DEFINE_string(load_index, &quot;&quot;, &quot;Load the index from a file instead of walking the repository&quot;);
+ DEFINE_string(git_dir, &quot;.git&quot;, &quot;The git directory to read from&quot;);
+ DEFINE_bool(quiet, false, &quot;Do the search, but don&#39;t print results.&quot;);
+<a href="#h0-1-3" id="h0-1-3" class="i">+DEFINE_string(listen, &quot;&quot;, &quot;Listen on a UNIX socket for connections&quot;);
+</a> 
+ using namespace std;
+ using namespace re2;
+ 
+<a href="#h0-1-8" id="h0-1-8" class="i">+void die_errno(const char *str) {
+</a><a href="#h0-1-9" id="h0-1-9" class="i">+    perror(str);
+</a><a href="#h0-1-10" id="h0-1-10" class="i">+    exit(1);
+</a><a href="#h0-1-11" id="h0-1-11" class="i">+}
+</a><a href="#h0-1-12" id="h0-1-12" class="i">+
+</a> long timeval_ms (struct timeval tv) {
+     return tv.tv_sec * 1000 + tv.tv_usec / 1000;
+ }
+<a href="#h0-2" id="h0-2" class="h">@@ -198,12 +207,7 @@ void interact(code_searcher *cs, FILE *in, FILE *out) {
+</a>     }
+ }
+ 
+<a href="#h0-2-3" id="h0-2-3" class="d">-int main(int argc, char **argv) {
+</a><a href="#h0-2-4" id="h0-2-4" class="d">-    google::SetUsageMessage(&quot;Usage: &quot; + string(argv[0]) + &quot; &lt;options&gt; REFS&quot;);
+</a><a href="#h0-2-5" id="h0-2-5" class="d">-    google::ParseCommandLineFlags(&amp;argc, &amp;argv, true);
+</a><a href="#h0-2-6" id="h0-2-6" class="d">-
+</a><a href="#h0-2-7" id="h0-2-7" class="d">-    code_searcher counter;
+</a><a href="#h0-2-8" id="h0-2-8" class="d">-
+</a><a href="#h0-2-9" id="h0-2-9" class="i">+void initialize_search(code_searcher *search, int argc, char **argv) {
+</a>     if (FLAGS_load_index.size() == 0) {
+         git_repository *repo;
+         git_repository_open(&amp;repo, FLAGS_git_dir.c_str());
+<a href="#h0-3" id="h0-3" class="h">@@ -215,25 +219,82 @@ int main(int argc, char **argv) {
+</a>             if (!FLAGS_json)
+                 printf(&quot;Walking %s...&quot;, argv[i]);
+             fflush(stdout);
+<a href="#h0-3-3" id="h0-3-3" class="d">-            counter.walk_ref(repo, argv[i]);
+</a><a href="#h0-3-4" id="h0-3-4" class="i">+            search-&gt;walk_ref(repo, argv[i]);
+</a>             elapsed = tm.elapsed();
+             if (!FLAGS_json)
+                 printf(&quot; done.\n&quot;);
+         }
+<a href="#h0-3-9" id="h0-3-9" class="d">-        counter.finalize();
+</a><a href="#h0-3-10" id="h0-3-10" class="i">+        search-&gt;finalize();
+</a>         elapsed = tm.elapsed();
+         if (!FLAGS_json)
+             printf(&quot;repository indexed in %d.%06ds\n&quot;,
+                    (int)elapsed.tv_sec, (int)elapsed.tv_usec);
+     } else {
+<a href="#h0-3-16" id="h0-3-16" class="d">-        counter.load_index(FLAGS_load_index);
+</a><a href="#h0-3-17" id="h0-3-17" class="i">+        search-&gt;load_index(FLAGS_load_index);
+</a>     }
+     if (!FLAGS_json &amp;&amp; !FLAGS_load_index.size())
+<a href="#h0-3-20" id="h0-3-20" class="d">-        counter.dump_stats();
+</a><a href="#h0-3-21" id="h0-3-21" class="i">+        search-&gt;dump_stats();
+</a>     if (FLAGS_dump_index.size())
+<a href="#h0-3-23" id="h0-3-23" class="d">-        counter.dump_index(FLAGS_dump_index);
+</a><a href="#h0-3-24" id="h0-3-24" class="i">+        search-&gt;dump_index(FLAGS_dump_index);
+</a><a href="#h0-3-25" id="h0-3-25" class="i">+}
+</a><a href="#h0-3-26" id="h0-3-26" class="i">+
+</a><a href="#h0-3-27" id="h0-3-27" class="i">+struct child_state {
+</a><a href="#h0-3-28" id="h0-3-28" class="i">+    int fd;
+</a><a href="#h0-3-29" id="h0-3-29" class="i">+    code_searcher *search;
+</a><a href="#h0-3-30" id="h0-3-30" class="i">+};
+</a><a href="#h0-3-31" id="h0-3-31" class="i">+
+</a><a href="#h0-3-32" id="h0-3-32" class="i">+void *handle_client(void *data) {
+</a><a href="#h0-3-33" id="h0-3-33" class="i">+    child_state *child = static_cast&lt;child_state*&gt;(data);
+</a><a href="#h0-3-34" id="h0-3-34" class="i">+    FILE *client = fdopen(child-&gt;fd, &quot;w+&quot;);
+</a><a href="#h0-3-35" id="h0-3-35" class="i">+    interact(child-&gt;search, client, client);
+</a><a href="#h0-3-36" id="h0-3-36" class="i">+    close(child-&gt;fd);
+</a><a href="#h0-3-37" id="h0-3-37" class="i">+    delete child;
+</a><a href="#h0-3-38" id="h0-3-38" class="i">+    return 0;
+</a><a href="#h0-3-39" id="h0-3-39" class="i">+}
+</a><a href="#h0-3-40" id="h0-3-40" class="i">+
+</a><a href="#h0-3-41" id="h0-3-41" class="i">+void listen(code_searcher *search, string path) {
+</a><a href="#h0-3-42" id="h0-3-42" class="i">+    int server = socket(AF_UNIX, SOCK_STREAM, 0);
+</a><a href="#h0-3-43" id="h0-3-43" class="i">+    if (server &lt; 0)
+</a><a href="#h0-3-44" id="h0-3-44" class="i">+        die_errno(&quot;socket(AF_UNIX)&quot;);
+</a><a href="#h0-3-45" id="h0-3-45" class="i">+
+</a><a href="#h0-3-46" id="h0-3-46" class="i">+    struct sockaddr_un addr;
+</a> 
+<a href="#h0-3-48" id="h0-3-48" class="d">-    interact(&amp;counter, stdin, stdout);
+</a><a href="#h0-3-49" id="h0-3-49" class="i">+    memset(&amp;addr, 0, sizeof addr);
+</a><a href="#h0-3-50" id="h0-3-50" class="i">+    addr.sun_family = AF_UNIX;
+</a><a href="#h0-3-51" id="h0-3-51" class="i">+    memcpy(addr.sun_path, path.c_str(), path.size());
+</a><a href="#h0-3-52" id="h0-3-52" class="i">+
+</a><a href="#h0-3-53" id="h0-3-53" class="i">+    if (::bind(server, reinterpret_cast&lt;sockaddr*&gt;(&amp;addr), sizeof addr) &lt; 0)
+</a><a href="#h0-3-54" id="h0-3-54" class="i">+        die_errno(&quot;Unable to bind socket&quot;);
+</a><a href="#h0-3-55" id="h0-3-55" class="i">+
+</a><a href="#h0-3-56" id="h0-3-56" class="i">+    if (listen(server, 4) &lt; 0)
+</a><a href="#h0-3-57" id="h0-3-57" class="i">+        die_errno(&quot;listen()&quot;);
+</a><a href="#h0-3-58" id="h0-3-58" class="i">+
+</a><a href="#h0-3-59" id="h0-3-59" class="i">+    while(1) {
+</a><a href="#h0-3-60" id="h0-3-60" class="i">+        int fd = accept(server, NULL, NULL);
+</a><a href="#h0-3-61" id="h0-3-61" class="i">+        if (fd &lt; 0)
+</a><a href="#h0-3-62" id="h0-3-62" class="i">+            die_errno(&quot;accept&quot;);
+</a><a href="#h0-3-63" id="h0-3-63" class="i">+
+</a><a href="#h0-3-64" id="h0-3-64" class="i">+        child_state *state = new child_state;
+</a><a href="#h0-3-65" id="h0-3-65" class="i">+        state-&gt;fd = fd;
+</a><a href="#h0-3-66" id="h0-3-66" class="i">+        state-&gt;search = search;
+</a><a href="#h0-3-67" id="h0-3-67" class="i">+
+</a><a href="#h0-3-68" id="h0-3-68" class="i">+        pthread_t thread;
+</a><a href="#h0-3-69" id="h0-3-69" class="i">+        pthread_create(&amp;thread, NULL, handle_client, state);
+</a><a href="#h0-3-70" id="h0-3-70" class="i">+    }
+</a><a href="#h0-3-71" id="h0-3-71" class="i">+}
+</a><a href="#h0-3-72" id="h0-3-72" class="i">+
+</a><a href="#h0-3-73" id="h0-3-73" class="i">+int main(int argc, char **argv) {
+</a><a href="#h0-3-74" id="h0-3-74" class="i">+    google::SetUsageMessage(&quot;Usage: &quot; + string(argv[0]) + &quot; &lt;options&gt; REFS&quot;);
+</a><a href="#h0-3-75" id="h0-3-75" class="i">+    google::ParseCommandLineFlags(&amp;argc, &amp;argv, true);
+</a><a href="#h0-3-76" id="h0-3-76" class="i">+
+</a><a href="#h0-3-77" id="h0-3-77" class="i">+    code_searcher counter;
+</a><a href="#h0-3-78" id="h0-3-78" class="i">+
+</a><a href="#h0-3-79" id="h0-3-79" class="i">+    initialize_search(&amp;counter, argc, argv);
+</a><a href="#h0-3-80" id="h0-3-80" class="i">+
+</a><a href="#h0-3-81" id="h0-3-81" class="i">+    if (FLAGS_listen.size())
+</a><a href="#h0-3-82" id="h0-3-82" class="i">+        listen(&amp;counter, FLAGS_listen);
+</a><a href="#h0-3-83" id="h0-3-83" class="i">+    else
+</a><a href="#h0-3-84" id="h0-3-84" class="i">+        interact(&amp;counter, stdin, stdout);
+</a> 
+     return 0;
+ }
+</pre>
+</div>
+</body>
+</html>

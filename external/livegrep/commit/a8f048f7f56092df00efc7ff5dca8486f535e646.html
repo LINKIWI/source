@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>port tests to use the GRPC server - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/a8f048f7f56092df00efc7ff5dca8486f535e646">a8f048f7f56092df00efc7ff5dca8486f535e646</a>
+<b>parent</b> <a href="../commit/dcce4bb31be47ed35a9a86c1fce291997039a214">dcce4bb31be47ed35a9a86c1fce291997039a214</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Sat, 22 Oct 2016 16:24:40 -0700
+
+port tests to use the GRPC server
+
+this is both marginally cleaner, and tests the GRPC server class, too.
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">src/lib/timer.h</a></td><td> | </td><td class="num">4</td><td><span class="i">++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">src/tools/BUILD</a></td><td> | </td><td class="num">19</td><td><span class="i">++++++++++++++++</span><span class="d">---</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">src/tools/grpc_server.cc</a></td><td> | </td><td class="num">3</td><td><span class="i">+</span><span class="d">--</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">src/tools/transport.cc</a></td><td> | </td><td class="num">5</td><td><span class="i">+</span><span class="d">----</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h4">src/tools/transport.h</a></td><td> | </td><td class="num">2</td><td><span class="i"></span><span class="d">--</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h5">test/BUILD</a></td><td> | </td><td class="num">1</td><td><span class="i">+</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h6">test/codesearch_test.cc</a></td><td> | </td><td class="num">125</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++</span><span class="d">---------------------------------------</span></td></tr>
+</table></pre><pre>7 files changed, 86 insertions(+), 73 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/src/lib/timer.h">src/lib/timer.h</a> b/<a href="../file/src/lib/timer.h">src/lib/timer.h</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -141,4 +141,8 @@ protected:
+</a> #endif
+ };
+ 
+<a href="#h0-0-3" id="h0-0-3" class="i">+inline static long timeval_ms(struct timeval tv) {
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+    return tv.tv_sec * 1000 + tv.tv_usec / 1000;
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+}
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+
+</a> #endif
+<b>diff --git a/<a id="h1" href="../file/src/tools/BUILD">src/tools/BUILD</a> b/<a href="../file/src/tools/BUILD">src/tools/BUILD</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -1,20 +1,33 @@
+</a><a href="#h1-0-0" id="h1-0-0" class="i">+cc_library(
+</a><a href="#h1-0-1" id="h1-0-1" class="i">+  name = &quot;grpc_server&quot;,
+</a><a href="#h1-0-2" id="h1-0-2" class="i">+  srcs = [
+</a><a href="#h1-0-3" id="h1-0-3" class="i">+    &quot;grpc_server.cc&quot;,
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+    &quot;grpc_server.h&quot;,
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+    &quot;limits.h&quot;,
+</a><a href="#h1-0-6" id="h1-0-6" class="i">+  ],
+</a><a href="#h1-0-7" id="h1-0-7" class="i">+  deps = [
+</a><a href="#h1-0-8" id="h1-0-8" class="i">+    &quot;//src:codesearch&quot;,
+</a><a href="#h1-0-9" id="h1-0-9" class="i">+    &quot;//src/proto:cc_proto&quot;,
+</a><a href="#h1-0-10" id="h1-0-10" class="i">+    &quot;@com_github_grpc_grpc//:grpc&quot;,
+</a><a href="#h1-0-11" id="h1-0-11" class="i">+  ],
+</a><a href="#h1-0-12" id="h1-0-12" class="i">+  visibility = [ &quot;//visibility:public&quot; ],
+</a><a href="#h1-0-13" id="h1-0-13" class="i">+)
+</a><a href="#h1-0-14" id="h1-0-14" class="i">+
+</a> cc_binary(
+   name = &quot;codesearch&quot;,
+   srcs = [
+     &quot;codesearch.cc&quot;,
+<a href="#h1-0-19" id="h1-0-19" class="d">-    &quot;grpc_server.cc&quot;,
+</a><a href="#h1-0-20" id="h1-0-20" class="d">-    &quot;grpc_server.h&quot;,
+</a>     &quot;transport.cc&quot;,
+     &quot;transport.h&quot;,
+     &quot;limits.h&quot;,
+   ],
+   deps = [
+<a href="#h1-0-26" id="h1-0-26" class="i">+    &quot;:grpc_server&quot;,
+</a>     &quot;//src:codesearch&quot;,
+     &quot;//src/proto:cc_proto&quot;,
+ 
+     &quot;@boost//:bind&quot;,
+     &quot;@com_github_libgit2//:libgit2&quot;,
+<a href="#h1-0-32" id="h1-0-32" class="d">-    &quot;@com_github_grpc_grpc//:grpc&quot;,
+</a>   ],
+   copts = [
+     &quot;-Wno-deprecated-declarations&quot;,
+<b>diff --git a/<a id="h2" href="../file/src/tools/grpc_server.cc">src/tools/grpc_server.cc</a> b/<a href="../file/src/tools/grpc_server.cc">src/tools/grpc_server.cc</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -1,4 +1,5 @@
+</a> #include &quot;src/lib/debug.h&quot;
+<a href="#h2-0-1" id="h2-0-1" class="i">+#include &quot;src/lib/timer.h&quot;
+</a> 
+ #include &quot;src/codesearch.h&quot;
+ #include &quot;src/tagsearch.h&quot;
+<a href="#h2-1" id="h2-1" class="h">@@ -127,8 +128,6 @@ private:
+</a>     CodeSearchResult* response_;
+ };
+ 
+<a href="#h2-1-3" id="h2-1-3" class="d">-extern long timeval_ms(struct timeval tv);
+</a><a href="#h2-1-4" id="h2-1-4" class="d">-
+</a> static std::string pat(const std::unique_ptr&lt;RE2&gt; &amp;p) {
+     if (p.get() == 0)
+         return &quot;&quot;;
+<b>diff --git a/<a id="h3" href="../file/src/tools/transport.cc">src/tools/transport.cc</a> b/<a href="../file/src/tools/transport.cc">src/tools/transport.cc</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -6,6 +6,7 @@
+</a>  * modify it under the terms listed in the COPYING file.
+  ********************************************************************/
+ #include &quot;src/lib/debug.h&quot;
+<a href="#h3-0-3" id="h3-0-3" class="i">+#include &quot;src/lib/timer.h&quot;
+</a> 
+ #include &quot;src/codesearch.h&quot;
+ #include &quot;src/tools/transport.h&quot;
+<a href="#h3-1" id="h3-1" class="h">@@ -255,10 +256,6 @@ json_parse_error parse_object(json_object *js, repo_spec *r) {
+</a> 
+ };
+ 
+<a href="#h3-1-3" id="h3-1-3" class="d">-long timeval_ms (struct timeval tv) {
+</a><a href="#h3-1-4" id="h3-1-4" class="d">-    return tv.tv_sec * 1000 + tv.tv_usec / 1000;
+</a><a href="#h3-1-5" id="h3-1-5" class="d">-}
+</a><a href="#h3-1-6" id="h3-1-6" class="d">-
+</a> codesearch_transport::codesearch_transport(FILE *in, FILE *out) : in_(in), out_(out) {
+     assert(!setvbuf(in_,  NULL, _IOFBF, 4096*4));
+     assert(!setvbuf(out_, NULL, _IOLBF, 4096));
+<b>diff --git a/<a id="h4" href="../file/src/tools/transport.h">src/tools/transport.h</a> b/<a href="../file/src/tools/transport.h">src/tools/transport.h</a></b>
+<a href="#h4-0" id="h4-0" class="h">@@ -42,8 +42,6 @@ struct index_spec {
+</a>     std::vector&lt;repo_spec&gt; repos;
+ };
+ 
+<a href="#h4-0-3" id="h4-0-3" class="d">-long timeval_ms (struct timeval tv);
+</a><a href="#h4-0-4" id="h4-0-4" class="d">-
+</a> class codesearch_transport {
+ public:
+     codesearch_transport(FILE *in, FILE *out);
+<b>diff --git a/<a id="h5" href="../file/test/BUILD">test/BUILD</a> b/<a href="../file/test/BUILD">test/BUILD</a></b>
+<a href="#h5-0" id="h5-0" class="h">@@ -6,6 +6,7 @@ cc_test(
+</a>     ],
+     deps = [
+       &quot;//src:codesearch&quot;,
+<a href="#h5-0-3" id="h5-0-3" class="i">+      &quot;//src/tools:grpc_server&quot;,
+</a>       &quot;@gtest//:gtest&quot;,
+     ],
+     defines = [
+<b>diff --git a/<a id="h6" href="../file/test/codesearch_test.cc">test/codesearch_test.cc</a> b/<a href="../file/test/codesearch_test.cc">test/codesearch_test.cc</a></b>
+<a href="#h6-0" id="h6-0" class="h">@@ -3,6 +3,7 @@
+</a> 
+ #include &quot;src/codesearch.h&quot;
+ #include &quot;src/content.h&quot;
+<a href="#h6-0-3" id="h6-0-3" class="i">+#include &quot;src/tools/grpc_server.h&quot;
+</a> 
+ class codesearch_test : public ::testing::Test {
+ protected:
+<a href="#h6-1" id="h6-1" class="h">@@ -61,17 +62,6 @@ TEST_F(codesearch_test, NoTrailingNewLine) {
+</a>     EXPECT_EQ(string(&quot;no newline\n&quot;), content);
+ }
+ 
+<a href="#h6-1-3" id="h6-1-3" class="d">-struct accumulate_matches {
+</a><a href="#h6-1-4" id="h6-1-4" class="d">-    vector&lt;match_result&gt; *results_;
+</a><a href="#h6-1-5" id="h6-1-5" class="d">-    accumulate_matches(vector&lt;match_result&gt; *results) : results_(results) {
+</a><a href="#h6-1-6" id="h6-1-6" class="d">-        results_-&gt;clear();
+</a><a href="#h6-1-7" id="h6-1-7" class="d">-    }
+</a><a href="#h6-1-8" id="h6-1-8" class="d">-
+</a><a href="#h6-1-9" id="h6-1-9" class="d">-    void operator()(const match_result *m) {
+</a><a href="#h6-1-10" id="h6-1-10" class="d">-        results_-&gt;push_back(*m);
+</a><a href="#h6-1-11" id="h6-1-11" class="d">-    }
+</a><a href="#h6-1-12" id="h6-1-12" class="d">-};
+</a><a href="#h6-1-13" id="h6-1-13" class="d">-
+</a> TEST_F(codesearch_test, DuplicateLinesInFile) {
+     cs_.index_file(tree_, &quot;/data/file1&quot;,
+                    &quot;line 1\n&quot;
+<a href="#h6-2" id="h6-2" class="h">@@ -79,18 +69,19 @@ TEST_F(codesearch_test, DuplicateLinesInFile) {
+</a>                    &quot;line 2\n&quot;);
+     cs_.finalize();
+ 
+<a href="#h6-2-3" id="h6-2-3" class="d">-    code_searcher::search_thread search(&amp;cs_);
+</a><a href="#h6-2-4" id="h6-2-4" class="d">-    match_stats stats;
+</a><a href="#h6-2-5" id="h6-2-5" class="d">-    query q;
+</a><a href="#h6-2-6" id="h6-2-6" class="d">-    RE2::Options opts;
+</a><a href="#h6-2-7" id="h6-2-7" class="d">-    default_re2_options(opts);
+</a><a href="#h6-2-8" id="h6-2-8" class="d">-    q.line_pat.reset(new RE2(&quot;line 1&quot;, opts));
+</a><a href="#h6-2-9" id="h6-2-9" class="d">-    vector&lt;match_result&gt; results;
+</a><a href="#h6-2-10" id="h6-2-10" class="d">-    search.match(q, accumulate_matches(&amp;results), &amp;stats);
+</a><a href="#h6-2-11" id="h6-2-11" class="d">-
+</a><a href="#h6-2-12" id="h6-2-12" class="d">-    ASSERT_EQ(2, results.size());
+</a><a href="#h6-2-13" id="h6-2-13" class="d">-    EXPECT_EQ(1, results[0].lno);
+</a><a href="#h6-2-14" id="h6-2-14" class="d">-    EXPECT_EQ(2, results[1].lno);
+</a><a href="#h6-2-15" id="h6-2-15" class="i">+    CodeSearchImpl srv(&amp;cs_, nullptr);
+</a><a href="#h6-2-16" id="h6-2-16" class="i">+    Query request;
+</a><a href="#h6-2-17" id="h6-2-17" class="i">+    CodeSearchResult matches;
+</a><a href="#h6-2-18" id="h6-2-18" class="i">+    request.set_line(&quot;line 1&quot;);
+</a><a href="#h6-2-19" id="h6-2-19" class="i">+
+</a><a href="#h6-2-20" id="h6-2-20" class="i">+    grpc::ServerContext ctx;
+</a><a href="#h6-2-21" id="h6-2-21" class="i">+
+</a><a href="#h6-2-22" id="h6-2-22" class="i">+    grpc::Status st = srv.Search(&amp;ctx, &amp;request, &amp;matches);
+</a><a href="#h6-2-23" id="h6-2-23" class="i">+    ASSERT_TRUE(st.ok());
+</a><a href="#h6-2-24" id="h6-2-24" class="i">+
+</a><a href="#h6-2-25" id="h6-2-25" class="i">+    ASSERT_EQ(2, matches.results_size());
+</a><a href="#h6-2-26" id="h6-2-26" class="i">+    EXPECT_EQ(1, matches.results(0).line_number());
+</a><a href="#h6-2-27" id="h6-2-27" class="i">+    EXPECT_EQ(2, matches.results(1).line_number());
+</a> }
+ 
+ TEST_F(codesearch_test, LongLines) {
+<a href="#h6-3" id="h6-3" class="h">@@ -105,17 +96,18 @@ TEST_F(codesearch_test, LongLines) {
+</a>                    string(&quot;NEEDLE\n&quot;));
+     cs_.finalize();
+ 
+<a href="#h6-3-3" id="h6-3-3" class="d">-    code_searcher::search_thread search(&amp;cs_);
+</a><a href="#h6-3-4" id="h6-3-4" class="d">-    match_stats stats;
+</a><a href="#h6-3-5" id="h6-3-5" class="d">-    query q;
+</a><a href="#h6-3-6" id="h6-3-6" class="d">-    RE2::Options opts;
+</a><a href="#h6-3-7" id="h6-3-7" class="d">-    default_re2_options(opts);
+</a><a href="#h6-3-8" id="h6-3-8" class="d">-    q.line_pat.reset(new RE2(&quot;NEEDLE&quot;, opts));
+</a><a href="#h6-3-9" id="h6-3-9" class="d">-    vector&lt;match_result&gt; results;
+</a><a href="#h6-3-10" id="h6-3-10" class="d">-    search.match(q, accumulate_matches(&amp;results), &amp;stats);
+</a><a href="#h6-3-11" id="h6-3-11" class="d">-
+</a><a href="#h6-3-12" id="h6-3-12" class="d">-    ASSERT_EQ(1, results.size());
+</a><a href="#h6-3-13" id="h6-3-13" class="d">-    EXPECT_EQ(4, results[0].lno);
+</a><a href="#h6-3-14" id="h6-3-14" class="i">+    CodeSearchImpl srv(&amp;cs_, nullptr);
+</a><a href="#h6-3-15" id="h6-3-15" class="i">+    Query request;
+</a><a href="#h6-3-16" id="h6-3-16" class="i">+    CodeSearchResult matches;
+</a><a href="#h6-3-17" id="h6-3-17" class="i">+    request.set_line(&quot;NEEDLE&quot;);
+</a><a href="#h6-3-18" id="h6-3-18" class="i">+
+</a><a href="#h6-3-19" id="h6-3-19" class="i">+    grpc::ServerContext ctx;
+</a><a href="#h6-3-20" id="h6-3-20" class="i">+
+</a><a href="#h6-3-21" id="h6-3-21" class="i">+    grpc::Status st = srv.Search(&amp;ctx, &amp;request, &amp;matches);
+</a><a href="#h6-3-22" id="h6-3-22" class="i">+    ASSERT_TRUE(st.ok());
+</a><a href="#h6-3-23" id="h6-3-23" class="i">+
+</a><a href="#h6-3-24" id="h6-3-24" class="i">+    ASSERT_EQ(1, matches.results_size());
+</a><a href="#h6-3-25" id="h6-3-25" class="i">+    EXPECT_EQ(4, matches.results(0).line_number());
+</a> }
+ 
+ 
+<a href="#h6-4" id="h6-4" class="h">@@ -129,32 +121,41 @@ TEST_F(codesearch_test, RestrictFiles) {
+</a>     cs_.index_file(other, &quot;/file2&quot;, &quot;contents&quot;);
+     cs_.finalize();
+ 
+<a href="#h6-4-3" id="h6-4-3" class="d">-    code_searcher::search_thread search(&amp;cs_);
+</a><a href="#h6-4-4" id="h6-4-4" class="d">-    match_stats stats;
+</a><a href="#h6-4-5" id="h6-4-5" class="d">-    query q;
+</a><a href="#h6-4-6" id="h6-4-6" class="d">-    vector&lt;match_result&gt; results;
+</a><a href="#h6-4-7" id="h6-4-7" class="d">-    RE2::Options opts;
+</a><a href="#h6-4-8" id="h6-4-8" class="d">-    default_re2_options(opts);
+</a><a href="#h6-4-9" id="h6-4-9" class="d">-
+</a><a href="#h6-4-10" id="h6-4-10" class="d">-    q.line_pat.reset(new RE2(&quot;contents&quot;, opts));
+</a><a href="#h6-4-11" id="h6-4-11" class="d">-    q.file_pat.reset(new RE2(&quot;file1&quot;, opts));
+</a><a href="#h6-4-12" id="h6-4-12" class="d">-
+</a><a href="#h6-4-13" id="h6-4-13" class="d">-    search.match(q, accumulate_matches(&amp;results), &amp;stats);
+</a><a href="#h6-4-14" id="h6-4-14" class="d">-    ASSERT_EQ(2, results.size());
+</a><a href="#h6-4-15" id="h6-4-15" class="d">-    EXPECT_EQ(&quot;/file1&quot;, results[0].file-&gt;path);
+</a><a href="#h6-4-16" id="h6-4-16" class="d">-    EXPECT_EQ(&quot;/file1&quot;, results[1].file-&gt;path);
+</a><a href="#h6-4-17" id="h6-4-17" class="d">-
+</a><a href="#h6-4-18" id="h6-4-18" class="d">-    q.file_pat.reset();
+</a><a href="#h6-4-19" id="h6-4-19" class="d">-    q.tree_pat.reset(new RE2(&quot;REPO&quot;, opts));
+</a><a href="#h6-4-20" id="h6-4-20" class="d">-    search.match(q, accumulate_matches(&amp;results), &amp;stats);
+</a><a href="#h6-4-21" id="h6-4-21" class="d">-    ASSERT_EQ(2, results.size());
+</a><a href="#h6-4-22" id="h6-4-22" class="d">-    EXPECT_EQ(&quot;REPO&quot;, results[0].file-&gt;tree-&gt;name);
+</a><a href="#h6-4-23" id="h6-4-23" class="d">-    EXPECT_EQ(&quot;REPO&quot;, results[1].file-&gt;tree-&gt;name);
+</a><a href="#h6-4-24" id="h6-4-24" class="d">-
+</a><a href="#h6-4-25" id="h6-4-25" class="d">-    q.tree_pat.reset();
+</a><a href="#h6-4-26" id="h6-4-26" class="d">-    q.negate.file_pat.reset(new RE2(&quot;file1&quot;, opts));
+</a><a href="#h6-4-27" id="h6-4-27" class="d">-    search.match(q, accumulate_matches(&amp;results), &amp;stats);
+</a><a href="#h6-4-28" id="h6-4-28" class="d">-    ASSERT_EQ(2, results.size());
+</a><a href="#h6-4-29" id="h6-4-29" class="d">-    EXPECT_EQ(&quot;/file2&quot;, results[0].file-&gt;path);
+</a><a href="#h6-4-30" id="h6-4-30" class="d">-    EXPECT_EQ(&quot;/file2&quot;, results[1].file-&gt;path);
+</a><a href="#h6-4-31" id="h6-4-31" class="i">+    CodeSearchImpl srv(&amp;cs_, nullptr);
+</a><a href="#h6-4-32" id="h6-4-32" class="i">+    Query request;
+</a><a href="#h6-4-33" id="h6-4-33" class="i">+    CodeSearchResult matches;
+</a><a href="#h6-4-34" id="h6-4-34" class="i">+    grpc::ServerContext ctx;
+</a><a href="#h6-4-35" id="h6-4-35" class="i">+    grpc::Status st;
+</a><a href="#h6-4-36" id="h6-4-36" class="i">+
+</a><a href="#h6-4-37" id="h6-4-37" class="i">+    request.set_line(&quot;contents&quot;);
+</a><a href="#h6-4-38" id="h6-4-38" class="i">+    request.set_file(&quot;file1&quot;);
+</a><a href="#h6-4-39" id="h6-4-39" class="i">+
+</a><a href="#h6-4-40" id="h6-4-40" class="i">+    st = srv.Search(&amp;ctx, &amp;request, &amp;matches);
+</a><a href="#h6-4-41" id="h6-4-41" class="i">+    ASSERT_TRUE(st.ok());
+</a><a href="#h6-4-42" id="h6-4-42" class="i">+
+</a><a href="#h6-4-43" id="h6-4-43" class="i">+    ASSERT_EQ(2, matches.results_size());
+</a><a href="#h6-4-44" id="h6-4-44" class="i">+    EXPECT_EQ(&quot;/file1&quot;, matches.results(0).path());
+</a><a href="#h6-4-45" id="h6-4-45" class="i">+    EXPECT_EQ(&quot;/file1&quot;, matches.results(1).path());
+</a><a href="#h6-4-46" id="h6-4-46" class="i">+
+</a><a href="#h6-4-47" id="h6-4-47" class="i">+    request.clear_file();
+</a><a href="#h6-4-48" id="h6-4-48" class="i">+    request.set_repo(&quot;REPO&quot;);
+</a><a href="#h6-4-49" id="h6-4-49" class="i">+
+</a><a href="#h6-4-50" id="h6-4-50" class="i">+    matches.Clear();
+</a><a href="#h6-4-51" id="h6-4-51" class="i">+    st = srv.Search(&amp;ctx, &amp;request, &amp;matches);
+</a><a href="#h6-4-52" id="h6-4-52" class="i">+    ASSERT_TRUE(st.ok());
+</a><a href="#h6-4-53" id="h6-4-53" class="i">+
+</a><a href="#h6-4-54" id="h6-4-54" class="i">+    ASSERT_EQ(2, matches.results_size());
+</a><a href="#h6-4-55" id="h6-4-55" class="i">+    EXPECT_EQ(&quot;REPO&quot;, matches.results(0).tree());
+</a><a href="#h6-4-56" id="h6-4-56" class="i">+    EXPECT_EQ(&quot;REPO&quot;, matches.results(1).tree());
+</a><a href="#h6-4-57" id="h6-4-57" class="i">+
+</a><a href="#h6-4-58" id="h6-4-58" class="i">+    request.clear_repo();
+</a><a href="#h6-4-59" id="h6-4-59" class="i">+    request.set_not_file(&quot;file1&quot;);
+</a><a href="#h6-4-60" id="h6-4-60" class="i">+
+</a><a href="#h6-4-61" id="h6-4-61" class="i">+    matches.Clear();
+</a><a href="#h6-4-62" id="h6-4-62" class="i">+    st = srv.Search(&amp;ctx, &amp;request, &amp;matches);
+</a><a href="#h6-4-63" id="h6-4-63" class="i">+    ASSERT_TRUE(st.ok());
+</a><a href="#h6-4-64" id="h6-4-64" class="i">+
+</a><a href="#h6-4-65" id="h6-4-65" class="i">+    ASSERT_EQ(2, matches.results_size());
+</a><a href="#h6-4-66" id="h6-4-66" class="i">+    EXPECT_EQ(&quot;/file2&quot;, matches.results(0).path());
+</a><a href="#h6-4-67" id="h6-4-67" class="i">+    EXPECT_EQ(&quot;/file2&quot;, matches.results(1).path());
+</a> }
+</pre>
+</div>
+</body>
+</html>

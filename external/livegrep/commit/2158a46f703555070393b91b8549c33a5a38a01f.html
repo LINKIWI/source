@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Add some logging to the backend - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/2158a46f703555070393b91b8549c33a5a38a01f">2158a46f703555070393b91b8549c33a5a38a01f</a>
+<b>parent</b> <a href="../commit/7b24feeeea195cb376bc37218932de3c73d70e1c">7b24feeeea195cb376bc37218932de3c73d70e1c</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Sun, 17 Jan 2016 20:11:21 -0800
+
+Add some logging to the backend
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">src/codesearch.h</a></td><td> | </td><td class="num">2</td><td><span class="i">++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">src/lib/debug.cc</a></td><td> | </td><td class="num">50</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">--</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">src/lib/debug.h</a></td><td> | </td><td class="num">16</td><td><span class="i">++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">src/tools/codesearch.cc</a></td><td> | </td><td class="num">13</td><td><span class="i">+++++++++++</span><span class="d">--</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h4">src/tools/transport.cc</a></td><td> | </td><td class="num">12</td><td><span class="i">++++++++</span><span class="d">----</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h5">src/tools/transport.h</a></td><td> | </td><td class="num">2</td><td><span class="i">++</span><span class="d"></span></td></tr>
+</table></pre><pre>6 files changed, 87 insertions(+), 8 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/src/codesearch.h">src/codesearch.h</a> b/<a href="../file/src/codesearch.h">src/codesearch.h</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -129,6 +129,8 @@ struct match_result {
+</a> // non-NULL; file_pat and tree_pat may be NULL to specify &quot;no
+ // constraint&quot;
+ struct query {
+<a href="#h0-0-3" id="h0-0-3" class="i">+    std::string trace_id;
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+
+</a>     std::unique_ptr&lt;RE2&gt; line_pat;
+     std::unique_ptr&lt;RE2&gt; file_pat;
+     std::unique_ptr&lt;RE2&gt; tree_pat;
+<b>diff --git a/<a id="h1" href="../file/src/lib/debug.cc">src/lib/debug.cc</a> b/<a href="../file/src/lib/debug.cc">src/lib/debug.cc</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -15,12 +15,16 @@
+</a> #include &lt;stdio.h&gt;
+ #include &lt;assert.h&gt;
+ 
+<a href="#h1-0-3" id="h1-0-3" class="i">+#include &quot;per_thread.h&quot;
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+
+</a> using std::string;
+ 
+ debug_mode debug_enabled;
+ 
+ DEFINE_string(debug, &quot;&quot;, &quot;Enable debugging for selected subsystems&quot;);
+ 
+<a href="#h1-0-11" id="h1-0-11" class="i">+static per_thread&lt;string&gt; trace_id;
+</a><a href="#h1-0-12" id="h1-0-12" class="i">+
+</a> struct debug_flag {
+     const char *flag;
+     debug_mode bits;
+<a href="#h1-1" id="h1-1" class="h">@@ -85,8 +89,13 @@ void cs_debug(const char *file, int lno, const char *fmt, ...) {
+</a>     va_list ap;
+     va_start(ap, fmt);
+ 
+<a href="#h1-1-3" id="h1-1-3" class="d">-    string buf = strprintf(&quot;[%s:%d] %s\n&quot;,
+</a><a href="#h1-1-4" id="h1-1-4" class="d">-                           file, lno, vstrprintf(fmt, ap).c_str());
+</a><a href="#h1-1-5" id="h1-1-5" class="i">+    string buf;
+</a><a href="#h1-1-6" id="h1-1-6" class="i">+    if (trace_id-&gt;empty())
+</a><a href="#h1-1-7" id="h1-1-7" class="i">+        buf = strprintf(&quot;[%s:%d] %s\n&quot;,
+</a><a href="#h1-1-8" id="h1-1-8" class="i">+                        file, lno, vstrprintf(fmt, ap).c_str());
+</a><a href="#h1-1-9" id="h1-1-9" class="i">+    else
+</a><a href="#h1-1-10" id="h1-1-10" class="i">+        buf = strprintf(&quot;[%s][%s:%d] %s\n&quot;,
+</a><a href="#h1-1-11" id="h1-1-11" class="i">+                        trace_id-&gt;c_str(), file, lno, vstrprintf(fmt, ap).c_str());
+</a> 
+     va_end(ap);
+ 
+<a href="#h1-2" id="h1-2" class="h">@@ -102,3 +111,40 @@ void die(const char *fmt, ...) {
+</a>     va_end(ap);
+     exit(1);
+ }
+<a href="#h1-2-3" id="h1-2-3" class="i">+
+</a><a href="#h1-2-4" id="h1-2-4" class="i">+void vlog(const std::string &amp;trace, const char *fmt, va_list ap) {
+</a><a href="#h1-2-5" id="h1-2-5" class="i">+    string buf;
+</a><a href="#h1-2-6" id="h1-2-6" class="i">+    if (trace.empty())
+</a><a href="#h1-2-7" id="h1-2-7" class="i">+        buf = vstrprintf(fmt, ap);
+</a><a href="#h1-2-8" id="h1-2-8" class="i">+    else
+</a><a href="#h1-2-9" id="h1-2-9" class="i">+        buf = strprintf(&quot;[%s] %s\n&quot;,
+</a><a href="#h1-2-10" id="h1-2-10" class="i">+                        trace.c_str(), vstrprintf(fmt, ap).c_str());
+</a><a href="#h1-2-11" id="h1-2-11" class="i">+
+</a><a href="#h1-2-12" id="h1-2-12" class="i">+    fputs(buf.c_str(), stderr);
+</a><a href="#h1-2-13" id="h1-2-13" class="i">+}
+</a><a href="#h1-2-14" id="h1-2-14" class="i">+
+</a><a href="#h1-2-15" id="h1-2-15" class="i">+void log(const std::string &amp;trace, const char *fmt, ...) {
+</a><a href="#h1-2-16" id="h1-2-16" class="i">+    va_list ap;
+</a><a href="#h1-2-17" id="h1-2-17" class="i">+    va_start(ap, fmt);
+</a><a href="#h1-2-18" id="h1-2-18" class="i">+    vlog(trace, fmt, ap);
+</a><a href="#h1-2-19" id="h1-2-19" class="i">+    va_end(ap);
+</a><a href="#h1-2-20" id="h1-2-20" class="i">+}
+</a><a href="#h1-2-21" id="h1-2-21" class="i">+
+</a><a href="#h1-2-22" id="h1-2-22" class="i">+void log(const char *fmt, ...) {
+</a><a href="#h1-2-23" id="h1-2-23" class="i">+    va_list ap;
+</a><a href="#h1-2-24" id="h1-2-24" class="i">+    va_start(ap, fmt);
+</a><a href="#h1-2-25" id="h1-2-25" class="i">+    vlog(*trace_id, fmt, ap);
+</a><a href="#h1-2-26" id="h1-2-26" class="i">+    va_end(ap);
+</a><a href="#h1-2-27" id="h1-2-27" class="i">+}
+</a><a href="#h1-2-28" id="h1-2-28" class="i">+
+</a><a href="#h1-2-29" id="h1-2-29" class="i">+std::string current_trace_id() {
+</a><a href="#h1-2-30" id="h1-2-30" class="i">+    return *trace_id.get();
+</a><a href="#h1-2-31" id="h1-2-31" class="i">+}
+</a><a href="#h1-2-32" id="h1-2-32" class="i">+
+</a><a href="#h1-2-33" id="h1-2-33" class="i">+scoped_trace_id::scoped_trace_id(const std::string &amp;tid) {
+</a><a href="#h1-2-34" id="h1-2-34" class="i">+    orig_ = trace_id.put(new std::string(tid));
+</a><a href="#h1-2-35" id="h1-2-35" class="i">+}
+</a><a href="#h1-2-36" id="h1-2-36" class="i">+
+</a><a href="#h1-2-37" id="h1-2-37" class="i">+scoped_trace_id::~scoped_trace_id() {
+</a><a href="#h1-2-38" id="h1-2-38" class="i">+    delete trace_id.put(orig_);
+</a><a href="#h1-2-39" id="h1-2-39" class="i">+}
+</a><b>diff --git a/<a id="h2" href="../file/src/lib/debug.h">src/lib/debug.h</a> b/<a href="../file/src/lib/debug.h">src/lib/debug.h</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -34,4 +34,20 @@ std::string strprintf(const char *fmt, ...)
+</a> void die(const char *fmt, ...)
+     __attribute__((format (printf, 1, 2), noreturn));
+ 
+<a href="#h2-0-3" id="h2-0-3" class="i">+void log(const char *fmt, ...)
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+    __attribute__((format (printf, 1, 2)));
+</a><a href="#h2-0-5" id="h2-0-5" class="i">+void log(const std::string &amp;trace, const char *fmt, ...)
+</a><a href="#h2-0-6" id="h2-0-6" class="i">+    __attribute__((format (printf, 2, 3)));
+</a><a href="#h2-0-7" id="h2-0-7" class="i">+
+</a><a href="#h2-0-8" id="h2-0-8" class="i">+std::string current_trace_id();
+</a><a href="#h2-0-9" id="h2-0-9" class="i">+
+</a><a href="#h2-0-10" id="h2-0-10" class="i">+class scoped_trace_id {
+</a><a href="#h2-0-11" id="h2-0-11" class="i">+ public:
+</a><a href="#h2-0-12" id="h2-0-12" class="i">+    scoped_trace_id(const std::string &amp;tid);
+</a><a href="#h2-0-13" id="h2-0-13" class="i">+    ~scoped_trace_id();
+</a><a href="#h2-0-14" id="h2-0-14" class="i">+ private:
+</a><a href="#h2-0-15" id="h2-0-15" class="i">+    std::string *orig_;
+</a><a href="#h2-0-16" id="h2-0-16" class="i">+};
+</a><a href="#h2-0-17" id="h2-0-17" class="i">+
+</a><a href="#h2-0-18" id="h2-0-18" class="i">+
+</a> #endif
+<b>diff --git a/<a id="h3" href="../file/src/tools/codesearch.cc">src/tools/codesearch.cc</a> b/<a href="../file/src/tools/codesearch.cc">src/tools/codesearch.cc</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -80,12 +80,22 @@ void interact(code_searcher *cs, codesearch_transport *tx) {
+</a>         if (!tx-&gt;read_query(&amp;q, &amp;done))
+             continue;
+ 
+<a href="#h3-0-3" id="h3-0-3" class="i">+        log(q.trace_id,
+</a><a href="#h3-0-4" id="h3-0-4" class="i">+            &quot;processing query line=&#39;%s&#39; file=&#39;%s&#39; tree=&#39;%s&#39; not_file=&#39;%s&#39; not_tree=&#39;%s&#39;&quot;,
+</a><a href="#h3-0-5" id="h3-0-5" class="i">+            q.line_pat-&gt;pattern().c_str(),
+</a><a href="#h3-0-6" id="h3-0-6" class="i">+            q.file_pat-&gt;pattern().c_str(),
+</a><a href="#h3-0-7" id="h3-0-7" class="i">+            q.tree_pat-&gt;pattern().c_str(),
+</a><a href="#h3-0-8" id="h3-0-8" class="i">+            q.negate.file_pat-&gt;pattern().c_str(),
+</a><a href="#h3-0-9" id="h3-0-9" class="i">+            q.negate.tree_pat-&gt;pattern().c_str());
+</a><a href="#h3-0-10" id="h3-0-10" class="i">+
+</a>         if (q.line_pat-&gt;ProgramSize() &gt; kMaxProgramSize) {
+<a href="#h3-0-12" id="h3-0-12" class="i">+            log(q.trace_id, &quot;program too large size=%d&quot;, q.line_pat-&gt;ProgramSize());
+</a>             tx-&gt;write_error(&quot;Parse error.&quot;);
+             continue;
+         }
+         int w = width.Walk(q.line_pat-&gt;Regexp(), 0);
+         if (w &gt; kMaxWidth) {
+<a href="#h3-0-18" id="h3-0-18" class="i">+            log(q.trace_id, &quot;program too wide width=%d&quot;, w);
+</a>             tx-&gt;write_error(&quot;Parse error.&quot;);
+             continue;
+         }
+<a href="#h3-1" id="h3-1" class="h">@@ -94,8 +104,6 @@ void interact(code_searcher *cs, codesearch_transport *tx) {
+</a>             struct timeval elapsed;
+             match_stats stats;
+ 
+<a href="#h3-1-3" id="h3-1-3" class="d">-            fprintf(stderr, &quot;ProgramSize: %d\n&quot;, q.line_pat-&gt;ProgramSize());
+</a><a href="#h3-1-4" id="h3-1-4" class="d">-
+</a>             {
+                 sem_wait(&amp;interact_sem);
+                 search.match(q, print_match(tx), &amp;stats);
+<a href="#h3-2" id="h3-2" class="h">@@ -103,6 +111,7 @@ void interact(code_searcher *cs, codesearch_transport *tx) {
+</a>             }
+             elapsed = tm.elapsed();
+             tx-&gt;write_done(elapsed, &amp;stats);
+<a href="#h3-2-3" id="h3-2-3" class="i">+            log(q.trace_id, &quot;done elapsed=%ld&quot;, timeval_ms(elapsed));
+</a>         }
+     }
+ }
+<b>diff --git a/<a id="h4" href="../file/src/tools/transport.cc">src/tools/transport.cc</a> b/<a href="../file/src/tools/transport.cc">src/tools/transport.cc</a></b>
+<a href="#h4-0" id="h4-0" class="h">@@ -56,10 +56,6 @@ json_object *to_json(const index_info *info) {
+</a>     return out;
+ }
+ 
+<a href="#h4-0-3" id="h4-0-3" class="d">-long timeval_ms (struct timeval tv) {
+</a><a href="#h4-0-4" id="h4-0-4" class="d">-    return tv.tv_sec * 1000 + tv.tv_usec / 1000;
+</a><a href="#h4-0-5" id="h4-0-5" class="d">-}
+</a><a href="#h4-0-6" id="h4-0-6" class="d">-
+</a> json_object *to_json(timeval t) {
+     return json_object_new_int(timeval_ms(t));
+ }
+<a href="#h4-1" id="h4-1" class="h">@@ -182,6 +178,10 @@ json_parse_error parse_object(json_object *js, query *q) {
+</a>     json_object *b = NULL, *negate = NULL;
+     json_parse_error err;
+ 
+<a href="#h4-1-3" id="h4-1-3" class="i">+    err = parse_object(js, &quot;trace_id&quot;, &amp;q-&gt;trace_id);
+</a><a href="#h4-1-4" id="h4-1-4" class="i">+    if (!err.ok())
+</a><a href="#h4-1-5" id="h4-1-5" class="i">+        return err;
+</a><a href="#h4-1-6" id="h4-1-6" class="i">+
+</a>     err = parse_object(js, &quot;body&quot;, &amp;b);
+     if (!err.ok())
+         return err;
+<a href="#h4-2" id="h4-2" class="h">@@ -257,6 +257,10 @@ json_parse_error parse_object(json_object *js, repo_spec *r) {
+</a> 
+ };
+ 
+<a href="#h4-2-3" id="h4-2-3" class="i">+long timeval_ms (struct timeval tv) {
+</a><a href="#h4-2-4" id="h4-2-4" class="i">+    return tv.tv_sec * 1000 + tv.tv_usec / 1000;
+</a><a href="#h4-2-5" id="h4-2-5" class="i">+}
+</a><a href="#h4-2-6" id="h4-2-6" class="i">+
+</a> codesearch_transport::codesearch_transport(FILE *in, FILE *out) : in_(in), out_(out) {
+     assert(!setvbuf(in_,  NULL, _IOFBF, 4096*4));
+     assert(!setvbuf(out_, NULL, _IOLBF, 4096));
+<b>diff --git a/<a id="h5" href="../file/src/tools/transport.h">src/tools/transport.h</a> b/<a href="../file/src/tools/transport.h">src/tools/transport.h</a></b>
+<a href="#h5-0" id="h5-0" class="h">@@ -42,6 +42,8 @@ struct index_spec {
+</a>     std::vector&lt;repo_spec&gt; repos;
+ };
+ 
+<a href="#h5-0-3" id="h5-0-3" class="i">+long timeval_ms (struct timeval tv);
+</a><a href="#h5-0-4" id="h5-0-4" class="i">+
+</a> class codesearch_transport {
+ public:
+     codesearch_transport(FILE *in, FILE *out);
+</pre>
+</div>
+</body>
+</html>

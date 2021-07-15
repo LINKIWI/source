@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Merge pull request #109 from dropbox/query-parser - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/cb5002239a50411f84ca86354723c01f7166a95c">cb5002239a50411f84ca86354723c01f7166a95c</a>
+<b>parent</b> <a href="../commit/cb937d04e4c1d61ef0ada6bfab49235bb97f3a60">cb937d04e4c1d61ef0ada6bfab49235bb97f3a60</a>
+<b>Author:</b> Josiah Boning &lt;<a href="mailto:jboning@gmail.com">jboning@gmail.com</a>&gt;
+<b>Date:</b>   Mon, 16 Oct 2017 11:11:09 -0700
+
+Merge pull request #109 from dropbox/query-parser
+
+Query parser tweaks
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">server/api.go</a></td><td> | </td><td class="num">25</td><td><span class="i">+++++++++++++++</span><span class="d">----------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">server/query.go</a></td><td> | </td><td class="num">111</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">--------------------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">server/query_test.go</a></td><td> | </td><td class="num">102</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">--------------</span></td></tr>
+</table></pre><pre>3 files changed, 175 insertions(+), 63 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/server/api.go">server/api.go</a> b/<a href="../file/server/api.go">server/api.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -52,29 +52,34 @@ func extractQuery(ctx context.Context, r *http.Request) (pb.Query, error) {
+</a> 	var query pb.Query
+ 	var err error
+ 
+<a href="#h0-0-3" id="h0-0-3" class="i">+	regex := true
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+	if re, ok := params[&quot;regex&quot;]; ok &amp;&amp; re[0] == &quot;false&quot; {
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+		regex = false
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+	}
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+
+</a> 	if q, ok := params[&quot;q&quot;]; ok {
+<a href="#h0-0-9" id="h0-0-9" class="d">-		query, err = ParseQuery(q[0])
+</a><a href="#h0-0-10" id="h0-0-10" class="i">+		query, err = ParseQuery(q[0], regex)
+</a> 		log.Printf(ctx, &quot;parsing query q=%q out=%s&quot;, q[0], asJSON{query})
+ 	}
+ 
+ 	// Support old-style query arguments
+ 	if line, ok := params[&quot;line&quot;]; ok {
+ 		query.Line = line[0]
+<a href="#h0-0-17" id="h0-0-17" class="i">+		if !regex {
+</a><a href="#h0-0-18" id="h0-0-18" class="i">+			query.Line = regexp.QuoteMeta(query.Line)
+</a><a href="#h0-0-19" id="h0-0-19" class="i">+		}
+</a> 	}
+ 	if file, ok := params[&quot;file&quot;]; ok {
+ 		query.File = file[0]
+<a href="#h0-0-23" id="h0-0-23" class="i">+		if !regex {
+</a><a href="#h0-0-24" id="h0-0-24" class="i">+			query.File = regexp.QuoteMeta(query.File)
+</a><a href="#h0-0-25" id="h0-0-25" class="i">+		}
+</a> 	}
+ 	if repo, ok := params[&quot;repo&quot;]; ok {
+ 		query.Repo = repo[0]
+<a href="#h0-0-29" id="h0-0-29" class="d">-	}
+</a><a href="#h0-0-30" id="h0-0-30" class="d">-
+</a><a href="#h0-0-31" id="h0-0-31" class="d">-	// Support explict URL controls for case and regex-ness. Note that these
+</a><a href="#h0-0-32" id="h0-0-32" class="d">-	// can interact poorly with in-query control terms (for example: `lit:`
+</a><a href="#h0-0-33" id="h0-0-33" class="d">-	// combined with ?regex=false will result in double-escaping).
+</a><a href="#h0-0-34" id="h0-0-34" class="d">-	if re, ok := params[&quot;regex&quot;]; ok &amp;&amp; re[0] == &quot;false&quot; {
+</a><a href="#h0-0-35" id="h0-0-35" class="d">-		query.Line = regexp.QuoteMeta(query.Line)
+</a><a href="#h0-0-36" id="h0-0-36" class="d">-		query.File = regexp.QuoteMeta(query.File)
+</a><a href="#h0-0-37" id="h0-0-37" class="d">-		query.Repo = regexp.QuoteMeta(query.Repo)
+</a><a href="#h0-0-38" id="h0-0-38" class="i">+		if !regex {
+</a><a href="#h0-0-39" id="h0-0-39" class="i">+			query.Repo = regexp.QuoteMeta(query.Repo)
+</a><a href="#h0-0-40" id="h0-0-40" class="i">+		}
+</a> 	}
+ 
+ 	// New-style repo multiselect, only if &quot;repo:&quot; is not in the query.
+<b>diff --git a/<a id="h1" href="../file/server/query.go">server/query.go</a> b/<a href="../file/server/query.go">server/query.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -38,74 +38,106 @@ func onlyOneSynonym(ops map[string]string, op1 string, op2 string) (string, erro
+</a> 	return ops[op2], nil
+ }
+ 
+<a href="#h1-0-3" id="h1-0-3" class="d">-func ParseQuery(query string) (pb.Query, error) {
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+func ParseQuery(query string, globalRegex bool) (pb.Query, error) {
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+	var out pb.Query
+</a><a href="#h1-0-6" id="h1-0-6" class="i">+
+</a> 	ops := make(map[string]string)
+ 	key := &quot;&quot;
+<a href="#h1-0-9" id="h1-0-9" class="i">+	term := &quot;&quot;
+</a> 	q := strings.TrimSpace(query)
+<a href="#h1-0-11" id="h1-0-11" class="i">+	inRegex := globalRegex
+</a><a href="#h1-0-12" id="h1-0-12" class="i">+	justGotSpace := true
+</a> 
+ 	for {
+ 		m := pieceRE.FindStringSubmatchIndex(q)
+ 		if m == nil {
+<a href="#h1-0-17" id="h1-0-17" class="d">-			ops[key] += q
+</a><a href="#h1-0-18" id="h1-0-18" class="i">+			term += q
+</a><a href="#h1-0-19" id="h1-0-19" class="i">+			if _, alreadySet := ops[key]; alreadySet {
+</a><a href="#h1-0-20" id="h1-0-20" class="i">+				return out, fmt.Errorf(&quot;got term twice: %s&quot;, key)
+</a><a href="#h1-0-21" id="h1-0-21" class="i">+			}
+</a><a href="#h1-0-22" id="h1-0-22" class="i">+			ops[key] = term
+</a> 			break
+ 		}
+ 
+<a href="#h1-0-26" id="h1-0-26" class="d">-		ops[key] += q[:m[0]]
+</a><a href="#h1-0-27" id="h1-0-27" class="i">+		term += q[:m[0]]
+</a> 		match := q[m[0]:m[1]]
+ 		q = q[m[1]:]
+ 
+<a href="#h1-0-31" id="h1-0-31" class="i">+		justGotSpace = justGotSpace &amp;&amp; m[0] == 0
+</a><a href="#h1-0-32" id="h1-0-32" class="i">+
+</a> 		if match == &quot; &quot; {
+ 			// A space: Ends the operator, if we&#39;re in one.
+ 			if key == &quot;&quot; {
+<a href="#h1-0-36" id="h1-0-36" class="d">-				ops[key] += &quot; &quot;
+</a><a href="#h1-0-37" id="h1-0-37" class="i">+				term += &quot; &quot;
+</a><a href="#h1-0-38" id="h1-0-38" class="i">+
+</a> 			} else {
+<a href="#h1-0-40" id="h1-0-40" class="i">+				if _, alreadySet := ops[key]; alreadySet {
+</a><a href="#h1-0-41" id="h1-0-41" class="i">+					return out, fmt.Errorf(&quot;got term twice: %s&quot;, key)
+</a><a href="#h1-0-42" id="h1-0-42" class="i">+				}
+</a><a href="#h1-0-43" id="h1-0-43" class="i">+				ops[key] = term
+</a> 				key = &quot;&quot;
+<a href="#h1-0-45" id="h1-0-45" class="i">+				term = &quot;&quot;
+</a><a href="#h1-0-46" id="h1-0-46" class="i">+				inRegex = globalRegex
+</a> 			}
+ 		} else if match == &quot;(&quot; {
+<a href="#h1-0-49" id="h1-0-49" class="d">-			// A parenthesis. Nothing is special until the
+</a><a href="#h1-0-50" id="h1-0-50" class="d">-			// end of a balanced set of parenthesis
+</a><a href="#h1-0-51" id="h1-0-51" class="d">-			p := 1
+</a><a href="#h1-0-52" id="h1-0-52" class="d">-			i := 0
+</a><a href="#h1-0-53" id="h1-0-53" class="d">-			esc := false
+</a><a href="#h1-0-54" id="h1-0-54" class="d">-			var w bytes.Buffer
+</a><a href="#h1-0-55" id="h1-0-55" class="d">-			for i &lt; len(q) {
+</a><a href="#h1-0-56" id="h1-0-56" class="d">-				// We decode runes ourselves instead
+</a><a href="#h1-0-57" id="h1-0-57" class="d">-				// of using range because exiting the
+</a><a href="#h1-0-58" id="h1-0-58" class="d">-				// loop with i = len(q) makes the edge
+</a><a href="#h1-0-59" id="h1-0-59" class="d">-				// cases simpler.
+</a><a href="#h1-0-60" id="h1-0-60" class="d">-				r, l := utf8.DecodeRuneInString(q[i:])
+</a><a href="#h1-0-61" id="h1-0-61" class="d">-				i += l
+</a><a href="#h1-0-62" id="h1-0-62" class="d">-				switch {
+</a><a href="#h1-0-63" id="h1-0-63" class="d">-				case esc:
+</a><a href="#h1-0-64" id="h1-0-64" class="d">-					esc = false
+</a><a href="#h1-0-65" id="h1-0-65" class="d">-				case r == &#39;\\&#39;:
+</a><a href="#h1-0-66" id="h1-0-66" class="d">-					esc = true
+</a><a href="#h1-0-67" id="h1-0-67" class="d">-				case r == &#39;(&#39;:
+</a><a href="#h1-0-68" id="h1-0-68" class="d">-					p++
+</a><a href="#h1-0-69" id="h1-0-69" class="d">-				case r == &#39;)&#39;:
+</a><a href="#h1-0-70" id="h1-0-70" class="d">-					p--
+</a><a href="#h1-0-71" id="h1-0-71" class="d">-				}
+</a><a href="#h1-0-72" id="h1-0-72" class="d">-				w.WriteRune(r)
+</a><a href="#h1-0-73" id="h1-0-73" class="d">-				if p == 0 {
+</a><a href="#h1-0-74" id="h1-0-74" class="d">-					break
+</a><a href="#h1-0-75" id="h1-0-75" class="i">+			if !(inRegex || justGotSpace) {
+</a><a href="#h1-0-76" id="h1-0-76" class="i">+				term += &quot;(&quot;
+</a><a href="#h1-0-77" id="h1-0-77" class="i">+			} else {
+</a><a href="#h1-0-78" id="h1-0-78" class="i">+				// A parenthesis. Nothing is special until the
+</a><a href="#h1-0-79" id="h1-0-79" class="i">+				// end of a balanced set of parenthesis
+</a><a href="#h1-0-80" id="h1-0-80" class="i">+				p := 1
+</a><a href="#h1-0-81" id="h1-0-81" class="i">+				i := 0
+</a><a href="#h1-0-82" id="h1-0-82" class="i">+				esc := false
+</a><a href="#h1-0-83" id="h1-0-83" class="i">+				var w bytes.Buffer
+</a><a href="#h1-0-84" id="h1-0-84" class="i">+				for i &lt; len(q) {
+</a><a href="#h1-0-85" id="h1-0-85" class="i">+					// We decode runes ourselves instead
+</a><a href="#h1-0-86" id="h1-0-86" class="i">+					// of using range because exiting the
+</a><a href="#h1-0-87" id="h1-0-87" class="i">+					// loop with i = len(q) makes the edge
+</a><a href="#h1-0-88" id="h1-0-88" class="i">+					// cases simpler.
+</a><a href="#h1-0-89" id="h1-0-89" class="i">+					r, l := utf8.DecodeRuneInString(q[i:])
+</a><a href="#h1-0-90" id="h1-0-90" class="i">+					i += l
+</a><a href="#h1-0-91" id="h1-0-91" class="i">+					switch {
+</a><a href="#h1-0-92" id="h1-0-92" class="i">+					case esc:
+</a><a href="#h1-0-93" id="h1-0-93" class="i">+						esc = false
+</a><a href="#h1-0-94" id="h1-0-94" class="i">+					case r == &#39;\\&#39;:
+</a><a href="#h1-0-95" id="h1-0-95" class="i">+						esc = true
+</a><a href="#h1-0-96" id="h1-0-96" class="i">+					case r == &#39;(&#39;:
+</a><a href="#h1-0-97" id="h1-0-97" class="i">+						p++
+</a><a href="#h1-0-98" id="h1-0-98" class="i">+					case r == &#39;)&#39;:
+</a><a href="#h1-0-99" id="h1-0-99" class="i">+						p--
+</a><a href="#h1-0-100" id="h1-0-100" class="i">+					}
+</a><a href="#h1-0-101" id="h1-0-101" class="i">+					w.WriteRune(r)
+</a><a href="#h1-0-102" id="h1-0-102" class="i">+					if p == 0 {
+</a><a href="#h1-0-103" id="h1-0-103" class="i">+						break
+</a><a href="#h1-0-104" id="h1-0-104" class="i">+					}
+</a> 				}
+<a href="#h1-0-106" id="h1-0-106" class="i">+				term += match + w.String()
+</a><a href="#h1-0-107" id="h1-0-107" class="i">+				q = q[i:]
+</a> 			}
+<a href="#h1-0-109" id="h1-0-109" class="d">-			ops[key] += match + w.String()
+</a><a href="#h1-0-110" id="h1-0-110" class="d">-			q = q[i:]
+</a> 		} else if match[0] == &#39;\\&#39; {
+<a href="#h1-0-112" id="h1-0-112" class="d">-			ops[key] += match
+</a><a href="#h1-0-113" id="h1-0-113" class="i">+			term += match
+</a> 		} else {
+ 			// An operator. The key is in match group 1
+ 			newKey := match[m[2]-m[0] : m[3]-m[0]]
+ 			if key == &quot;&quot; &amp;&amp; knownTags[newKey] {
+<a href="#h1-0-118" id="h1-0-118" class="i">+				if strings.TrimSpace(term) != &quot;&quot; {
+</a><a href="#h1-0-119" id="h1-0-119" class="i">+					if _, alreadySet := ops[key]; alreadySet {
+</a><a href="#h1-0-120" id="h1-0-120" class="i">+						return out, fmt.Errorf(&quot;main search term must be contiguous&quot;)
+</a><a href="#h1-0-121" id="h1-0-121" class="i">+					}
+</a><a href="#h1-0-122" id="h1-0-122" class="i">+					ops[key] = term
+</a><a href="#h1-0-123" id="h1-0-123" class="i">+				}
+</a><a href="#h1-0-124" id="h1-0-124" class="i">+				term = &quot;&quot;
+</a> 				key = newKey
+ 			} else {
+<a href="#h1-0-127" id="h1-0-127" class="d">-				ops[key] += match
+</a><a href="#h1-0-128" id="h1-0-128" class="i">+				term += match
+</a><a href="#h1-0-129" id="h1-0-129" class="i">+			}
+</a><a href="#h1-0-130" id="h1-0-130" class="i">+			if key == &quot;lit&quot; {
+</a><a href="#h1-0-131" id="h1-0-131" class="i">+				inRegex = false
+</a> 			}
+ 		}
+<a href="#h1-0-134" id="h1-0-134" class="i">+		justGotSpace = (match == &quot; &quot;)
+</a> 	}
+ 
+<a href="#h1-0-137" id="h1-0-137" class="d">-	var out pb.Query
+</a> 	var err error
+ 	if out.File, err = onlyOneSynonym(ops, &quot;file&quot;, &quot;path&quot;); err != nil {
+ 		return out, err
+<a href="#h1-1" id="h1-1" class="h">@@ -120,7 +152,7 @@ func ParseQuery(query string) (pb.Query, error) {
+</a> 	var bits []string
+ 	for _, k := range []string{&quot;&quot;, &quot;case&quot;, &quot;lit&quot;} {
+ 		bit := strings.TrimSpace(ops[k])
+<a href="#h1-1-3" id="h1-1-3" class="d">-		if k == &quot;lit&quot; {
+</a><a href="#h1-1-4" id="h1-1-4" class="i">+		if k == &quot;lit&quot; || !globalRegex {
+</a> 			bit = regexp.QuoteMeta(bit)
+ 		}
+ 		if len(bit) != 0 {
+<a href="#h1-2" id="h1-2" class="h">@@ -136,6 +168,13 @@ func ParseQuery(query string) (pb.Query, error) {
+</a> 		out.Line = bits[0]
+ 	}
+ 
+<a href="#h1-2-3" id="h1-2-3" class="i">+	if !globalRegex {
+</a><a href="#h1-2-4" id="h1-2-4" class="i">+		out.File = regexp.QuoteMeta(out.File)
+</a><a href="#h1-2-5" id="h1-2-5" class="i">+		out.NotFile = regexp.QuoteMeta(out.NotFile)
+</a><a href="#h1-2-6" id="h1-2-6" class="i">+		out.Repo = regexp.QuoteMeta(out.Repo)
+</a><a href="#h1-2-7" id="h1-2-7" class="i">+		out.NotRepo = regexp.QuoteMeta(out.NotRepo)
+</a><a href="#h1-2-8" id="h1-2-8" class="i">+	}
+</a><a href="#h1-2-9" id="h1-2-9" class="i">+
+</a> 	if out.Line == &quot;&quot; &amp;&amp; out.File != &quot;&quot; {
+ 		out.Line = out.File
+ 		out.File = &quot;&quot;
+<b>diff --git a/<a id="h2" href="../file/server/query_test.go">server/query_test.go</a> b/<a href="../file/server/query_test.go">server/query_test.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -9,16 +9,20 @@ import (
+</a> 
+ func TestParseQuery(t *testing.T) {
+ 	cases := []struct {
+<a href="#h2-0-3" id="h2-0-3" class="d">-		in  string
+</a><a href="#h2-0-4" id="h2-0-4" class="d">-		out pb.Query
+</a><a href="#h2-0-5" id="h2-0-5" class="i">+		in    string
+</a><a href="#h2-0-6" id="h2-0-6" class="i">+		out   pb.Query
+</a><a href="#h2-0-7" id="h2-0-7" class="i">+		regex bool
+</a> 	}{
+<a href="#h2-0-9" id="h2-0-9" class="i">+		// regex parse mode
+</a> 		{
+ 			&quot;hello&quot;,
+ 			pb.Query{Line: &quot;hello&quot;, FoldCase: true},
+<a href="#h2-0-13" id="h2-0-13" class="i">+			true,
+</a> 		},
+ 		{
+ 			&quot;a b c&quot;,
+ 			pb.Query{Line: &quot;a b c&quot;, FoldCase: true},
+<a href="#h2-0-18" id="h2-0-18" class="i">+			true,
+</a> 		},
+ 		{
+ 			&quot;line file:.rb&quot;,
+<a href="#h2-1" id="h2-1" class="h">@@ -27,107 +31,174 @@ func TestParseQuery(t *testing.T) {
+</a> 				File:     &quot;.rb&quot;,
+ 				FoldCase: true,
+ 			},
+<a href="#h2-1-3" id="h2-1-3" class="i">+			true,
+</a> 		},
+ 		{
+ 			&quot; a  &quot;,
+ 			pb.Query{Line: &quot;a&quot;, FoldCase: true},
+<a href="#h2-1-8" id="h2-1-8" class="i">+			true,
+</a> 		},
+ 		{
+ 			&quot;( a  )&quot;,
+ 			pb.Query{Line: &quot;( a  )&quot;, FoldCase: true},
+<a href="#h2-1-13" id="h2-1-13" class="i">+			true,
+</a> 		},
+ 		{
+ 			&quot;Aa&quot;,
+ 			pb.Query{Line: &quot;Aa&quot;, FoldCase: false},
+<a href="#h2-1-18" id="h2-1-18" class="i">+			true,
+</a> 		},
+ 		{
+ 			&quot;case:abc&quot;,
+ 			pb.Query{Line: &quot;abc&quot;, FoldCase: false},
+<a href="#h2-1-23" id="h2-1-23" class="i">+			true,
+</a> 		},
+ 		{
+ 			&quot;case:abc file:^kernel/&quot;,
+ 			pb.Query{Line: &quot;abc&quot;, FoldCase: false, File: &quot;^kernel/&quot;},
+<a href="#h2-1-28" id="h2-1-28" class="i">+			true,
+</a> 		},
+ 		{
+ 			&quot;case:abc file:( )&quot;,
+ 			pb.Query{Line: &quot;abc&quot;, FoldCase: false, File: &quot;( )&quot;},
+<a href="#h2-1-33" id="h2-1-33" class="d">-		},
+</a><a href="#h2-1-34" id="h2-1-34" class="d">-		{
+</a><a href="#h2-1-35" id="h2-1-35" class="d">-			&quot;a file:b c&quot;,
+</a><a href="#h2-1-36" id="h2-1-36" class="d">-			pb.Query{Line: &quot;a c&quot;, FoldCase: true, File: &quot;b&quot;},
+</a><a href="#h2-1-37" id="h2-1-37" class="d">-		},
+</a><a href="#h2-1-38" id="h2-1-38" class="d">-		{
+</a><a href="#h2-1-39" id="h2-1-39" class="d">-			&quot;a file:((abc()())()) c&quot;,
+</a><a href="#h2-1-40" id="h2-1-40" class="d">-			pb.Query{Line: &quot;a c&quot;, FoldCase: true, File: &quot;((abc()())())&quot;},
+</a><a href="#h2-1-41" id="h2-1-41" class="i">+			true,
+</a> 		},
+ 		{
+ 			&quot;(  () (   &quot;,
+ 			pb.Query{Line: &quot;(  () (&quot;, FoldCase: true},
+<a href="#h2-1-46" id="h2-1-46" class="i">+			true,
+</a> 		},
+ 		{
+ 			`a file:\(`,
+ 			pb.Query{Line: &quot;a&quot;, File: `\(`, FoldCase: true},
+<a href="#h2-1-51" id="h2-1-51" class="i">+			true,
+</a> 		},
+ 		{
+ 			`a file:(\()`,
+ 			pb.Query{Line: &quot;a&quot;, File: `(\()`, FoldCase: true},
+<a href="#h2-1-56" id="h2-1-56" class="i">+			true,
+</a> 		},
+ 		{
+ 			`(`,
+ 			pb.Query{Line: &quot;(&quot;, FoldCase: true},
+<a href="#h2-1-61" id="h2-1-61" class="i">+			true,
+</a> 		},
+ 		{
+ 			`(file:)`,
+ 			pb.Query{Line: &quot;(file:)&quot;, FoldCase: true},
+<a href="#h2-1-66" id="h2-1-66" class="i">+			true,
+</a> 		},
+ 		{
+ 			`re tags:kind:function`,
+ 			pb.Query{Line: &quot;re&quot;, FoldCase: true, Tags: &quot;kind:function&quot;},
+<a href="#h2-1-71" id="h2-1-71" class="i">+			true,
+</a> 		},
+ 		{
+ 			`-file:Godep re`,
+ 			pb.Query{Line: &quot;re&quot;, NotFile: &quot;Godep&quot;, FoldCase: true},
+<a href="#h2-1-76" id="h2-1-76" class="i">+			true,
+</a> 		},
+ 		{
+ 			`-file:. -repo:Godep re`,
+ 			pb.Query{Line: &quot;re&quot;, NotFile: &quot;.&quot;, NotRepo: &quot;Godep&quot;, FoldCase: true},
+<a href="#h2-1-81" id="h2-1-81" class="i">+			true,
+</a> 		},
+ 		{
+ 			`-tags:kind:class re`,
+ 			pb.Query{Line: &quot;re&quot;, NotTags: &quot;kind:class&quot;, FoldCase: true},
+<a href="#h2-1-86" id="h2-1-86" class="i">+			true,
+</a> 		},
+ 		{
+ 			`case:foo:`,
+ 			pb.Query{Line: &quot;foo:&quot;, FoldCase: false},
+<a href="#h2-1-91" id="h2-1-91" class="i">+			true,
+</a> 		},
+ 		{
+ 			`lit:.`,
+ 			pb.Query{Line: `\.`, FoldCase: false},
+<a href="#h2-1-96" id="h2-1-96" class="i">+			true,
+</a> 		},
+ 		{
+ 			`std::string`,
+ 			pb.Query{Line: `std::string`, FoldCase: true},
+<a href="#h2-1-101" id="h2-1-101" class="i">+			true,
+</a> 		},
+ 		{
+ 			`a max_matches:100`,
+ 			pb.Query{Line: &quot;a&quot;, FoldCase: true, MaxMatches: 100},
+<a href="#h2-1-106" id="h2-1-106" class="i">+			true,
+</a> 		},
+ 		{
+ 			`a max_matches:`,
+ 			pb.Query{Line: &quot;a&quot;, FoldCase: true},
+<a href="#h2-1-111" id="h2-1-111" class="i">+			true,
+</a> 		},
+ 		{
+ 			`file:hello`,
+ 			pb.Query{Line: &quot;hello&quot;, FoldCase: true, FilenameOnly: true},
+<a href="#h2-1-116" id="h2-1-116" class="i">+			true,
+</a> 		},
+ 		{
+ 			`file:HELLO`,
+ 			pb.Query{Line: &quot;HELLO&quot;, FoldCase: false, FilenameOnly: true},
+<a href="#h2-1-121" id="h2-1-121" class="i">+			true,
+</a><a href="#h2-1-122" id="h2-1-122" class="i">+		},
+</a><a href="#h2-1-123" id="h2-1-123" class="i">+		{
+</a><a href="#h2-1-124" id="h2-1-124" class="i">+			`lit:a( file:b`,
+</a><a href="#h2-1-125" id="h2-1-125" class="i">+			pb.Query{Line: `a\(`, File: &quot;b&quot;, FoldCase: false},
+</a><a href="#h2-1-126" id="h2-1-126" class="i">+			true,
+</a><a href="#h2-1-127" id="h2-1-127" class="i">+		},
+</a><a href="#h2-1-128" id="h2-1-128" class="i">+		{
+</a><a href="#h2-1-129" id="h2-1-129" class="i">+			`lit:a(b file:c`,
+</a><a href="#h2-1-130" id="h2-1-130" class="i">+			pb.Query{Line: `a\(b`, File: &quot;c&quot;, FoldCase: false},
+</a><a href="#h2-1-131" id="h2-1-131" class="i">+			true,
+</a><a href="#h2-1-132" id="h2-1-132" class="i">+		},
+</a><a href="#h2-1-133" id="h2-1-133" class="i">+
+</a><a href="#h2-1-134" id="h2-1-134" class="i">+		// literal parse mode
+</a><a href="#h2-1-135" id="h2-1-135" class="i">+		{
+</a><a href="#h2-1-136" id="h2-1-136" class="i">+			&quot;a( file:b&quot;,
+</a><a href="#h2-1-137" id="h2-1-137" class="i">+			pb.Query{Line: `a\(`, File: &quot;b&quot;, FoldCase: true},
+</a><a href="#h2-1-138" id="h2-1-138" class="i">+			false,
+</a><a href="#h2-1-139" id="h2-1-139" class="i">+		},
+</a><a href="#h2-1-140" id="h2-1-140" class="i">+		{
+</a><a href="#h2-1-141" id="h2-1-141" class="i">+			&quot;a (file:b&quot;,
+</a><a href="#h2-1-142" id="h2-1-142" class="i">+			pb.Query{Line: `a \(file:b`, FoldCase: true},
+</a><a href="#h2-1-143" id="h2-1-143" class="i">+			false,
+</a><a href="#h2-1-144" id="h2-1-144" class="i">+		},
+</a><a href="#h2-1-145" id="h2-1-145" class="i">+		{
+</a><a href="#h2-1-146" id="h2-1-146" class="i">+			&quot;(file:a b&quot;,
+</a><a href="#h2-1-147" id="h2-1-147" class="i">+			pb.Query{Line: `\(file:a b`, FoldCase: true},
+</a><a href="#h2-1-148" id="h2-1-148" class="i">+			false,
+</a><a href="#h2-1-149" id="h2-1-149" class="i">+		},
+</a><a href="#h2-1-150" id="h2-1-150" class="i">+		{
+</a><a href="#h2-1-151" id="h2-1-151" class="i">+			&quot;(file:a) b&quot;,
+</a><a href="#h2-1-152" id="h2-1-152" class="i">+			pb.Query{Line: `\(file:a\) b`, FoldCase: true},
+</a><a href="#h2-1-153" id="h2-1-153" class="i">+			false,
+</a><a href="#h2-1-154" id="h2-1-154" class="i">+		},
+</a><a href="#h2-1-155" id="h2-1-155" class="i">+		{
+</a><a href="#h2-1-156" id="h2-1-156" class="i">+			&quot;(file:a repo:b&quot;,
+</a><a href="#h2-1-157" id="h2-1-157" class="i">+			pb.Query{Line: `\(file:a repo:b`, FoldCase: true},
+</a><a href="#h2-1-158" id="h2-1-158" class="i">+			false,
+</a><a href="#h2-1-159" id="h2-1-159" class="i">+		},
+</a><a href="#h2-1-160" id="h2-1-160" class="i">+		{
+</a><a href="#h2-1-161" id="h2-1-161" class="i">+			&quot;(file:a) repo:b&quot;,
+</a><a href="#h2-1-162" id="h2-1-162" class="i">+			pb.Query{Line: `\(file:a\)`, Repo: &quot;b&quot;, FoldCase: true},
+</a><a href="#h2-1-163" id="h2-1-163" class="i">+			false,
+</a><a href="#h2-1-164" id="h2-1-164" class="i">+		},
+</a><a href="#h2-1-165" id="h2-1-165" class="i">+		{
+</a><a href="#h2-1-166" id="h2-1-166" class="i">+			&quot;(file:a) (repo:b)&quot;,
+</a><a href="#h2-1-167" id="h2-1-167" class="i">+			pb.Query{Line: `\(file:a\) \(repo:b\)`, FoldCase: true},
+</a><a href="#h2-1-168" id="h2-1-168" class="i">+			false,
+</a><a href="#h2-1-169" id="h2-1-169" class="i">+		},
+</a><a href="#h2-1-170" id="h2-1-170" class="i">+		{
+</a><a href="#h2-1-171" id="h2-1-171" class="i">+			&quot;file:a( b&quot;,
+</a><a href="#h2-1-172" id="h2-1-172" class="i">+			pb.Query{Line: `b`, File: `a\(`, FoldCase: true},
+</a><a href="#h2-1-173" id="h2-1-173" class="i">+			false,
+</a> 		},
+ 	}
+ 
+ 	for _, tc := range cases {
+<a href="#h2-1-178" id="h2-1-178" class="d">-		parsed, err := ParseQuery(tc.in)
+</a><a href="#h2-1-179" id="h2-1-179" class="i">+		parsed, err := ParseQuery(tc.in, tc.regex)
+</a> 		if !reflect.DeepEqual(tc.out, parsed) {
+ 			t.Errorf(&quot;error parsing %q: expected %#v got %#v&quot;,
+ 				tc.in, tc.out, parsed)
+<a href="#h2-2" id="h2-2" class="h">@@ -136,11 +207,6 @@ func TestParseQuery(t *testing.T) {
+</a> 			t.Errorf(&quot;parse(%v) error=%v&quot;, tc.in, err)
+ 		}
+ 	}
+<a href="#h2-2-3" id="h2-2-3" class="d">-
+</a><a href="#h2-2-4" id="h2-2-4" class="d">-	_, err := ParseQuery(`hello case:foo`)
+</a><a href="#h2-2-5" id="h2-2-5" class="d">-	if err == nil {
+</a><a href="#h2-2-6" id="h2-2-6" class="d">-		t.Errorf(&quot;parse multiple regexes, no error&quot;)
+</a><a href="#h2-2-7" id="h2-2-7" class="d">-	}
+</a> }
+ 
+ func TestParseQueryError(t *testing.T) {
+<a href="#h2-3" id="h2-3" class="h">@@ -151,10 +217,12 @@ func TestParseQueryError(t *testing.T) {
+</a> 		{&quot;lit:a b&quot;},
+ 		{&quot;case:a lit:b&quot;},
+ 		{&quot;a max_matches:a&quot;},
+<a href="#h2-3-3" id="h2-3-3" class="i">+		{&quot;a file:b c&quot;},
+</a><a href="#h2-3-4" id="h2-3-4" class="i">+		{&quot;a file:((abc()())()) c&quot;},
+</a> 	}
+ 
+ 	for _, tc := range cases {
+<a href="#h2-3-8" id="h2-3-8" class="d">-		parsed, err := ParseQuery(tc.in)
+</a><a href="#h2-3-9" id="h2-3-9" class="i">+		parsed, err := ParseQuery(tc.in, true)
+</a> 		if err == nil {
+ 			t.Errorf(&quot;expected an error parsing (%v), got %#v&quot;, tc.in, parsed)
+ 		}
+</pre>
+</div>
+</body>
+</html>

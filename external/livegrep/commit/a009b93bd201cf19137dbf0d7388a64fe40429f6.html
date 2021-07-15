@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Make the filename table use vectors - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/a009b93bd201cf19137dbf0d7388a64fe40429f6">a009b93bd201cf19137dbf0d7388a64fe40429f6</a>
+<b>parent</b> <a href="../commit/6c92452b44f94515777c003b4fc17d4ac5fc0627">6c92452b44f94515777c003b4fc17d4ac5fc0627</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Wed,  8 Aug 2018 02:57:21 +0000
+
+Make the filename table use vectors
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">src/codesearch.cc</a></td><td> | </td><td class="num">39</td><td><span class="i">++++++++++++++++++</span><span class="d">---------------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">src/codesearch.h</a></td><td> | </td><td class="num">5</td><td><span class="i">++</span><span class="d">---</span></td></tr>
+</table></pre><pre>2 files changed, 20 insertions(+), 24 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/src/codesearch.cc">src/codesearch.cc</a> b/<a href="../file/src/codesearch.cc">src/codesearch.cc</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -392,7 +392,7 @@ protected:
+</a> };
+ 
+ int suffix_search(const unsigned char *data,
+<a href="#h0-0-3" id="h0-0-3" class="d">-                  uint32_t *suffixes,
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+                  const uint32_t *suffixes,
+</a>                   int size,
+                   intrusive_ptr&lt;IndexKey&gt; index,
+                   vector&lt;uint32_t&gt; &amp;indexes_out);
+<a href="#h0-1" id="h0-1" class="h">@@ -401,10 +401,12 @@ void filename_searcher::operator()()
+</a> {
+     static per_thread&lt;vector&lt;uint32_t&gt; &gt; indexes;
+     if (!indexes.get()) {
+<a href="#h0-1-3" id="h0-1-3" class="d">-        indexes.put(new vector&lt;uint32_t&gt;(cc_-&gt;filename_data_size_ / kMinFilterRatio / 10));
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+        indexes.put(new vector&lt;uint32_t&gt;(cc_-&gt;filename_data_.size() / kMinFilterRatio / 10));
+</a>     }
+ 
+<a href="#h0-1-7" id="h0-1-7" class="d">-    int count = suffix_search(cc_-&gt;filename_data_, cc_-&gt;filename_suffixes_, cc_-&gt;filename_data_size_, index_key_, *indexes);
+</a><a href="#h0-1-8" id="h0-1-8" class="i">+    int count = suffix_search(cc_-&gt;filename_data_.data(),
+</a><a href="#h0-1-9" id="h0-1-9" class="i">+                              cc_-&gt;filename_suffixes_.data(),
+</a><a href="#h0-1-10" id="h0-1-10" class="i">+                              cc_-&gt;filename_data_.size(), index_key_, *indexes);
+</a> 
+     if (count &gt; indexes-&gt;size()) {
+         for (auto it = cc_-&gt;files_.begin(); it &lt; cc_-&gt;files_.end(); it++) {
+<a href="#h0-2" id="h0-2" class="h">@@ -468,7 +470,7 @@ void filename_searcher::match_filename(indexed_file *file) {
+</a> }
+ 
+ code_searcher::code_searcher()
+<a href="#h0-2-3" id="h0-2-3" class="d">-    : alloc_(), finalized_(false), filename_data_(NULL), filename_suffixes_(NULL)
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+    : alloc_(), finalized_(false), filename_data_(), filename_suffixes_()
+</a> {
+ #ifdef USE_DENSE_HASH_SET
+     lines_.set_empty_key(empty_string);
+<a href="#h0-3" id="h0-3" class="h">@@ -489,35 +491,30 @@ code_searcher::~code_searcher() {
+</a>             json_object_put(tree-&gt;metadata);
+         }
+     }
+<a href="#h0-3-3" id="h0-3-3" class="d">-
+</a><a href="#h0-3-4" id="h0-3-4" class="d">-    if (filename_data_ != NULL) {
+</a><a href="#h0-3-5" id="h0-3-5" class="d">-        delete[] filename_data_;
+</a><a href="#h0-3-6" id="h0-3-6" class="d">-    }
+</a><a href="#h0-3-7" id="h0-3-7" class="d">-    if (filename_suffixes_ != NULL) {
+</a><a href="#h0-3-8" id="h0-3-8" class="d">-        delete[] filename_suffixes_;
+</a><a href="#h0-3-9" id="h0-3-9" class="d">-    }
+</a> }
+ 
+ void code_searcher::index_filenames() {
+     log(&quot;Building filename index...&quot;);
+     filename_positions_.reserve(files_.size());
+ 
+<a href="#h0-3-16" id="h0-3-16" class="d">-    filename_data_size_ = 0;
+</a><a href="#h0-3-17" id="h0-3-17" class="i">+    size_t filename_data_size = 0;
+</a>     for (auto it = files_.begin(); it != files_.end(); ++it) {
+<a href="#h0-3-19" id="h0-3-19" class="d">-        filename_data_size_ += (*it)-&gt;path.size() + 1;
+</a><a href="#h0-3-20" id="h0-3-20" class="i">+        filename_data_size += (*it)-&gt;path.size() + 1;
+</a>     }
+ 
+<a href="#h0-3-23" id="h0-3-23" class="d">-    filename_data_ = new unsigned char[filename_data_size_];
+</a><a href="#h0-3-24" id="h0-3-24" class="i">+    filename_data_.resize(filename_data_size);
+</a>     int offset = 0;
+     for (auto it = files_.begin(); it != files_.end(); ++it) {
+<a href="#h0-3-27" id="h0-3-27" class="d">-        memcpy(filename_data_ + offset, (*it)-&gt;path.data(), (*it)-&gt;path.size());
+</a><a href="#h0-3-28" id="h0-3-28" class="i">+        memcpy(filename_data_.data() + offset, (*it)-&gt;path.data(), (*it)-&gt;path.size());
+</a>         filename_data_[offset + (*it)-&gt;path.size()] = &#39;\0&#39;;
+         filename_positions_.emplace_back(offset, it-&gt;get());
+         offset += (*it)-&gt;path.size() + 1;
+     }
+ 
+<a href="#h0-3-34" id="h0-3-34" class="d">-    filename_suffixes_ = new uint32_t[filename_data_size_];
+</a><a href="#h0-3-35" id="h0-3-35" class="d">-    divsufsort(filename_data_, reinterpret_cast&lt;saidx_t*&gt;(filename_suffixes_), filename_data_size_);
+</a><a href="#h0-3-36" id="h0-3-36" class="i">+    filename_suffixes_.resize(filename_data_size);
+</a><a href="#h0-3-37" id="h0-3-37" class="i">+    divsufsort(filename_data_.data(),
+</a><a href="#h0-3-38" id="h0-3-38" class="i">+               reinterpret_cast&lt;saidx_t*&gt;(filename_suffixes_.data()),
+</a><a href="#h0-3-39" id="h0-3-39" class="i">+               filename_data_size);
+</a> }
+ 
+ void code_searcher::finalize() {
+<a href="#h0-4" id="h0-4" class="h">@@ -689,7 +686,7 @@ void searcher::operator()(const chunk *chunk)
+</a> }
+ 
+ struct walk_state {
+<a href="#h0-4-3" id="h0-4-3" class="d">-    uint32_t *left, *right;
+</a><a href="#h0-4-4" id="h0-4-4" class="i">+    const uint32_t *left, *right;
+</a>     intrusive_ptr&lt;IndexKey&gt; key;
+     int depth;
+ };
+<a href="#h0-5" id="h0-5" class="h">@@ -715,7 +712,7 @@ struct lt_index {
+</a> };
+ 
+ int suffix_search(const unsigned char *data,
+<a href="#h0-5-3" id="h0-5-3" class="d">-                  uint32_t *suffixes,
+</a><a href="#h0-5-4" id="h0-5-4" class="i">+                  const uint32_t *suffixes,
+</a>                   int size,
+                   intrusive_ptr&lt;IndexKey&gt; index,
+                   vector&lt;uint32_t&gt; &amp;indexes_out) {
+<a href="#h0-6" id="h0-6" class="h">@@ -740,9 +737,9 @@ int suffix_search(const unsigned char *data,
+</a>         lt_index lt = {data, st.depth};
+         for (IndexKey::iterator it = st.key-&gt;begin();
+              it != st.key-&gt;end(); ++it) {
+<a href="#h0-6-3" id="h0-6-3" class="d">-            uint32_t *l, *r;
+</a><a href="#h0-6-4" id="h0-6-4" class="i">+            const uint32_t *l, *r;
+</a>             l = lower_bound(st.left, st.right, it-&gt;first.first, lt);
+<a href="#h0-6-6" id="h0-6-6" class="d">-            uint32_t *right = lower_bound(l, st.right,
+</a><a href="#h0-6-7" id="h0-6-7" class="i">+            const uint32_t *right = lower_bound(l, st.right,
+</a>                                           (unsigned char)(it-&gt;first.second + 1),
+                                           lt);
+             if (l == right)
+<b>diff --git a/<a id="h1" href="../file/src/codesearch.h">src/codesearch.h</a> b/<a href="../file/src/codesearch.h">src/codesearch.h</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -250,9 +250,8 @@ protected:
+</a> 
+     // Structures for fast filename search; somewhat similar to a single chunk.
+     // Built from files_ at finalization, not serialized or anything like that.
+<a href="#h1-0-3" id="h1-0-3" class="d">-    unsigned char *filename_data_;
+</a><a href="#h1-0-4" id="h1-0-4" class="d">-    int filename_data_size_;
+</a><a href="#h1-0-5" id="h1-0-5" class="d">-    uint32_t *filename_suffixes_;
+</a><a href="#h1-0-6" id="h1-0-6" class="i">+    vector&lt;unsigned char&gt; filename_data_;
+</a><a href="#h1-0-7" id="h1-0-7" class="i">+    vector&lt;uint32_t&gt; filename_suffixes_;
+</a>     // pairs (i, file), where file-&gt;path starts at filename_data_[i]
+     vector&lt;pair&lt;int, indexed_file*&gt;&gt; filename_positions_;
+ 
+</pre>
+</div>
+</body>
+</html>

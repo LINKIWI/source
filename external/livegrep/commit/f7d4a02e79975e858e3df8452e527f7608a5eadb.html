@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Make alloc_ a unique_ptr - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/f7d4a02e79975e858e3df8452e527f7608a5eadb">f7d4a02e79975e858e3df8452e527f7608a5eadb</a>
+<b>parent</b> <a href="../commit/d9e59316a9b93e4c3a9a4bc229b233fbbe4b69f7">d9e59316a9b93e4c3a9a4bc229b233fbbe4b69f7</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Tue,  7 Aug 2018 15:14:35 +0000
+
+Make alloc_ a unique_ptr
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">src/chunk_allocator.cc</a></td><td> | </td><td class="num">4</td><td><span class="i">++</span><span class="d">--</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">src/codesearch.cc</a></td><td> | </td><td class="num">22</td><td><span class="i">+++++++++++</span><span class="d">-----------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">src/codesearch.h</a></td><td> | </td><td class="num">11</td><td><span class="i">++++++</span><span class="d">-----</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">src/dump_load.cc</a></td><td> | </td><td class="num">10</td><td><span class="i">+++++</span><span class="d">-----</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h4">src/tagsearch.cc</a></td><td> | </td><td class="num">2</td><td><span class="i">+</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h5">src/tools/codesearch.cc</a></td><td> | </td><td class="num">1</td><td><span class="i">+</span><span class="d"></span></td></tr>
+</table></pre><pre>6 files changed, 26 insertions(+), 24 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/src/chunk_allocator.cc">src/chunk_allocator.cc</a> b/<a href="../file/src/chunk_allocator.cc">src/chunk_allocator.cc</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -154,6 +154,6 @@ public:
+</a>     }
+ };
+ 
+<a href="#h0-0-3" id="h0-0-3" class="d">-chunk_allocator *make_mem_allocator() {
+</a><a href="#h0-0-4" id="h0-0-4" class="d">-    return new mem_allocator();
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+unique_ptr&lt;chunk_allocator&gt; make_mem_allocator() {
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+    return make_unique&lt;mem_allocator&gt;();
+</a> }
+<b>diff --git a/<a id="h1" href="../file/src/codesearch.cc">src/codesearch.cc</a> b/<a href="../file/src/codesearch.cc">src/codesearch.cc</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -468,22 +468,22 @@ void filename_searcher::match_filename(indexed_file *file) {
+</a> }
+ 
+ code_searcher::code_searcher()
+<a href="#h1-0-3" id="h1-0-3" class="d">-    : alloc_(0), finalized_(false), filename_data_(NULL), filename_suffixes_(NULL)
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+    : alloc_(), finalized_(false), filename_data_(NULL), filename_suffixes_(NULL)
+</a> {
+ #ifdef USE_DENSE_HASH_SET
+     lines_.set_empty_key(empty_string);
+ #endif
+ }
+ 
+<a href="#h1-0-11" id="h1-0-11" class="d">-void code_searcher::set_alloc(chunk_allocator *alloc) {
+</a><a href="#h1-0-12" id="h1-0-12" class="i">+void code_searcher::set_alloc(std::unique_ptr&lt;chunk_allocator&gt; alloc) {
+</a>     assert(!alloc_);
+<a href="#h1-0-14" id="h1-0-14" class="d">-    alloc_ = alloc;
+</a><a href="#h1-0-15" id="h1-0-15" class="i">+    alloc_ = move(alloc);
+</a> }
+ 
+ code_searcher::~code_searcher() {
+     if (alloc_)
+         alloc_-&gt;cleanup();
+<a href="#h1-0-21" id="h1-0-21" class="d">-    delete alloc_;
+</a><a href="#h1-0-22" id="h1-0-22" class="i">+
+</a>     for (auto tree : trees_) {
+         if (tree-&gt;metadata != NULL) {
+             json_object_put(tree-&gt;metadata);
+<a href="#h1-1" id="h1-1" class="h">@@ -642,12 +642,12 @@ void code_searcher::index_file(const indexed_tree *tree,
+</a>         goto final;
+     }
+ 
+<a href="#h1-1-3" id="h1-1-3" class="d">-    sf-&gt;content = content.build(alloc_);
+</a><a href="#h1-1-4" id="h1-1-4" class="i">+    sf-&gt;content = content.build(alloc_.get());
+</a>     if (sf-&gt;content == 0) {
+         fprintf(stderr, &quot;WARN: %s:%s:%s is too large to be indexed.\n&quot;,
+                 tree-&gt;name.c_str(), tree-&gt;version.c_str(), path.c_str());
+         file_contents_builder dummy;
+<a href="#h1-1-9" id="h1-1-9" class="d">-        sf-&gt;content = dummy.build(alloc_);
+</a><a href="#h1-1-10" id="h1-1-10" class="i">+        sf-&gt;content = dummy.build(alloc_.get());
+</a>     }
+     idx_content_ranges.inc(sf-&gt;content-&gt;size());
+     assert(sf-&gt;content-&gt;size() &lt;= 3*lines);
+<a href="#h1-2" id="h1-2" class="h">@@ -1021,10 +1021,10 @@ void searcher::try_match(const StringPiece&amp; line,
+</a>                          indexed_file *sf) {
+ 
+     int lno = 1;
+<a href="#h1-2-3" id="h1-2-3" class="d">-    auto it = sf-&gt;content-&gt;begin(cc_-&gt;alloc_);
+</a><a href="#h1-2-4" id="h1-2-4" class="i">+    auto it = sf-&gt;content-&gt;begin(cc_-&gt;alloc_.get());
+</a> 
+     while (true) {
+<a href="#h1-2-7" id="h1-2-7" class="d">-        for (;it != sf-&gt;content-&gt;end(cc_-&gt;alloc_); ++it) {
+</a><a href="#h1-2-8" id="h1-2-8" class="i">+        for (;it != sf-&gt;content-&gt;end(cc_-&gt;alloc_.get()); ++it) {
+</a>             if (line.data() &gt;= it-&gt;data() &amp;&amp;
+                 line.data() &lt;= it-&gt;data() + it-&gt;size()) {
+                 lno += count(it-&gt;data(), line.data(), &#39;\n&#39;);
+<a href="#h1-3" id="h1-3" class="h">@@ -1036,7 +1036,7 @@ void searcher::try_match(const StringPiece&amp; line,
+</a> 
+         debug(kDebugSearch, &quot;found match on %s:%d&quot;, sf-&gt;path.c_str(), lno);
+ 
+<a href="#h1-3-3" id="h1-3-3" class="d">-        if (it == sf-&gt;content-&gt;end(cc_-&gt;alloc_))
+</a><a href="#h1-3-4" id="h1-3-4" class="i">+        if (it == sf-&gt;content-&gt;end(cc_-&gt;alloc_.get()))
+</a>             return;
+ 
+         match_result *m = new match_result;
+<a href="#h1-4" id="h1-4" class="h">@@ -1054,7 +1054,7 @@ void searcher::try_match(const StringPiece&amp; line,
+</a> 
+         for (i = 0; i &lt; kContextLines; i++) {
+             if (l.data() == bit-&gt;data()) {
+<a href="#h1-4-3" id="h1-4-3" class="d">-                if (bit == sf-&gt;content-&gt;begin(cc_-&gt;alloc_))
+</a><a href="#h1-4-4" id="h1-4-4" class="i">+                if (bit == sf-&gt;content-&gt;begin(cc_-&gt;alloc_.get()))
+</a>                     break;
+                 --bit;
+                 l = StringPiece(bit-&gt;data() + bit-&gt;size() + 1, 0);
+<a href="#h1-5" id="h1-5" class="h">@@ -1067,7 +1067,7 @@ void searcher::try_match(const StringPiece&amp; line,
+</a> 
+         for (i = 0; i &lt; kContextLines; i++) {
+             if (l.data() + l.size() == fit-&gt;data() + fit-&gt;size()) {
+<a href="#h1-5-3" id="h1-5-3" class="d">-                if (++fit == sf-&gt;content-&gt;end(cc_-&gt;alloc_))
+</a><a href="#h1-5-4" id="h1-5-4" class="i">+                if (++fit == sf-&gt;content-&gt;end(cc_-&gt;alloc_.get()))
+</a>                     break;
+                 l = StringPiece(fit-&gt;data() - 1, 0);
+             }
+<b>diff --git a/<a id="h2" href="../file/src/codesearch.h">src/codesearch.h</a> b/<a href="../file/src/codesearch.h">src/codesearch.h</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -16,6 +16,7 @@
+</a> #include &lt;mutex&gt;
+ #include &lt;thread&gt;
+ #include &lt;functional&gt;
+<a href="#h2-0-3" id="h2-0-3" class="i">+#include &lt;memory&gt;
+</a> #include &lt;boost/intrusive_ptr.hpp&gt;
+ 
+ #ifdef USE_DENSE_HASH_SET
+<a href="#h2-1" id="h2-1" class="h">@@ -161,8 +162,8 @@ public:
+</a>                     StringPiece contents);
+     void finalize();
+ 
+<a href="#h2-1-3" id="h2-1-3" class="d">-    void set_alloc(chunk_allocator *alloc);
+</a><a href="#h2-1-4" id="h2-1-4" class="d">-    chunk_allocator *alloc() { return alloc_; }
+</a><a href="#h2-1-5" id="h2-1-5" class="i">+    void set_alloc(std::unique_ptr&lt;chunk_allocator&gt; alloc);
+</a><a href="#h2-1-6" id="h2-1-6" class="i">+    chunk_allocator *alloc() { return alloc_.get(); }
+</a> 
+     vector&lt;indexed_tree&gt; trees() const;
+     string name() const {
+<a href="#h2-2" id="h2-2" class="h">@@ -238,7 +239,7 @@ protected:
+</a>     // present.
+     string_hash lines_;
+ 
+<a href="#h2-2-3" id="h2-2-3" class="d">-    chunk_allocator *alloc_;
+</a><a href="#h2-2-4" id="h2-2-4" class="i">+    std::unique_ptr&lt;chunk_allocator&gt; alloc_;
+</a> 
+     // Indicates that everything all is ready for searching--we are done creating
+     // index or initializing it from a file.
+<a href="#h2-3" id="h2-3" class="h">@@ -270,9 +271,9 @@ private:
+</a> };
+ 
+ // dump_load.cc
+<a href="#h2-3-3" id="h2-3-3" class="d">-chunk_allocator *make_dump_allocator(code_searcher *search, const string&amp; path);
+</a><a href="#h2-3-4" id="h2-3-4" class="i">+std::unique_ptr&lt;chunk_allocator&gt; make_dump_allocator(code_searcher *search, const string&amp; path);
+</a> // chunk_allocator.cc
+<a href="#h2-3-6" id="h2-3-6" class="d">-chunk_allocator *make_mem_allocator();
+</a><a href="#h2-3-7" id="h2-3-7" class="i">+std::unique_ptr&lt;chunk_allocator&gt; make_mem_allocator();
+</a> 
+ void default_re2_options(RE2::Options&amp;);
+ 
+<b>diff --git a/<a id="h3" href="../file/src/dump_load.cc">src/dump_load.cc</a> b/<a href="../file/src/dump_load.cc">src/dump_load.cc</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -238,8 +238,8 @@ protected:
+</a>     chunk_header *next_chunk_;
+ };
+ 
+<a href="#h3-0-3" id="h3-0-3" class="d">-chunk_allocator *make_dump_allocator(code_searcher *search, const string&amp; path) {
+</a><a href="#h3-0-4" id="h3-0-4" class="d">-    return new dump_allocator(search, path.c_str());
+</a><a href="#h3-0-5" id="h3-0-5" class="i">+std::unique_ptr&lt;chunk_allocator&gt; make_dump_allocator(code_searcher *search, const string&amp; path) {
+</a><a href="#h3-0-6" id="h3-0-6" class="i">+    return std::make_unique&lt;dump_allocator&gt;(search, path.c_str());
+</a> }
+ 
+ void codesearch_index::dump_file(map&lt;const indexed_tree*, int&gt;&amp; ids, indexed_file *sf) {
+<a href="#h3-1" id="h3-1" class="h">@@ -491,7 +491,7 @@ void code_searcher::dump_index(const string &amp;path) {
+</a> }
+ 
+ void code_searcher::load_index(const string &amp;path) {
+<a href="#h3-1-3" id="h3-1-3" class="d">-    load_allocator *alloc = new load_allocator(this, path);
+</a><a href="#h3-1-4" id="h3-1-4" class="d">-    set_alloc(alloc);
+</a><a href="#h3-1-5" id="h3-1-5" class="d">-    alloc-&gt;load(this);
+</a><a href="#h3-1-6" id="h3-1-6" class="i">+    std::unique_ptr&lt;load_allocator&gt; alloc = std::make_unique&lt;load_allocator&gt;(this, path);
+</a><a href="#h3-1-7" id="h3-1-7" class="i">+    set_alloc(move(alloc));
+</a><a href="#h3-1-8" id="h3-1-8" class="i">+    dynamic_cast&lt;load_allocator*&gt;(alloc_.get())-&gt;load(this);
+</a> }
+<b>diff --git a/<a id="h4" href="../file/src/tagsearch.cc">src/tagsearch.cc</a> b/<a href="../file/src/tagsearch.cc">src/tagsearch.cc</a></b>
+<a href="#h4-0" id="h4-0" class="h">@@ -50,7 +50,7 @@ std::string create_tag_line_regex(
+</a> };
+ 
+ void tag_searcher::cache_indexed_files(code_searcher* cs) {
+<a href="#h4-0-3" id="h4-0-3" class="d">-    file_alloc_ = cs-&gt;alloc_;
+</a><a href="#h4-0-4" id="h4-0-4" class="i">+    file_alloc_ = cs-&gt;alloc_.get();
+</a>     for (auto it = cs-&gt;begin_files(); it != cs-&gt;end_files(); ++it) {
+         auto file = *it;
+         auto key = path(file-&gt;tree-&gt;name) / path(file-&gt;path);
+<b>diff --git a/<a id="h5" href="../file/src/tools/codesearch.cc">src/tools/codesearch.cc</a> b/<a href="../file/src/tools/codesearch.cc">src/tools/codesearch.cc</a></b>
+<a href="#h5-0" id="h5-0" class="h">@@ -10,6 +10,7 @@
+</a> #include &quot;src/lib/debug.h&quot;
+ 
+ #include &quot;src/codesearch.h&quot;
+<a href="#h5-0-3" id="h5-0-3" class="i">+#include &quot;src/chunk_allocator.h&quot;
+</a> #include &quot;src/tagsearch.h&quot;
+ #include &quot;src/re_width.h&quot;
+ #include &quot;src/git_indexer.h&quot;
+</pre>
+</div>
+</body>
+</html>

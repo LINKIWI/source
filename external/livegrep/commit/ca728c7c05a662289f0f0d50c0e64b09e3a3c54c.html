@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Add Reload RPC to reinitialize codesearch backend - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/ca728c7c05a662289f0f0d50c0e64b09e3a3c54c">ca728c7c05a662289f0f0d50c0e64b09e3a3c54c</a>
+<b>parent</b> <a href="../commit/0683e6e6118873cd5416b2f18a2a366d50b91806">0683e6e6118873cd5416b2f18a2a366d50b91806</a>
+<b>Author:</b> Josiah Boning &lt;<a href="mailto:josiah@dropbox.com">josiah@dropbox.com</a>&gt;
+<b>Date:</b>   Wed, 31 May 2017 08:52:30 +0000
+
+Add Reload RPC to reinitialize codesearch backend
+
+This shuts down the grpc server and starts everything up again. Intended
+to be called after a new index has been created on disk, to begin
+serving from it.
+
+To avoid leaking memory on every reload, this change also releases
+allocated memory where necessary. `valgrind --tool=memcheck
+--leak-check=full` reported no leaks or errors during some cursory
+searches and reloads.
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">src/chunk.h</a></td><td> | </td><td class="num">10</td><td><span class="i">++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">src/codesearch.cc</a></td><td> | </td><td class="num">10</td><td><span class="i">++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">src/proto/livegrep.proto</a></td><td> | </td><td class="num">4</td><td><span class="i">++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">src/tools/codesearch.cc</a></td><td> | </td><td class="num">39</td><td><span class="i">+++++++++++++++++++++++++++</span><span class="d">------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h4">src/tools/grpc_server.cc</a></td><td> | </td><td class="num">24</td><td><span class="i">+++++++++++++++++++</span><span class="d">-----</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h5">src/tools/grpc_server.h</a></td><td> | </td><td class="num">5</td><td><span class="i">++++</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h6">test/codesearch_test.cc</a></td><td> | </td><td class="num">12</td><td><span class="i">++++++</span><span class="d">------</span></td></tr>
+</table></pre><pre>7 files changed, 80 insertions(+), 24 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/src/chunk.h">src/chunk.h</a> b/<a href="../file/src/chunk.h">src/chunk.h</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -53,6 +53,15 @@ struct chunk_file_node {
+</a>     int right_limit;
+ 
+     chunk_file_node *left, *right;
+<a href="#h0-0-3" id="h0-0-3" class="i">+
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+    ~chunk_file_node() {
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+        if (left != NULL) {
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+            delete left;
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+        }
+</a><a href="#h0-0-8" id="h0-0-8" class="i">+        if (right != NULL) {
+</a><a href="#h0-0-9" id="h0-0-9" class="i">+            delete right;
+</a><a href="#h0-0-10" id="h0-0-10" class="i">+        }
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+    }
+</a> };
+ 
+ struct chunk {
+<a href="#h0-1" id="h0-1" class="h">@@ -71,6 +80,7 @@ struct chunk {
+</a>           suffixes(suffixes), data(data) { }
+ 
+     ~chunk() {
+<a href="#h0-1-3" id="h0-1-3" class="i">+        delete cf_root;
+</a>     }
+ 
+     void add_chunk_file(indexed_file *sf, const StringPiece&amp; line);
+<b>diff --git a/<a id="h1" href="../file/src/codesearch.cc">src/codesearch.cc</a> b/<a href="../file/src/codesearch.cc">src/codesearch.cc</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -33,6 +33,7 @@
+</a> 
+ #include &quot;re2/re2.h&quot;
+ #include &quot;gflags/gflags.h&quot;
+<a href="#h1-0-3" id="h1-0-3" class="i">+#include &lt;json-c/json.h&gt;
+</a> 
+ #include &quot;utf8.h&quot;
+ 
+<a href="#h1-1" id="h1-1" class="h">@@ -368,6 +369,15 @@ code_searcher::~code_searcher() {
+</a>     if (alloc_)
+         alloc_-&gt;cleanup();
+     delete alloc_;
+<a href="#h1-1-3" id="h1-1-3" class="i">+    for (auto tree : trees_) {
+</a><a href="#h1-1-4" id="h1-1-4" class="i">+        if (tree-&gt;metadata != NULL) {
+</a><a href="#h1-1-5" id="h1-1-5" class="i">+            json_object_put(tree-&gt;metadata);
+</a><a href="#h1-1-6" id="h1-1-6" class="i">+        }
+</a><a href="#h1-1-7" id="h1-1-7" class="i">+        delete tree;
+</a><a href="#h1-1-8" id="h1-1-8" class="i">+    }
+</a><a href="#h1-1-9" id="h1-1-9" class="i">+    for (auto file : files_) {
+</a><a href="#h1-1-10" id="h1-1-10" class="i">+        delete file;
+</a><a href="#h1-1-11" id="h1-1-11" class="i">+    }
+</a> }
+ 
+ void code_searcher::finalize() {
+<b>diff --git a/<a id="h2" href="../file/src/proto/livegrep.proto">src/proto/livegrep.proto</a> b/<a href="../file/src/proto/livegrep.proto">src/proto/livegrep.proto</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -61,7 +61,11 @@ message CodeSearchResult {
+</a> message InfoRequest {
+ }
+ 
+<a href="#h2-0-3" id="h2-0-3" class="i">+message Empty {
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+}
+</a><a href="#h2-0-5" id="h2-0-5" class="i">+
+</a> service CodeSearch {
+     rpc Info(InfoRequest) returns (ServerInfo);
+     rpc Search(Query) returns (CodeSearchResult);
+<a href="#h2-0-9" id="h2-0-9" class="i">+    rpc Reload(Empty) returns (Empty);
+</a> }
+<b>diff --git a/<a id="h3" href="../file/src/tools/codesearch.cc">src/tools/codesearch.cc</a> b/<a href="../file/src/tools/codesearch.cc">src/tools/codesearch.cc</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -29,6 +29,7 @@
+</a> 
+ #include &lt;iostream&gt;
+ #include &lt;functional&gt;
+<a href="#h3-0-3" id="h3-0-3" class="i">+#include &lt;future&gt;
+</a> #include &lt;thread&gt;
+ 
+ #include &lt;gflags/gflags.h&gt;
+<a href="#h3-1" id="h3-1" class="h">@@ -48,6 +49,7 @@ DEFINE_string(load_tags, &quot;&quot;, &quot;Load the index built from a tags file.&quot;);
+</a> DEFINE_bool(quiet, false, &quot;Do the search, but don&#39;t print results.&quot;);
+ DEFINE_bool(index_only, false, &quot;Build the index and don&#39;t serve queries&quot;);
+ DEFINE_string(grpc, &quot;localhost:9999&quot;, &quot;GRPC listener address&quot;);
+<a href="#h3-1-3" id="h3-1-3" class="i">+DEFINE_bool(reload_rpc, false, &quot;Enable the Reload RPC&quot;);
+</a> 
+ using namespace std;
+ using namespace re2;
+<a href="#h3-2" id="h3-2" class="h">@@ -138,32 +140,45 @@ void initialize_search(code_searcher *search,
+</a> }
+ 
+ void listen_grpc(code_searcher *search, code_searcher *tags, const string&amp; addr) {
+<a href="#h3-2-3" id="h3-2-3" class="d">-    unique_ptr&lt;CodeSearch::Service&gt; service(build_grpc_server(search, tags));
+</a><a href="#h3-2-4" id="h3-2-4" class="i">+    promise&lt;void&gt; reload_request;
+</a><a href="#h3-2-5" id="h3-2-5" class="i">+    auto reload_request_ptr = FLAGS_reload_rpc ? &amp;reload_request : NULL;
+</a><a href="#h3-2-6" id="h3-2-6" class="i">+
+</a><a href="#h3-2-7" id="h3-2-7" class="i">+    unique_ptr&lt;CodeSearch::Service&gt; service(build_grpc_server(search, tags, reload_request_ptr));
+</a> 
+     ServerBuilder builder;
+     builder.AddListeningPort(addr, grpc::InsecureServerCredentials());
+     builder.RegisterService(service.get());
+     std::unique_ptr&lt;Server&gt; server(builder.BuildAndStart());
+<a href="#h3-2-13" id="h3-2-13" class="d">-    server-&gt;Wait();
+</a><a href="#h3-2-14" id="h3-2-14" class="i">+
+</a><a href="#h3-2-15" id="h3-2-15" class="i">+    if (FLAGS_reload_rpc) {
+</a><a href="#h3-2-16" id="h3-2-16" class="i">+        thread shutdown_thread([&amp;]() {
+</a><a href="#h3-2-17" id="h3-2-17" class="i">+            reload_request.get_future().wait();
+</a><a href="#h3-2-18" id="h3-2-18" class="i">+            server-&gt;Shutdown();
+</a><a href="#h3-2-19" id="h3-2-19" class="i">+        });
+</a><a href="#h3-2-20" id="h3-2-20" class="i">+        server-&gt;Wait();
+</a><a href="#h3-2-21" id="h3-2-21" class="i">+        shutdown_thread.join();
+</a><a href="#h3-2-22" id="h3-2-22" class="i">+    } else {
+</a><a href="#h3-2-23" id="h3-2-23" class="i">+        server-&gt;Wait();
+</a><a href="#h3-2-24" id="h3-2-24" class="i">+    }
+</a> }
+ 
+ int main(int argc, char **argv) {
+     gflags::SetUsageMessage(&quot;Usage: &quot; + string(argv[0]) + &quot; &lt;options&gt; REFS&quot;);
+     gflags::ParseCommandLineFlags(&amp;argc, &amp;argv, true);
+ 
+<a href="#h3-2-31" id="h3-2-31" class="d">-    code_searcher search;
+</a><a href="#h3-2-32" id="h3-2-32" class="d">-    code_searcher tags;
+</a><a href="#h3-2-33" id="h3-2-33" class="d">-
+</a>     signal(SIGPIPE, SIG_IGN);
+ 
+<a href="#h3-2-36" id="h3-2-36" class="d">-    initialize_search(&amp;search, &amp;tags, argc, argv);
+</a><a href="#h3-2-37" id="h3-2-37" class="i">+    while (true) {
+</a><a href="#h3-2-38" id="h3-2-38" class="i">+        code_searcher search;
+</a><a href="#h3-2-39" id="h3-2-39" class="i">+        code_searcher tags;
+</a> 
+<a href="#h3-2-41" id="h3-2-41" class="d">-    if (FLAGS_index_only)
+</a><a href="#h3-2-42" id="h3-2-42" class="d">-        return 0;
+</a><a href="#h3-2-43" id="h3-2-43" class="i">+        initialize_search(&amp;search, &amp;tags, argc, argv);
+</a> 
+<a href="#h3-2-45" id="h3-2-45" class="d">-    if (FLAGS_grpc.size()) {
+</a><a href="#h3-2-46" id="h3-2-46" class="d">-        listen_grpc(&amp;search, &amp;tags, FLAGS_grpc);
+</a><a href="#h3-2-47" id="h3-2-47" class="d">-    }
+</a><a href="#h3-2-48" id="h3-2-48" class="i">+        if (FLAGS_index_only)
+</a><a href="#h3-2-49" id="h3-2-49" class="i">+            return 0;
+</a> 
+<a href="#h3-2-51" id="h3-2-51" class="d">-    return 0;
+</a><a href="#h3-2-52" id="h3-2-52" class="i">+        if (FLAGS_grpc.size()) {
+</a><a href="#h3-2-53" id="h3-2-53" class="i">+            listen_grpc(&amp;search, &amp;tags, FLAGS_grpc);
+</a><a href="#h3-2-54" id="h3-2-54" class="i">+        }
+</a><a href="#h3-2-55" id="h3-2-55" class="i">+    }
+</a> }
+<b>diff --git a/<a id="h4" href="../file/src/tools/grpc_server.cc">src/tools/grpc_server.cc</a> b/<a href="../file/src/tools/grpc_server.cc">src/tools/grpc_server.cc</a></b>
+<a href="#h4-0" id="h4-0" class="h">@@ -13,6 +13,7 @@
+</a> #include &lt;string&gt;
+ #include &lt;algorithm&gt;
+ #include &lt;functional&gt;
+<a href="#h4-0-3" id="h4-0-3" class="i">+#include &lt;future&gt;
+</a> 
+ #include &lt;boost/bind.hpp&gt;
+ 
+<a href="#h4-1" id="h4-1" class="h">@@ -24,26 +25,30 @@ using std::string;
+</a> 
+ class CodeSearchImpl final : public CodeSearch::Service {
+  public:
+<a href="#h4-1-3" id="h4-1-3" class="d">-    explicit CodeSearchImpl(code_searcher *cs, code_searcher *tagdata);
+</a><a href="#h4-1-4" id="h4-1-4" class="i">+    explicit CodeSearchImpl(code_searcher *cs, code_searcher *tagdata, std::promise&lt;void&gt; *reload_request);
+</a>     virtual ~CodeSearchImpl();
+ 
+     virtual grpc::Status Info(grpc::ServerContext* context, const ::InfoRequest* request, ::ServerInfo* response);
+     virtual grpc::Status Search(grpc::ServerContext* context, const ::Query* request, ::CodeSearchResult* response);
+<a href="#h4-1-9" id="h4-1-9" class="i">+    virtual grpc::Status Reload(grpc::ServerContext* context, const ::Empty* request, ::Empty* response);
+</a> 
+  private:
+     code_searcher *cs_;
+     code_searcher *tagdata_;
+<a href="#h4-1-14" id="h4-1-14" class="i">+    std::promise&lt;void&gt; *reload_request_;
+</a>     tag_searcher *tagmatch_;
+ 
+     thread_queue &lt;code_searcher::search_thread*&gt; pool_;
+ };
+ 
+<a href="#h4-1-20" id="h4-1-20" class="d">-std::unique_ptr&lt;CodeSearch::Service&gt; build_grpc_server(code_searcher *cs, code_searcher *tagdata) {
+</a><a href="#h4-1-21" id="h4-1-21" class="d">-    return std::unique_ptr&lt;CodeSearch::Service&gt;(new CodeSearchImpl(cs, tagdata));
+</a><a href="#h4-1-22" id="h4-1-22" class="i">+std::unique_ptr&lt;CodeSearch::Service&gt; build_grpc_server(code_searcher *cs,
+</a><a href="#h4-1-23" id="h4-1-23" class="i">+                                                       code_searcher *tagdata,
+</a><a href="#h4-1-24" id="h4-1-24" class="i">+                                                       std::promise&lt;void&gt; *reload_request) {
+</a><a href="#h4-1-25" id="h4-1-25" class="i">+    return std::unique_ptr&lt;CodeSearch::Service&gt;(new CodeSearchImpl(cs, tagdata, reload_request));
+</a> }
+ 
+<a href="#h4-1-28" id="h4-1-28" class="d">-CodeSearchImpl::CodeSearchImpl(code_searcher *cs, code_searcher *tagdata)
+</a><a href="#h4-1-29" id="h4-1-29" class="d">-    : cs_(cs), tagdata_(tagdata), tagmatch_(nullptr) {
+</a><a href="#h4-1-30" id="h4-1-30" class="i">+CodeSearchImpl::CodeSearchImpl(code_searcher *cs, code_searcher *tagdata, std::promise&lt;void&gt; *reload_request)
+</a><a href="#h4-1-31" id="h4-1-31" class="i">+    : cs_(cs), tagdata_(tagdata), reload_request_(reload_request), tagmatch_(nullptr) {
+</a>     if (tagdata != nullptr) {
+         tagmatch_ = new tag_searcher;
+         tagmatch_-&gt;cache_indexed_files(cs_);
+<a href="#h4-2" id="h4-2" class="h">@@ -258,3 +263,12 @@ Status CodeSearchImpl::Search(ServerContext* context, const ::Query* request, ::
+</a> 
+     return Status::OK;
+ }
+<a href="#h4-2-3" id="h4-2-3" class="i">+
+</a><a href="#h4-2-4" id="h4-2-4" class="i">+Status CodeSearchImpl::Reload(ServerContext* context, const ::Empty* request, ::Empty* response) {
+</a><a href="#h4-2-5" id="h4-2-5" class="i">+    log(&quot;Reload()&quot;);
+</a><a href="#h4-2-6" id="h4-2-6" class="i">+    if (reload_request_ == NULL) {
+</a><a href="#h4-2-7" id="h4-2-7" class="i">+      return Status(StatusCode::UNIMPLEMENTED, &quot;reload rpc not enabled&quot;);
+</a><a href="#h4-2-8" id="h4-2-8" class="i">+    }
+</a><a href="#h4-2-9" id="h4-2-9" class="i">+    reload_request_-&gt;set_value();
+</a><a href="#h4-2-10" id="h4-2-10" class="i">+    return Status::OK;
+</a><a href="#h4-2-11" id="h4-2-11" class="i">+}
+</a><b>diff --git a/<a id="h5" href="../file/src/tools/grpc_server.h">src/tools/grpc_server.h</a> b/<a href="../file/src/tools/grpc_server.h">src/tools/grpc_server.h</a></b>
+<a href="#h5-0" id="h5-0" class="h">@@ -2,11 +2,14 @@
+</a> #define CODESEARCH_GRPC_SERVER_H
+ 
+ #include &quot;src/proto/livegrep.grpc.pb.h&quot;
+<a href="#h5-0-3" id="h5-0-3" class="i">+#include &lt;future&gt;
+</a> #include &lt;memory&gt;
+ 
+ class code_searcher;
+ class tag_searcher;
+ 
+<a href="#h5-0-9" id="h5-0-9" class="d">-std::unique_ptr&lt;CodeSearch::Service&gt; build_grpc_server(code_searcher *cs, code_searcher *tagdata);
+</a><a href="#h5-0-10" id="h5-0-10" class="i">+std::unique_ptr&lt;CodeSearch::Service&gt; build_grpc_server(code_searcher *cs,
+</a><a href="#h5-0-11" id="h5-0-11" class="i">+                                                       code_searcher *tagdata,
+</a><a href="#h5-0-12" id="h5-0-12" class="i">+                                                       std::promise&lt;void&gt; *reload_request);
+</a> 
+ #endif /* CODESEARCH_GRPC_SERVER_H */
+<b>diff --git a/<a id="h6" href="../file/test/codesearch_test.cc">test/codesearch_test.cc</a> b/<a href="../file/test/codesearch_test.cc">test/codesearch_test.cc</a></b>
+<a href="#h6-0" id="h6-0" class="h">@@ -44,7 +44,7 @@ TEST_F(codesearch_test, IndexTest) {
+</a> TEST_F(codesearch_test, BadRegex) {
+     cs_.index_file(tree_, &quot;/data/file1&quot;, file1);
+     cs_.finalize();
+<a href="#h6-0-3" id="h6-0-3" class="d">-    std::unique_ptr&lt;CodeSearch::Service&gt; srv(build_grpc_server(&amp;cs_, nullptr));
+</a><a href="#h6-0-4" id="h6-0-4" class="i">+    std::unique_ptr&lt;CodeSearch::Service&gt; srv(build_grpc_server(&amp;cs_, nullptr, nullptr));
+</a>     Query request;
+     CodeSearchResult matches;
+     request.set_line(&quot;(&quot;);
+<a href="#h6-1" id="h6-1" class="h">@@ -83,7 +83,7 @@ TEST_F(codesearch_test, DuplicateLinesInFile) {
+</a>                    &quot;line 2\n&quot;);
+     cs_.finalize();
+ 
+<a href="#h6-1-3" id="h6-1-3" class="d">-    std::unique_ptr&lt;CodeSearch::Service&gt; srv(build_grpc_server(&amp;cs_, nullptr));
+</a><a href="#h6-1-4" id="h6-1-4" class="i">+    std::unique_ptr&lt;CodeSearch::Service&gt; srv(build_grpc_server(&amp;cs_, nullptr, nullptr));
+</a>     Query request;
+     CodeSearchResult matches;
+     request.set_line(&quot;line 1&quot;);
+<a href="#h6-2" id="h6-2" class="h">@@ -110,7 +110,7 @@ TEST_F(codesearch_test, LongLines) {
+</a>                    string(&quot;NEEDLE\n&quot;));
+     cs_.finalize();
+ 
+<a href="#h6-2-3" id="h6-2-3" class="d">-    std::unique_ptr&lt;CodeSearch::Service&gt; srv(build_grpc_server(&amp;cs_, nullptr));
+</a><a href="#h6-2-4" id="h6-2-4" class="i">+    std::unique_ptr&lt;CodeSearch::Service&gt; srv(build_grpc_server(&amp;cs_, nullptr, nullptr));
+</a>     Query request;
+     CodeSearchResult matches;
+     request.set_line(&quot;NEEDLE&quot;);
+<a href="#h6-3" id="h6-3" class="h">@@ -135,7 +135,7 @@ TEST_F(codesearch_test, RestrictFiles) {
+</a>     cs_.index_file(other, &quot;/file2&quot;, &quot;contents&quot;);
+     cs_.finalize();
+ 
+<a href="#h6-3-3" id="h6-3-3" class="d">-    std::unique_ptr&lt;CodeSearch::Service&gt; srv(build_grpc_server(&amp;cs_, nullptr));
+</a><a href="#h6-3-4" id="h6-3-4" class="i">+    std::unique_ptr&lt;CodeSearch::Service&gt; srv(build_grpc_server(&amp;cs_, nullptr, nullptr));
+</a>     Query request;
+     CodeSearchResult matches;
+     grpc::ServerContext ctx;
+<a href="#h6-4" id="h6-4" class="h">@@ -191,7 +191,7 @@ TEST_F(codesearch_test, Tags) {
+</a>                     &quot;do_the_thing\trepo/file.c\t1;\&quot;\tfunction\n&quot;);
+     tags.finalize();
+ 
+<a href="#h6-4-3" id="h6-4-3" class="d">-    std::unique_ptr&lt;CodeSearch::Service&gt; srv(build_grpc_server(&amp;cs_, &amp;tags));
+</a><a href="#h6-4-4" id="h6-4-4" class="i">+    std::unique_ptr&lt;CodeSearch::Service&gt; srv(build_grpc_server(&amp;cs_, &amp;tags, nullptr));
+</a>     Query request;
+     CodeSearchResult matches;
+     grpc::ServerContext ctx;
+<a href="#h6-5" id="h6-5" class="h">@@ -213,7 +213,7 @@ TEST_F(codesearch_test, MaxMatches) {
+</a>     cs_.index_file(tree_, &quot;/file3&quot;, &quot;contents&quot;);
+     cs_.finalize();
+ 
+<a href="#h6-5-3" id="h6-5-3" class="d">-    std::unique_ptr&lt;CodeSearch::Service&gt; srv(build_grpc_server(&amp;cs_, nullptr));
+</a><a href="#h6-5-4" id="h6-5-4" class="i">+    std::unique_ptr&lt;CodeSearch::Service&gt; srv(build_grpc_server(&amp;cs_, nullptr, nullptr));
+</a>     {
+         CodeSearchResult all_matches;
+         Query request;
+</pre>
+</div>
+</body>
+</html>

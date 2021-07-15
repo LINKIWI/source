@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Generalize the radix sort code into a header file. - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/6036f5718a233b29f3b400c66b7d0c0b6c760bbd">6036f5718a233b29f3b400c66b7d0c0b6c760bbd</a>
+<b>parent</b> <a href="../commit/37a8c197f5c68f52a4c9fb58b705e5c1b17d12b8">37a8c197f5c68f52a4c9fb58b705e5c1b17d12b8</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Sat, 12 Nov 2011 18:42:40 -0500
+
+Generalize the radix sort code into a header file.
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">chunk.cc</a></td><td> | </td><td class="num">60</td><td><span class="i">+++++++++++++++++</span><span class="d">-------------------------------------------</span></td></tr>
+<tr><td class="A">A</td><td><a href="#h1">radix_sort.h</a></td><td> | </td><td class="num">46</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+</table></pre><pre>2 files changed, 63 insertions(+), 43 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/chunk.cc">chunk.cc</a> b/<a href="../file/chunk.cc">chunk.cc</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -1,4 +1,6 @@
+</a> #include &quot;chunk.h&quot;
+<a href="#h0-0-1" id="h0-0-1" class="i">+#include &quot;radix_sort.h&quot;
+</a><a href="#h0-0-2" id="h0-0-2" class="i">+
+</a> #include &lt;re2/re2.h&gt;
+ #include &lt;gflags/gflags.h&gt;
+ 
+<a href="#h0-1" id="h0-1" class="h">@@ -8,7 +10,7 @@ DECLARE_bool(index);
+</a> 
+ class radix_sorter {
+ public:
+<a href="#h0-1-3" id="h0-1-3" class="d">-    radix_sorter(chunk *chunk) : chunk_(chunk), cmp(*this) {
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+    radix_sorter(chunk *chunk) : chunk_(chunk) {
+</a>         lengths = new uint32_t[chunk_-&gt;size];
+         for (int i = 0; i &lt; chunk_-&gt;size; i ++)
+             lengths[i] = static_cast&lt;char*&gt;
+<a href="#h0-2" id="h0-2" class="h">@@ -24,8 +26,7 @@ public:
+</a> 
+     struct cmp_suffix {
+         radix_sorter &amp;sort;
+<a href="#h0-2-3" id="h0-2-3" class="d">-        cmp_suffix(radix_sorter &amp;s) : sort(s) {
+</a><a href="#h0-2-4" id="h0-2-4" class="d">-        }
+</a><a href="#h0-2-5" id="h0-2-5" class="i">+        cmp_suffix(radix_sorter &amp;s) : sort(s) {}
+</a>         bool operator()(uint32_t lhs, uint32_t rhs) {
+             char *l = &amp;sort.chunk_-&gt;data[lhs];
+             char *r = &amp;sort.chunk_-&gt;data[rhs];
+<a href="#h0-3" id="h0-3" class="h">@@ -39,9 +40,16 @@ public:
+</a>             return ll &lt; rl;
+         }
+     };
+<a href="#h0-3-3" id="h0-3-3" class="d">-private:
+</a><a href="#h0-3-4" id="h0-3-4" class="d">-    void radix_sort(uint32_t *, uint32_t *, int);
+</a> 
+<a href="#h0-3-6" id="h0-3-6" class="i">+    struct indexer {
+</a><a href="#h0-3-7" id="h0-3-7" class="i">+        radix_sorter &amp;sort;
+</a><a href="#h0-3-8" id="h0-3-8" class="i">+        indexer(radix_sorter &amp;s) : sort(s) {}
+</a><a href="#h0-3-9" id="h0-3-9" class="i">+        unsigned operator()(uint32_t off, int i) {
+</a><a href="#h0-3-10" id="h0-3-10" class="i">+            return sort.index(off, i);
+</a><a href="#h0-3-11" id="h0-3-11" class="i">+        }
+</a><a href="#h0-3-12" id="h0-3-12" class="i">+    };
+</a><a href="#h0-3-13" id="h0-3-13" class="i">+
+</a><a href="#h0-3-14" id="h0-3-14" class="i">+private:
+</a>     unsigned index(uint32_t off, int i) {
+         if (i &gt;= lengths[off]) return 0;
+         return (unsigned)(unsigned char)chunk_-&gt;data[off + i];
+<a href="#h0-4" id="h0-4" class="h">@@ -49,7 +57,6 @@ private:
+</a> 
+     chunk *chunk_;
+     unsigned *lengths;
+<a href="#h0-4-3" id="h0-4-3" class="d">-    cmp_suffix cmp;
+</a> 
+     radix_sorter(const radix_sorter&amp;);
+     radix_sorter operator=(const radix_sorter&amp;);
+<a href="#h0-5" id="h0-5" class="h">@@ -100,48 +107,15 @@ void chunk::finish_file() {
+</a> }
+ 
+ int chunk::chunk_files = 0;
+<a href="#h0-5-3" id="h0-5-3" class="d">-const size_t kRadixCutoff = 128;
+</a> 
+ void radix_sorter::sort() {
+<a href="#h0-5-6" id="h0-5-6" class="d">-    radix_sort(chunk_-&gt;suffixes, chunk_-&gt;suffixes + chunk_-&gt;size, 0);
+</a><a href="#h0-5-7" id="h0-5-7" class="i">+    cmp_suffix cmp(*this);
+</a><a href="#h0-5-8" id="h0-5-8" class="i">+    indexer idx(*this);
+</a><a href="#h0-5-9" id="h0-5-9" class="i">+    radix_sort(chunk_-&gt;suffixes, chunk_-&gt;suffixes + chunk_-&gt;size, 0,
+</a><a href="#h0-5-10" id="h0-5-10" class="i">+               idx, cmp);
+</a>     assert(is_sorted(chunk_-&gt;suffixes, chunk_-&gt;suffixes + chunk_-&gt;size, cmp));
+ }
+ 
+<a href="#h0-5-14" id="h0-5-14" class="d">-void radix_sorter::radix_sort(uint32_t *left, uint32_t *right, int level) {
+</a><a href="#h0-5-15" id="h0-5-15" class="d">-    if (right - left &lt; kRadixCutoff) {
+</a><a href="#h0-5-16" id="h0-5-16" class="d">-        std::sort(left, right, cmp);
+</a><a href="#h0-5-17" id="h0-5-17" class="d">-        return;
+</a><a href="#h0-5-18" id="h0-5-18" class="d">-    }
+</a><a href="#h0-5-19" id="h0-5-19" class="d">-    unsigned counts[256] = {};
+</a><a href="#h0-5-20" id="h0-5-20" class="d">-    unsigned dest[256];
+</a><a href="#h0-5-21" id="h0-5-21" class="d">-    uint32_t *p;
+</a><a href="#h0-5-22" id="h0-5-22" class="d">-    for (p = left; p != right; p++)
+</a><a href="#h0-5-23" id="h0-5-23" class="d">-        counts[index(*p, level)]++;
+</a><a href="#h0-5-24" id="h0-5-24" class="d">-    for (int i = 0, total = 0; i &lt; 256; i++) {
+</a><a href="#h0-5-25" id="h0-5-25" class="d">-        int tmp = counts[i];
+</a><a href="#h0-5-26" id="h0-5-26" class="d">-        counts[i] = total;
+</a><a href="#h0-5-27" id="h0-5-27" class="d">-        total += tmp;
+</a><a href="#h0-5-28" id="h0-5-28" class="d">-    }
+</a><a href="#h0-5-29" id="h0-5-29" class="d">-    memcpy(dest, counts, sizeof counts);
+</a><a href="#h0-5-30" id="h0-5-30" class="d">-    int this_chunk;
+</a><a href="#h0-5-31" id="h0-5-31" class="d">-    for (p = left, this_chunk = 0; this_chunk &lt; 255;) {
+</a><a href="#h0-5-32" id="h0-5-32" class="d">-        if (p - left == counts[this_chunk + 1]) {
+</a><a href="#h0-5-33" id="h0-5-33" class="d">-            this_chunk++;
+</a><a href="#h0-5-34" id="h0-5-34" class="d">-            continue;
+</a><a href="#h0-5-35" id="h0-5-35" class="d">-        }
+</a><a href="#h0-5-36" id="h0-5-36" class="d">-        int target = index(*p, level);
+</a><a href="#h0-5-37" id="h0-5-37" class="d">-        if (target == this_chunk) {
+</a><a href="#h0-5-38" id="h0-5-38" class="d">-            p++;
+</a><a href="#h0-5-39" id="h0-5-39" class="d">-            continue;
+</a><a href="#h0-5-40" id="h0-5-40" class="d">-        }
+</a><a href="#h0-5-41" id="h0-5-41" class="d">-        assert(dest[target] &lt; (right - left));
+</a><a href="#h0-5-42" id="h0-5-42" class="d">-        swap(left[dest[target]++], *p);
+</a><a href="#h0-5-43" id="h0-5-43" class="d">-    }
+</a><a href="#h0-5-44" id="h0-5-44" class="d">-    for (int i = 1; i &lt; 256; i++) {
+</a><a href="#h0-5-45" id="h0-5-45" class="d">-        uint32_t *r = (i == 255) ? right : left + counts[i+1];
+</a><a href="#h0-5-46" id="h0-5-46" class="d">-        radix_sort(left + counts[i], r, level + 1);
+</a><a href="#h0-5-47" id="h0-5-47" class="d">-    }
+</a><a href="#h0-5-48" id="h0-5-48" class="d">-}
+</a> 
+ void chunk::finalize() {
+     if (FLAGS_index) {
+<b>diff --git a/<a id="h1" href="../file/radix_sort.h">radix_sort.h</a> b/<a href="../file/radix_sort.h">radix_sort.h</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -0,0 +1,46 @@
+</a><a href="#h1-0-0" id="h1-0-0" class="i">+#ifndef CODESEARCH_RADIX_SORT_H
+</a><a href="#h1-0-1" id="h1-0-1" class="i">+#define CODESEARCH_RADIX_SORT_H
+</a><a href="#h1-0-2" id="h1-0-2" class="i">+
+</a><a href="#h1-0-3" id="h1-0-3" class="i">+#include &lt;algorithm&gt;
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+const size_t kRadixCutoff = 128;
+</a><a href="#h1-0-6" id="h1-0-6" class="i">+
+</a><a href="#h1-0-7" id="h1-0-7" class="i">+template &lt;typename Index, typename Compare&gt;
+</a><a href="#h1-0-8" id="h1-0-8" class="i">+void radix_sort(uint32_t *left, uint32_t *right, int level,
+</a><a href="#h1-0-9" id="h1-0-9" class="i">+                              Index index, Compare cmp) {
+</a><a href="#h1-0-10" id="h1-0-10" class="i">+    if (right - left &lt; kRadixCutoff) {
+</a><a href="#h1-0-11" id="h1-0-11" class="i">+        std::sort(left, right, cmp);
+</a><a href="#h1-0-12" id="h1-0-12" class="i">+        return;
+</a><a href="#h1-0-13" id="h1-0-13" class="i">+    }
+</a><a href="#h1-0-14" id="h1-0-14" class="i">+    unsigned counts[256] = {};
+</a><a href="#h1-0-15" id="h1-0-15" class="i">+    unsigned dest[256];
+</a><a href="#h1-0-16" id="h1-0-16" class="i">+    uint32_t *p;
+</a><a href="#h1-0-17" id="h1-0-17" class="i">+    for (p = left; p != right; p++)
+</a><a href="#h1-0-18" id="h1-0-18" class="i">+        counts[index(*p, level)]++;
+</a><a href="#h1-0-19" id="h1-0-19" class="i">+    for (int i = 0, total = 0; i &lt; 256; i++) {
+</a><a href="#h1-0-20" id="h1-0-20" class="i">+        int tmp = counts[i];
+</a><a href="#h1-0-21" id="h1-0-21" class="i">+        counts[i] = total;
+</a><a href="#h1-0-22" id="h1-0-22" class="i">+        total += tmp;
+</a><a href="#h1-0-23" id="h1-0-23" class="i">+    }
+</a><a href="#h1-0-24" id="h1-0-24" class="i">+    memcpy(dest, counts, sizeof counts);
+</a><a href="#h1-0-25" id="h1-0-25" class="i">+    int this_chunk;
+</a><a href="#h1-0-26" id="h1-0-26" class="i">+    for (p = left, this_chunk = 0; this_chunk &lt; 255;) {
+</a><a href="#h1-0-27" id="h1-0-27" class="i">+        if (p - left == counts[this_chunk + 1]) {
+</a><a href="#h1-0-28" id="h1-0-28" class="i">+            this_chunk++;
+</a><a href="#h1-0-29" id="h1-0-29" class="i">+            continue;
+</a><a href="#h1-0-30" id="h1-0-30" class="i">+        }
+</a><a href="#h1-0-31" id="h1-0-31" class="i">+        int target = index(*p, level);
+</a><a href="#h1-0-32" id="h1-0-32" class="i">+        if (target == this_chunk) {
+</a><a href="#h1-0-33" id="h1-0-33" class="i">+            p++;
+</a><a href="#h1-0-34" id="h1-0-34" class="i">+            continue;
+</a><a href="#h1-0-35" id="h1-0-35" class="i">+        }
+</a><a href="#h1-0-36" id="h1-0-36" class="i">+        assert(dest[target] &lt; (right - left));
+</a><a href="#h1-0-37" id="h1-0-37" class="i">+        swap(left[dest[target]++], *p);
+</a><a href="#h1-0-38" id="h1-0-38" class="i">+    }
+</a><a href="#h1-0-39" id="h1-0-39" class="i">+    for (int i = 1; i &lt; 256; i++) {
+</a><a href="#h1-0-40" id="h1-0-40" class="i">+        uint32_t *r = (i == 255) ? right : left + counts[i+1];
+</a><a href="#h1-0-41" id="h1-0-41" class="i">+        radix_sort(left + counts[i], r, level + 1, index, cmp);
+</a><a href="#h1-0-42" id="h1-0-42" class="i">+    }
+</a><a href="#h1-0-43" id="h1-0-43" class="i">+}
+</a><a href="#h1-0-44" id="h1-0-44" class="i">+
+</a><a href="#h1-0-45" id="h1-0-45" class="i">+#endif
+</a></pre>
+</div>
+</body>
+</html>

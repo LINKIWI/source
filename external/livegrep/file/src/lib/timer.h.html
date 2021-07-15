@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>timer.h - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../../../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../../../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../../../log">Log</a> | <a href="../../../files">Files</a> | <a href="../../../refs">Refs</a> | <a href="../../../file/README.md">README</a> | <a href="../../../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<p> timer.h (3914B) (<a href="../../../raw/src/lib/timer.h">raw</a>)</p><hr/><pre id="blob">
+<a href="#l1" class="line" id="l1">      1</a> /********************************************************************
+<a href="#l2" class="line" id="l2">      2</a>  * livegrep -- timer.h
+<a href="#l3" class="line" id="l3">      3</a>  * Copyright (c) 2011-2013 Nelson Elhage
+<a href="#l4" class="line" id="l4">      4</a>  *
+<a href="#l5" class="line" id="l5">      5</a>  * This program is free software. You may use, redistribute, and/or
+<a href="#l6" class="line" id="l6">      6</a>  * modify it under the terms listed in the COPYING file.
+<a href="#l7" class="line" id="l7">      7</a>  ********************************************************************/
+<a href="#l8" class="line" id="l8">      8</a> #ifndef CODESEARCH_TIMER_H
+<a href="#l9" class="line" id="l9">      9</a> #define CODESEARCH_TIMER_H
+<a href="#l10" class="line" id="l10">     10</a> #include &lt;sys/time.h&gt;
+<a href="#l11" class="line" id="l11">     11</a> #include &lt;assert.h&gt;
+<a href="#l12" class="line" id="l12">     12</a> #include &lt;mutex&gt;
+<a href="#l13" class="line" id="l13">     13</a> 
+<a href="#l14" class="line" id="l14">     14</a> static int timeval_subtract (struct timeval *result, struct timeval *x, struct timeval *y);
+<a href="#l15" class="line" id="l15">     15</a> static void timeval_add(struct timeval *res, const struct timeval *x, const struct timeval *y);
+<a href="#l16" class="line" id="l16">     16</a> 
+<a href="#l17" class="line" id="l17">     17</a> class timer {
+<a href="#l18" class="line" id="l18">     18</a> public:
+<a href="#l19" class="line" id="l19">     19</a>     timer(bool startnow = true)
+<a href="#l20" class="line" id="l20">     20</a>         : running_(false), elapsed_({0,0}){
+<a href="#l21" class="line" id="l21">     21</a>         if (startnow)
+<a href="#l22" class="line" id="l22">     22</a>             start();
+<a href="#l23" class="line" id="l23">     23</a>     }
+<a href="#l24" class="line" id="l24">     24</a> 
+<a href="#l25" class="line" id="l25">     25</a>     void start() {
+<a href="#l26" class="line" id="l26">     26</a>         std::unique_lock&lt;std::mutex&gt; locked(lock_);
+<a href="#l27" class="line" id="l27">     27</a>         assert(!running_);
+<a href="#l28" class="line" id="l28">     28</a>         running_ = true;
+<a href="#l29" class="line" id="l29">     29</a>         gettimeofday(&amp;start_, NULL);
+<a href="#l30" class="line" id="l30">     30</a>     }
+<a href="#l31" class="line" id="l31">     31</a> 
+<a href="#l32" class="line" id="l32">     32</a>     void pause() {
+<a href="#l33" class="line" id="l33">     33</a>         std::unique_lock&lt;std::mutex&gt; locked(lock_);
+<a href="#l34" class="line" id="l34">     34</a>         struct timeval now, delta;
+<a href="#l35" class="line" id="l35">     35</a>         assert(running_);
+<a href="#l36" class="line" id="l36">     36</a>         running_ = false;
+<a href="#l37" class="line" id="l37">     37</a>         gettimeofday(&amp;now, NULL);
+<a href="#l38" class="line" id="l38">     38</a>         timeval_subtract(&amp;delta, &amp;now, &amp;start_);
+<a href="#l39" class="line" id="l39">     39</a>         timeval_add(&amp;elapsed_, &amp;delta, &amp;elapsed_);
+<a href="#l40" class="line" id="l40">     40</a>     }
+<a href="#l41" class="line" id="l41">     41</a> 
+<a href="#l42" class="line" id="l42">     42</a>     void reset() {
+<a href="#l43" class="line" id="l43">     43</a>         std::unique_lock&lt;std::mutex&gt; locked(lock_);
+<a href="#l44" class="line" id="l44">     44</a>         running_ = false;
+<a href="#l45" class="line" id="l45">     45</a>         elapsed_ = (struct timeval){0,0};
+<a href="#l46" class="line" id="l46">     46</a>     }
+<a href="#l47" class="line" id="l47">     47</a> 
+<a href="#l48" class="line" id="l48">     48</a>     void add(timer &amp;other) {
+<a href="#l49" class="line" id="l49">     49</a>         std::unique_lock&lt;std::mutex&gt; locked(lock_);
+<a href="#l50" class="line" id="l50">     50</a>         assert(!running_);
+<a href="#l51" class="line" id="l51">     51</a>         struct timeval elapsed = other.elapsed();
+<a href="#l52" class="line" id="l52">     52</a>         timeval_add(&amp;elapsed_, &amp;elapsed_, &amp;elapsed);
+<a href="#l53" class="line" id="l53">     53</a>     }
+<a href="#l54" class="line" id="l54">     54</a> 
+<a href="#l55" class="line" id="l55">     55</a>     bool running() {
+<a href="#l56" class="line" id="l56">     56</a>         std::unique_lock&lt;std::mutex&gt; locked(lock_);
+<a href="#l57" class="line" id="l57">     57</a>         return running_;
+<a href="#l58" class="line" id="l58">     58</a>     }
+<a href="#l59" class="line" id="l59">     59</a> 
+<a href="#l60" class="line" id="l60">     60</a>     struct timeval elapsed() {
+<a href="#l61" class="line" id="l61">     61</a>         std::unique_lock&lt;std::mutex&gt; locked(lock_);
+<a href="#l62" class="line" id="l62">     62</a>         if (running_) {
+<a href="#l63" class="line" id="l63">     63</a>             struct timeval now, delta;
+<a href="#l64" class="line" id="l64">     64</a>             gettimeofday(&amp;now, NULL);
+<a href="#l65" class="line" id="l65">     65</a>             timeval_subtract(&amp;delta, &amp;now, &amp;start_);
+<a href="#l66" class="line" id="l66">     66</a>             timeval_add(&amp;elapsed_, &amp;delta, &amp;elapsed_);
+<a href="#l67" class="line" id="l67">     67</a>             start_ = now;
+<a href="#l68" class="line" id="l68">     68</a>         }
+<a href="#l69" class="line" id="l69">     69</a>         return elapsed_;
+<a href="#l70" class="line" id="l70">     70</a>     }
+<a href="#l71" class="line" id="l71">     71</a> 
+<a href="#l72" class="line" id="l72">     72</a> protected:
+<a href="#l73" class="line" id="l73">     73</a>     bool running_;
+<a href="#l74" class="line" id="l74">     74</a>     struct timeval start_;
+<a href="#l75" class="line" id="l75">     75</a>     struct timeval elapsed_;
+<a href="#l76" class="line" id="l76">     76</a>     std::mutex lock_;
+<a href="#l77" class="line" id="l77">     77</a> 
+<a href="#l78" class="line" id="l78">     78</a>     timer(const timer&amp; rhs);
+<a href="#l79" class="line" id="l79">     79</a>     timer operator=(const timer&amp; rhs);
+<a href="#l80" class="line" id="l80">     80</a> };
+<a href="#l81" class="line" id="l81">     81</a> 
+<a href="#l82" class="line" id="l82">     82</a> 
+<a href="#l83" class="line" id="l83">     83</a> /* Subtract the `struct timeval&#39; values X and Y,
+<a href="#l84" class="line" id="l84">     84</a>    storing the result in RESULT.
+<a href="#l85" class="line" id="l85">     85</a>    Return 1 if the difference is negative, otherwise 0.  */
+<a href="#l86" class="line" id="l86">     86</a> static inline int
+<a href="#l87" class="line" id="l87">     87</a> timeval_subtract (struct timeval *result, struct timeval *x, struct timeval *y)
+<a href="#l88" class="line" id="l88">     88</a> {
+<a href="#l89" class="line" id="l89">     89</a>     /* Perform the carry for the later subtraction by updating y. */
+<a href="#l90" class="line" id="l90">     90</a>     if (x-&gt;tv_usec &lt; y-&gt;tv_usec) {
+<a href="#l91" class="line" id="l91">     91</a>         int nsec = (y-&gt;tv_usec - x-&gt;tv_usec) / 1000000 + 1;
+<a href="#l92" class="line" id="l92">     92</a>         y-&gt;tv_usec -= 1000000 * nsec;
+<a href="#l93" class="line" id="l93">     93</a>         y-&gt;tv_sec += nsec;
+<a href="#l94" class="line" id="l94">     94</a>     }
+<a href="#l95" class="line" id="l95">     95</a>     if (x-&gt;tv_usec - y-&gt;tv_usec &gt; 1000000) {
+<a href="#l96" class="line" id="l96">     96</a>         int nsec = (x-&gt;tv_usec - y-&gt;tv_usec) / 1000000;
+<a href="#l97" class="line" id="l97">     97</a>         y-&gt;tv_usec += 1000000 * nsec;
+<a href="#l98" class="line" id="l98">     98</a>         y-&gt;tv_sec -= nsec;
+<a href="#l99" class="line" id="l99">     99</a>     }
+<a href="#l100" class="line" id="l100">    100</a> 
+<a href="#l101" class="line" id="l101">    101</a>     /* Compute the time remaining to wait.
+<a href="#l102" class="line" id="l102">    102</a>        tv_usec is certainly positive. */
+<a href="#l103" class="line" id="l103">    103</a>     result-&gt;tv_sec = x-&gt;tv_sec - y-&gt;tv_sec;
+<a href="#l104" class="line" id="l104">    104</a>     result-&gt;tv_usec = x-&gt;tv_usec - y-&gt;tv_usec;
+<a href="#l105" class="line" id="l105">    105</a> 
+<a href="#l106" class="line" id="l106">    106</a>     /* Return 1 if result is negative. */
+<a href="#l107" class="line" id="l107">    107</a>     return x-&gt;tv_sec &lt; y-&gt;tv_sec;
+<a href="#l108" class="line" id="l108">    108</a> }
+<a href="#l109" class="line" id="l109">    109</a> 
+<a href="#l110" class="line" id="l110">    110</a> static inline void
+<a href="#l111" class="line" id="l111">    111</a> timeval_add(struct timeval *res, const struct timeval *x,
+<a href="#l112" class="line" id="l112">    112</a>             const struct timeval *y)
+<a href="#l113" class="line" id="l113">    113</a> {
+<a href="#l114" class="line" id="l114">    114</a>     res-&gt;tv_sec = x-&gt;tv_sec + y-&gt;tv_sec;
+<a href="#l115" class="line" id="l115">    115</a>     res-&gt;tv_usec = x-&gt;tv_usec + y-&gt;tv_usec;
+<a href="#l116" class="line" id="l116">    116</a> 
+<a href="#l117" class="line" id="l117">    117</a>     while (res-&gt;tv_usec &gt; 1000000) {
+<a href="#l118" class="line" id="l118">    118</a>         res-&gt;tv_usec -= 1000000;
+<a href="#l119" class="line" id="l119">    119</a>         res-&gt;tv_sec++;
+<a href="#l120" class="line" id="l120">    120</a>     }
+<a href="#l121" class="line" id="l121">    121</a> }
+<a href="#l122" class="line" id="l122">    122</a> 
+<a href="#l123" class="line" id="l123">    123</a> class run_timer {
+<a href="#l124" class="line" id="l124">    124</a> public:
+<a href="#l125" class="line" id="l125">    125</a>     run_timer(timer&amp; timer)
+<a href="#l126" class="line" id="l126">    126</a> #ifndef CODESEARCH_SLOWGTOD
+<a href="#l127" class="line" id="l127">    127</a>         : timer_(timer), local_()
+<a href="#l128" class="line" id="l128">    128</a> #endif
+<a href="#l129" class="line" id="l129">    129</a>     {
+<a href="#l130" class="line" id="l130">    130</a>     }
+<a href="#l131" class="line" id="l131">    131</a>     ~run_timer() {
+<a href="#l132" class="line" id="l132">    132</a> #ifndef CODESEARCH_SLOWGTOD
+<a href="#l133" class="line" id="l133">    133</a>         local_.pause();
+<a href="#l134" class="line" id="l134">    134</a>         timer_.add(local_);
+<a href="#l135" class="line" id="l135">    135</a> #endif
+<a href="#l136" class="line" id="l136">    136</a>     }
+<a href="#l137" class="line" id="l137">    137</a> protected:
+<a href="#l138" class="line" id="l138">    138</a> #ifndef CODESEARCH_SLOWGTOD
+<a href="#l139" class="line" id="l139">    139</a>     timer &amp;timer_;
+<a href="#l140" class="line" id="l140">    140</a>     timer local_;
+<a href="#l141" class="line" id="l141">    141</a> #endif
+<a href="#l142" class="line" id="l142">    142</a> };
+<a href="#l143" class="line" id="l143">    143</a> 
+<a href="#l144" class="line" id="l144">    144</a> inline static long timeval_ms(struct timeval tv) {
+<a href="#l145" class="line" id="l145">    145</a>     return tv.tv_sec * 1000 + tv.tv_usec / 1000;
+<a href="#l146" class="line" id="l146">    146</a> }
+<a href="#l147" class="line" id="l147">    147</a> 
+<a href="#l148" class="line" id="l148">    148</a> #endif
+</pre>
+</div>
+</body>
+</html>

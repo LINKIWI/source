@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Revert &quot;Use a shared thread pool across all search servers.&quot; - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/78bacc201e456f4b273a5753c85b3f1c0273b7d0">78bacc201e456f4b273a5753c85b3f1c0273b7d0</a>
+<b>parent</b> <a href="../commit/667f315b6028ca89d7db008fd66b8f81a444cf62">667f315b6028ca89d7db008fd66b8f81a444cf62</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Wed,  7 Mar 2012 22:34:19 -0500
+
+Revert &quot;Use a shared thread pool across all search servers.&quot;
+
+This reverts commit 481a1667756e0d57f6c8c30af68da6851835cbf1.
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">main.cc</a></td><td> | </td><td class="num">14</td><td><span class="i">+++++++</span><span class="d">-------</span></td></tr>
+</table></pre><pre>1 file changed, 7 insertions(+), 7 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/main.cc">main.cc</a> b/<a href="../file/main.cc">main.cc</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -174,7 +174,8 @@ bool parse_input(FILE *out, string in, string&amp; line_re, string&amp; file_re)
+</a> 
+ sem_t interact_sem;
+ 
+<a href="#h0-0-3" id="h0-0-3" class="d">-void interact(code_searcher::search_thread *search, FILE *in, FILE *out) {
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+void interact(code_searcher *cs, FILE *in, FILE *out) {
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+    code_searcher::search_thread search(cs);
+</a>     WidthWalker width;
+ 
+     assert(in != out);
+<a href="#h0-1" id="h0-1" class="h">@@ -243,7 +244,7 @@ void interact(code_searcher::search_thread *search, FILE *in, FILE *out) {
+</a> 
+             {
+                 sem_wait(&amp;interact_sem);
+<a href="#h0-1-3" id="h0-1-3" class="d">-                search-&gt;match(re, file.size() ? &amp;file_re : 0, print_match(out), &amp;stats);
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+                search.match(re, file.size() ? &amp;file_re : 0, print_match(out), &amp;stats);
+</a>                 sem_post(&amp;interact_sem);
+             }
+             elapsed = tm.elapsed();
+<a href="#h0-2" id="h0-2" class="h">@@ -302,7 +303,7 @@ void initialize_search(code_searcher *search, int argc, char **argv) {
+</a> 
+ struct child_state {
+     int fd;
+<a href="#h0-2-3" id="h0-2-3" class="d">-    code_searcher::search_thread *search;
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+    code_searcher *search;
+</a> };
+ 
+ void *handle_client(void *data) {
+<a href="#h0-3" id="h0-3" class="h">@@ -316,7 +317,7 @@ void *handle_client(void *data) {
+</a>     return 0;
+ }
+ 
+<a href="#h0-3-3" id="h0-3-3" class="d">-void listen(code_searcher::search_thread *search, string path) {
+</a><a href="#h0-3-4" id="h0-3-4" class="i">+void listen(code_searcher *search, string path) {
+</a>     int server = socket(AF_UNIX, SOCK_STREAM, 0);
+     if (server &lt; 0)
+         die_errno(&quot;socket(AF_UNIX)&quot;);
+<a href="#h0-4" id="h0-4" class="h">@@ -354,7 +355,6 @@ int main(int argc, char **argv) {
+</a>     prctl(PR_SET_PDEATHSIG, SIGINT);
+ 
+     code_searcher counter;
+<a href="#h0-4-3" id="h0-4-3" class="d">-    code_searcher::search_thread thread(&amp;counter);
+</a> 
+     signal(SIGPIPE, SIG_IGN);
+ 
+<a href="#h0-5" id="h0-5" class="h">@@ -365,9 +365,9 @@ int main(int argc, char **argv) {
+</a> 
+ 
+     if (FLAGS_listen.size())
+<a href="#h0-5-3" id="h0-5-3" class="d">-        listen(&amp;thread, FLAGS_listen);
+</a><a href="#h0-5-4" id="h0-5-4" class="i">+        listen(&amp;counter, FLAGS_listen);
+</a>     else
+<a href="#h0-5-6" id="h0-5-6" class="d">-        interact(&amp;thread, stdin, stdout);
+</a><a href="#h0-5-7" id="h0-5-7" class="i">+        interact(&amp;counter, stdin, stdout);
+</a> 
+     return 0;
+ }
+</pre>
+</div>
+</body>
+</html>

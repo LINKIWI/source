@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Refactor dumping into some more helpers. - livegrep - Fast, regular expression code search service</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="../../"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/38c111ba98b0f706a3fa2774b9a19b632c17dfcd">38c111ba98b0f706a3fa2774b9a19b632c17dfcd</a>
+<b>parent</b> <a href="../commit/205da483b99391f8ba934c3b30fd72792e214e08">205da483b99391f8ba934c3b30fd72792e214e08</a>
+<b>Author:</b> Nelson Elhage &lt;<a href="mailto:nelhage@nelhage.com">nelhage@nelhage.com</a>&gt;
+<b>Date:</b>   Tue, 29 May 2012 21:12:11 -0400
+
+Refactor dumping into some more helpers.
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">dump_load.cc</a></td><td> | </td><td class="num">36</td><td><span class="i">++++++++++++++++++++++++</span><span class="d">------------</span></td></tr>
+</table></pre><pre>1 file changed, 24 insertions(+), 12 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/dump_load.cc">dump_load.cc</a> b/<a href="../file/dump_load.cc">dump_load.cc</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -36,7 +36,9 @@ struct chunk_header {
+</a> class codesearch_index {
+ public:
+     codesearch_index(code_searcher *cs, string path, bool dump) :
+<a href="#h0-0-3" id="h0-0-3" class="d">-        cs_(cs), stream_(path.c_str(), dump ? (ios::out | ios::trunc) : ios::in) {
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+        cs_(cs),
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+        stream_(path.c_str(), dump ? (ios::out | ios::trunc) : ios::in),
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+        hdr_() {
+</a>         assert(!stream_.fail());
+         fd_ = open(path.c_str(), dump ? O_WRONLY|O_APPEND : O_RDONLY);
+         assert(fd_ &gt; 0);
+<a href="#h0-1" id="h0-1" class="h">@@ -45,6 +47,8 @@ public:
+</a>     void dump();
+     void load();
+ protected:
+<a href="#h0-1-3" id="h0-1-3" class="i">+    void dump_chunk_data();
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+    void dump_metadata();
+</a>     void dump_file(search_file *);
+     void dump_file_contents(search_file *);
+     void dump_chunk_file(chunk_file *cf);
+<a href="#h0-2" id="h0-2" class="h">@@ -104,6 +108,7 @@ protected:
+</a>     std::fstream stream_;
+     int fd_;
+ 
+<a href="#h0-2-3" id="h0-2-3" class="i">+    index_header hdr_;
+</a>     map&lt;chunk*, int&gt; chunk_ids_;
+     vector&lt;chunk*&gt; chunks_;
+ };
+<a href="#h0-3" id="h0-3" class="h">@@ -157,20 +162,13 @@ void codesearch_index::dump_file_contents(search_file *sf) {
+</a>     }
+ }
+ 
+<a href="#h0-3-3" id="h0-3-3" class="d">-void codesearch_index::dump() {
+</a><a href="#h0-3-4" id="h0-3-4" class="d">-    assert(cs_-&gt;finalized_);
+</a><a href="#h0-3-5" id="h0-3-5" class="d">-    index_header hdr = {};
+</a><a href="#h0-3-6" id="h0-3-6" class="d">-    hdr.magic   = kIndexMagic;
+</a><a href="#h0-3-7" id="h0-3-7" class="d">-    hdr.version = kIndexVersion;
+</a><a href="#h0-3-8" id="h0-3-8" class="d">-    hdr.chunk_size = kChunkSize;
+</a><a href="#h0-3-9" id="h0-3-9" class="i">+void codesearch_index::dump_metadata() {
+</a><a href="#h0-3-10" id="h0-3-10" class="i">+    hdr_.metadata_off = stream_.tellp();
+</a> 
+     metadata_header meta;
+     meta.nrefs   = cs_-&gt;refs_.size();
+     meta.nfiles  = cs_-&gt;files_.size();
+     meta.nchunks = cs_-&gt;alloc_-&gt;size();
+<a href="#h0-3-16" id="h0-3-16" class="d">-
+</a><a href="#h0-3-17" id="h0-3-17" class="d">-    dump(&amp;hdr);
+</a><a href="#h0-3-18" id="h0-3-18" class="d">-    hdr.metadata_off = stream_.tellp();
+</a>     dump(&amp;meta);
+ 
+     for (vector&lt;const char*&gt;::iterator it = cs_-&gt;refs_.begin();
+<a href="#h0-4" id="h0-4" class="h">@@ -195,16 +193,30 @@ void codesearch_index::dump() {
+</a>          it != cs_-&gt;files_.end(); ++it) {
+         dump_file_contents(*it);
+     }
+<a href="#h0-4-3" id="h0-4-3" class="i">+}
+</a> 
+<a href="#h0-4-5" id="h0-4-5" class="i">+void codesearch_index::dump_chunk_data() {
+</a>     alignp(kPageSize);
+<a href="#h0-4-7" id="h0-4-7" class="d">-    hdr.chunks_off = stream_.tellp();
+</a><a href="#h0-4-8" id="h0-4-8" class="i">+    hdr_.chunks_off = stream_.tellp();
+</a>     for (list&lt;chunk*&gt;::iterator it = cs_-&gt;alloc_-&gt;begin();
+          it != cs_-&gt;alloc_-&gt;end(); ++it) {
+         dump_chunk_data(*it);
+     }
+<a href="#h0-4-13" id="h0-4-13" class="i">+}
+</a><a href="#h0-4-14" id="h0-4-14" class="i">+
+</a><a href="#h0-4-15" id="h0-4-15" class="i">+void codesearch_index::dump() {
+</a><a href="#h0-4-16" id="h0-4-16" class="i">+    assert(cs_-&gt;finalized_);
+</a><a href="#h0-4-17" id="h0-4-17" class="i">+    hdr_.magic      = kIndexMagic;
+</a><a href="#h0-4-18" id="h0-4-18" class="i">+    hdr_.version    = kIndexVersion;
+</a><a href="#h0-4-19" id="h0-4-19" class="i">+    hdr_.chunk_size = kChunkSize;
+</a><a href="#h0-4-20" id="h0-4-20" class="i">+
+</a><a href="#h0-4-21" id="h0-4-21" class="i">+    dump(&amp;hdr_);
+</a><a href="#h0-4-22" id="h0-4-22" class="i">+
+</a><a href="#h0-4-23" id="h0-4-23" class="i">+    dump_metadata();
+</a><a href="#h0-4-24" id="h0-4-24" class="i">+    dump_chunk_data();
+</a> 
+     stream_.seekp(0);
+<a href="#h0-4-27" id="h0-4-27" class="d">-    dump(&amp;hdr);
+</a><a href="#h0-4-28" id="h0-4-28" class="i">+    dump(&amp;hdr_);
+</a> }
+ 
+ search_file *codesearch_index::load_file() {
+</pre>
+</div>
+</body>
+</html>
