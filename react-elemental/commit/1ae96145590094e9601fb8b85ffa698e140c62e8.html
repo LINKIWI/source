@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>a11y-friendly SelectList; respects some keyboard events - react-elemental - Flat React UI component library</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="react-elemental Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="react-elemental Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>react-elemental</h1><span class="desc">Flat React UI component library</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/react-elemental.git">https://source.static.kevinlin.info/react-elemental.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/LICENSE">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/1ae96145590094e9601fb8b85ffa698e140c62e8">1ae96145590094e9601fb8b85ffa698e140c62e8</a>
+<b>parent</b> <a href="../commit/b92202d58bcf43c2fd1e1d85cacb4f8c07c3a571">b92202d58bcf43c2fd1e1d85cacb4f8c07c3a571</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sat,  5 Aug 2017 19:28:36 -0700
+
+a11y-friendly SelectList; respects some keyboard events
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">src/components/select-list/index.js</a></td><td> | </td><td class="num">132</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">--------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">src/components/select-list/select-list-item.js</a></td><td> | </td><td class="num">9</td><td><span class="i">+++++++</span><span class="d">--</span></td></tr>
+</table></pre><pre>2 files changed, 127 insertions(+), 14 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/src/components/select-list/index.js">src/components/select-list/index.js</a> b/<a href="../file/src/components/select-list/index.js">src/components/select-list/index.js</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -11,6 +11,24 @@ const noop = () =&gt; {};
+</a> // Generic, (hopefully) unique key reserved for the placeholder item in the select list.
+ const PLACEHOLDER_VALUE = &#39;select-list-placeholder-item-value&#39;;
+ 
+<a href="#h0-0-3" id="h0-0-3" class="i">+// Mapping of keys to event key codes.
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+const KEY_CODES = {
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+  SPACE: 32,
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+  ENTER: 13,
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+  ESC: 27,
+</a><a href="#h0-0-8" id="h0-0-8" class="i">+  UP: 38,
+</a><a href="#h0-0-9" id="h0-0-9" class="i">+  DOWN: 40,
+</a><a href="#h0-0-10" id="h0-0-10" class="i">+};
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+
+</a><a href="#h0-0-12" id="h0-0-12" class="i">+/**
+</a><a href="#h0-0-13" id="h0-0-13" class="i">+ * Some cleverness is required to make Javascript&#39;s modulo operator return a nonnegative number for
+</a><a href="#h0-0-14" id="h0-0-14" class="i">+ * modulo operations on negative integers.
+</a><a href="#h0-0-15" id="h0-0-15" class="i">+ *
+</a><a href="#h0-0-16" id="h0-0-16" class="i">+ * @param {number} num Number for which a modulo operation should be performed.
+</a><a href="#h0-0-17" id="h0-0-17" class="i">+ * @param {number} modulus Modulus integer.
+</a><a href="#h0-0-18" id="h0-0-18" class="i">+ */
+</a><a href="#h0-0-19" id="h0-0-19" class="i">+const modulo = (num, modulus) =&gt; ((num % modulus) + modulus) % modulus;
+</a><a href="#h0-0-20" id="h0-0-20" class="i">+
+</a> /**
+  * Dropdown menu component.
+  */
+<a href="#h0-1" id="h0-1" class="h">@@ -52,10 +70,12 @@ export default class SelectList extends Component {
+</a> 
+     this.state = {
+       isExpanded: false,
+<a href="#h0-1-3" id="h0-1-3" class="i">+      isFocused: false,
+</a>       selectedOption: {
+         label: placeholder,
+         value: PLACEHOLDER_VALUE,
+       },
+<a href="#h0-1-8" id="h0-1-8" class="i">+      highlightedIdx: null,
+</a>     };
+   }
+ 
+<a href="#h0-2" id="h0-2" class="h">@@ -65,11 +85,82 @@ export default class SelectList extends Component {
+</a>     this.toggleExpand();
+   };
+ 
+<a href="#h0-2-3" id="h0-2-3" class="i">+  handleFocus = () =&gt; this.setState({ isFocused: true });
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+
+</a><a href="#h0-2-5" id="h0-2-5" class="i">+  // The dropdown will be blurred on any mouse event that isn&#39;t on the select item placeholder.
+</a><a href="#h0-2-6" id="h0-2-6" class="i">+  // In order to allow the onClick event of the dropdown items to fire before triggering normal
+</a><a href="#h0-2-7" id="h0-2-7" class="i">+  // onBlur behavior, we will delay the standard blur behavior.
+</a><a href="#h0-2-8" id="h0-2-8" class="i">+  handleBlur = () =&gt; setTimeout(() =&gt; {
+</a><a href="#h0-2-9" id="h0-2-9" class="i">+    this.setState({
+</a><a href="#h0-2-10" id="h0-2-10" class="i">+      isExpanded: false,
+</a><a href="#h0-2-11" id="h0-2-11" class="i">+      isFocused: false,
+</a><a href="#h0-2-12" id="h0-2-12" class="i">+      highlightedIdx: null,
+</a><a href="#h0-2-13" id="h0-2-13" class="i">+    });
+</a><a href="#h0-2-14" id="h0-2-14" class="i">+  }, 50);
+</a><a href="#h0-2-15" id="h0-2-15" class="i">+
+</a><a href="#h0-2-16" id="h0-2-16" class="i">+  handleKeyDown = (evt) =&gt; {
+</a><a href="#h0-2-17" id="h0-2-17" class="i">+    const { keyCode } = evt;
+</a><a href="#h0-2-18" id="h0-2-18" class="i">+    const { options } = this.props;
+</a><a href="#h0-2-19" id="h0-2-19" class="i">+
+</a><a href="#h0-2-20" id="h0-2-20" class="i">+    const selectHandler = () =&gt; {
+</a><a href="#h0-2-21" id="h0-2-21" class="i">+      const { highlightedIdx } = this.state;
+</a><a href="#h0-2-22" id="h0-2-22" class="i">+
+</a><a href="#h0-2-23" id="h0-2-23" class="i">+      if (highlightedIdx !== null) {
+</a><a href="#h0-2-24" id="h0-2-24" class="i">+        return this.onChange(options[modulo(highlightedIdx, options.length)])();
+</a><a href="#h0-2-25" id="h0-2-25" class="i">+      }
+</a><a href="#h0-2-26" id="h0-2-26" class="i">+
+</a><a href="#h0-2-27" id="h0-2-27" class="i">+      return this.toggleExpand();
+</a><a href="#h0-2-28" id="h0-2-28" class="i">+    };
+</a><a href="#h0-2-29" id="h0-2-29" class="i">+
+</a><a href="#h0-2-30" id="h0-2-30" class="i">+    const escapeHandler = () =&gt; this.handleBlur();
+</a><a href="#h0-2-31" id="h0-2-31" class="i">+
+</a><a href="#h0-2-32" id="h0-2-32" class="i">+    const upHandler = () =&gt; this.setState(({ highlightedIdx }) =&gt; ({
+</a><a href="#h0-2-33" id="h0-2-33" class="i">+      isExpanded: true,
+</a><a href="#h0-2-34" id="h0-2-34" class="i">+      highlightedIdx: highlightedIdx === null ? -1 : highlightedIdx - 1,
+</a><a href="#h0-2-35" id="h0-2-35" class="i">+    }));
+</a><a href="#h0-2-36" id="h0-2-36" class="i">+
+</a><a href="#h0-2-37" id="h0-2-37" class="i">+    const downHandler = () =&gt; this.setState(({ highlightedIdx }) =&gt; ({
+</a><a href="#h0-2-38" id="h0-2-38" class="i">+      isExpanded: true,
+</a><a href="#h0-2-39" id="h0-2-39" class="i">+      highlightedIdx: highlightedIdx === null ? 0 : highlightedIdx + 1,
+</a><a href="#h0-2-40" id="h0-2-40" class="i">+    }));
+</a><a href="#h0-2-41" id="h0-2-41" class="i">+
+</a><a href="#h0-2-42" id="h0-2-42" class="i">+    const characterSearchHandler = () =&gt; {
+</a><a href="#h0-2-43" id="h0-2-43" class="i">+      const char = String.fromCharCode(keyCode);
+</a><a href="#h0-2-44" id="h0-2-44" class="i">+      const isNonControlCharacter =
+</a><a href="#h0-2-45" id="h0-2-45" class="i">+        // Number keys
+</a><a href="#h0-2-46" id="h0-2-46" class="i">+        (keyCode &gt; 47 &amp;&amp; keyCode &lt; 58) ||
+</a><a href="#h0-2-47" id="h0-2-47" class="i">+        // Alphabetic keys
+</a><a href="#h0-2-48" id="h0-2-48" class="i">+        (keyCode &gt; 64 &amp;&amp; keyCode &lt; 91);
+</a><a href="#h0-2-49" id="h0-2-49" class="i">+      const matchingOptionIdx = options
+</a><a href="#h0-2-50" id="h0-2-50" class="i">+        .findIndex((option) =&gt; option.label.toLowerCase().startsWith(char.toLowerCase()));
+</a><a href="#h0-2-51" id="h0-2-51" class="i">+
+</a><a href="#h0-2-52" id="h0-2-52" class="i">+      // Don&#39;t attempt to perform a character search on pressed control characters
+</a><a href="#h0-2-53" id="h0-2-53" class="i">+      if (!isNonControlCharacter) {
+</a><a href="#h0-2-54" id="h0-2-54" class="i">+        return null;
+</a><a href="#h0-2-55" id="h0-2-55" class="i">+      }
+</a><a href="#h0-2-56" id="h0-2-56" class="i">+
+</a><a href="#h0-2-57" id="h0-2-57" class="i">+      return this.setState(({ highlightedIdx }) =&gt; ({
+</a><a href="#h0-2-58" id="h0-2-58" class="i">+        isExpanded: true,
+</a><a href="#h0-2-59" id="h0-2-59" class="i">+        highlightedIdx: (matchingOptionIdx &gt;= 0) ? matchingOptionIdx : highlightedIdx,
+</a><a href="#h0-2-60" id="h0-2-60" class="i">+      }));
+</a><a href="#h0-2-61" id="h0-2-61" class="i">+    };
+</a><a href="#h0-2-62" id="h0-2-62" class="i">+
+</a><a href="#h0-2-63" id="h0-2-63" class="i">+    const keyHandlers = {
+</a><a href="#h0-2-64" id="h0-2-64" class="i">+      [KEY_CODES.SPACE]: selectHandler,
+</a><a href="#h0-2-65" id="h0-2-65" class="i">+      [KEY_CODES.ENTER]: selectHandler,
+</a><a href="#h0-2-66" id="h0-2-66" class="i">+      [KEY_CODES.ESC]: escapeHandler,
+</a><a href="#h0-2-67" id="h0-2-67" class="i">+      [KEY_CODES.UP]: upHandler,
+</a><a href="#h0-2-68" id="h0-2-68" class="i">+      [KEY_CODES.DOWN]: downHandler,
+</a><a href="#h0-2-69" id="h0-2-69" class="i">+    };
+</a><a href="#h0-2-70" id="h0-2-70" class="i">+
+</a><a href="#h0-2-71" id="h0-2-71" class="i">+    return (keyHandlers[keyCode] || characterSearchHandler)();
+</a><a href="#h0-2-72" id="h0-2-72" class="i">+  };
+</a><a href="#h0-2-73" id="h0-2-73" class="i">+
+</a>   toggleExpand = () =&gt; this.setState(({ isExpanded }) =&gt; ({ isExpanded: !isExpanded }));
+ 
+   render() {
+     const { label, sublabel, options, width, height, error, style: overrides } = this.props;
+<a href="#h0-2-78" id="h0-2-78" class="d">-    const { isExpanded, selectedOption } = this.state;
+</a><a href="#h0-2-79" id="h0-2-79" class="i">+    const { isExpanded, isFocused, selectedOption, highlightedIdx } = this.state;
+</a> 
+     const dropdownElementsStyle = {
+       position: &#39;absolute&#39;,
+<a href="#h0-3" id="h0-3" class="h">@@ -81,17 +172,24 @@ export default class SelectList extends Component {
+</a>       },
+     };
+ 
+<a href="#h0-3-3" id="h0-3-3" class="d">-    const dropdownElements = options.map((option) =&gt; (
+</a><a href="#h0-3-4" id="h0-3-4" class="d">-      &lt;SelectListItem
+</a><a href="#h0-3-5" id="h0-3-5" class="d">-        key={option.value}
+</a><a href="#h0-3-6" id="h0-3-6" class="d">-        label={option.label}
+</a><a href="#h0-3-7" id="h0-3-7" class="d">-        width={width}
+</a><a href="#h0-3-8" id="h0-3-8" class="d">-        onClick={this.onChange(option)}
+</a><a href="#h0-3-9" id="h0-3-9" class="d">-      /&gt;
+</a><a href="#h0-3-10" id="h0-3-10" class="d">-    ));
+</a><a href="#h0-3-11" id="h0-3-11" class="i">+    const outlineColor = (() =&gt; {
+</a><a href="#h0-3-12" id="h0-3-12" class="i">+      if (isExpanded) {
+</a><a href="#h0-3-13" id="h0-3-13" class="i">+        return colors.primary;
+</a><a href="#h0-3-14" id="h0-3-14" class="i">+      }
+</a><a href="#h0-3-15" id="h0-3-15" class="i">+      if (isFocused) {
+</a><a href="#h0-3-16" id="h0-3-16" class="i">+        return colors.gray35;
+</a><a href="#h0-3-17" id="h0-3-17" class="i">+      }
+</a><a href="#h0-3-18" id="h0-3-18" class="i">+      return colors.gray10;
+</a><a href="#h0-3-19" id="h0-3-19" class="i">+    })();
+</a> 
+     return (
+<a href="#h0-3-22" id="h0-3-22" class="d">-      &lt;div style={overrides}&gt;
+</a><a href="#h0-3-23" id="h0-3-23" class="i">+      &lt;div
+</a><a href="#h0-3-24" id="h0-3-24" class="i">+        onKeyDown={this.handleKeyDown}
+</a><a href="#h0-3-25" id="h0-3-25" class="i">+        onFocus={this.handleFocus}
+</a><a href="#h0-3-26" id="h0-3-26" class="i">+        onBlur={this.handleBlur}
+</a><a href="#h0-3-27" id="h0-3-27" class="i">+        tabIndex={0}
+</a><a href="#h0-3-28" id="h0-3-28" class="i">+        style={overrides}
+</a><a href="#h0-3-29" id="h0-3-29" class="i">+      &gt;
+</a>         {
+           (label || sublabel) &amp;&amp; (
+             &lt;Spacing size=&quot;tiny&quot; bottom&gt;
+<a href="#h0-4" id="h0-4" class="h">@@ -115,17 +213,27 @@ export default class SelectList extends Component {
+</a> 
+         &lt;SelectListPlaceholder
+           label={selectedOption.label}
+<a href="#h0-4-3" id="h0-4-3" class="i">+          color={outlineColor}
+</a>           arrowDirection={isExpanded ? &#39;up&#39; : &#39;down&#39;}
+           width={width}
+           error={error}
+           onClick={this.onChange(selectedOption)}
+<a href="#h0-4-8" id="h0-4-8" class="d">-          {...isExpanded &amp;&amp; { color: colors.primary }}
+</a>         /&gt;
+ 
+         {
+           isExpanded &amp;&amp; (
+             &lt;div style={dropdownElementsStyle}&gt;
+<a href="#h0-4-14" id="h0-4-14" class="d">-              {dropdownElements}
+</a><a href="#h0-4-15" id="h0-4-15" class="i">+              {options.map((option, idx) =&gt; (
+</a><a href="#h0-4-16" id="h0-4-16" class="i">+                &lt;SelectListItem
+</a><a href="#h0-4-17" id="h0-4-17" class="i">+                  key={option.value}
+</a><a href="#h0-4-18" id="h0-4-18" class="i">+                  label={option.label}
+</a><a href="#h0-4-19" id="h0-4-19" class="i">+                  width={width}
+</a><a href="#h0-4-20" id="h0-4-20" class="i">+                  isSelected={
+</a><a href="#h0-4-21" id="h0-4-21" class="i">+                    (highlightedIdx !== null) &amp;&amp; modulo(highlightedIdx, options.length) === idx
+</a><a href="#h0-4-22" id="h0-4-22" class="i">+                  }
+</a><a href="#h0-4-23" id="h0-4-23" class="i">+                  onClick={this.onChange(option)}
+</a><a href="#h0-4-24" id="h0-4-24" class="i">+                /&gt;
+</a><a href="#h0-4-25" id="h0-4-25" class="i">+              ))}
+</a>             &lt;/div&gt;
+           )
+         }
+<b>diff --git a/<a id="h1" href="../file/src/components/select-list/select-list-item.js">src/components/select-list/select-list-item.js</a> b/<a href="../file/src/components/select-list/select-list-item.js">src/components/select-list/select-list-item.js</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -11,9 +11,14 @@ export default class SelectListItem extends Component {
+</a>   static propTypes = {
+     label: PropTypes.string.isRequired,
+     width: PropTypes.number.isRequired,
+<a href="#h1-0-3" id="h1-0-3" class="i">+    isSelected: PropTypes.bool,
+</a>     onClick: PropTypes.func.isRequired,
+   };
+ 
+<a href="#h1-0-7" id="h1-0-7" class="i">+  static defaultProps = {
+</a><a href="#h1-0-8" id="h1-0-8" class="i">+    isSelected: false,
+</a><a href="#h1-0-9" id="h1-0-9" class="i">+  };
+</a><a href="#h1-0-10" id="h1-0-10" class="i">+
+</a>   state = {
+     isHover: false,
+   };
+<a href="#h1-1" id="h1-1" class="h">@@ -21,11 +26,11 @@ export default class SelectListItem extends Component {
+</a>   handleHoverStateChange = (isHover) =&gt; () =&gt; this.setState({ isHover });
+ 
+   render() {
+<a href="#h1-1-3" id="h1-1-3" class="d">-    const { label, width, onClick } = this.props;
+</a><a href="#h1-1-4" id="h1-1-4" class="i">+    const { label, width, isSelected, onClick } = this.props;
+</a>     const { isHover } = this.state;
+ 
+     const style = {
+<a href="#h1-1-8" id="h1-1-8" class="d">-      backgroundColor: isHover ? colors.primaryLight : &#39;white&#39;,
+</a><a href="#h1-1-9" id="h1-1-9" class="i">+      backgroundColor: (isHover || isSelected) ? colors.primaryLight : &#39;white&#39;,
+</a>       border: `1px solid ${colors.gray10}`,
+       borderTop: &#39;none&#39;,
+       cursor: &#39;pointer&#39;,
+</pre>
+</div>
+</body>
+</html>
