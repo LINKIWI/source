@@ -125,7 +125,7 @@ pre a.d:hover {
 <a href="../../../../log">Log</a> | <a href="../../../../files">Files</a> | <a href="../../../../refs">Refs</a> | <a href="../../../../file/README.md">README</a> | <a href="../../../../file/COPYING">LICENSE</a></td></tr></table>
 <hr/>
 <div id="content">
-<p> defs.bzl (30991B) (<a href="../../../../raw/tools/org_dropbox_rules_node/node/defs.bzl">raw</a>)</p><hr/><pre id="blob">
+<p> defs.bzl (31731B) (<a href="../../../../raw/tools/org_dropbox_rules_node/node/defs.bzl">raw</a>)</p><hr/><pre id="blob">
 <a href="#l1" class="line" id="l1">      1</a> &quot;&quot;&quot;Node Rules
 <a href="#l2" class="line" id="l2">      2</a> 
 <a href="#l3" class="line" id="l3">      3</a> Bazel rules for working with node.
@@ -1055,16 +1055,43 @@ pre a.d:hover {
 <a href="#l927" class="line" id="l927">    927</a> )
 <a href="#l928" class="line" id="l928">    928</a> &quot;&quot;&quot;
 <a href="#l929" class="line" id="l929">    929</a> 
-<a href="#l930" class="line" id="l930">    930</a> def node_repositories(omit_nodejs = False):
-<a href="#l931" class="line" id="l931">    931</a>     if not omit_nodejs:
-<a href="#l932" class="line" id="l932">    932</a>         http_archive(
-<a href="#l933" class="line" id="l933">    933</a>             name = &quot;nodejs&quot;,
-<a href="#l934" class="line" id="l934">    934</a>             build_file_content = NODEJS_BUILD_FILE_CONTENT,
-<a href="#l935" class="line" id="l935">    935</a>             sha256 = &quot;e68cc956f0ca5c54e7f3016d639baf987f6f9de688bb7b31339ab7561af88f41&quot;,
-<a href="#l936" class="line" id="l936">    936</a>             strip_prefix = &quot;node-v6.11.1-linux-x64&quot;,
-<a href="#l937" class="line" id="l937">    937</a>             type = &quot;tar.xz&quot;,
-<a href="#l938" class="line" id="l938">    938</a>             url = &quot;https://nodejs.org/dist/v6.11.1/node-v6.11.1-linux-x64.tar.xz&quot;,
-<a href="#l939" class="line" id="l939">    939</a>         )
+<a href="#l930" class="line" id="l930">    930</a> def _nodejs_dist_impl(repository_ctx):
+<a href="#l931" class="line" id="l931">    931</a>     version = repository_ctx.attr.version
+<a href="#l932" class="line" id="l932">    932</a>     if repository_ctx.os.name == &quot;mac os x&quot;:
+<a href="#l933" class="line" id="l933">    933</a>         sha256 = repository_ctx.attr.sha256[&quot;darwin&quot;]
+<a href="#l934" class="line" id="l934">    934</a>         platform = &quot;darwin-x64&quot;
+<a href="#l935" class="line" id="l935">    935</a>     else:
+<a href="#l936" class="line" id="l936">    936</a>         sha256 = repository_ctx.attr.sha256[&quot;linux&quot;]
+<a href="#l937" class="line" id="l937">    937</a>         platform = &quot;linux-x64&quot;
+<a href="#l938" class="line" id="l938">    938</a> 
+<a href="#l939" class="line" id="l939">    939</a>     url = &quot;https://nodejs.org/dist/v%s/node-v%s-%s.tar.xz&quot; % (version, version, platform)
+<a href="#l940" class="line" id="l940">    940</a>     strip_prefix = &quot;node-v%s-%s&quot; % (version, platform)
+<a href="#l941" class="line" id="l941">    941</a> 
+<a href="#l942" class="line" id="l942">    942</a>     repository_ctx.download_and_extract(
+<a href="#l943" class="line" id="l943">    943</a>         url = url,
+<a href="#l944" class="line" id="l944">    944</a>         stripPrefix = strip_prefix,
+<a href="#l945" class="line" id="l945">    945</a>         sha256 = sha256,
+<a href="#l946" class="line" id="l946">    946</a>     )
+<a href="#l947" class="line" id="l947">    947</a>     repository_ctx.file(&quot;BUILD&quot;, content = NODEJS_BUILD_FILE_CONTENT)
+<a href="#l948" class="line" id="l948">    948</a> 
+<a href="#l949" class="line" id="l949">    949</a> _nodejs_dist = repository_rule(
+<a href="#l950" class="line" id="l950">    950</a>     _nodejs_dist_impl,
+<a href="#l951" class="line" id="l951">    951</a>     attrs = {
+<a href="#l952" class="line" id="l952">    952</a>         &quot;version&quot;: attr.string(default = &quot;6.11.1&quot;),
+<a href="#l953" class="line" id="l953">    953</a>         &quot;sha256&quot;: attr.string_dict(
+<a href="#l954" class="line" id="l954">    954</a>             default = {
+<a href="#l955" class="line" id="l955">    955</a>                 &quot;linux&quot;: &quot;e68cc956f0ca5c54e7f3016d639baf987f6f9de688bb7b31339ab7561af88f41&quot;,
+<a href="#l956" class="line" id="l956">    956</a>                 &quot;darwin&quot;: &quot;60521df5c436552bc09ae68e8399e7e32cf34c36b21f1dd93c4ddfa421ed7ef0&quot;,
+<a href="#l957" class="line" id="l957">    957</a>             },
+<a href="#l958" class="line" id="l958">    958</a>         ),
+<a href="#l959" class="line" id="l959">    959</a>     }
+<a href="#l960" class="line" id="l960">    960</a> )
+<a href="#l961" class="line" id="l961">    961</a> 
+<a href="#l962" class="line" id="l962">    962</a> def node_repositories(omit_nodejs = False):
+<a href="#l963" class="line" id="l963">    963</a>     if not omit_nodejs:
+<a href="#l964" class="line" id="l964">    964</a>         _nodejs_dist(
+<a href="#l965" class="line" id="l965">    965</a>             name = &quot;nodejs&quot;,
+<a href="#l966" class="line" id="l966">    966</a>         )
 </pre>
 </div>
 </body>
