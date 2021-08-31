@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>cmd/zero: Manager uptime metrics with service PID tag - zero - Process and socket manager for zero-downtime binary deploys</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="zero Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="zero Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>zero</h1><span class="desc">Process and socket manager for zero-downtime binary deploys</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/zero.git">https://source.static.kevinlin.info/zero.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/e39c4dd835d691f03f9644b42add2e78a6a4a228">e39c4dd835d691f03f9644b42add2e78a6a4a228</a>
+<b>parent</b> <a href="../commit/0fbe07ab1c2efbf3db5a987f631e5920fe25ad2e">0fbe07ab1c2efbf3db5a987f631e5920fe25ad2e</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sun, 30 May 2021 21:58:53 -0700
+
+cmd/zero: Manager uptime metrics with service PID tag
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">cmd/zero/main.go</a></td><td> | </td><td class="num">21</td><td><span class="i">+++++++++++++++++++</span><span class="d">--</span></td></tr>
+</table></pre><pre>1 file changed, 19 insertions(+), 2 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/cmd/zero/main.go">cmd/zero/main.go</a> b/<a href="../file/cmd/zero/main.go">cmd/zero/main.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -188,12 +188,29 @@ func main() {
+</a> 		cfg.Service.Runtime.Args,
+ 	)
+ 
+<a href="#h0-0-3" id="h0-0-3" class="d">-	metrics.Incr(&quot;process.start&quot;, tags)
+</a><a href="#h0-0-4" id="h0-0-4" class="d">-
+</a> 	if err := m.Start(); err != nil {
+ 		panic(err)
+ 	}
+ 
+<a href="#h0-0-9" id="h0-0-9" class="i">+	metrics.Incr(&quot;process.start&quot;, tags)
+</a><a href="#h0-0-10" id="h0-0-10" class="i">+
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+	go func() {
+</a><a href="#h0-0-12" id="h0-0-12" class="i">+		uptime := lib.NewStopwatch()
+</a><a href="#h0-0-13" id="h0-0-13" class="i">+		tags := map[string]interface{}{
+</a><a href="#h0-0-14" id="h0-0-14" class="i">+			&quot;name&quot;: cfg.Service.Runtime.Name,
+</a><a href="#h0-0-15" id="h0-0-15" class="i">+			&quot;path&quot;: cfg.Service.Runtime.Path,
+</a><a href="#h0-0-16" id="h0-0-16" class="i">+		}
+</a><a href="#h0-0-17" id="h0-0-17" class="i">+
+</a><a href="#h0-0-18" id="h0-0-18" class="i">+		for {
+</a><a href="#h0-0-19" id="h0-0-19" class="i">+			if process, err := m.Process(); err == nil {
+</a><a href="#h0-0-20" id="h0-0-20" class="i">+				tags[&quot;pid&quot;] = process.Pid
+</a><a href="#h0-0-21" id="h0-0-21" class="i">+				metrics.Gauge(&quot;manager.uptime&quot;, uptime.Elapsed().Seconds(), tags)
+</a><a href="#h0-0-22" id="h0-0-22" class="i">+			}
+</a><a href="#h0-0-23" id="h0-0-23" class="i">+
+</a><a href="#h0-0-24" id="h0-0-24" class="i">+			time.Sleep(10 * time.Second)
+</a><a href="#h0-0-25" id="h0-0-25" class="i">+		}
+</a><a href="#h0-0-26" id="h0-0-26" class="i">+	}()
+</a><a href="#h0-0-27" id="h0-0-27" class="i">+
+</a> 	log.Printf(
+ 		&quot;main: started service process; waiting for reload or shutdown: reload=%v shutdown=%v&quot;,
+ 		cfg.Service.Options.ReloadSignal,
+</pre>
+</div>
+</body>
+</html>

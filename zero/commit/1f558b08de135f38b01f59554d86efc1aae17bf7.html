@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/manager: Initial process manager implementation - zero - Process and socket manager for zero-downtime binary deploys</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="zero Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="zero Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>zero</h1><span class="desc">Process and socket manager for zero-downtime binary deploys</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/zero.git">https://source.static.kevinlin.info/zero.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/1f558b08de135f38b01f59554d86efc1aae17bf7">1f558b08de135f38b01f59554d86efc1aae17bf7</a>
+<b>parent</b> <a href="../commit/3857974d4de16e0fe67861d243e902e204c86c67">3857974d4de16e0fe67861d243e902e204c86c67</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sun, 30 May 2021 15:46:13 -0700
+
+internal/manager: Initial process manager implementation
+
+<b>Diffstat:</b>
+<table><tr><td class="A">A</td><td><a href="#h0">internal/manager/manager.go</a></td><td> | </td><td class="num">194</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+</table></pre><pre>1 file changed, 194 insertions(+), 0 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/manager/manager.go">internal/manager/manager.go</a> b/<a href="../file/internal/manager/manager.go">internal/manager/manager.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -0,0 +1,194 @@
+</a><a href="#h0-0-0" id="h0-0-0" class="i">+package manager
+</a><a href="#h0-0-1" id="h0-0-1" class="i">+
+</a><a href="#h0-0-2" id="h0-0-2" class="i">+import (
+</a><a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;fmt&quot;
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+	&quot;net&quot;
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+	&quot;os&quot;
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+	&quot;os/exec&quot;
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+	&quot;sync&quot;
+</a><a href="#h0-0-8" id="h0-0-8" class="i">+	&quot;time&quot;
+</a><a href="#h0-0-9" id="h0-0-9" class="i">+
+</a><a href="#h0-0-10" id="h0-0-10" class="i">+	&quot;zero/internal/config&quot;
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+)
+</a><a href="#h0-0-12" id="h0-0-12" class="i">+
+</a><a href="#h0-0-13" id="h0-0-13" class="i">+type Manager struct {
+</a><a href="#h0-0-14" id="h0-0-14" class="i">+	cfg config.Service
+</a><a href="#h0-0-15" id="h0-0-15" class="i">+	cmd func() *exec.Cmd
+</a><a href="#h0-0-16" id="h0-0-16" class="i">+
+</a><a href="#h0-0-17" id="h0-0-17" class="i">+	active *exec.Cmd
+</a><a href="#h0-0-18" id="h0-0-18" class="i">+	mutex  sync.Mutex
+</a><a href="#h0-0-19" id="h0-0-19" class="i">+}
+</a><a href="#h0-0-20" id="h0-0-20" class="i">+
+</a><a href="#h0-0-21" id="h0-0-21" class="i">+// NewManager creates a new process manager.
+</a><a href="#h0-0-22" id="h0-0-22" class="i">+func NewManager(cfg config.Service) (*Manager, error) {
+</a><a href="#h0-0-23" id="h0-0-23" class="i">+	var env []string
+</a><a href="#h0-0-24" id="h0-0-24" class="i">+	var files []*os.File
+</a><a href="#h0-0-25" id="h0-0-25" class="i">+	var maxFD int
+</a><a href="#h0-0-26" id="h0-0-26" class="i">+
+</a><a href="#h0-0-27" id="h0-0-27" class="i">+	for _, listener := range cfg.Listeners {
+</a><a href="#h0-0-28" id="h0-0-28" class="i">+		if listener.SocketFD &gt; maxFD {
+</a><a href="#h0-0-29" id="h0-0-29" class="i">+			maxFD = listener.SocketFD
+</a><a href="#h0-0-30" id="h0-0-30" class="i">+		}
+</a><a href="#h0-0-31" id="h0-0-31" class="i">+	}
+</a><a href="#h0-0-32" id="h0-0-32" class="i">+
+</a><a href="#h0-0-33" id="h0-0-33" class="i">+	for _, envvar := range cfg.Runtime.Environment {
+</a><a href="#h0-0-34" id="h0-0-34" class="i">+		if envvar.Value != &quot;&quot; {
+</a><a href="#h0-0-35" id="h0-0-35" class="i">+			env = append(env, fmt.Sprintf(&quot;%s=%s&quot;, envvar.Key, envvar.Value))
+</a><a href="#h0-0-36" id="h0-0-36" class="i">+		} else {
+</a><a href="#h0-0-37" id="h0-0-37" class="i">+			env = append(env, fmt.Sprintf(&quot;%s=%s&quot;, envvar.Key, os.Getenv(envvar.Key)))
+</a><a href="#h0-0-38" id="h0-0-38" class="i">+		}
+</a><a href="#h0-0-39" id="h0-0-39" class="i">+	}
+</a><a href="#h0-0-40" id="h0-0-40" class="i">+
+</a><a href="#h0-0-41" id="h0-0-41" class="i">+	files = make([]*os.File, maxFD-2) // FD 1 and 2 are reserved for stdout and stderr
+</a><a href="#h0-0-42" id="h0-0-42" class="i">+
+</a><a href="#h0-0-43" id="h0-0-43" class="i">+	for _, listener := range cfg.Listeners {
+</a><a href="#h0-0-44" id="h0-0-44" class="i">+		var file *os.File
+</a><a href="#h0-0-45" id="h0-0-45" class="i">+
+</a><a href="#h0-0-46" id="h0-0-46" class="i">+		ln, err := listener.Address.Listen()
+</a><a href="#h0-0-47" id="h0-0-47" class="i">+		if err != nil {
+</a><a href="#h0-0-48" id="h0-0-48" class="i">+			return nil, err
+</a><a href="#h0-0-49" id="h0-0-49" class="i">+		}
+</a><a href="#h0-0-50" id="h0-0-50" class="i">+
+</a><a href="#h0-0-51" id="h0-0-51" class="i">+		switch tln := ln.(type) {
+</a><a href="#h0-0-52" id="h0-0-52" class="i">+		case *net.TCPListener:
+</a><a href="#h0-0-53" id="h0-0-53" class="i">+			file, err = tln.File()
+</a><a href="#h0-0-54" id="h0-0-54" class="i">+			if err != nil {
+</a><a href="#h0-0-55" id="h0-0-55" class="i">+				return nil, err
+</a><a href="#h0-0-56" id="h0-0-56" class="i">+			}
+</a><a href="#h0-0-57" id="h0-0-57" class="i">+		case *net.UnixListener:
+</a><a href="#h0-0-58" id="h0-0-58" class="i">+			file, err = tln.File()
+</a><a href="#h0-0-59" id="h0-0-59" class="i">+			if err != nil {
+</a><a href="#h0-0-60" id="h0-0-60" class="i">+				return nil, err
+</a><a href="#h0-0-61" id="h0-0-61" class="i">+			}
+</a><a href="#h0-0-62" id="h0-0-62" class="i">+		default:
+</a><a href="#h0-0-63" id="h0-0-63" class="i">+			return nil, fmt.Errorf(
+</a><a href="#h0-0-64" id="h0-0-64" class="i">+				&quot;manager: unsupported listener type: name=%s address=%v type=%T&quot;,
+</a><a href="#h0-0-65" id="h0-0-65" class="i">+				listener.Name,
+</a><a href="#h0-0-66" id="h0-0-66" class="i">+				listener.Address,
+</a><a href="#h0-0-67" id="h0-0-67" class="i">+				ln,
+</a><a href="#h0-0-68" id="h0-0-68" class="i">+			)
+</a><a href="#h0-0-69" id="h0-0-69" class="i">+		}
+</a><a href="#h0-0-70" id="h0-0-70" class="i">+
+</a><a href="#h0-0-71" id="h0-0-71" class="i">+		// The ith index in ExtraFiles corresponds to socket FD i + 3.
+</a><a href="#h0-0-72" id="h0-0-72" class="i">+		files[listener.SocketFD-3] = file
+</a><a href="#h0-0-73" id="h0-0-73" class="i">+	}
+</a><a href="#h0-0-74" id="h0-0-74" class="i">+
+</a><a href="#h0-0-75" id="h0-0-75" class="i">+	cmd := func() *exec.Cmd {
+</a><a href="#h0-0-76" id="h0-0-76" class="i">+		return &amp;exec.Cmd{
+</a><a href="#h0-0-77" id="h0-0-77" class="i">+			Dir:        cfg.Runtime.Directory,
+</a><a href="#h0-0-78" id="h0-0-78" class="i">+			Path:       cfg.Runtime.Path,
+</a><a href="#h0-0-79" id="h0-0-79" class="i">+			Args:       append([]string{cfg.Runtime.Path}, cfg.Runtime.Args...),
+</a><a href="#h0-0-80" id="h0-0-80" class="i">+			Env:        env,
+</a><a href="#h0-0-81" id="h0-0-81" class="i">+			ExtraFiles: files,
+</a><a href="#h0-0-82" id="h0-0-82" class="i">+			Stdout:     os.Stdout,
+</a><a href="#h0-0-83" id="h0-0-83" class="i">+			Stderr:     os.Stderr,
+</a><a href="#h0-0-84" id="h0-0-84" class="i">+		}
+</a><a href="#h0-0-85" id="h0-0-85" class="i">+	}
+</a><a href="#h0-0-86" id="h0-0-86" class="i">+
+</a><a href="#h0-0-87" id="h0-0-87" class="i">+	return &amp;Manager{
+</a><a href="#h0-0-88" id="h0-0-88" class="i">+		cfg: cfg,
+</a><a href="#h0-0-89" id="h0-0-89" class="i">+		cmd: cmd,
+</a><a href="#h0-0-90" id="h0-0-90" class="i">+	}, nil
+</a><a href="#h0-0-91" id="h0-0-91" class="i">+}
+</a><a href="#h0-0-92" id="h0-0-92" class="i">+
+</a><a href="#h0-0-93" id="h0-0-93" class="i">+// Start starts the process asynchronously.
+</a><a href="#h0-0-94" id="h0-0-94" class="i">+func (m *Manager) Start() error {
+</a><a href="#h0-0-95" id="h0-0-95" class="i">+	if m.active != nil {
+</a><a href="#h0-0-96" id="h0-0-96" class="i">+		return fmt.Errorf(&quot;manager: cannot start when an active process exists&quot;)
+</a><a href="#h0-0-97" id="h0-0-97" class="i">+	}
+</a><a href="#h0-0-98" id="h0-0-98" class="i">+
+</a><a href="#h0-0-99" id="h0-0-99" class="i">+	m.active = m.cmd()
+</a><a href="#h0-0-100" id="h0-0-100" class="i">+
+</a><a href="#h0-0-101" id="h0-0-101" class="i">+	return m.active.Start()
+</a><a href="#h0-0-102" id="h0-0-102" class="i">+}
+</a><a href="#h0-0-103" id="h0-0-103" class="i">+
+</a><a href="#h0-0-104" id="h0-0-104" class="i">+// Reload gracefully reloads the process by launching a new process, followed by shutting down the
+</a><a href="#h0-0-105" id="h0-0-105" class="i">+// active process.
+</a><a href="#h0-0-106" id="h0-0-106" class="i">+func (m *Manager) Reload() error {
+</a><a href="#h0-0-107" id="h0-0-107" class="i">+	m.mutex.Lock()
+</a><a href="#h0-0-108" id="h0-0-108" class="i">+	defer m.mutex.Unlock()
+</a><a href="#h0-0-109" id="h0-0-109" class="i">+
+</a><a href="#h0-0-110" id="h0-0-110" class="i">+	if m.active == nil {
+</a><a href="#h0-0-111" id="h0-0-111" class="i">+		return fmt.Errorf(&quot;manager: cannot reload with no current active process&quot;)
+</a><a href="#h0-0-112" id="h0-0-112" class="i">+	}
+</a><a href="#h0-0-113" id="h0-0-113" class="i">+
+</a><a href="#h0-0-114" id="h0-0-114" class="i">+	pending := m.cmd()
+</a><a href="#h0-0-115" id="h0-0-115" class="i">+	exited := make(chan error)
+</a><a href="#h0-0-116" id="h0-0-116" class="i">+
+</a><a href="#h0-0-117" id="h0-0-117" class="i">+	if err := pending.Start(); err != nil {
+</a><a href="#h0-0-118" id="h0-0-118" class="i">+		return fmt.Errorf(&quot;manager: error starting new process instance: err=%v&quot;, err)
+</a><a href="#h0-0-119" id="h0-0-119" class="i">+	}
+</a><a href="#h0-0-120" id="h0-0-120" class="i">+
+</a><a href="#h0-0-121" id="h0-0-121" class="i">+	go func() {
+</a><a href="#h0-0-122" id="h0-0-122" class="i">+		exited &lt;- pending.Wait()
+</a><a href="#h0-0-123" id="h0-0-123" class="i">+	}()
+</a><a href="#h0-0-124" id="h0-0-124" class="i">+
+</a><a href="#h0-0-125" id="h0-0-125" class="i">+	select {
+</a><a href="#h0-0-126" id="h0-0-126" class="i">+	case err := &lt;-exited:
+</a><a href="#h0-0-127" id="h0-0-127" class="i">+		if err != nil {
+</a><a href="#h0-0-128" id="h0-0-128" class="i">+			return fmt.Errorf(
+</a><a href="#h0-0-129" id="h0-0-129" class="i">+				&quot;manager: error starting new process instance: err=%v&quot;,
+</a><a href="#h0-0-130" id="h0-0-130" class="i">+				err,
+</a><a href="#h0-0-131" id="h0-0-131" class="i">+			)
+</a><a href="#h0-0-132" id="h0-0-132" class="i">+		}
+</a><a href="#h0-0-133" id="h0-0-133" class="i">+
+</a><a href="#h0-0-134" id="h0-0-134" class="i">+		return fmt.Errorf(
+</a><a href="#h0-0-135" id="h0-0-135" class="i">+			&quot;manager: process exited before required threshold uptime: delay=%v&quot;,
+</a><a href="#h0-0-136" id="h0-0-136" class="i">+			m.cfg.Options.ShutdownDelay,
+</a><a href="#h0-0-137" id="h0-0-137" class="i">+		)
+</a><a href="#h0-0-138" id="h0-0-138" class="i">+	case &lt;-time.After(m.cfg.Options.ShutdownDelay):
+</a><a href="#h0-0-139" id="h0-0-139" class="i">+	}
+</a><a href="#h0-0-140" id="h0-0-140" class="i">+
+</a><a href="#h0-0-141" id="h0-0-141" class="i">+	if err := m.shutdown(); err != nil {
+</a><a href="#h0-0-142" id="h0-0-142" class="i">+		return fmt.Errorf(
+</a><a href="#h0-0-143" id="h0-0-143" class="i">+			&quot;manager: error shutting down active process instance: err=%v&quot;,
+</a><a href="#h0-0-144" id="h0-0-144" class="i">+			err,
+</a><a href="#h0-0-145" id="h0-0-145" class="i">+		)
+</a><a href="#h0-0-146" id="h0-0-146" class="i">+	}
+</a><a href="#h0-0-147" id="h0-0-147" class="i">+
+</a><a href="#h0-0-148" id="h0-0-148" class="i">+	m.active = pending
+</a><a href="#h0-0-149" id="h0-0-149" class="i">+
+</a><a href="#h0-0-150" id="h0-0-150" class="i">+	return nil
+</a><a href="#h0-0-151" id="h0-0-151" class="i">+}
+</a><a href="#h0-0-152" id="h0-0-152" class="i">+
+</a><a href="#h0-0-153" id="h0-0-153" class="i">+// Close shuts down the manager by shutting down the currently active process. It obtains an
+</a><a href="#h0-0-154" id="h0-0-154" class="i">+// exclusive lock to avoid contention with an in-progress reload.
+</a><a href="#h0-0-155" id="h0-0-155" class="i">+func (m *Manager) Close() error {
+</a><a href="#h0-0-156" id="h0-0-156" class="i">+	m.mutex.Lock()
+</a><a href="#h0-0-157" id="h0-0-157" class="i">+	defer m.mutex.Unlock()
+</a><a href="#h0-0-158" id="h0-0-158" class="i">+
+</a><a href="#h0-0-159" id="h0-0-159" class="i">+	return m.shutdown()
+</a><a href="#h0-0-160" id="h0-0-160" class="i">+}
+</a><a href="#h0-0-161" id="h0-0-161" class="i">+
+</a><a href="#h0-0-162" id="h0-0-162" class="i">+// shutdown shuts down the currently active process. It attempts to gracefully shut down the process
+</a><a href="#h0-0-163" id="h0-0-163" class="i">+// using its graceful shutdown signal, but will forcefully kill the process if it is still alive
+</a><a href="#h0-0-164" id="h0-0-164" class="i">+// past its shutdown timeout.
+</a><a href="#h0-0-165" id="h0-0-165" class="i">+func (m *Manager) shutdown() error {
+</a><a href="#h0-0-166" id="h0-0-166" class="i">+	exited := make(chan error)
+</a><a href="#h0-0-167" id="h0-0-167" class="i">+
+</a><a href="#h0-0-168" id="h0-0-168" class="i">+	if err := m.active.Process.Signal(m.cfg.Options.ShutdownSignal.Signal); err != nil {
+</a><a href="#h0-0-169" id="h0-0-169" class="i">+		return err
+</a><a href="#h0-0-170" id="h0-0-170" class="i">+	}
+</a><a href="#h0-0-171" id="h0-0-171" class="i">+
+</a><a href="#h0-0-172" id="h0-0-172" class="i">+	go func() {
+</a><a href="#h0-0-173" id="h0-0-173" class="i">+		exited &lt;- m.active.Wait()
+</a><a href="#h0-0-174" id="h0-0-174" class="i">+	}()
+</a><a href="#h0-0-175" id="h0-0-175" class="i">+
+</a><a href="#h0-0-176" id="h0-0-176" class="i">+	// Synchronously wait for the process to exit if there is no configured shutdown timeout.
+</a><a href="#h0-0-177" id="h0-0-177" class="i">+	if m.cfg.Options.ShutdownTimeout == 0 {
+</a><a href="#h0-0-178" id="h0-0-178" class="i">+		return &lt;-exited
+</a><a href="#h0-0-179" id="h0-0-179" class="i">+	}
+</a><a href="#h0-0-180" id="h0-0-180" class="i">+
+</a><a href="#h0-0-181" id="h0-0-181" class="i">+	select {
+</a><a href="#h0-0-182" id="h0-0-182" class="i">+	case err := &lt;-exited:
+</a><a href="#h0-0-183" id="h0-0-183" class="i">+		if err != nil {
+</a><a href="#h0-0-184" id="h0-0-184" class="i">+			return err
+</a><a href="#h0-0-185" id="h0-0-185" class="i">+		}
+</a><a href="#h0-0-186" id="h0-0-186" class="i">+	case &lt;-time.After(m.cfg.Options.ShutdownTimeout):
+</a><a href="#h0-0-187" id="h0-0-187" class="i">+		// Process has not exited after the configured timeout grace period; kill the
+</a><a href="#h0-0-188" id="h0-0-188" class="i">+		// process immediately
+</a><a href="#h0-0-189" id="h0-0-189" class="i">+		return m.active.Process.Kill()
+</a><a href="#h0-0-190" id="h0-0-190" class="i">+	}
+</a><a href="#h0-0-191" id="h0-0-191" class="i">+
+</a><a href="#h0-0-192" id="h0-0-192" class="i">+	return nil
+</a><a href="#h0-0-193" id="h0-0-193" class="i">+}
+</a></pre>
+</div>
+</body>
+</html>

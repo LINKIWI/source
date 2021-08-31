@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>cmd/zero: Reload and shutdown metrics instrumentation - zero - Process and socket manager for zero-downtime binary deploys</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="zero Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="zero Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>zero</h1><span class="desc">Process and socket manager for zero-downtime binary deploys</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/zero.git">https://source.static.kevinlin.info/zero.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/24de6f3b8346ba16ba9eb60f01023d1bafaefa1d">24de6f3b8346ba16ba9eb60f01023d1bafaefa1d</a>
+<b>parent</b> <a href="../commit/3295e6f22f3dd93b4e7bd821897ef5db5de40743">3295e6f22f3dd93b4e7bd821897ef5db5de40743</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sun, 30 May 2021 21:32:26 -0700
+
+cmd/zero: Reload and shutdown metrics instrumentation
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">cmd/zero/main.go</a></td><td> | </td><td class="num">44</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++</span><span class="d">--</span></td></tr>
+</table></pre><pre>1 file changed, 42 insertions(+), 2 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/cmd/zero/main.go">cmd/zero/main.go</a> b/<a href="../file/cmd/zero/main.go">cmd/zero/main.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -102,6 +102,11 @@ func main() {
+</a> 		)
+ 	}
+ 
+<a href="#h0-0-3" id="h0-0-3" class="i">+	tags := map[string]interface{}{
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+		&quot;name&quot;: cfg.Service.Runtime.Name,
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+		&quot;path&quot;: cfg.Service.Runtime.Path,
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+	}
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+
+</a> 	m, err := manager.NewManager(cfg.Service)
+ 	if err != nil {
+ 		panic(err)
+<a href="#h0-1" id="h0-1" class="h">@@ -111,17 +116,45 @@ func main() {
+</a> 	signal.Notify(reload, cfg.Service.Options.ReloadSignal.Signal)
+ 
+ 	go func() {
+<a href="#h0-1-3" id="h0-1-3" class="i">+		var reloads int
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+
+</a> 		for {
+ 			&lt;-reload
+<a href="#h0-1-7" id="h0-1-7" class="d">-			log.Println(&quot;main: processing zero reload signal&quot;)
+</a> 
+<a href="#h0-1-9" id="h0-1-9" class="d">-			_, err := m.Reload()
+</a><a href="#h0-1-10" id="h0-1-10" class="i">+			log.Printf(
+</a><a href="#h0-1-11" id="h0-1-11" class="i">+				&quot;main: processing zero process reload signal: signal=%s&quot;,
+</a><a href="#h0-1-12" id="h0-1-12" class="i">+				cfg.Service.Options.ReloadSignal.Signal,
+</a><a href="#h0-1-13" id="h0-1-13" class="i">+			)
+</a><a href="#h0-1-14" id="h0-1-14" class="i">+
+</a><a href="#h0-1-15" id="h0-1-15" class="i">+			reloads++
+</a><a href="#h0-1-16" id="h0-1-16" class="i">+			stopwatch := lib.NewStopwatch()
+</a><a href="#h0-1-17" id="h0-1-17" class="i">+			metrics.Incr(&quot;process.reload&quot;, tags)
+</a><a href="#h0-1-18" id="h0-1-18" class="i">+			metrics.Gauge(&quot;process.reload.total&quot;, float64(reloads), tags)
+</a><a href="#h0-1-19" id="h0-1-19" class="i">+
+</a><a href="#h0-1-20" id="h0-1-20" class="i">+			stats, err := m.Reload()
+</a> 			if err != nil {
+ 				log.Printf(&quot;main: error during process reload: err=%v&quot;, err)
+ 				sentry.CaptureException(err)
+ 			} else {
+ 				log.Println(&quot;main: completed process reload successfully&quot;)
+ 			}
+<a href="#h0-1-27" id="h0-1-27" class="i">+
+</a><a href="#h0-1-28" id="h0-1-28" class="i">+			metrics.Timing(&quot;process.reload.duration&quot;, stopwatch.Elapsed(), tags)
+</a><a href="#h0-1-29" id="h0-1-29" class="i">+
+</a><a href="#h0-1-30" id="h0-1-30" class="i">+			if stats != nil {
+</a><a href="#h0-1-31" id="h0-1-31" class="i">+				rusage := stats.SysUsage().(*syscall.Rusage)
+</a><a href="#h0-1-32" id="h0-1-32" class="i">+
+</a><a href="#h0-1-33" id="h0-1-33" class="i">+				metrics.Gauge(&quot;process.stats.system_time&quot;, stats.SystemTime().Seconds(), tags)
+</a><a href="#h0-1-34" id="h0-1-34" class="i">+				metrics.Gauge(&quot;process.stats.user_time&quot;, stats.UserTime().Seconds(), tags)
+</a><a href="#h0-1-35" id="h0-1-35" class="i">+				metrics.Gauge(&quot;process.stats.max_rss&quot;, float64(rusage.Maxrss), tags)
+</a><a href="#h0-1-36" id="h0-1-36" class="i">+				metrics.Gauge(&quot;process.stats.minor_faults&quot;, float64(rusage.Minflt), tags)
+</a><a href="#h0-1-37" id="h0-1-37" class="i">+				metrics.Gauge(&quot;process.stats.major_faults&quot;, float64(rusage.Majflt), tags)
+</a><a href="#h0-1-38" id="h0-1-38" class="i">+				metrics.Gauge(&quot;process.stats.disk_reads&quot;, float64(rusage.Inblock), tags)
+</a><a href="#h0-1-39" id="h0-1-39" class="i">+				metrics.Gauge(&quot;process.stats.disk_writes&quot;, float64(rusage.Oublock), tags)
+</a><a href="#h0-1-40" id="h0-1-40" class="i">+				metrics.Gauge(&quot;process.stats.signals&quot;, float64(rusage.Nsignals), tags)
+</a><a href="#h0-1-41" id="h0-1-41" class="i">+				metrics.Gauge(&quot;process.stats.voluntary_context_switches&quot;, float64(rusage.Nvcsw), tags)
+</a><a href="#h0-1-42" id="h0-1-42" class="i">+				metrics.Gauge(&quot;process.stats.involuntary_context_switches&quot;, float64(rusage.Nivcsw), tags)
+</a><a href="#h0-1-43" id="h0-1-43" class="i">+			}
+</a> 		}
+ 	}()
+ 
+<a href="#h0-2" id="h0-2" class="h">@@ -135,12 +168,17 @@ func main() {
+</a> 		&lt;-shutdown
+ 		log.Println(&quot;main: starting zero graceful shutdown&quot;)
+ 
+<a href="#h0-2-3" id="h0-2-3" class="i">+		stopwatch := lib.NewStopwatch()
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+		metrics.Incr(&quot;process.shutdown&quot;, tags)
+</a><a href="#h0-2-5" id="h0-2-5" class="i">+
+</a> 		if err := m.Close(); err != nil {
+ 			log.Printf(&quot;main: error during graceful shutdown of child: err=%v&quot;, err)
+ 			sentry.CaptureException(err)
+ 		} else {
+ 			log.Println(&quot;main: completed graceful shutdown successfully&quot;)
+ 		}
+<a href="#h0-2-12" id="h0-2-12" class="i">+
+</a><a href="#h0-2-13" id="h0-2-13" class="i">+		metrics.Timing(&quot;process.shutdown.duration&quot;, stopwatch.Elapsed(), tags)
+</a> 	}()
+ 
+ 	log.Printf(
+<a href="#h0-3" id="h0-3" class="h">@@ -150,6 +188,8 @@ func main() {
+</a> 		cfg.Service.Runtime.Args,
+ 	)
+ 
+<a href="#h0-3-3" id="h0-3-3" class="i">+	metrics.Incr(&quot;process.start&quot;, tags)
+</a><a href="#h0-3-4" id="h0-3-4" class="i">+
+</a> 	if err := m.Start(); err != nil {
+ 		panic(err)
+ 	}
+</pre>
+</div>
+</body>
+</html>
