@@ -167,7 +167,7 @@ func search(client *webgrep.Client) error {
 	resp, searchErr := client.Search(&webgrep.SearchQueryRequest{
 		Query:         strings.TrimSpace(input),
 		File:          *flagFile,
-		Repos:         flagRepos.Values(),
+		Repositories:  flagRepos.Values(),
 		Regex:         *flagRegex,
 		CaseSensitive: *flagCaseSensitive,
 		MaxMatches:    *flagMaxMatches,

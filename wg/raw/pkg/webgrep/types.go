@@ -3,16 +3,18 @@ package webgrep
 const (
 	// EndpointSearch is the path to the code search query endpoint.
 	EndpointSearch = "/api/search"
+	// EndpointSource is the path to the source code query endpoint.
+	EndpointSource = "/api/source"
 	// EndpointMetadata is the path to the metadata endpoint.
 	EndpointMetadata = "/api/meta/info"
 )
 
 // CodeSearchResult formalizes fields for a single code search result.
 type CodeSearchResult struct {
-	Repo    string `json:"repo"`
-	Version string `json:"version"`
-	Path    string `json:"path"`
-	Lines   []struct {
+	Repository string `json:"repo"`
+	Version    string `json:"version"`
+	Path       string `json:"path"`
+	Lines      []struct {
 		Line   string `json:"line"`
 		Number int    `json:"number"`
 		Bounds []int  `json:"bounds"`
@@ -21,10 +23,10 @@ type CodeSearchResult struct {
 
 // FileSearchResult formalizes fields for a single file path result.
 type FileSearchResult struct {
-	Repo    string `json:"repo"`
-	Version string `json:"version"`
-	Path    string `json:"path"`
-	Bounds  []int  `json:"bounds"`
+	Repository string `json:"repo"`
+	Version    string `json:"version"`
+	Path       string `json:"path"`
+	Bounds     []int  `json:"bounds"`
 }
 
 // SearchStats formalizes fields in server-side search statistics.
@@ -46,7 +48,7 @@ type Repository struct {
 type SearchQueryRequest struct {
 	Query         string   `json:"query"`
 	File          string   `json:"file"`
-	Repos         []string `json:"repos"`
+	Repositories  []string `json:"repos"`
 	Regex         bool     `json:"regex"`
 	CaseSensitive bool     `json:"caseSensitive"`
 	MaxMatches    int      `json:"maxMatches"`
@@ -58,6 +60,21 @@ type SearchQueryResponse struct {
 	Stats SearchStats        `json:"stats"`
 	Code  []CodeSearchResult `json:"code"`
 	Files []FileSearchResult `json:"files"`
+}
+
+// SourceQueryRequest describes the top-level request for a source code query.
+type SourceQueryRequest struct {
+	Repository string `json:"repo"`
+	Version    string `json:"version"`
+	Path       string `json:"path"`
+}
+
+// SourceQueryResponse is a wrapper over the contents of a source code query response payload.
+type SourceQueryResponse struct {
+	Repository string   `json:"repo"`
+	Version    string   `json:"version"`
+	Path       string   `json:"path"`
+	Lines      []string `json:"source"`
 }
 
 // MetadataResponse describes the top-level response for a metadata request.

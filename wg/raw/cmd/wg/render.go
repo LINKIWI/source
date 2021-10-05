@@ -53,7 +53,7 @@ func (d *tableResultsRenderer) RenderCodeSearchResults(code []webgrep.CodeSearch
 
 			row := []string{
 				result.Version,
-				result.Repo,
+				result.Repository,
 				result.Path,
 				strconv.Itoa(line.Number),
 				fmt.Sprintf("|%s", source),
@@ -81,7 +81,7 @@ func (d *tableResultsRenderer) RenderFileSearchResults(files []webgrep.FileSearc
 
 		row := []string{
 			result.Version,
-			result.Repo,
+			result.Repository,
 			path,
 		}
 
@@ -106,7 +106,7 @@ func (s *stackedResultsRenderer) RenderCodeSearchResults(code []webgrep.CodeSear
 
 	for idx, result := range code {
 		block := cli.NewTable()
-		header := fmt.Sprintf("%s > %s", result.Repo, result.Path)
+		header := fmt.Sprintf("%s > %s", result.Repository, result.Path)
 
 		lines = append(lines, cli.Bold(header))
 		lines = append(lines, cli.Bold(strings.Repeat("-", len(header))))
@@ -146,7 +146,7 @@ func (s *stackedResultsRenderer) RenderFileSearchResults(files []webgrep.FileSea
 	repoFiles := make(map[string][]webgrep.FileSearchResult)
 
 	for _, result := range files {
-		repoFiles[result.Repo] = append(repoFiles[result.Repo], result)
+		repoFiles[result.Repository] = append(repoFiles[result.Repository], result)
 	}
 
 	for repo, result := range repoFiles {

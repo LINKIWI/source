@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>cmd/wg, pkg/webgrep: Refactor repos -&gt; repositories in request schema - wg - Webgrep command line client</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="wg Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="wg Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>wg</h1><span class="desc">Webgrep command line client</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/wg.git">https://source.static.kevinlin.info/wg.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/a8ad18dc105432babfd3352fa4402560120d8a11">a8ad18dc105432babfd3352fa4402560120d8a11</a>
+<b>parent</b> <a href="../commit/af11da29a9afbccdec401cfc7bd915ae8cc846df">af11da29a9afbccdec401cfc7bd915ae8cc846df</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Fri, 18 Jun 2021 20:56:50 -0700
+
+cmd/wg, pkg/webgrep: Refactor repos -&gt; repositories in request schema
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">cmd/wg/main.go</a></td><td> | </td><td class="num">2</td><td><span class="i">+</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">cmd/wg/render.go</a></td><td> | </td><td class="num">8</td><td><span class="i">++++</span><span class="d">----</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">pkg/webgrep/types.go</a></td><td> | </td><td class="num">20</td><td><span class="i">+++++++++++</span><span class="d">---------</span></td></tr>
+</table></pre><pre>3 files changed, 16 insertions(+), 14 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/cmd/wg/main.go">cmd/wg/main.go</a> b/<a href="../file/cmd/wg/main.go">cmd/wg/main.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -167,7 +167,7 @@ func search(client *webgrep.Client) error {
+</a> 	resp, searchErr := client.Search(&amp;webgrep.SearchQueryRequest{
+ 		Query:         strings.TrimSpace(input),
+ 		File:          *flagFile,
+<a href="#h0-0-3" id="h0-0-3" class="d">-		Repos:         flagRepos.Values(),
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+		Repositories:  flagRepos.Values(),
+</a> 		Regex:         *flagRegex,
+ 		CaseSensitive: *flagCaseSensitive,
+ 		MaxMatches:    *flagMaxMatches,
+<b>diff --git a/<a id="h1" href="../file/cmd/wg/render.go">cmd/wg/render.go</a> b/<a href="../file/cmd/wg/render.go">cmd/wg/render.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -53,7 +53,7 @@ func (d *tableResultsRenderer) RenderCodeSearchResults(code []webgrep.CodeSearch
+</a> 
+ 			row := []string{
+ 				result.Version,
+<a href="#h1-0-3" id="h1-0-3" class="d">-				result.Repo,
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+				result.Repository,
+</a> 				result.Path,
+ 				strconv.Itoa(line.Number),
+ 				fmt.Sprintf(&quot;|%s&quot;, source),
+<a href="#h1-1" id="h1-1" class="h">@@ -81,7 +81,7 @@ func (d *tableResultsRenderer) RenderFileSearchResults(files []webgrep.FileSearc
+</a> 
+ 		row := []string{
+ 			result.Version,
+<a href="#h1-1-3" id="h1-1-3" class="d">-			result.Repo,
+</a><a href="#h1-1-4" id="h1-1-4" class="i">+			result.Repository,
+</a> 			path,
+ 		}
+ 
+<a href="#h1-2" id="h1-2" class="h">@@ -106,7 +106,7 @@ func (s *stackedResultsRenderer) RenderCodeSearchResults(code []webgrep.CodeSear
+</a> 
+ 	for idx, result := range code {
+ 		block := cli.NewTable()
+<a href="#h1-2-3" id="h1-2-3" class="d">-		header := fmt.Sprintf(&quot;%s &gt; %s&quot;, result.Repo, result.Path)
+</a><a href="#h1-2-4" id="h1-2-4" class="i">+		header := fmt.Sprintf(&quot;%s &gt; %s&quot;, result.Repository, result.Path)
+</a> 
+ 		lines = append(lines, cli.Bold(header))
+ 		lines = append(lines, cli.Bold(strings.Repeat(&quot;-&quot;, len(header))))
+<a href="#h1-3" id="h1-3" class="h">@@ -146,7 +146,7 @@ func (s *stackedResultsRenderer) RenderFileSearchResults(files []webgrep.FileSea
+</a> 	repoFiles := make(map[string][]webgrep.FileSearchResult)
+ 
+ 	for _, result := range files {
+<a href="#h1-3-3" id="h1-3-3" class="d">-		repoFiles[result.Repo] = append(repoFiles[result.Repo], result)
+</a><a href="#h1-3-4" id="h1-3-4" class="i">+		repoFiles[result.Repository] = append(repoFiles[result.Repository], result)
+</a> 	}
+ 
+ 	for repo, result := range repoFiles {
+<b>diff --git a/<a id="h2" href="../file/pkg/webgrep/types.go">pkg/webgrep/types.go</a> b/<a href="../file/pkg/webgrep/types.go">pkg/webgrep/types.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -3,16 +3,18 @@ package webgrep
+</a> const (
+ 	// EndpointSearch is the path to the code search query endpoint.
+ 	EndpointSearch = &quot;/api/search&quot;
+<a href="#h2-0-3" id="h2-0-3" class="i">+	// EndpointSource is the path to the source code query endpoint.
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+	EndpointSource = &quot;/api/source&quot;
+</a> 	// EndpointMetadata is the path to the metadata endpoint.
+ 	EndpointMetadata = &quot;/api/meta/info&quot;
+ )
+ 
+ // CodeSearchResult formalizes fields for a single code search result.
+ type CodeSearchResult struct {
+<a href="#h2-0-11" id="h2-0-11" class="d">-	Repo    string `json:&quot;repo&quot;`
+</a><a href="#h2-0-12" id="h2-0-12" class="d">-	Version string `json:&quot;version&quot;`
+</a><a href="#h2-0-13" id="h2-0-13" class="d">-	Path    string `json:&quot;path&quot;`
+</a><a href="#h2-0-14" id="h2-0-14" class="d">-	Lines   []struct {
+</a><a href="#h2-0-15" id="h2-0-15" class="i">+	Repository string `json:&quot;repo&quot;`
+</a><a href="#h2-0-16" id="h2-0-16" class="i">+	Version    string `json:&quot;version&quot;`
+</a><a href="#h2-0-17" id="h2-0-17" class="i">+	Path       string `json:&quot;path&quot;`
+</a><a href="#h2-0-18" id="h2-0-18" class="i">+	Lines      []struct {
+</a> 		Line   string `json:&quot;line&quot;`
+ 		Number int    `json:&quot;number&quot;`
+ 		Bounds []int  `json:&quot;bounds&quot;`
+<a href="#h2-1" id="h2-1" class="h">@@ -21,10 +23,10 @@ type CodeSearchResult struct {
+</a> 
+ // FileSearchResult formalizes fields for a single file path result.
+ type FileSearchResult struct {
+<a href="#h2-1-3" id="h2-1-3" class="d">-	Repo    string `json:&quot;repo&quot;`
+</a><a href="#h2-1-4" id="h2-1-4" class="d">-	Version string `json:&quot;version&quot;`
+</a><a href="#h2-1-5" id="h2-1-5" class="d">-	Path    string `json:&quot;path&quot;`
+</a><a href="#h2-1-6" id="h2-1-6" class="d">-	Bounds  []int  `json:&quot;bounds&quot;`
+</a><a href="#h2-1-7" id="h2-1-7" class="i">+	Repository string `json:&quot;repo&quot;`
+</a><a href="#h2-1-8" id="h2-1-8" class="i">+	Version    string `json:&quot;version&quot;`
+</a><a href="#h2-1-9" id="h2-1-9" class="i">+	Path       string `json:&quot;path&quot;`
+</a><a href="#h2-1-10" id="h2-1-10" class="i">+	Bounds     []int  `json:&quot;bounds&quot;`
+</a> }
+ 
+ // SearchStats formalizes fields in server-side search statistics.
+<a href="#h2-2" id="h2-2" class="h">@@ -46,7 +48,7 @@ type Repository struct {
+</a> type SearchQueryRequest struct {
+ 	Query         string   `json:&quot;query&quot;`
+ 	File          string   `json:&quot;file&quot;`
+<a href="#h2-2-3" id="h2-2-3" class="d">-	Repos         []string `json:&quot;repos&quot;`
+</a><a href="#h2-2-4" id="h2-2-4" class="i">+	Repositories  []string `json:&quot;repos&quot;`
+</a> 	Regex         bool     `json:&quot;regex&quot;`
+ 	CaseSensitive bool     `json:&quot;caseSensitive&quot;`
+ 	MaxMatches    int      `json:&quot;maxMatches&quot;`
+</pre>
+</div>
+</body>
+</html>
