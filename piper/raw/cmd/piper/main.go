@@ -122,7 +122,7 @@ func main() {
 			zap.String("topic", cfgRelay.KafkaTopic),
 		)
 
-		go func(cfgRelay *config.Relay) {
+		go func(cfgRelay config.Relay) {
 			for {
 				logger.Info(
 					"initializing log stream relay",
@@ -176,7 +176,7 @@ func main() {
 
 // streamLog opens a tailer on a log file and starts a Kafka producer for new lines.
 // The function returns when the tailer completes or encounters an error.
-func streamLog(cfgRelay *config.Relay) error {
+func streamLog(cfgRelay config.Relay) error {
 	// Tailer initialization
 
 	tailOpts := tail.Options{

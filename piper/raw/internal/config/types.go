@@ -28,8 +28,8 @@ const (
 
 // Config describes the top-level sections recognized in the configuration.
 type Config struct {
-	Piper  *Piper   `toml:"piper"`
-	Relays []*Relay `toml:"relay"`
+	Piper  Piper   `toml:"piper"`
+	Relays []Relay `toml:"relay"`
 }
 
 // Piper provides configuration of the application itself.
