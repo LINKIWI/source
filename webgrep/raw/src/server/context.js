@@ -133,7 +133,13 @@ export default class Context {
           return new SourceClient(
             new GitlabSourceBackend(
               this.config.get('server.source.gitlab.base_url') || 'https://gitlab.com',
+              this.config.get('server.source.gitlab.socket_path'),
               this.config.get('server.source.gitlab.access_token'),
+              {
+                key: this.config.get('server.source.gitlab.tls_key'),
+                cert: this.config.get('server.source.gitlab.tls_cert'),
+                ca: this.config.get('server.source.gitlab.tls_ca_cert'),
+              },
             ),
             this.metrics,
           );

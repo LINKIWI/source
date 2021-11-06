@@ -125,7 +125,7 @@ pre a.d:hover {
 <a href="../../../../log">Log</a> | <a href="../../../../files">Files</a> | <a href="../../../../refs">Refs</a> | <a href="../../../../file/README.md">README</a> | <a href="../../../../file/LICENSE">LICENSE</a></td></tr></table>
 <hr/>
 <div id="content">
-<p> source.js (4043B) (<a href="../../../../raw/src/server/clients/source.js">raw</a>)</p><hr/><pre id="blob">
+<p> source.js (4510B) (<a href="../../../../raw/src/server/clients/source.js">raw</a>)</p><hr/><pre id="blob">
 <a href="#l1" class="line" id="l1">      1</a> import fs from &#39;fs&#39;;
 <a href="#l2" class="line" id="l2">      2</a> import { Gitlab } from &#39;gitlab&#39;;
 <a href="#l3" class="line" id="l3">      3</a> import git from &#39;isomorphic-git&#39;;
@@ -192,71 +192,76 @@ pre a.d:hover {
 <a href="#l64" class="line" id="l64">     64</a>   /**
 <a href="#l65" class="line" id="l65">     65</a>    * Create a client instance.
 <a href="#l66" class="line" id="l66">     66</a>    *
-<a href="#l67" class="line" id="l67">     67</a>    * @param {String} host Base URL to the Gitlab instance.
-<a href="#l68" class="line" id="l68">     68</a>    * @param {String} accessToken Gitlab API access token.
-<a href="#l69" class="line" id="l69">     69</a>    */
-<a href="#l70" class="line" id="l70">     70</a>   constructor(host, accessToken) {
-<a href="#l71" class="line" id="l71">     71</a>     super();
-<a href="#l72" class="line" id="l72">     72</a> 
-<a href="#l73" class="line" id="l73">     73</a>     this.client = new Gitlab({
-<a href="#l74" class="line" id="l74">     74</a>       host,
-<a href="#l75" class="line" id="l75">     75</a>       token: accessToken,
-<a href="#l76" class="line" id="l76">     76</a>     });
-<a href="#l77" class="line" id="l77">     77</a>   }
-<a href="#l78" class="line" id="l78">     78</a> 
-<a href="#l79" class="line" id="l79">     79</a>   read(repo, version, path, cb) {
-<a href="#l80" class="line" id="l80">     80</a>     return this.client.RepositoryFiles.showRaw(
-<a href="#l81" class="line" id="l81">     81</a>       encodeURIComponent(repo),
-<a href="#l82" class="line" id="l82">     82</a>       encodeURIComponent(path),
-<a href="#l83" class="line" id="l83">     83</a>       version,
-<a href="#l84" class="line" id="l84">     84</a>     )
-<a href="#l85" class="line" id="l85">     85</a>       .then((raw) =&gt; cb(null, Buffer.from(raw).toString(&#39;base64&#39;)))
-<a href="#l86" class="line" id="l86">     86</a>       .catch((err) =&gt; cb(err));
-<a href="#l87" class="line" id="l87">     87</a>   }
-<a href="#l88" class="line" id="l88">     88</a> }
-<a href="#l89" class="line" id="l89">     89</a> 
-<a href="#l90" class="line" id="l90">     90</a> /**
-<a href="#l91" class="line" id="l91">     91</a>  * Client for viewing raw source code, backed by a source viewer implementation.
-<a href="#l92" class="line" id="l92">     92</a>  */
-<a href="#l93" class="line" id="l93">     93</a> export default class SourceClient {
-<a href="#l94" class="line" id="l94">     94</a>   /**
-<a href="#l95" class="line" id="l95">     95</a>    * Create a client instance.
-<a href="#l96" class="line" id="l96">     96</a>    *
-<a href="#l97" class="line" id="l97">     97</a>    * @param {SourceBackend} backend Instance of a source viewer backend implementation.
-<a href="#l98" class="line" id="l98">     98</a>    * @param {MetricsClient} metrics Metrics client instance to provide transparent instrumentation
-<a href="#l99" class="line" id="l99">     99</a>    *                                of source code read calls.
-<a href="#l100" class="line" id="l100">    100</a>    */
-<a href="#l101" class="line" id="l101">    101</a>   constructor(backend, metrics) {
-<a href="#l102" class="line" id="l102">    102</a>     this.backend = backend;
-<a href="#l103" class="line" id="l103">    103</a>     this.metrics = metrics;
-<a href="#l104" class="line" id="l104">    104</a>   }
-<a href="#l105" class="line" id="l105">    105</a> 
-<a href="#l106" class="line" id="l106">    106</a>   /**
-<a href="#l107" class="line" id="l107">    107</a>    * Read the base64-encoded contents of a file.
-<a href="#l108" class="line" id="l108">    108</a>    *
-<a href="#l109" class="line" id="l109">    109</a>    * @param {String} repo Repository identifier.
-<a href="#l110" class="line" id="l110">    110</a>    * @param {String} version Git ref identifying the commit-ish at which the source should be read.
-<a href="#l111" class="line" id="l111">    111</a>    * @param {String} path Path to the file.
-<a href="#l112" class="line" id="l112">    112</a>    * @param {Function} cb Callback function invoked with (err, base64 contents) on completion.
-<a href="#l113" class="line" id="l113">    113</a>    */
-<a href="#l114" class="line" id="l114">    114</a>   read(repo, version, path, cb) {
-<a href="#l115" class="line" id="l115">    115</a>     const duration = stopwatch();
-<a href="#l116" class="line" id="l116">    116</a> 
-<a href="#l117" class="line" id="l117">    117</a>     this.metrics.increment(&#39;event.source.read.request&#39;, { repo });
-<a href="#l118" class="line" id="l118">    118</a> 
-<a href="#l119" class="line" id="l119">    119</a>     return this.backend.read(repo, version, path, (err, contents) =&gt; {
-<a href="#l120" class="line" id="l120">    120</a>       if (err) {
-<a href="#l121" class="line" id="l121">    121</a>         this.metrics.increment(&#39;event.source.read.error&#39;, { repo });
-<a href="#l122" class="line" id="l122">    122</a>         return cb(err);
-<a href="#l123" class="line" id="l123">    123</a>       }
-<a href="#l124" class="line" id="l124">    124</a> 
-<a href="#l125" class="line" id="l125">    125</a>       this.metrics.timing(&#39;latency.source.read&#39;, duration.elapsed(), { repo });
-<a href="#l126" class="line" id="l126">    126</a>       this.metrics.gauge(&#39;gauge.source.file_size&#39;, contents.length, { repo });
-<a href="#l127" class="line" id="l127">    127</a> 
-<a href="#l128" class="line" id="l128">    128</a>       return cb(null, contents);
-<a href="#l129" class="line" id="l129">    129</a>     });
-<a href="#l130" class="line" id="l130">    130</a>   }
-<a href="#l131" class="line" id="l131">    131</a> }
+<a href="#l67" class="line" id="l67">     67</a>    * @param {String} baseURL Base URL to the GitLab instance.
+<a href="#l68" class="line" id="l68">     68</a>    * @param {String} socketPath Path to a Unix domain socket listener of the GitLab instance.
+<a href="#l69" class="line" id="l69">     69</a>    * @param {String} accessToken Gitlab API access token.
+<a href="#l70" class="line" id="l70">     70</a>    * @param {Object} tlsContext Client key, client certificate, and CA certificate paths for mutual
+<a href="#l71" class="line" id="l71">     71</a>    *                            TLS authentication.
+<a href="#l72" class="line" id="l72">     72</a>    */
+<a href="#l73" class="line" id="l73">     73</a>   constructor(baseURL, socketPath, accessToken, tlsContext) {
+<a href="#l74" class="line" id="l74">     74</a>     super();
+<a href="#l75" class="line" id="l75">     75</a> 
+<a href="#l76" class="line" id="l76">     76</a>     this.client = new Gitlab({
+<a href="#l77" class="line" id="l77">     77</a>       host: baseURL,
+<a href="#l78" class="line" id="l78">     78</a>       socket: socketPath,
+<a href="#l79" class="line" id="l79">     79</a>       token: accessToken,
+<a href="#l80" class="line" id="l80">     80</a>       tlsContext: {
+<a href="#l81" class="line" id="l81">     81</a>         key: tlsContext.key &amp;&amp; fs.readFileSync(tlsContext.key),
+<a href="#l82" class="line" id="l82">     82</a>         cert: tlsContext.cert &amp;&amp; fs.readFileSync(tlsContext.cert),
+<a href="#l83" class="line" id="l83">     83</a>         ca: tlsContext.ca &amp;&amp; fs.readFileSync(tlsContext.ca),
+<a href="#l84" class="line" id="l84">     84</a>       },
+<a href="#l85" class="line" id="l85">     85</a>     });
+<a href="#l86" class="line" id="l86">     86</a>   }
+<a href="#l87" class="line" id="l87">     87</a> 
+<a href="#l88" class="line" id="l88">     88</a>   read(repo, version, path, cb) {
+<a href="#l89" class="line" id="l89">     89</a>     return this.client.RepositoryFiles.showRaw(repo, path, version)
+<a href="#l90" class="line" id="l90">     90</a>       .then((raw) =&gt; cb(null, Buffer.from(raw).toString(&#39;base64&#39;)))
+<a href="#l91" class="line" id="l91">     91</a>       .catch((err) =&gt; cb(err));
+<a href="#l92" class="line" id="l92">     92</a>   }
+<a href="#l93" class="line" id="l93">     93</a> }
+<a href="#l94" class="line" id="l94">     94</a> 
+<a href="#l95" class="line" id="l95">     95</a> /**
+<a href="#l96" class="line" id="l96">     96</a>  * Client for viewing raw source code, backed by a source viewer implementation.
+<a href="#l97" class="line" id="l97">     97</a>  */
+<a href="#l98" class="line" id="l98">     98</a> export default class SourceClient {
+<a href="#l99" class="line" id="l99">     99</a>   /**
+<a href="#l100" class="line" id="l100">    100</a>    * Create a client instance.
+<a href="#l101" class="line" id="l101">    101</a>    *
+<a href="#l102" class="line" id="l102">    102</a>    * @param {SourceBackend} backend Instance of a source viewer backend implementation.
+<a href="#l103" class="line" id="l103">    103</a>    * @param {MetricsClient} metrics Metrics client instance to provide transparent instrumentation
+<a href="#l104" class="line" id="l104">    104</a>    *                                of source code read calls.
+<a href="#l105" class="line" id="l105">    105</a>    */
+<a href="#l106" class="line" id="l106">    106</a>   constructor(backend, metrics) {
+<a href="#l107" class="line" id="l107">    107</a>     this.backend = backend;
+<a href="#l108" class="line" id="l108">    108</a>     this.metrics = metrics;
+<a href="#l109" class="line" id="l109">    109</a>   }
+<a href="#l110" class="line" id="l110">    110</a> 
+<a href="#l111" class="line" id="l111">    111</a>   /**
+<a href="#l112" class="line" id="l112">    112</a>    * Read the base64-encoded contents of a file.
+<a href="#l113" class="line" id="l113">    113</a>    *
+<a href="#l114" class="line" id="l114">    114</a>    * @param {String} repo Repository identifier.
+<a href="#l115" class="line" id="l115">    115</a>    * @param {String} version Git ref identifying the commit-ish at which the source should be read.
+<a href="#l116" class="line" id="l116">    116</a>    * @param {String} path Path to the file.
+<a href="#l117" class="line" id="l117">    117</a>    * @param {Function} cb Callback function invoked with (err, base64 contents) on completion.
+<a href="#l118" class="line" id="l118">    118</a>    */
+<a href="#l119" class="line" id="l119">    119</a>   read(repo, version, path, cb) {
+<a href="#l120" class="line" id="l120">    120</a>     const duration = stopwatch();
+<a href="#l121" class="line" id="l121">    121</a> 
+<a href="#l122" class="line" id="l122">    122</a>     this.metrics.increment(&#39;event.source.read.request&#39;, { repo });
+<a href="#l123" class="line" id="l123">    123</a> 
+<a href="#l124" class="line" id="l124">    124</a>     return this.backend.read(repo, version, path, (err, contents) =&gt; {
+<a href="#l125" class="line" id="l125">    125</a>       if (err) {
+<a href="#l126" class="line" id="l126">    126</a>         this.metrics.increment(&#39;event.source.read.error&#39;, { repo });
+<a href="#l127" class="line" id="l127">    127</a>         return cb(err);
+<a href="#l128" class="line" id="l128">    128</a>       }
+<a href="#l129" class="line" id="l129">    129</a> 
+<a href="#l130" class="line" id="l130">    130</a>       this.metrics.timing(&#39;latency.source.read&#39;, duration.elapsed(), { repo });
+<a href="#l131" class="line" id="l131">    131</a>       this.metrics.gauge(&#39;gauge.source.file_size&#39;, contents.length, { repo });
+<a href="#l132" class="line" id="l132">    132</a> 
+<a href="#l133" class="line" id="l133">    133</a>       return cb(null, contents);
+<a href="#l134" class="line" id="l134">    134</a>     });
+<a href="#l135" class="line" id="l135">    135</a>   }
+<a href="#l136" class="line" id="l136">    136</a> }
 </pre>
 </div>
 </body>

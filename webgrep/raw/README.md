@@ -35,8 +35,12 @@ The following documents each field and its expected value:
 |`server.cache.memory.ttl`|No|TTL for in-memory cache keys in milliseconds (default 10 minutes)|
 |`server.source.local.repositories[].name`|No|Local on-disk repository name for source code viewer|
 |`server.source.local.repositories[].path`|No|Local on-disk repository directory path|
-|`server.source.gitlab.base_url`|No|Gitlab instance base URL for source code viewer (default `https://gitlab.com`)|
-|`server.source.gitlab.access_token`|No|Gitlab API access token|
+|`server.source.gitlab.base_url`|No|GitLab instance base URL for source code viewer (default `https://gitlab.com`)|
+|`server.source.gitlab.socket_path`|No|Path to a Unix domain socket for accessing GitLab API|
+|`server.source.gitlab.access_token`|No|GitLab API access token|
+|`server.source.gitlab.tls_key`|No|TLS client key path for mutual authentication with GitLab|
+|`server.source.gitlab.tls_cert`|No|TLS client certificate path for mutual authentication with GitLab|
+|`server.source.gitlab.tls_ca_cert`|No|TLS CA certificate path for server authentication of GitLab|
 |`client.site.logo`|No|URL to an image to use as the logo shown in the upper-left corner|
 |`client.site.title`|No|Formatting string for creating browser page titles (default `webgrep`)|
 |`client.site.about`|No|About text shown in the Admin section|

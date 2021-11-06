@@ -64,24 +64,29 @@ export class GitlabSourceBackend extends SourceBackend {
   /**
    * Create a client instance.
    *
-   * @param {String} host Base URL to the Gitlab instance.
+   * @param {String} baseURL Base URL to the GitLab instance.
+   * @param {String} socketPath Path to a Unix domain socket listener of the GitLab instance.
    * @param {String} accessToken Gitlab API access token.
+   * @param {Object} tlsContext Client key, client certificate, and CA certificate paths for mutual
+   *                            TLS authentication.
    */
-  constructor(host, accessToken) {
+  constructor(baseURL, socketPath, accessToken, tlsContext) {
     super();
 
     this.client = new Gitlab({
-      host,
+      host: baseURL,
+      socket: socketPath,
       token: accessToken,
+      tlsContext: {
+        key: tlsContext.key && fs.readFileSync(tlsContext.key),
+        cert: tlsContext.cert && fs.readFileSync(tlsContext.cert),
+        ca: tlsContext.ca && fs.readFileSync(tlsContext.ca),
+      },
     });
   }
 
   read(repo, version, path, cb) {
-    return this.client.RepositoryFiles.showRaw(
-      encodeURIComponent(repo),
-      encodeURIComponent(path),
-      version,
-    )
+    return this.client.RepositoryFiles.showRaw(repo, path, version)
       .then((raw) => cb(null, Buffer.from(raw).toString('base64')))
       .catch((err) => cb(err));
   }

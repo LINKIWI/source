@@ -1,7 +1,9 @@
 package codehost
 
 import (
+	"crypto/tls"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 
@@ -18,6 +20,8 @@ type GitLabCodeHost struct {
 // NewGitLabCodeHost creates a new GitLabCodeHost given CLI-supplied key-value parameters.
 // It allows specification of a custom GitLab base URL, and a whitelist of project namespaces.
 func NewGitLabCodeHost(params map[string]string) (CodeHost, error) {
+	backend := http.DefaultClient
+
 	// GitLab instance base URL
 	baseURL := params["base-url"]
 	if baseURL == "" {
@@ -34,13 +38,31 @@ func NewGitLabCodeHost(params map[string]string) (CodeHost, error) {
 		return nil, fmt.Errorf("gitlab: no access token specified")
 	}
 
+	// Optional TLS client authentication context
+	tlsKey := params["tls-key"]
+	tlsCert := params["tls-cert"]
+	if tlsKey != "" && tlsCert != "" {
+		cert, err := tls.LoadX509KeyPair(tlsCert, tlsKey)
+		if err != nil {
+			return nil, fmt.Errorf("gitlab: error reading TLS keypair: err=%v", err)
+		}
+
+		backend = &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					Certificates: []tls.Certificate{cert},
+				},
+			},
+		}
+	}
+
 	// Optionally specify repository namespaces to list for indexing, comma-delimited
 	var namespaces []string
 	if joinedNamespaces := params["namespaces"]; joinedNamespaces != "" {
 		namespaces = strings.Split(joinedNamespaces, ",")
 	}
 
-	client := gitlab.NewClient(nil, accessToken)
+	client := gitlab.NewClient(backend, accessToken)
 
 	if err := client.SetBaseURL(apiBaseURL); err != nil {
 		return nil, fmt.Errorf("gitlab: error setting base URL: err=%v", err)

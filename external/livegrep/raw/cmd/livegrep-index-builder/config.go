@@ -29,7 +29,7 @@ func indexConfig(name string, repoBasePath string, projects []*codehost.Project)
 	}
 
 	return &pb.IndexSpec{
-		Name:  name,
-		Repos: repositories,
+		Name:         name,
+		Repositories: repositories,
 	}
 }

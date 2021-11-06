@@ -47,6 +47,7 @@ export const CANONICAL_FILE_EXTENSION_LANGUAGES = {
   '.swift': 'swift',
   '.toml': 'toml',
   '.ts': 'typescript',
+  '.xml': 'markup',
   '.yaml': 'yaml',
   '.yml': 'yaml',
 };
