@@ -34,6 +34,7 @@ export const CANONICAL_FILE_EXTENSION_LANGUAGES = {
   '.php': 'php',
   '.pl': 'perl',
   '.pp': 'ruby',
+  '.properties': 'properties',
   '.proto': 'protobuf',
   '.py': 'python',
   '.rb': 'ruby',
