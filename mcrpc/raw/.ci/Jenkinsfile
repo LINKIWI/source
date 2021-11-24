@@ -1,0 +1,83 @@
+pipeline {
+    agent {
+        docker {
+            image 'docker.internal.kevinlin.info/infra/ci-base:0.3.5'
+            label 'docker-executor'
+        }
+    }
+
+    options {
+        withAWS(
+            endpointUrl: 'https://storage.kevinlin.info',
+            credentials: 'storage-internal',
+        )
+    }
+
+    stages {
+        stage('Install') {
+            steps {
+                sh 'go mod download -x'
+            }
+        }
+        stage('Build') {
+            steps {
+                sh 'make build'
+            }
+        }
+        stage('Test') {
+            parallel {
+                stage('Lint') {
+                    steps {
+                         sh 'make lint'
+                    }
+                }
+                stage('Unit') {
+                    steps {
+                        sh 'make test'
+                    }
+                }
+            }
+        }
+        stage('Release') {
+            steps {
+                sh 'touch release.tar.gz'
+                sh 'tar --exclude=release.tar.gz -czvf release.tar.gz .'
+                s3Upload(
+                    bucket: 'internal',
+                    path: "deploy/${env.JOB_NAME}/${env.GIT_COMMIT}/",
+                    file: 'release.tar.gz',
+                )
+            }
+        }
+        stage('Publish') {
+            environment {
+                LIBRARY_VERSION = sh(
+                    script: 'git show ' +
+                            '--no-patch ' +
+                            '--no-notes ' +
+                            "--date=format:\"v0.0.0-%Y%m%d%H%M%S-\$(echo ${GIT_COMMIT} | cut -c -12)\" " +
+                            "--pretty=format:'%cd' ${GIT_COMMIT}",
+                    returnStdout: true,
+                ).trim()
+                LIBRARY_TIMESTAMP = sh(
+                    script: 'date +"%Y-%m-%dT%H:%M:%SZ"',
+                    returnStdout: true,
+                ).trim()
+            }
+            steps {
+                build(
+                    job: 'task--go-library',
+                    parameters: [
+                        string(name: 'RELEASE_ARTIFACT', value: env.JOB_NAME),
+                        string(name: 'RELEASE_VERSION', value: env.GIT_COMMIT),
+                        string(name: 'LIBRARY_IMPORT_PATH', value: 'lib.kevinlin.info/mcrpc'),
+                        string(name: 'LIBRARY_VERSION', value: env.LIBRARY_VERSION),
+                        string(name: 'LIBRARY_TIMESTAMP', value: env.LIBRARY_TIMESTAMP),
+                        string(name: 'CLOAK_CONFIG', value: 'cloak.yaml'),
+                    ],
+                    wait: true,
+                )
+            }
+        }
+    }
+}

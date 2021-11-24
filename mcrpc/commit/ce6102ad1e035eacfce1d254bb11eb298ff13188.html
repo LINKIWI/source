@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>protocol: Reader for extracting fully formed request messages from an io.Reader stream - mcrpc - Library for building memcache protocol servers</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="mcrpc Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="mcrpc Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>mcrpc</h1><span class="desc">Library for building memcache protocol servers</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/mcrpc.git">https://source.static.kevinlin.info/mcrpc.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/ce6102ad1e035eacfce1d254bb11eb298ff13188">ce6102ad1e035eacfce1d254bb11eb298ff13188</a>
+<b>parent</b> <a href="../commit/303eb76b4180833ff421a48cd562cbaae1c4d239">303eb76b4180833ff421a48cd562cbaae1c4d239</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Mon, 22 Nov 2021 16:31:19 -0800
+
+protocol: Reader for extracting fully formed request messages from an io.Reader stream
+
+<b>Diffstat:</b>
+<table><tr><td class="A">A</td><td><a href="#h0">protocol/reader.go</a></td><td> | </td><td class="num">106</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="A">A</td><td><a href="#h1">protocol/reader_test.go</a></td><td> | </td><td class="num">87</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+</table></pre><pre>2 files changed, 193 insertions(+), 0 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/protocol/reader.go">protocol/reader.go</a> b/<a href="../file/protocol/reader.go">protocol/reader.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -0,0 +1,106 @@
+</a><a href="#h0-0-0" id="h0-0-0" class="i">+package protocol
+</a><a href="#h0-0-1" id="h0-0-1" class="i">+
+</a><a href="#h0-0-2" id="h0-0-2" class="i">+import (
+</a><a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;bufio&quot;
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+	&quot;bytes&quot;
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+	&quot;errors&quot;
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+	&quot;fmt&quot;
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+	&quot;io&quot;
+</a><a href="#h0-0-8" id="h0-0-8" class="i">+)
+</a><a href="#h0-0-9" id="h0-0-9" class="i">+
+</a><a href="#h0-0-10" id="h0-0-10" class="i">+var (
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+	// crlf is a byte sequence conventionally marking the end of a protocol message.
+</a><a href="#h0-0-12" id="h0-0-12" class="i">+	crlf = []byte(&quot;\r\n&quot;)
+</a><a href="#h0-0-13" id="h0-0-13" class="i">+	// storageCommands is a slice of protocol command names that are responsible for storing
+</a><a href="#h0-0-14" id="h0-0-14" class="i">+	// data. These commands prefix the only messages in the protocol that terminate on the
+</a><a href="#h0-0-15" id="h0-0-15" class="i">+	// second CRLF sequence, rather than the first.
+</a><a href="#h0-0-16" id="h0-0-16" class="i">+	storageCommands = [][]byte{
+</a><a href="#h0-0-17" id="h0-0-17" class="i">+		[]byte(&quot;set&quot;),
+</a><a href="#h0-0-18" id="h0-0-18" class="i">+		[]byte(&quot;add&quot;),
+</a><a href="#h0-0-19" id="h0-0-19" class="i">+		[]byte(&quot;replace&quot;),
+</a><a href="#h0-0-20" id="h0-0-20" class="i">+		[]byte(&quot;append&quot;),
+</a><a href="#h0-0-21" id="h0-0-21" class="i">+		[]byte(&quot;prepend&quot;),
+</a><a href="#h0-0-22" id="h0-0-22" class="i">+		[]byte(&quot;cas&quot;),
+</a><a href="#h0-0-23" id="h0-0-23" class="i">+	}
+</a><a href="#h0-0-24" id="h0-0-24" class="i">+	// maxStorageHeaderSize is the upper limit on the storage header size. In practice, this is
+</a><a href="#h0-0-25" id="h0-0-25" class="i">+	// the upper limit of depth the reader will scan for the header for storage protocol
+</a><a href="#h0-0-26" id="h0-0-26" class="i">+	// commands.
+</a><a href="#h0-0-27" id="h0-0-27" class="i">+	maxStorageHeaderSize = 64
+</a><a href="#h0-0-28" id="h0-0-28" class="i">+	// maxStorageItemSize is a reasonable upper limit on the maximum supported item size
+</a><a href="#h0-0-29" id="h0-0-29" class="i">+	// supported by the reader. In practice, this is the upper limit of depth the reader will
+</a><a href="#h0-0-30" id="h0-0-30" class="i">+	// scan for the full data block for storage protocol commands.
+</a><a href="#h0-0-31" id="h0-0-31" class="i">+	maxStorageItemSize = 10 * 1024 * 1024
+</a><a href="#h0-0-32" id="h0-0-32" class="i">+)
+</a><a href="#h0-0-33" id="h0-0-33" class="i">+
+</a><a href="#h0-0-34" id="h0-0-34" class="i">+// Reader abstracts over an io.Reader that acts as an input stream for memcache protocol commands.
+</a><a href="#h0-0-35" id="h0-0-35" class="i">+type Reader struct {
+</a><a href="#h0-0-36" id="h0-0-36" class="i">+	bufStream *bufio.Reader
+</a><a href="#h0-0-37" id="h0-0-37" class="i">+	io.Reader
+</a><a href="#h0-0-38" id="h0-0-38" class="i">+}
+</a><a href="#h0-0-39" id="h0-0-39" class="i">+
+</a><a href="#h0-0-40" id="h0-0-40" class="i">+// NewReader creates a new protocol-aware reader from an io.Reader.
+</a><a href="#h0-0-41" id="h0-0-41" class="i">+func NewReader(stream io.Reader) *Reader {
+</a><a href="#h0-0-42" id="h0-0-42" class="i">+	return &amp;Reader{
+</a><a href="#h0-0-43" id="h0-0-43" class="i">+		bufStream: bufio.NewReader(stream),
+</a><a href="#h0-0-44" id="h0-0-44" class="i">+		Reader:    stream,
+</a><a href="#h0-0-45" id="h0-0-45" class="i">+	}
+</a><a href="#h0-0-46" id="h0-0-46" class="i">+}
+</a><a href="#h0-0-47" id="h0-0-47" class="i">+
+</a><a href="#h0-0-48" id="h0-0-48" class="i">+// ReadASCIICommand reads a full ASCII command from the underlying io.Reader, exercising heuristics
+</a><a href="#h0-0-49" id="h0-0-49" class="i">+// to determine how far into the stream data should be read.
+</a><a href="#h0-0-50" id="h0-0-50" class="i">+func (r *Reader) ReadASCIICommand() ([]byte, error) {
+</a><a href="#h0-0-51" id="h0-0-51" class="i">+	// Check only the length of the request equal to the length of the longest storage command
+</a><a href="#h0-0-52" id="h0-0-52" class="i">+	initial, err := r.bufStream.Peek(7)
+</a><a href="#h0-0-53" id="h0-0-53" class="i">+	if err != nil {
+</a><a href="#h0-0-54" id="h0-0-54" class="i">+		return nil, err
+</a><a href="#h0-0-55" id="h0-0-55" class="i">+	}
+</a><a href="#h0-0-56" id="h0-0-56" class="i">+
+</a><a href="#h0-0-57" id="h0-0-57" class="i">+	// Storage commands are the only protocol request messages that conclude on the second CRLF
+</a><a href="#h0-0-58" id="h0-0-58" class="i">+	// sequence, which is treated as a separate case.
+</a><a href="#h0-0-59" id="h0-0-59" class="i">+	for _, cmd := range storageCommands {
+</a><a href="#h0-0-60" id="h0-0-60" class="i">+		if bytes.HasPrefix(initial, cmd) {
+</a><a href="#h0-0-61" id="h0-0-61" class="i">+			// Header
+</a><a href="#h0-0-62" id="h0-0-62" class="i">+			header, err := r.readUntil(crlf, maxStorageHeaderSize)
+</a><a href="#h0-0-63" id="h0-0-63" class="i">+			if err != nil {
+</a><a href="#h0-0-64" id="h0-0-64" class="i">+				return nil, err
+</a><a href="#h0-0-65" id="h0-0-65" class="i">+			}
+</a><a href="#h0-0-66" id="h0-0-66" class="i">+
+</a><a href="#h0-0-67" id="h0-0-67" class="i">+			// Body data (scan no more than 10 MB, to accommodate a 10 MB item size)
+</a><a href="#h0-0-68" id="h0-0-68" class="i">+			data, err := r.readUntil(crlf, maxStorageItemSize)
+</a><a href="#h0-0-69" id="h0-0-69" class="i">+			if err != nil {
+</a><a href="#h0-0-70" id="h0-0-70" class="i">+				return nil, err
+</a><a href="#h0-0-71" id="h0-0-71" class="i">+			}
+</a><a href="#h0-0-72" id="h0-0-72" class="i">+
+</a><a href="#h0-0-73" id="h0-0-73" class="i">+			return append(header, data...), nil
+</a><a href="#h0-0-74" id="h0-0-74" class="i">+		}
+</a><a href="#h0-0-75" id="h0-0-75" class="i">+	}
+</a><a href="#h0-0-76" id="h0-0-76" class="i">+
+</a><a href="#h0-0-77" id="h0-0-77" class="i">+	// For all other commands, consider the message to be complete upon the first CRLF.
+</a><a href="#h0-0-78" id="h0-0-78" class="i">+	return r.readUntil(crlf, maxStorageItemSize)
+</a><a href="#h0-0-79" id="h0-0-79" class="i">+}
+</a><a href="#h0-0-80" id="h0-0-80" class="i">+
+</a><a href="#h0-0-81" id="h0-0-81" class="i">+// readUntil continues reading from the buffered stream until the termination sequence is
+</a><a href="#h0-0-82" id="h0-0-82" class="i">+// encountered, with a finite limit on maximum forward seek length.
+</a><a href="#h0-0-83" id="h0-0-83" class="i">+func (r *Reader) readUntil(sequence []byte, maxSeek int) ([]byte, error) {
+</a><a href="#h0-0-84" id="h0-0-84" class="i">+	if maxSeek &lt; len(sequence) {
+</a><a href="#h0-0-85" id="h0-0-85" class="i">+		return nil, errors.New(&quot;protocol: sequence is shorter than maximum allowed seek&quot;)
+</a><a href="#h0-0-86" id="h0-0-86" class="i">+	}
+</a><a href="#h0-0-87" id="h0-0-87" class="i">+
+</a><a href="#h0-0-88" id="h0-0-88" class="i">+	buf := make([]byte, 0, maxSeek)
+</a><a href="#h0-0-89" id="h0-0-89" class="i">+	scan := make([]byte, 1)
+</a><a href="#h0-0-90" id="h0-0-90" class="i">+
+</a><a href="#h0-0-91" id="h0-0-91" class="i">+	for i := 0; i &lt; maxSeek; i++ {
+</a><a href="#h0-0-92" id="h0-0-92" class="i">+		_, err := r.bufStream.Read(scan)
+</a><a href="#h0-0-93" id="h0-0-93" class="i">+		if err != nil {
+</a><a href="#h0-0-94" id="h0-0-94" class="i">+			return nil, fmt.Errorf(&quot;protocol: error reading from buffered connection: err=%v&quot;, err)
+</a><a href="#h0-0-95" id="h0-0-95" class="i">+		}
+</a><a href="#h0-0-96" id="h0-0-96" class="i">+
+</a><a href="#h0-0-97" id="h0-0-97" class="i">+		buf = append(buf, scan...)
+</a><a href="#h0-0-98" id="h0-0-98" class="i">+
+</a><a href="#h0-0-99" id="h0-0-99" class="i">+		if i &gt;= len(sequence)-1 &amp;&amp; bytes.Equal(buf[len(buf)-len(sequence):], sequence) {
+</a><a href="#h0-0-100" id="h0-0-100" class="i">+			return buf, nil
+</a><a href="#h0-0-101" id="h0-0-101" class="i">+		}
+</a><a href="#h0-0-102" id="h0-0-102" class="i">+	}
+</a><a href="#h0-0-103" id="h0-0-103" class="i">+
+</a><a href="#h0-0-104" id="h0-0-104" class="i">+	return nil, fmt.Errorf(&quot;protocol: exhausted maximum allowed seek without finding sequence&quot;)
+</a><a href="#h0-0-105" id="h0-0-105" class="i">+}
+</a><b>diff --git a/<a id="h1" href="../file/protocol/reader_test.go">protocol/reader_test.go</a> b/<a href="../file/protocol/reader_test.go">protocol/reader_test.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -0,0 +1,87 @@
+</a><a href="#h1-0-0" id="h1-0-0" class="i">+package protocol
+</a><a href="#h1-0-1" id="h1-0-1" class="i">+
+</a><a href="#h1-0-2" id="h1-0-2" class="i">+import (
+</a><a href="#h1-0-3" id="h1-0-3" class="i">+	&quot;io&quot;
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+	&quot;strings&quot;
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+	&quot;testing&quot;
+</a><a href="#h1-0-6" id="h1-0-6" class="i">+	&quot;time&quot;
+</a><a href="#h1-0-7" id="h1-0-7" class="i">+
+</a><a href="#h1-0-8" id="h1-0-8" class="i">+	&quot;github.com/stretchr/testify/assert&quot;
+</a><a href="#h1-0-9" id="h1-0-9" class="i">+)
+</a><a href="#h1-0-10" id="h1-0-10" class="i">+
+</a><a href="#h1-0-11" id="h1-0-11" class="i">+func TestReaderReadRequestError(t *testing.T) {
+</a><a href="#h1-0-12" id="h1-0-12" class="i">+	t.Parallel()
+</a><a href="#h1-0-13" id="h1-0-13" class="i">+
+</a><a href="#h1-0-14" id="h1-0-14" class="i">+	streams := []io.Reader{
+</a><a href="#h1-0-15" id="h1-0-15" class="i">+		strings.NewReader(&quot;&quot;),
+</a><a href="#h1-0-16" id="h1-0-16" class="i">+		strings.NewReader(&quot;none&quot;),
+</a><a href="#h1-0-17" id="h1-0-17" class="i">+	}
+</a><a href="#h1-0-18" id="h1-0-18" class="i">+
+</a><a href="#h1-0-19" id="h1-0-19" class="i">+	for _, stream := range streams {
+</a><a href="#h1-0-20" id="h1-0-20" class="i">+		cmd, err := NewReader(stream).ReadASCIICommand()
+</a><a href="#h1-0-21" id="h1-0-21" class="i">+
+</a><a href="#h1-0-22" id="h1-0-22" class="i">+		assert.Error(t, err)
+</a><a href="#h1-0-23" id="h1-0-23" class="i">+		assert.Nil(t, cmd)
+</a><a href="#h1-0-24" id="h1-0-24" class="i">+	}
+</a><a href="#h1-0-25" id="h1-0-25" class="i">+}
+</a><a href="#h1-0-26" id="h1-0-26" class="i">+
+</a><a href="#h1-0-27" id="h1-0-27" class="i">+func TestReaderReadRequestSingleDelimiter(t *testing.T) {
+</a><a href="#h1-0-28" id="h1-0-28" class="i">+	t.Parallel()
+</a><a href="#h1-0-29" id="h1-0-29" class="i">+
+</a><a href="#h1-0-30" id="h1-0-30" class="i">+	requests := []Request{
+</a><a href="#h1-0-31" id="h1-0-31" class="i">+		&amp;VersionRequest{},
+</a><a href="#h1-0-32" id="h1-0-32" class="i">+		&amp;ShutdownRequest{Type: &quot;graceful&quot;},
+</a><a href="#h1-0-33" id="h1-0-33" class="i">+		&amp;FlushRequest{Delay: 5 * time.Second},
+</a><a href="#h1-0-34" id="h1-0-34" class="i">+		&amp;StatsRequest{},
+</a><a href="#h1-0-35" id="h1-0-35" class="i">+		&amp;StatsRequest{Type: &quot;settings&quot;},
+</a><a href="#h1-0-36" id="h1-0-36" class="i">+		&amp;WatchRequest{Loggers: []string{&quot;fetchers&quot;, &quot;mutations&quot;}},
+</a><a href="#h1-0-37" id="h1-0-37" class="i">+		&amp;TouchRequest{Key: &quot;key&quot;, Expiration: 5 * time.Second},
+</a><a href="#h1-0-38" id="h1-0-38" class="i">+		&amp;DeleteRequest{Key: &quot;key&quot;},
+</a><a href="#h1-0-39" id="h1-0-39" class="i">+		&amp;IncrRequest{Key: &quot;key&quot;, Delta: 5},
+</a><a href="#h1-0-40" id="h1-0-40" class="i">+		&amp;DecrRequest{Key: &quot;key&quot;, Delta: 5},
+</a><a href="#h1-0-41" id="h1-0-41" class="i">+		&amp;GetRequest{Keys: []string{&quot;k&quot;}},
+</a><a href="#h1-0-42" id="h1-0-42" class="i">+		&amp;GetRequest{Keys: []string{&quot;foo&quot;, &quot;bar&quot;}},
+</a><a href="#h1-0-43" id="h1-0-43" class="i">+		&amp;GetsRequest{Keys: []string{&quot;foo&quot;, &quot;bar&quot;}},
+</a><a href="#h1-0-44" id="h1-0-44" class="i">+		&amp;GatRequest{Keys: []string{&quot;k&quot;}, Expiration: 5 * time.Second},
+</a><a href="#h1-0-45" id="h1-0-45" class="i">+		&amp;GatsRequest{Keys: []string{&quot;k&quot;}, Expiration: 5 * time.Second},
+</a><a href="#h1-0-46" id="h1-0-46" class="i">+	}
+</a><a href="#h1-0-47" id="h1-0-47" class="i">+
+</a><a href="#h1-0-48" id="h1-0-48" class="i">+	for _, req := range requests {
+</a><a href="#h1-0-49" id="h1-0-49" class="i">+		reader := NewReader(strings.NewReader(req.String()))
+</a><a href="#h1-0-50" id="h1-0-50" class="i">+		cmd, err := reader.ReadASCIICommand()
+</a><a href="#h1-0-51" id="h1-0-51" class="i">+
+</a><a href="#h1-0-52" id="h1-0-52" class="i">+		assert.NoError(t, err)
+</a><a href="#h1-0-53" id="h1-0-53" class="i">+		assert.Equal(t, req.String(), string(cmd))
+</a><a href="#h1-0-54" id="h1-0-54" class="i">+	}
+</a><a href="#h1-0-55" id="h1-0-55" class="i">+}
+</a><a href="#h1-0-56" id="h1-0-56" class="i">+
+</a><a href="#h1-0-57" id="h1-0-57" class="i">+func TestReaderReadRequestDoubleDelimiter(t *testing.T) {
+</a><a href="#h1-0-58" id="h1-0-58" class="i">+	t.Parallel()
+</a><a href="#h1-0-59" id="h1-0-59" class="i">+
+</a><a href="#h1-0-60" id="h1-0-60" class="i">+	payload := &amp;Storage{
+</a><a href="#h1-0-61" id="h1-0-61" class="i">+		Key:        &quot;key&quot;,
+</a><a href="#h1-0-62" id="h1-0-62" class="i">+		Flags:      1,
+</a><a href="#h1-0-63" id="h1-0-63" class="i">+		Expiration: 2 * time.Second,
+</a><a href="#h1-0-64" id="h1-0-64" class="i">+		Size:       3,
+</a><a href="#h1-0-65" id="h1-0-65" class="i">+		CasUnique:  4,
+</a><a href="#h1-0-66" id="h1-0-66" class="i">+		Data:       []byte(&quot;data&quot;),
+</a><a href="#h1-0-67" id="h1-0-67" class="i">+		NoReply:    true,
+</a><a href="#h1-0-68" id="h1-0-68" class="i">+	}
+</a><a href="#h1-0-69" id="h1-0-69" class="i">+
+</a><a href="#h1-0-70" id="h1-0-70" class="i">+	requests := []Request{
+</a><a href="#h1-0-71" id="h1-0-71" class="i">+		&amp;SetRequest{Payload: payload},
+</a><a href="#h1-0-72" id="h1-0-72" class="i">+		&amp;AddRequest{Payload: payload},
+</a><a href="#h1-0-73" id="h1-0-73" class="i">+		&amp;ReplaceRequest{Payload: payload},
+</a><a href="#h1-0-74" id="h1-0-74" class="i">+		&amp;AppendRequest{Payload: payload},
+</a><a href="#h1-0-75" id="h1-0-75" class="i">+		&amp;PrependRequest{Payload: payload},
+</a><a href="#h1-0-76" id="h1-0-76" class="i">+		&amp;CasRequest{Payload: payload},
+</a><a href="#h1-0-77" id="h1-0-77" class="i">+	}
+</a><a href="#h1-0-78" id="h1-0-78" class="i">+
+</a><a href="#h1-0-79" id="h1-0-79" class="i">+	for _, req := range requests {
+</a><a href="#h1-0-80" id="h1-0-80" class="i">+		reader := NewReader(strings.NewReader(req.String()))
+</a><a href="#h1-0-81" id="h1-0-81" class="i">+		cmd, err := reader.ReadASCIICommand()
+</a><a href="#h1-0-82" id="h1-0-82" class="i">+
+</a><a href="#h1-0-83" id="h1-0-83" class="i">+		assert.NoError(t, err)
+</a><a href="#h1-0-84" id="h1-0-84" class="i">+		assert.Equal(t, req.String(), string(cmd))
+</a><a href="#h1-0-85" id="h1-0-85" class="i">+	}
+</a><a href="#h1-0-86" id="h1-0-86" class="i">+}
+</a></pre>
+</div>
+</body>
+</html>

@@ -1,0 +1,59 @@
+pipeline {
+    agent {
+        docker {
+            image 'docker.internal.kevinlin.info/infra/ci-base:0.3.5'
+            label 'docker-executor'
+        }
+    }
+
+    options {
+        withAWS(
+            endpointUrl: 'https://storage.kevinlin.info',
+            credentials: 'storage-internal',
+        )
+    }
+
+    stages {
+        stage('Install') {
+            steps {
+                sh 'go mod download -x'
+                sh 'go mod tidy -v'
+            }
+        }
+        stage('Test') {
+            parallel {
+                stage('Lint') {
+                    steps {
+                         sh 'make lint'
+                    }
+                }
+                stage('Unit') {
+                    steps {
+                        sh 'make test'
+                    }
+                }
+            }
+        }
+        stage('Build') {
+            environment {
+                CGO_ENABLED = '0'
+                GOOS = 'linux'
+                GOARCH = 'amd64'
+                VERSION = "${GIT_COMMIT}"
+            }
+            steps {
+                sh 'make'
+            }
+        }
+        stage('Release') {
+            steps {
+                sh 'tar -cvzf release.tar.gz bin/'
+                s3Upload(
+                    bucket: 'internal',
+                    path: "deploy/${env.JOB_NAME}/${env.GIT_COMMIT}/",
+                    file: 'release.tar.gz',
+                )
+            }
+        }
+    }
+}

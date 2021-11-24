@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>protocol: Refactor RetrievalPayload -&gt; Retrieval, StoragePayload -&gt; Storage - mcrpc - Library for building memcache protocol servers</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="mcrpc Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="mcrpc Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>mcrpc</h1><span class="desc">Library for building memcache protocol servers</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/mcrpc.git">https://source.static.kevinlin.info/mcrpc.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/2f94523f3e298bba38a460715c0803c13bcf3ea0">2f94523f3e298bba38a460715c0803c13bcf3ea0</a>
+<b>parent</b> <a href="../commit/57bac5a9d91d4ba64174fd8444f0b9a5801dcbcc">57bac5a9d91d4ba64174fd8444f0b9a5801dcbcc</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Mon, 22 Nov 2021 08:46:28 -0800
+
+protocol: Refactor RetrievalPayload -&gt; Retrieval, StoragePayload -&gt; Storage
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">protocol/ascii.go</a></td><td> | </td><td class="num">4</td><td><span class="i">++</span><span class="d">--</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">protocol/ascii_test.go</a></td><td> | </td><td class="num">40</td><td><span class="i">++++++++++++++++++++</span><span class="d">--------------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">protocol/types.go</a></td><td> | </td><td class="num">28</td><td><span class="i">++++++++++++++</span><span class="d">--------------</span></td></tr>
+</table></pre><pre>3 files changed, 36 insertions(+), 36 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/protocol/ascii.go">protocol/ascii.go</a> b/<a href="../file/protocol/ascii.go">protocol/ascii.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -237,7 +237,7 @@ func (g *GatsResponse) String() string {
+</a> 	return (&amp;GetResponse{Values: g.Values}).String()
+ }
+ 
+<a href="#h0-0-3" id="h0-0-3" class="d">-func (r *RetrievalPayload) String() string {
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+func (r *Retrieval) String() string {
+</a> 	if r.CasUnique == 0 {
+ 		return fmt.Sprintf(
+ 			&quot;VALUE %s %d %d\r\n%s\r\n&quot;,
+<a href="#h0-1" id="h0-1" class="h">@@ -317,7 +317,7 @@ func (c *CasResponse) String() string {
+</a> 	return (&amp;SetResponse{Status: c.Status}).String()
+ }
+ 
+<a href="#h0-1-3" id="h0-1-3" class="d">-func (s *StoragePayload) String() string {
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+func (s *Storage) String() string {
+</a> 	exptime := fmt.Sprintf(&quot;%.f&quot;, s.Expiration.Seconds())
+ 
+ 	switch {
+<b>diff --git a/<a id="h1" href="../file/protocol/ascii_test.go">protocol/ascii_test.go</a> b/<a href="../file/protocol/ascii_test.go">protocol/ascii_test.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -459,7 +459,7 @@ func TestGetResponse(t *testing.T) {
+</a> 	}{
+ 		{
+ 			response: &amp;GetResponse{
+<a href="#h1-0-3" id="h1-0-3" class="d">-				Values: []*RetrievalPayload{
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+				Values: []*Retrieval{
+</a> 					{
+ 						Key:   &quot;foo&quot;,
+ 						Flags: 5,
+<a href="#h1-1" id="h1-1" class="h">@@ -472,7 +472,7 @@ func TestGetResponse(t *testing.T) {
+</a> 		},
+ 		{
+ 			response: &amp;GetResponse{
+<a href="#h1-1-3" id="h1-1-3" class="d">-				Values: []*RetrievalPayload{
+</a><a href="#h1-1-4" id="h1-1-4" class="i">+				Values: []*Retrieval{
+</a> 					{
+ 						Key:   &quot;foo&quot;,
+ 						Flags: 5,
+<a href="#h1-2" id="h1-2" class="h">@@ -527,7 +527,7 @@ func TestGetsResponse(t *testing.T) {
+</a> 	}{
+ 		{
+ 			response: &amp;GetsResponse{
+<a href="#h1-2-3" id="h1-2-3" class="d">-				Values: []*RetrievalPayload{
+</a><a href="#h1-2-4" id="h1-2-4" class="i">+				Values: []*Retrieval{
+</a> 					{
+ 						Key:       &quot;foo&quot;,
+ 						Flags:     5,
+<a href="#h1-3" id="h1-3" class="h">@@ -541,7 +541,7 @@ func TestGetsResponse(t *testing.T) {
+</a> 		},
+ 		{
+ 			response: &amp;GetsResponse{
+<a href="#h1-3-3" id="h1-3-3" class="d">-				Values: []*RetrievalPayload{
+</a><a href="#h1-3-4" id="h1-3-4" class="i">+				Values: []*Retrieval{
+</a> 					{
+ 						Key:       &quot;foo&quot;,
+ 						Flags:     5,
+<a href="#h1-4" id="h1-4" class="h">@@ -604,7 +604,7 @@ func TestGatResponse(t *testing.T) {
+</a> 	}{
+ 		{
+ 			response: &amp;GatResponse{
+<a href="#h1-4-3" id="h1-4-3" class="d">-				Values: []*RetrievalPayload{
+</a><a href="#h1-4-4" id="h1-4-4" class="i">+				Values: []*Retrieval{
+</a> 					{
+ 						Key:   &quot;foo&quot;,
+ 						Flags: 5,
+<a href="#h1-5" id="h1-5" class="h">@@ -617,7 +617,7 @@ func TestGatResponse(t *testing.T) {
+</a> 		},
+ 		{
+ 			response: &amp;GatResponse{
+<a href="#h1-5-3" id="h1-5-3" class="d">-				Values: []*RetrievalPayload{
+</a><a href="#h1-5-4" id="h1-5-4" class="i">+				Values: []*Retrieval{
+</a> 					{
+ 						Key:   &quot;foo&quot;,
+ 						Flags: 5,
+<a href="#h1-6" id="h1-6" class="h">@@ -678,7 +678,7 @@ func TestGatsResponse(t *testing.T) {
+</a> 	}{
+ 		{
+ 			response: &amp;GatsResponse{
+<a href="#h1-6-3" id="h1-6-3" class="d">-				Values: []*RetrievalPayload{
+</a><a href="#h1-6-4" id="h1-6-4" class="i">+				Values: []*Retrieval{
+</a> 					{
+ 						Key:       &quot;foo&quot;,
+ 						Flags:     5,
+<a href="#h1-7" id="h1-7" class="h">@@ -692,7 +692,7 @@ func TestGatsResponse(t *testing.T) {
+</a> 		},
+ 		{
+ 			response: &amp;GatsResponse{
+<a href="#h1-7-3" id="h1-7-3" class="d">-				Values: []*RetrievalPayload{
+</a><a href="#h1-7-4" id="h1-7-4" class="i">+				Values: []*Retrieval{
+</a> 					{
+ 						Key:       &quot;foo&quot;,
+ 						Flags:     5,
+<a href="#h1-8" id="h1-8" class="h">@@ -727,7 +727,7 @@ func TestSetRequest(t *testing.T) {
+</a> 	}{
+ 		{
+ 			request: &amp;SetRequest{
+<a href="#h1-8-3" id="h1-8-3" class="d">-				Payload: &amp;StoragePayload{
+</a><a href="#h1-8-4" id="h1-8-4" class="i">+				Payload: &amp;Storage{
+</a> 					Key:        &quot;key&quot;,
+ 					Flags:      1,
+ 					Expiration: 2 * time.Second,
+<a href="#h1-9" id="h1-9" class="h">@@ -740,7 +740,7 @@ func TestSetRequest(t *testing.T) {
+</a> 		},
+ 		{
+ 			request: &amp;SetRequest{
+<a href="#h1-9-3" id="h1-9-3" class="d">-				Payload: &amp;StoragePayload{
+</a><a href="#h1-9-4" id="h1-9-4" class="i">+				Payload: &amp;Storage{
+</a> 					Key:        &quot;key&quot;,
+ 					Flags:      1,
+ 					Expiration: 2 * time.Second,
+<a href="#h1-10" id="h1-10" class="h">@@ -797,7 +797,7 @@ func TestAddRequest(t *testing.T) {
+</a> 	}{
+ 		{
+ 			request: &amp;AddRequest{
+<a href="#h1-10-3" id="h1-10-3" class="d">-				Payload: &amp;StoragePayload{
+</a><a href="#h1-10-4" id="h1-10-4" class="i">+				Payload: &amp;Storage{
+</a> 					Key:        &quot;key&quot;,
+ 					Flags:      1,
+ 					Expiration: 2 * time.Second,
+<a href="#h1-11" id="h1-11" class="h">@@ -810,7 +810,7 @@ func TestAddRequest(t *testing.T) {
+</a> 		},
+ 		{
+ 			request: &amp;AddRequest{
+<a href="#h1-11-3" id="h1-11-3" class="d">-				Payload: &amp;StoragePayload{
+</a><a href="#h1-11-4" id="h1-11-4" class="i">+				Payload: &amp;Storage{
+</a> 					Key:        &quot;key&quot;,
+ 					Flags:      1,
+ 					Expiration: 2 * time.Second,
+<a href="#h1-12" id="h1-12" class="h">@@ -867,7 +867,7 @@ func TestReplaceRequest(t *testing.T) {
+</a> 	}{
+ 		{
+ 			request: &amp;ReplaceRequest{
+<a href="#h1-12-3" id="h1-12-3" class="d">-				Payload: &amp;StoragePayload{
+</a><a href="#h1-12-4" id="h1-12-4" class="i">+				Payload: &amp;Storage{
+</a> 					Key:        &quot;key&quot;,
+ 					Flags:      1,
+ 					Expiration: 2 * time.Second,
+<a href="#h1-13" id="h1-13" class="h">@@ -880,7 +880,7 @@ func TestReplaceRequest(t *testing.T) {
+</a> 		},
+ 		{
+ 			request: &amp;ReplaceRequest{
+<a href="#h1-13-3" id="h1-13-3" class="d">-				Payload: &amp;StoragePayload{
+</a><a href="#h1-13-4" id="h1-13-4" class="i">+				Payload: &amp;Storage{
+</a> 					Key:        &quot;key&quot;,
+ 					Flags:      1,
+ 					Expiration: 2 * time.Second,
+<a href="#h1-14" id="h1-14" class="h">@@ -937,7 +937,7 @@ func TestAppendRequest(t *testing.T) {
+</a> 	}{
+ 		{
+ 			request: &amp;AppendRequest{
+<a href="#h1-14-3" id="h1-14-3" class="d">-				Payload: &amp;StoragePayload{
+</a><a href="#h1-14-4" id="h1-14-4" class="i">+				Payload: &amp;Storage{
+</a> 					Key:        &quot;key&quot;,
+ 					Flags:      1,
+ 					Expiration: 2 * time.Second,
+<a href="#h1-15" id="h1-15" class="h">@@ -950,7 +950,7 @@ func TestAppendRequest(t *testing.T) {
+</a> 		},
+ 		{
+ 			request: &amp;AppendRequest{
+<a href="#h1-15-3" id="h1-15-3" class="d">-				Payload: &amp;StoragePayload{
+</a><a href="#h1-15-4" id="h1-15-4" class="i">+				Payload: &amp;Storage{
+</a> 					Key:        &quot;key&quot;,
+ 					Flags:      1,
+ 					Expiration: 2 * time.Second,
+<a href="#h1-16" id="h1-16" class="h">@@ -1007,7 +1007,7 @@ func TestPrependRequest(t *testing.T) {
+</a> 	}{
+ 		{
+ 			request: &amp;PrependRequest{
+<a href="#h1-16-3" id="h1-16-3" class="d">-				Payload: &amp;StoragePayload{
+</a><a href="#h1-16-4" id="h1-16-4" class="i">+				Payload: &amp;Storage{
+</a> 					Key:        &quot;key&quot;,
+ 					Flags:      1,
+ 					Expiration: 2 * time.Second,
+<a href="#h1-17" id="h1-17" class="h">@@ -1020,7 +1020,7 @@ func TestPrependRequest(t *testing.T) {
+</a> 		},
+ 		{
+ 			request: &amp;PrependRequest{
+<a href="#h1-17-3" id="h1-17-3" class="d">-				Payload: &amp;StoragePayload{
+</a><a href="#h1-17-4" id="h1-17-4" class="i">+				Payload: &amp;Storage{
+</a> 					Key:        &quot;key&quot;,
+ 					Flags:      1,
+ 					Expiration: 2 * time.Second,
+<a href="#h1-18" id="h1-18" class="h">@@ -1077,7 +1077,7 @@ func TestCasRequest(t *testing.T) {
+</a> 	}{
+ 		{
+ 			request: &amp;CasRequest{
+<a href="#h1-18-3" id="h1-18-3" class="d">-				Payload: &amp;StoragePayload{
+</a><a href="#h1-18-4" id="h1-18-4" class="i">+				Payload: &amp;Storage{
+</a> 					Key:        &quot;key&quot;,
+ 					Flags:      1,
+ 					Expiration: 2 * time.Second,
+<a href="#h1-19" id="h1-19" class="h">@@ -1091,7 +1091,7 @@ func TestCasRequest(t *testing.T) {
+</a> 		},
+ 		{
+ 			request: &amp;CasRequest{
+<a href="#h1-19-3" id="h1-19-3" class="d">-				Payload: &amp;StoragePayload{
+</a><a href="#h1-19-4" id="h1-19-4" class="i">+				Payload: &amp;Storage{
+</a> 					Key:        &quot;key&quot;,
+ 					Flags:      1,
+ 					Expiration: 2 * time.Second,
+<b>diff --git a/<a id="h2" href="../file/protocol/types.go">protocol/types.go</a> b/<a href="../file/protocol/types.go">protocol/types.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -185,7 +185,7 @@ type GetRequest struct {
+</a> 
+ // GetResponse is the Response counterpart to GetRequest.
+ type GetResponse struct {
+<a href="#h2-0-3" id="h2-0-3" class="d">-	Values []*RetrievalPayload
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+	Values []*Retrieval
+</a> }
+ 
+ // GetsRequest is a Request to fetch the values and CAS unique values associated with one or more
+<a href="#h2-1" id="h2-1" class="h">@@ -196,7 +196,7 @@ type GetsRequest struct {
+</a> 
+ // GetsResponse is the Response counterpart to GetsRequest.
+ type GetsResponse struct {
+<a href="#h2-1-3" id="h2-1-3" class="d">-	Values []*RetrievalPayload
+</a><a href="#h2-1-4" id="h2-1-4" class="i">+	Values []*Retrieval
+</a> }
+ 
+ // GatRequest is a Request to get and touch one or more keys.
+<a href="#h2-2" id="h2-2" class="h">@@ -207,7 +207,7 @@ type GatRequest struct {
+</a> 
+ // GatResponse is the Response counterpart to GatRequest.
+ type GatResponse struct {
+<a href="#h2-2-3" id="h2-2-3" class="d">-	Values []*RetrievalPayload
+</a><a href="#h2-2-4" id="h2-2-4" class="i">+	Values []*Retrieval
+</a> }
+ 
+ // GatsRequest is a Request to get and touch one or more keys with their CAS unique values.
+<a href="#h2-3" id="h2-3" class="h">@@ -218,11 +218,11 @@ type GatsRequest struct {
+</a> 
+ // GatsResponse is the Response counterpart to GatsRequest.
+ type GatsResponse struct {
+<a href="#h2-3-3" id="h2-3-3" class="d">-	Values []*RetrievalPayload
+</a><a href="#h2-3-4" id="h2-3-4" class="i">+	Values []*Retrieval
+</a> }
+ 
+<a href="#h2-3-7" id="h2-3-7" class="d">-// RetrievalPayload describes elements of a value for a get-like request.
+</a><a href="#h2-3-8" id="h2-3-8" class="d">-type RetrievalPayload struct {
+</a><a href="#h2-3-9" id="h2-3-9" class="i">+// Retrieval describes elements of a value for a get-like request.
+</a><a href="#h2-3-10" id="h2-3-10" class="i">+type Retrieval struct {
+</a> 	Key       string
+ 	Flags     uint16
+ 	Size      int
+<a href="#h2-4" id="h2-4" class="h">@@ -232,7 +232,7 @@ type RetrievalPayload struct {
+</a> 
+ // SetRequest is a Request to set a key.
+ type SetRequest struct {
+<a href="#h2-4-3" id="h2-4-3" class="d">-	Payload *StoragePayload
+</a><a href="#h2-4-4" id="h2-4-4" class="i">+	Payload *Storage
+</a> }
+ 
+ // SetResponse is the Response counterpart to SetRequest.
+<a href="#h2-5" id="h2-5" class="h">@@ -242,7 +242,7 @@ type SetResponse struct {
+</a> 
+ // AddRequest is a Request to set a key, but only if it does not already exist.
+ type AddRequest struct {
+<a href="#h2-5-3" id="h2-5-3" class="d">-	Payload *StoragePayload
+</a><a href="#h2-5-4" id="h2-5-4" class="i">+	Payload *Storage
+</a> }
+ 
+ // AddResponse is the Response counterpart to AddRequest.
+<a href="#h2-6" id="h2-6" class="h">@@ -252,7 +252,7 @@ type AddResponse struct {
+</a> 
+ // ReplaceRequest is a Request to replace the value of an existing key.
+ type ReplaceRequest struct {
+<a href="#h2-6-3" id="h2-6-3" class="d">-	Payload *StoragePayload
+</a><a href="#h2-6-4" id="h2-6-4" class="i">+	Payload *Storage
+</a> }
+ 
+ // ReplaceResponse is the Response counterpart to ReplaceRequest.
+<a href="#h2-7" id="h2-7" class="h">@@ -263,7 +263,7 @@ type ReplaceResponse struct {
+</a> // AppendRequest is a Request to append data to the end of the value associated with an existing
+ // key.
+ type AppendRequest struct {
+<a href="#h2-7-3" id="h2-7-3" class="d">-	Payload *StoragePayload
+</a><a href="#h2-7-4" id="h2-7-4" class="i">+	Payload *Storage
+</a> }
+ 
+ // AppendResponse is the Response counterpart to AppendRequest.
+<a href="#h2-8" id="h2-8" class="h">@@ -274,7 +274,7 @@ type AppendResponse struct {
+</a> // PrependRequest is a Request to prepend data to the beginning of the value associated with an
+ // existing key.
+ type PrependRequest struct {
+<a href="#h2-8-3" id="h2-8-3" class="d">-	Payload *StoragePayload
+</a><a href="#h2-8-4" id="h2-8-4" class="i">+	Payload *Storage
+</a> }
+ 
+ // PrependResponse is the Response counterpart to PrependRequest.
+<a href="#h2-9" id="h2-9" class="h">@@ -284,7 +284,7 @@ type PrependResponse struct {
+</a> 
+ // CasRequest is a Request to store a key, with a unique value for check-and-set semantics.
+ type CasRequest struct {
+<a href="#h2-9-3" id="h2-9-3" class="d">-	Payload *StoragePayload
+</a><a href="#h2-9-4" id="h2-9-4" class="i">+	Payload *Storage
+</a> }
+ 
+ // CasResponse is the Response counterpart to CasRequest.
+<a href="#h2-10" id="h2-10" class="h">@@ -292,8 +292,8 @@ type CasResponse struct {
+</a> 	Status StoreStatus
+ }
+ 
+<a href="#h2-10-3" id="h2-10-3" class="d">-// StoragePayload describes elements of a value for a update-like request.
+</a><a href="#h2-10-4" id="h2-10-4" class="d">-type StoragePayload struct {
+</a><a href="#h2-10-5" id="h2-10-5" class="i">+// Storage describes elements of a value for a update-like request.
+</a><a href="#h2-10-6" id="h2-10-6" class="i">+type Storage struct {
+</a> 	Key        string
+ 	Flags      uint16
+ 	Expiration time.Duration
+</pre>
+</div>
+</body>
+</html>

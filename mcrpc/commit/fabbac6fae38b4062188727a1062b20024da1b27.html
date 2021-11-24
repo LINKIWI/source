@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>pkg/protocol: Simplify Ragel state machine by using shared parser state and assembling into structs after parse - mcrpc - Library for building memcache protocol servers</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="mcrpc Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="mcrpc Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>mcrpc</h1><span class="desc">Library for building memcache protocol servers</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/mcrpc.git">https://source.static.kevinlin.info/mcrpc.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/fabbac6fae38b4062188727a1062b20024da1b27">fabbac6fae38b4062188727a1062b20024da1b27</a>
+<b>parent</b> <a href="../commit/a0b3e49a1af7cdba8babd2bd05cd09a37b35abee">a0b3e49a1af7cdba8babd2bd05cd09a37b35abee</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Mon, 22 Nov 2021 08:42:26 -0800
+
+pkg/protocol: Simplify Ragel state machine by using shared parser state and assembling into structs after parse
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">pkg/protocol/memcache.rl</a></td><td> | </td><td class="num">365</td><td><span class="i">++++++++++++++++++++++++++++++++++++</span><span class="d">-------------------------------------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">pkg/protocol/types.go</a></td><td> | </td><td class="num">26</td><td><span class="i">+++++++++++++++++++++++++</span><span class="d">-</span></td></tr>
+</table></pre><pre>2 files changed, 190 insertions(+), 201 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/pkg/protocol/memcache.rl">pkg/protocol/memcache.rl</a> b/<a href="../file/pkg/protocol/memcache.rl">pkg/protocol/memcache.rl</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -7,7 +7,7 @@ import (
+</a> )
+ 
+ %%{
+<a href="#h0-0-3" id="h0-0-3" class="d">-    machine memcache;
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+    machine memcache_ascii;
+</a> 
+     action mark {
+         m.mark()
+<a href="#h0-1" id="h0-1" class="h">@@ -15,194 +15,84 @@ import (
+</a> 
+     # Common
+ 
+<a href="#h0-1-3" id="h0-1-3" class="d">-    key = (any - &#39; &#39;+){1,250};
+</a><a href="#h0-1-4" id="h0-1-4" class="d">-
+</a><a href="#h0-1-5" id="h0-1-5" class="d">-    number = /[0-9]/+;
+</a><a href="#h0-1-6" id="h0-1-6" class="d">-
+</a><a href="#h0-1-7" id="h0-1-7" class="d">-    noreply = &#39;noreply&#39;;
+</a><a href="#h0-1-8" id="h0-1-8" class="d">-
+</a><a href="#h0-1-9" id="h0-1-9" class="d">-    # Core CRUD commands
+</a><a href="#h0-1-10" id="h0-1-10" class="d">-
+</a><a href="#h0-1-11" id="h0-1-11" class="d">-    get_key = key &gt;mark %{ get.Keys = append(get.Keys, m.text()) };
+</a><a href="#h0-1-12" id="h0-1-12" class="d">-    get_key_list = (get_key &#39; &#39;+)* get_key;
+</a><a href="#h0-1-13" id="h0-1-13" class="d">-    get = &#39;get&#39; &#39; &#39;+ get_key_list &#39;\r\n&#39; %{ return get, nil };
+</a><a href="#h0-1-14" id="h0-1-14" class="d">-
+</a><a href="#h0-1-15" id="h0-1-15" class="d">-    gets_key = key &gt;mark %{ gets.Keys = append(gets.Keys, m.text()) };
+</a><a href="#h0-1-16" id="h0-1-16" class="d">-    gets_key_list = (gets_key &#39; &#39;+)* gets_key;
+</a><a href="#h0-1-17" id="h0-1-17" class="d">-    gets = &#39;gets&#39; &#39; &#39;+ gets_key_list &#39;\r\n&#39; %{ return gets, nil };
+</a><a href="#h0-1-18" id="h0-1-18" class="d">-
+</a><a href="#h0-1-19" id="h0-1-19" class="d">-    gat_key = key &gt;mark %{ gat.Keys = append(gat.Keys, m.text()) };
+</a><a href="#h0-1-20" id="h0-1-20" class="d">-    gat_key_list = (gat_key &#39; &#39;+)* gat_key;
+</a><a href="#h0-1-21" id="h0-1-21" class="d">-    gat =
+</a><a href="#h0-1-22" id="h0-1-22" class="d">-        &#39;gat&#39;
+</a><a href="#h0-1-23" id="h0-1-23" class="d">-        &#39; &#39;+
+</a><a href="#h0-1-24" id="h0-1-24" class="d">-        (number &gt;mark %{
+</a><a href="#h0-1-25" id="h0-1-25" class="d">-            if duration, err := strconv.ParseUint(m.text(), 10, 64); err == nil {
+</a><a href="#h0-1-26" id="h0-1-26" class="d">-                gat.Expiration = time.Duration(duration) * time.Second
+</a><a href="#h0-1-27" id="h0-1-27" class="d">-            }
+</a><a href="#h0-1-28" id="h0-1-28" class="d">-        })
+</a><a href="#h0-1-29" id="h0-1-29" class="d">-        &#39; &#39;+
+</a><a href="#h0-1-30" id="h0-1-30" class="d">-        gat_key_list
+</a><a href="#h0-1-31" id="h0-1-31" class="d">-        &#39;\r\n&#39;
+</a><a href="#h0-1-32" id="h0-1-32" class="d">-        %{ return gat, nil };
+</a><a href="#h0-1-33" id="h0-1-33" class="d">-
+</a><a href="#h0-1-34" id="h0-1-34" class="d">-    gats_key = key &gt;mark %{ gats.Keys = append(gats.Keys, m.text()) };
+</a><a href="#h0-1-35" id="h0-1-35" class="d">-    gats_key_list = (gats_key &#39; &#39;+)* gats_key;
+</a><a href="#h0-1-36" id="h0-1-36" class="d">-    gats =
+</a><a href="#h0-1-37" id="h0-1-37" class="d">-        &#39;gats&#39;
+</a><a href="#h0-1-38" id="h0-1-38" class="d">-        &#39; &#39;+
+</a><a href="#h0-1-39" id="h0-1-39" class="d">-        (number &gt;mark %{
+</a><a href="#h0-1-40" id="h0-1-40" class="d">-            if duration, err := strconv.ParseUint(m.text(), 10, 64); err == nil {
+</a><a href="#h0-1-41" id="h0-1-41" class="d">-                gats.Expiration = time.Duration(duration) * time.Second
+</a><a href="#h0-1-42" id="h0-1-42" class="d">-            }
+</a><a href="#h0-1-43" id="h0-1-43" class="d">-        })
+</a><a href="#h0-1-44" id="h0-1-44" class="d">-        &#39; &#39;+
+</a><a href="#h0-1-45" id="h0-1-45" class="d">-        gats_key_list
+</a><a href="#h0-1-46" id="h0-1-46" class="d">-        &#39;\r\n&#39;
+</a><a href="#h0-1-47" id="h0-1-47" class="d">-        %{ return gats, nil };
+</a><a href="#h0-1-48" id="h0-1-48" class="d">-
+</a><a href="#h0-1-49" id="h0-1-49" class="d">-    storage_cmd = &#39;set&#39; | &#39;add&#39; | &#39;replace&#39; | &#39;append&#39; | &#39;prepend&#39;;
+</a><a href="#h0-1-50" id="h0-1-50" class="d">-    storage_data = (any - &#39;\r\n&#39;)+;
+</a><a href="#h0-1-51" id="h0-1-51" class="d">-    storage_header =
+</a><a href="#h0-1-52" id="h0-1-52" class="d">-        (key &gt;mark %{ payload.Key = m.text() })
+</a><a href="#h0-1-53" id="h0-1-53" class="d">-        &#39; &#39;+
+</a><a href="#h0-1-54" id="h0-1-54" class="d">-        (number &gt;mark %{
+</a><a href="#h0-1-55" id="h0-1-55" class="d">-            if flags, err := strconv.ParseUint(m.text(), 10, 16); err == nil {
+</a><a href="#h0-1-56" id="h0-1-56" class="d">-                payload.Flags = uint16(flags)
+</a><a href="#h0-1-57" id="h0-1-57" class="d">-            }
+</a><a href="#h0-1-58" id="h0-1-58" class="d">-        })
+</a><a href="#h0-1-59" id="h0-1-59" class="d">-        &#39; &#39;+
+</a><a href="#h0-1-60" id="h0-1-60" class="d">-        (number &gt;mark %{
+</a><a href="#h0-1-61" id="h0-1-61" class="d">-            if duration, err := strconv.ParseUint(m.text(), 10, 64); err == nil {
+</a><a href="#h0-1-62" id="h0-1-62" class="d">-                payload.Expiration = time.Duration(duration) * time.Second
+</a><a href="#h0-1-63" id="h0-1-63" class="d">-            }
+</a><a href="#h0-1-64" id="h0-1-64" class="d">-        })
+</a><a href="#h0-1-65" id="h0-1-65" class="d">-        &#39; &#39;+
+</a><a href="#h0-1-66" id="h0-1-66" class="d">-        (number &gt;mark %{
+</a><a href="#h0-1-67" id="h0-1-67" class="d">-            if size, err := strconv.Atoi(m.text()); err == nil {
+</a><a href="#h0-1-68" id="h0-1-68" class="d">-                payload.Size = size
+</a><a href="#h0-1-69" id="h0-1-69" class="d">-            }
+</a><a href="#h0-1-70" id="h0-1-70" class="d">-        });
+</a><a href="#h0-1-71" id="h0-1-71" class="d">-
+</a><a href="#h0-1-72" id="h0-1-72" class="d">-    storage =
+</a><a href="#h0-1-73" id="h0-1-73" class="d">-        (storage_cmd &gt;mark %{ storageCmd = m.text() })
+</a><a href="#h0-1-74" id="h0-1-74" class="d">-        &#39; &#39;+
+</a><a href="#h0-1-75" id="h0-1-75" class="d">-        storage_header
+</a><a href="#h0-1-76" id="h0-1-76" class="d">-        (&#39; &#39;+ noreply %{ payload.NoReply = true })?
+</a><a href="#h0-1-77" id="h0-1-77" class="d">-        &#39;\r\n&#39;
+</a><a href="#h0-1-78" id="h0-1-78" class="d">-        storage_data
+</a><a href="#h0-1-79" id="h0-1-79" class="d">-        &#39;\r\n&#39;
+</a><a href="#h0-1-80" id="h0-1-80" class="d">-        %{
+</a><a href="#h0-1-81" id="h0-1-81" class="d">-            switch storageCmd {
+</a><a href="#h0-1-82" id="h0-1-82" class="d">-            case &quot;set&quot;:
+</a><a href="#h0-1-83" id="h0-1-83" class="d">-                set.Payload = payload
+</a><a href="#h0-1-84" id="h0-1-84" class="d">-                return set, nil
+</a><a href="#h0-1-85" id="h0-1-85" class="d">-            case &quot;add&quot;:
+</a><a href="#h0-1-86" id="h0-1-86" class="d">-                add.Payload = payload
+</a><a href="#h0-1-87" id="h0-1-87" class="d">-                return add, nil
+</a><a href="#h0-1-88" id="h0-1-88" class="d">-            case &quot;replace&quot;:
+</a><a href="#h0-1-89" id="h0-1-89" class="d">-                replace.Payload = payload
+</a><a href="#h0-1-90" id="h0-1-90" class="d">-                return replace, nil
+</a><a href="#h0-1-91" id="h0-1-91" class="d">-            case &quot;append&quot;:
+</a><a href="#h0-1-92" id="h0-1-92" class="d">-                app.Payload = payload
+</a><a href="#h0-1-93" id="h0-1-93" class="d">-                return app, nil
+</a><a href="#h0-1-94" id="h0-1-94" class="d">-            case &quot;prepend&quot;:
+</a><a href="#h0-1-95" id="h0-1-95" class="d">-                prepend.Payload = payload
+</a><a href="#h0-1-96" id="h0-1-96" class="d">-                return prepend, nil
+</a><a href="#h0-1-97" id="h0-1-97" class="d">-            }
+</a><a href="#h0-1-98" id="h0-1-98" class="d">-        };
+</a><a href="#h0-1-99" id="h0-1-99" class="d">-
+</a><a href="#h0-1-100" id="h0-1-100" class="d">-    cas =
+</a><a href="#h0-1-101" id="h0-1-101" class="d">-        &#39;cas&#39;
+</a><a href="#h0-1-102" id="h0-1-102" class="d">-        &#39; &#39;+
+</a><a href="#h0-1-103" id="h0-1-103" class="d">-        storage_header
+</a><a href="#h0-1-104" id="h0-1-104" class="d">-        &#39; &#39;+
+</a><a href="#h0-1-105" id="h0-1-105" class="d">-        (number &gt;mark %{
+</a><a href="#h0-1-106" id="h0-1-106" class="d">-            if casUnique, err := strconv.ParseUint(m.text(), 10, 64); err == nil {
+</a><a href="#h0-1-107" id="h0-1-107" class="d">-                payload.CasUnique = casUnique
+</a><a href="#h0-1-108" id="h0-1-108" class="d">-            }
+</a><a href="#h0-1-109" id="h0-1-109" class="d">-        })
+</a><a href="#h0-1-110" id="h0-1-110" class="d">-        (&#39; &#39;+ noreply %{ payload.NoReply = true })?
+</a><a href="#h0-1-111" id="h0-1-111" class="d">-        &#39;\r\n&#39;
+</a><a href="#h0-1-112" id="h0-1-112" class="d">-        storage_data
+</a><a href="#h0-1-113" id="h0-1-113" class="d">-        &#39;\r\n&#39;
+</a><a href="#h0-1-114" id="h0-1-114" class="d">-        %{
+</a><a href="#h0-1-115" id="h0-1-115" class="d">-            cas.Payload = payload
+</a><a href="#h0-1-116" id="h0-1-116" class="d">-            return cas, nil
+</a><a href="#h0-1-117" id="h0-1-117" class="d">-        };
+</a><a href="#h0-1-118" id="h0-1-118" class="d">-
+</a><a href="#h0-1-119" id="h0-1-119" class="d">-    incr =
+</a><a href="#h0-1-120" id="h0-1-120" class="d">-        &#39;incr&#39;
+</a><a href="#h0-1-121" id="h0-1-121" class="d">-        &#39; &#39;+
+</a><a href="#h0-1-122" id="h0-1-122" class="d">-        (key &gt;mark %{ incr.Key = m.text() })
+</a><a href="#h0-1-123" id="h0-1-123" class="d">-        &#39; &#39;+
+</a><a href="#h0-1-124" id="h0-1-124" class="d">-        (number &gt;mark %{
+</a><a href="#h0-1-125" id="h0-1-125" class="d">-            if delta, err := strconv.ParseUint(m.text(), 10, 64); err == nil {
+</a><a href="#h0-1-126" id="h0-1-126" class="d">-                incr.Delta = delta
+</a><a href="#h0-1-127" id="h0-1-127" class="d">-            }
+</a><a href="#h0-1-128" id="h0-1-128" class="d">-        })
+</a><a href="#h0-1-129" id="h0-1-129" class="d">-        (&#39; &#39;+ noreply %{ incr.NoReply = true })?
+</a><a href="#h0-1-130" id="h0-1-130" class="d">-        &#39;\r\n&#39;
+</a><a href="#h0-1-131" id="h0-1-131" class="d">-        %{ return incr, nil };
+</a><a href="#h0-1-132" id="h0-1-132" class="d">-
+</a><a href="#h0-1-133" id="h0-1-133" class="d">-    decr =
+</a><a href="#h0-1-134" id="h0-1-134" class="d">-        &#39;decr&#39;
+</a><a href="#h0-1-135" id="h0-1-135" class="d">-        &#39; &#39;+
+</a><a href="#h0-1-136" id="h0-1-136" class="d">-        (key &gt;mark %{ decr.Key = m.text() })
+</a><a href="#h0-1-137" id="h0-1-137" class="d">-        &#39; &#39;+
+</a><a href="#h0-1-138" id="h0-1-138" class="d">-        (number &gt;mark %{
+</a><a href="#h0-1-139" id="h0-1-139" class="d">-            if delta, err := strconv.ParseUint(m.text(), 10, 64); err == nil {
+</a><a href="#h0-1-140" id="h0-1-140" class="d">-                decr.Delta = delta
+</a><a href="#h0-1-141" id="h0-1-141" class="d">-            }
+</a><a href="#h0-1-142" id="h0-1-142" class="d">-        })
+</a><a href="#h0-1-143" id="h0-1-143" class="d">-        (&#39; &#39;+ noreply %{ decr.NoReply = true })?
+</a><a href="#h0-1-144" id="h0-1-144" class="d">-        &#39;\r\n&#39;
+</a><a href="#h0-1-145" id="h0-1-145" class="d">-        %{ return decr, nil };
+</a><a href="#h0-1-146" id="h0-1-146" class="d">-
+</a><a href="#h0-1-147" id="h0-1-147" class="d">-    delete =
+</a><a href="#h0-1-148" id="h0-1-148" class="d">-        &#39;delete&#39;
+</a><a href="#h0-1-149" id="h0-1-149" class="d">-        &#39; &#39;+
+</a><a href="#h0-1-150" id="h0-1-150" class="d">-        (key &gt;mark %{ del.Key = m.text() })
+</a><a href="#h0-1-151" id="h0-1-151" class="d">-        (&#39; &#39;+ noreply %{ del.NoReply = true })?
+</a><a href="#h0-1-152" id="h0-1-152" class="d">-        &#39;\r\n&#39;
+</a><a href="#h0-1-153" id="h0-1-153" class="d">-        %{ return del, nil };
+</a><a href="#h0-1-154" id="h0-1-154" class="d">-
+</a><a href="#h0-1-155" id="h0-1-155" class="d">-    touch =
+</a><a href="#h0-1-156" id="h0-1-156" class="d">-        &#39;touch&#39;
+</a><a href="#h0-1-157" id="h0-1-157" class="d">-        &#39; &#39;+
+</a><a href="#h0-1-158" id="h0-1-158" class="d">-        (key &gt;mark %{ touch.Key = m.text() })
+</a><a href="#h0-1-159" id="h0-1-159" class="d">-        &#39; &#39;+
+</a><a href="#h0-1-160" id="h0-1-160" class="d">-        (number &gt;mark %{
+</a><a href="#h0-1-161" id="h0-1-161" class="d">-            if duration, err := strconv.ParseUint(m.text(), 10, 64); err == nil {
+</a><a href="#h0-1-162" id="h0-1-162" class="d">-                touch.Expiration = time.Duration(duration) * time.Second
+</a><a href="#h0-1-163" id="h0-1-163" class="d">-            }
+</a><a href="#h0-1-164" id="h0-1-164" class="d">-        })
+</a><a href="#h0-1-165" id="h0-1-165" class="d">-        (&#39; &#39;+ noreply %{ touch.NoReply = true })?
+</a><a href="#h0-1-166" id="h0-1-166" class="d">-        &#39;\r\n&#39;
+</a><a href="#h0-1-167" id="h0-1-167" class="d">-        %{ return touch, nil };
+</a><a href="#h0-1-168" id="h0-1-168" class="i">+    sp = &#39; &#39;+;
+</a><a href="#h0-1-169" id="h0-1-169" class="i">+    crlf = &#39;\r\n&#39;;
+</a><a href="#h0-1-170" id="h0-1-170" class="i">+    key = (any - &#39; &#39;+){1,250} &gt;mark %{ keys = append(keys, m.text()) };
+</a><a href="#h0-1-171" id="h0-1-171" class="i">+    key_list = (key sp)* key;
+</a><a href="#h0-1-172" id="h0-1-172" class="i">+    subcommand = sp /[a-z]/+ &gt;mark %{ subcommand = m.text() };
+</a><a href="#h0-1-173" id="h0-1-173" class="i">+    subcommand_list = (subcommand sp)* subcommand %{ subcommands = append(subcommands, subcommand) };
+</a><a href="#h0-1-174" id="h0-1-174" class="i">+    noreply = sp &#39;noreply&#39; %{ noreply = true };
+</a><a href="#h0-1-175" id="h0-1-175" class="i">+    exptime = /[0-9]/+ &gt;mark %{
+</a><a href="#h0-1-176" id="h0-1-176" class="i">+        if parsed, err := strconv.ParseUint(m.text(), 10, 64); err == nil {
+</a><a href="#h0-1-177" id="h0-1-177" class="i">+            exptime = time.Duration(parsed) * time.Second
+</a><a href="#h0-1-178" id="h0-1-178" class="i">+        }
+</a><a href="#h0-1-179" id="h0-1-179" class="i">+    };
+</a><a href="#h0-1-180" id="h0-1-180" class="i">+
+</a><a href="#h0-1-181" id="h0-1-181" class="i">+    # Get commands
+</a><a href="#h0-1-182" id="h0-1-182" class="i">+
+</a><a href="#h0-1-183" id="h0-1-183" class="i">+    get = &#39;get&#39; sp key_list crlf %{ cmd = Get };
+</a><a href="#h0-1-184" id="h0-1-184" class="i">+    gets = &#39;gets&#39; sp key_list crlf %{ cmd = Gets };
+</a><a href="#h0-1-185" id="h0-1-185" class="i">+    gat = &#39;gat&#39; sp exptime sp key_list crlf %{ cmd = Gat };
+</a><a href="#h0-1-186" id="h0-1-186" class="i">+    gats = &#39;gats&#39; sp exptime sp key_list crlf %{ cmd = Gats };
+</a><a href="#h0-1-187" id="h0-1-187" class="i">+
+</a><a href="#h0-1-188" id="h0-1-188" class="i">+    # Storage commands
+</a><a href="#h0-1-189" id="h0-1-189" class="i">+
+</a><a href="#h0-1-190" id="h0-1-190" class="i">+    storage_data = (any - crlf)+ &gt;mark %{ data = m.bytes() };
+</a><a href="#h0-1-191" id="h0-1-191" class="i">+    storage_header = key sp flags sp exptime sp size;
+</a><a href="#h0-1-192" id="h0-1-192" class="i">+    flags = /[0-9]/+ &gt;mark %{
+</a><a href="#h0-1-193" id="h0-1-193" class="i">+        if parsed, err := strconv.ParseUint(m.text(), 10, 16); err == nil {
+</a><a href="#h0-1-194" id="h0-1-194" class="i">+            flags = uint16(parsed)
+</a><a href="#h0-1-195" id="h0-1-195" class="i">+        }
+</a><a href="#h0-1-196" id="h0-1-196" class="i">+    };
+</a><a href="#h0-1-197" id="h0-1-197" class="i">+    size = /[0-9]/+ &gt;mark %{
+</a><a href="#h0-1-198" id="h0-1-198" class="i">+        if parsed, err := strconv.Atoi(m.text()); err == nil {
+</a><a href="#h0-1-199" id="h0-1-199" class="i">+            size = parsed
+</a><a href="#h0-1-200" id="h0-1-200" class="i">+        }
+</a><a href="#h0-1-201" id="h0-1-201" class="i">+    };
+</a><a href="#h0-1-202" id="h0-1-202" class="i">+    cas_unique = /[0-9]/+ &gt;mark %{
+</a><a href="#h0-1-203" id="h0-1-203" class="i">+        if parsed, err := strconv.ParseUint(m.text(), 10, 64); err == nil {
+</a><a href="#h0-1-204" id="h0-1-204" class="i">+            casUnique = parsed
+</a><a href="#h0-1-205" id="h0-1-205" class="i">+        }
+</a><a href="#h0-1-206" id="h0-1-206" class="i">+    };
+</a><a href="#h0-1-207" id="h0-1-207" class="i">+
+</a><a href="#h0-1-208" id="h0-1-208" class="i">+    set = &#39;set&#39; sp storage_header noreply? crlf storage_data crlf %{ cmd = Set };
+</a><a href="#h0-1-209" id="h0-1-209" class="i">+    add = &#39;add&#39; sp storage_header noreply? crlf storage_data crlf %{ cmd = Add };
+</a><a href="#h0-1-210" id="h0-1-210" class="i">+    replace = &#39;replace&#39; sp storage_header noreply? crlf storage_data crlf %{ cmd = Replace };
+</a><a href="#h0-1-211" id="h0-1-211" class="i">+    append = &#39;append&#39; sp storage_header noreply? crlf storage_data crlf %{ cmd = Append };
+</a><a href="#h0-1-212" id="h0-1-212" class="i">+    prepend = &#39;prepend&#39; sp storage_header noreply? crlf storage_data crlf %{ cmd = Prepend };
+</a><a href="#h0-1-213" id="h0-1-213" class="i">+    cas = &#39;cas&#39; sp storage_header sp cas_unique noreply? crlf storage_data crlf %{ cmd = Cas };
+</a><a href="#h0-1-214" id="h0-1-214" class="i">+
+</a><a href="#h0-1-215" id="h0-1-215" class="i">+    # Arithmetic commands
+</a><a href="#h0-1-216" id="h0-1-216" class="i">+
+</a><a href="#h0-1-217" id="h0-1-217" class="i">+    delta = /[0-9]/+ &gt;mark %{
+</a><a href="#h0-1-218" id="h0-1-218" class="i">+        if parsed, err := strconv.ParseUint(m.text(), 10, 64); err == nil {
+</a><a href="#h0-1-219" id="h0-1-219" class="i">+            delta = parsed
+</a><a href="#h0-1-220" id="h0-1-220" class="i">+        }
+</a><a href="#h0-1-221" id="h0-1-221" class="i">+    };
+</a><a href="#h0-1-222" id="h0-1-222" class="i">+
+</a><a href="#h0-1-223" id="h0-1-223" class="i">+    incr = &#39;incr&#39; sp key sp delta noreply? crlf %{ cmd = Incr };
+</a><a href="#h0-1-224" id="h0-1-224" class="i">+    decr = &#39;decr&#39; sp key sp delta noreply? crlf %{ cmd = Decr };
+</a><a href="#h0-1-225" id="h0-1-225" class="i">+    delete = &#39;delete&#39; sp key noreply? crlf %{ cmd = Delete };
+</a><a href="#h0-1-226" id="h0-1-226" class="i">+    touch = &#39;touch&#39; sp key sp exptime noreply? crlf %{ cmd = Touch };
+</a> 
+     # Observability commands
+ 
+<a href="#h0-1-230" id="h0-1-230" class="d">-    stats = &#39;stats&#39; (&#39; &#39;+ /[a-z]/+ &gt;mark %{ stats.Type = m.text() })? &#39;\r\n&#39; %{ return stats, nil };
+</a><a href="#h0-1-231" id="h0-1-231" class="d">-
+</a><a href="#h0-1-232" id="h0-1-232" class="d">-    watch_logger = /[a-z]/+ &gt;mark %{ watch.Loggers = append(watch.Loggers, m.text()) };
+</a><a href="#h0-1-233" id="h0-1-233" class="d">-    watch_logger_list = (watch_logger &#39; &#39;+)* watch_logger;
+</a><a href="#h0-1-234" id="h0-1-234" class="d">-    watch = &#39;watch&#39; &#39; &#39;+ watch_logger_list &#39;\r\n&#39; %{ return watch, nil };
+</a><a href="#h0-1-235" id="h0-1-235" class="i">+    stats = &#39;stats&#39; sp subcommand? crlf %{ cmd = Stats };
+</a><a href="#h0-1-236" id="h0-1-236" class="i">+    watch = &#39;watch&#39; sp subcommand_list crlf %{ cmd = Watch };
+</a> 
+     # Admin and metadata commands
+ 
+<a href="#h0-1-240" id="h0-1-240" class="d">-    version = &#39;version&#39; &#39;\r\n&#39; %{ return version, nil };
+</a><a href="#h0-1-241" id="h0-1-241" class="d">-
+</a><a href="#h0-1-242" id="h0-1-242" class="d">-    shutdown =
+</a><a href="#h0-1-243" id="h0-1-243" class="d">-        &#39;shutdown&#39;
+</a><a href="#h0-1-244" id="h0-1-244" class="d">-        (&#39; &#39;+ /[a-z]/+ &gt;mark %{ shutdown.Type = m.text() })?
+</a><a href="#h0-1-245" id="h0-1-245" class="d">-        &#39;\r\n&#39;
+</a><a href="#h0-1-246" id="h0-1-246" class="d">-        %{ return shutdown, nil };
+</a><a href="#h0-1-247" id="h0-1-247" class="i">+    version = &#39;version&#39; crlf %{ cmd = Version };
+</a><a href="#h0-1-248" id="h0-1-248" class="i">+    shutdown = &#39;shutdown&#39; sp subcommand? crlf %{ cmd = Shutdown };
+</a> 
+     # Main entry point
+ 
+     command :=
+<a href="#h0-1-253" id="h0-1-253" class="d">-        storage |
+</a><a href="#h0-1-254" id="h0-1-254" class="i">+        set |
+</a><a href="#h0-1-255" id="h0-1-255" class="i">+        add |
+</a><a href="#h0-1-256" id="h0-1-256" class="i">+        replace |
+</a><a href="#h0-1-257" id="h0-1-257" class="i">+        append |
+</a><a href="#h0-1-258" id="h0-1-258" class="i">+        prepend |
+</a>         cas |
+         get |
+         gets |
+<a href="#h0-2" id="h0-2" class="h">@@ -247,27 +137,17 @@ func NewASCIIParser() Parser {
+</a> }
+ 
+ func (m *machine) Parse(command []byte) (Request, error) {
+<a href="#h0-2-3" id="h0-2-3" class="d">-    var storageCmd string
+</a><a href="#h0-2-4" id="h0-2-4" class="d">-
+</a><a href="#h0-2-5" id="h0-2-5" class="d">-    version := &amp;VersionRequest{}
+</a><a href="#h0-2-6" id="h0-2-6" class="d">-    stats := &amp;StatsRequest{}
+</a><a href="#h0-2-7" id="h0-2-7" class="d">-    watch := &amp;WatchRequest{}
+</a><a href="#h0-2-8" id="h0-2-8" class="d">-    shutdown := &amp;ShutdownRequest{}
+</a><a href="#h0-2-9" id="h0-2-9" class="d">-    touch := &amp;TouchRequest{}
+</a><a href="#h0-2-10" id="h0-2-10" class="d">-    del := &amp;DeleteRequest{}
+</a><a href="#h0-2-11" id="h0-2-11" class="d">-    incr := &amp;IncrRequest{}
+</a><a href="#h0-2-12" id="h0-2-12" class="d">-    decr := &amp;DecrRequest{}
+</a><a href="#h0-2-13" id="h0-2-13" class="d">-    get := &amp;GetRequest{}
+</a><a href="#h0-2-14" id="h0-2-14" class="d">-    gets := &amp;GetsRequest{}
+</a><a href="#h0-2-15" id="h0-2-15" class="d">-    gat := &amp;GatRequest{}
+</a><a href="#h0-2-16" id="h0-2-16" class="d">-    gats := &amp;GatsRequest{}
+</a><a href="#h0-2-17" id="h0-2-17" class="d">-    payload := &amp;StoragePayload{}
+</a><a href="#h0-2-18" id="h0-2-18" class="d">-    set := &amp;SetRequest{}
+</a><a href="#h0-2-19" id="h0-2-19" class="d">-    add := &amp;AddRequest{}
+</a><a href="#h0-2-20" id="h0-2-20" class="d">-    replace := &amp;ReplaceRequest{}
+</a><a href="#h0-2-21" id="h0-2-21" class="d">-    app := &amp;AppendRequest{}
+</a><a href="#h0-2-22" id="h0-2-22" class="d">-    prepend := &amp;PrependRequest{}
+</a><a href="#h0-2-23" id="h0-2-23" class="d">-    cas := &amp;CasRequest{}
+</a><a href="#h0-2-24" id="h0-2-24" class="i">+    var cmd Command
+</a><a href="#h0-2-25" id="h0-2-25" class="i">+    var keys []string
+</a><a href="#h0-2-26" id="h0-2-26" class="i">+    var exptime time.Duration
+</a><a href="#h0-2-27" id="h0-2-27" class="i">+    var flags uint16
+</a><a href="#h0-2-28" id="h0-2-28" class="i">+    var size int
+</a><a href="#h0-2-29" id="h0-2-29" class="i">+    var casUnique uint64
+</a><a href="#h0-2-30" id="h0-2-30" class="i">+    var delta uint64
+</a><a href="#h0-2-31" id="h0-2-31" class="i">+    var subcommand string
+</a><a href="#h0-2-32" id="h0-2-32" class="i">+    var subcommands []string
+</a><a href="#h0-2-33" id="h0-2-33" class="i">+    var noreply bool
+</a><a href="#h0-2-34" id="h0-2-34" class="i">+    var data []byte
+</a> 
+     m.data = command
+     m.p = 0
+<a href="#h0-3" id="h0-3" class="h">@@ -278,6 +158,91 @@ func (m *machine) Parse(command []byte) (Request, error) {
+</a>     %% write init;
+     %% write exec;
+ 
+<a href="#h0-3-3" id="h0-3-3" class="i">+    switch cmd {
+</a><a href="#h0-3-4" id="h0-3-4" class="i">+    case Version:
+</a><a href="#h0-3-5" id="h0-3-5" class="i">+        return &amp;VersionRequest{}, nil
+</a><a href="#h0-3-6" id="h0-3-6" class="i">+
+</a><a href="#h0-3-7" id="h0-3-7" class="i">+    case Shutdown:
+</a><a href="#h0-3-8" id="h0-3-8" class="i">+        return &amp;ShutdownRequest{Type: subcommand}, nil
+</a><a href="#h0-3-9" id="h0-3-9" class="i">+
+</a><a href="#h0-3-10" id="h0-3-10" class="i">+    case Stats:
+</a><a href="#h0-3-11" id="h0-3-11" class="i">+        return &amp;StatsRequest{Type: subcommand}, nil
+</a><a href="#h0-3-12" id="h0-3-12" class="i">+
+</a><a href="#h0-3-13" id="h0-3-13" class="i">+    case Watch:
+</a><a href="#h0-3-14" id="h0-3-14" class="i">+        return &amp;WatchRequest{Loggers: subcommands}, nil
+</a><a href="#h0-3-15" id="h0-3-15" class="i">+
+</a><a href="#h0-3-16" id="h0-3-16" class="i">+    case Touch:
+</a><a href="#h0-3-17" id="h0-3-17" class="i">+        return &amp;TouchRequest{
+</a><a href="#h0-3-18" id="h0-3-18" class="i">+            Key: keys[0],
+</a><a href="#h0-3-19" id="h0-3-19" class="i">+            Expiration: exptime,
+</a><a href="#h0-3-20" id="h0-3-20" class="i">+            NoReply: noreply,
+</a><a href="#h0-3-21" id="h0-3-21" class="i">+        }, nil
+</a><a href="#h0-3-22" id="h0-3-22" class="i">+
+</a><a href="#h0-3-23" id="h0-3-23" class="i">+    case Delete:
+</a><a href="#h0-3-24" id="h0-3-24" class="i">+        return &amp;DeleteRequest{
+</a><a href="#h0-3-25" id="h0-3-25" class="i">+            Key: keys[0],
+</a><a href="#h0-3-26" id="h0-3-26" class="i">+            NoReply: noreply,
+</a><a href="#h0-3-27" id="h0-3-27" class="i">+        }, nil
+</a><a href="#h0-3-28" id="h0-3-28" class="i">+
+</a><a href="#h0-3-29" id="h0-3-29" class="i">+    case Incr:
+</a><a href="#h0-3-30" id="h0-3-30" class="i">+        return &amp;IncrRequest{
+</a><a href="#h0-3-31" id="h0-3-31" class="i">+            Key: keys[0],
+</a><a href="#h0-3-32" id="h0-3-32" class="i">+            Delta: delta,
+</a><a href="#h0-3-33" id="h0-3-33" class="i">+            NoReply: noreply,
+</a><a href="#h0-3-34" id="h0-3-34" class="i">+        }, nil
+</a><a href="#h0-3-35" id="h0-3-35" class="i">+
+</a><a href="#h0-3-36" id="h0-3-36" class="i">+    case Decr:
+</a><a href="#h0-3-37" id="h0-3-37" class="i">+        return &amp;DecrRequest{
+</a><a href="#h0-3-38" id="h0-3-38" class="i">+            Key: keys[0],
+</a><a href="#h0-3-39" id="h0-3-39" class="i">+            Delta: delta,
+</a><a href="#h0-3-40" id="h0-3-40" class="i">+            NoReply: noreply,
+</a><a href="#h0-3-41" id="h0-3-41" class="i">+        }, nil
+</a><a href="#h0-3-42" id="h0-3-42" class="i">+
+</a><a href="#h0-3-43" id="h0-3-43" class="i">+    case Get:
+</a><a href="#h0-3-44" id="h0-3-44" class="i">+        return &amp;GetRequest{Keys: keys}, nil
+</a><a href="#h0-3-45" id="h0-3-45" class="i">+
+</a><a href="#h0-3-46" id="h0-3-46" class="i">+    case Gets:
+</a><a href="#h0-3-47" id="h0-3-47" class="i">+        return &amp;GetsRequest{Keys: keys}, nil
+</a><a href="#h0-3-48" id="h0-3-48" class="i">+
+</a><a href="#h0-3-49" id="h0-3-49" class="i">+    case Gat:
+</a><a href="#h0-3-50" id="h0-3-50" class="i">+        return &amp;GatRequest{
+</a><a href="#h0-3-51" id="h0-3-51" class="i">+            Expiration: exptime,
+</a><a href="#h0-3-52" id="h0-3-52" class="i">+            Keys: keys,
+</a><a href="#h0-3-53" id="h0-3-53" class="i">+        }, nil
+</a><a href="#h0-3-54" id="h0-3-54" class="i">+
+</a><a href="#h0-3-55" id="h0-3-55" class="i">+    case Gats:
+</a><a href="#h0-3-56" id="h0-3-56" class="i">+        return &amp;GatsRequest{
+</a><a href="#h0-3-57" id="h0-3-57" class="i">+            Expiration: exptime,
+</a><a href="#h0-3-58" id="h0-3-58" class="i">+            Keys: keys,
+</a><a href="#h0-3-59" id="h0-3-59" class="i">+        }, nil
+</a><a href="#h0-3-60" id="h0-3-60" class="i">+
+</a><a href="#h0-3-61" id="h0-3-61" class="i">+    case Set, Add, Replace, Append, Prepend, Cas:
+</a><a href="#h0-3-62" id="h0-3-62" class="i">+        payload := &amp;StoragePayload{
+</a><a href="#h0-3-63" id="h0-3-63" class="i">+            Key: keys[0],
+</a><a href="#h0-3-64" id="h0-3-64" class="i">+            Flags: flags,
+</a><a href="#h0-3-65" id="h0-3-65" class="i">+            Expiration: exptime,
+</a><a href="#h0-3-66" id="h0-3-66" class="i">+            Size: size,
+</a><a href="#h0-3-67" id="h0-3-67" class="i">+            CasUnique: casUnique,
+</a><a href="#h0-3-68" id="h0-3-68" class="i">+            Data: data,
+</a><a href="#h0-3-69" id="h0-3-69" class="i">+            NoReply: noreply,
+</a><a href="#h0-3-70" id="h0-3-70" class="i">+        }
+</a><a href="#h0-3-71" id="h0-3-71" class="i">+
+</a><a href="#h0-3-72" id="h0-3-72" class="i">+        switch cmd {
+</a><a href="#h0-3-73" id="h0-3-73" class="i">+            case Set:
+</a><a href="#h0-3-74" id="h0-3-74" class="i">+                return &amp;SetRequest{Payload: payload}, nil
+</a><a href="#h0-3-75" id="h0-3-75" class="i">+            case Add:
+</a><a href="#h0-3-76" id="h0-3-76" class="i">+                return &amp;AddRequest{Payload: payload}, nil
+</a><a href="#h0-3-77" id="h0-3-77" class="i">+            case Replace:
+</a><a href="#h0-3-78" id="h0-3-78" class="i">+                return &amp;ReplaceRequest{Payload: payload}, nil
+</a><a href="#h0-3-79" id="h0-3-79" class="i">+            case Append:
+</a><a href="#h0-3-80" id="h0-3-80" class="i">+                return &amp;AppendRequest{Payload: payload}, nil
+</a><a href="#h0-3-81" id="h0-3-81" class="i">+            case Prepend:
+</a><a href="#h0-3-82" id="h0-3-82" class="i">+                return &amp;PrependRequest{Payload: payload}, nil
+</a><a href="#h0-3-83" id="h0-3-83" class="i">+            case Cas:
+</a><a href="#h0-3-84" id="h0-3-84" class="i">+                return &amp;CasRequest{Payload: payload}, nil
+</a><a href="#h0-3-85" id="h0-3-85" class="i">+        }
+</a><a href="#h0-3-86" id="h0-3-86" class="i">+    }
+</a><a href="#h0-3-87" id="h0-3-87" class="i">+
+</a>     return nil, ErrInvalidParse
+ }
+ 
+<b>diff --git a/<a id="h1" href="../file/pkg/protocol/types.go">pkg/protocol/types.go</a> b/<a href="../file/pkg/protocol/types.go">pkg/protocol/types.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -1,5 +1,4 @@
+</a> //go:generate ragel -G2 -Z memcache.rl -o memcache.go
+<a href="#h1-0-1" id="h1-0-1" class="d">-// TODO ^ should this go somewhere else?
+</a> 
+ package protocol
+ 
+<a href="#h1-1" id="h1-1" class="h">@@ -8,6 +7,31 @@ import (
+</a> 	&quot;time&quot;
+ )
+ 
+<a href="#h1-1-3" id="h1-1-3" class="i">+// Command enumerates all recognized protocol commands.
+</a><a href="#h1-1-4" id="h1-1-4" class="i">+type Command int
+</a><a href="#h1-1-5" id="h1-1-5" class="i">+
+</a><a href="#h1-1-6" id="h1-1-6" class="i">+// Enumeration of all recognized commands.
+</a><a href="#h1-1-7" id="h1-1-7" class="i">+const (
+</a><a href="#h1-1-8" id="h1-1-8" class="i">+	Version Command = iota
+</a><a href="#h1-1-9" id="h1-1-9" class="i">+	Shutdown
+</a><a href="#h1-1-10" id="h1-1-10" class="i">+	Stats
+</a><a href="#h1-1-11" id="h1-1-11" class="i">+	Watch
+</a><a href="#h1-1-12" id="h1-1-12" class="i">+	Touch
+</a><a href="#h1-1-13" id="h1-1-13" class="i">+	Delete
+</a><a href="#h1-1-14" id="h1-1-14" class="i">+	Incr
+</a><a href="#h1-1-15" id="h1-1-15" class="i">+	Decr
+</a><a href="#h1-1-16" id="h1-1-16" class="i">+	Get
+</a><a href="#h1-1-17" id="h1-1-17" class="i">+	Gets
+</a><a href="#h1-1-18" id="h1-1-18" class="i">+	Gat
+</a><a href="#h1-1-19" id="h1-1-19" class="i">+	Gats
+</a><a href="#h1-1-20" id="h1-1-20" class="i">+	Set
+</a><a href="#h1-1-21" id="h1-1-21" class="i">+	Add
+</a><a href="#h1-1-22" id="h1-1-22" class="i">+	Replace
+</a><a href="#h1-1-23" id="h1-1-23" class="i">+	Append
+</a><a href="#h1-1-24" id="h1-1-24" class="i">+	Prepend
+</a><a href="#h1-1-25" id="h1-1-25" class="i">+	Cas
+</a><a href="#h1-1-26" id="h1-1-26" class="i">+)
+</a><a href="#h1-1-27" id="h1-1-27" class="i">+
+</a> // StoreStatus enumerates known responses for storage commands.
+ type StoreStatus int
+ 
+</pre>
+</div>
+</body>
+</html>

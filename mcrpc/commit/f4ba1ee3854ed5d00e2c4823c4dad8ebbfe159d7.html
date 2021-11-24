@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>root: Client connection and raw command context keypairs - mcrpc - Library for building memcache protocol servers</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="mcrpc Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="mcrpc Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>mcrpc</h1><span class="desc">Library for building memcache protocol servers</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/mcrpc.git">https://source.static.kevinlin.info/mcrpc.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/f4ba1ee3854ed5d00e2c4823c4dad8ebbfe159d7">f4ba1ee3854ed5d00e2c4823c4dad8ebbfe159d7</a>
+<b>parent</b> <a href="../commit/ec72707d33ee7056ca90187bb7658a9d53d822c5">ec72707d33ee7056ca90187bb7658a9d53d822c5</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Tue, 23 Nov 2021 08:49:13 -0800
+
+root: Client connection and raw command context keypairs
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">server.go</a></td><td> | </td><td class="num">4</td><td><span class="i">+++</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">types.go</a></td><td> | </td><td class="num">12</td><td><span class="i">++++++++++++</span><span class="d"></span></td></tr>
+</table></pre><pre>2 files changed, 15 insertions(+), 1 deletion(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/server.go">server.go</a> b/<a href="../file/server.go">server.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -103,7 +103,6 @@ func (s *Server) handle(conn net.Conn) {
+</a> 
+ // dispatch parses the request and invokes the underlying service handler.
+ func (s *Server) dispatch(conn net.Conn, reader *protocol.Reader) error {
+<a href="#h0-0-3" id="h0-0-3" class="d">-	var ctx context.Context
+</a> 	var req protocol.Request
+ 	var resp protocol.Response
+ 	var hErr error
+<a href="#h0-1" id="h0-1" class="h">@@ -126,6 +125,9 @@ func (s *Server) dispatch(conn net.Conn, reader *protocol.Reader) error {
+</a> 		return fmt.Errorf(&quot;server: error parsing command: %v&quot;, err)
+ 	}
+ 
+<a href="#h0-1-3" id="h0-1-3" class="i">+	ctx := context.WithValue(context.Background(), ClientConnContextKey, conn)
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+	ctx = context.WithValue(ctx, ClientRawRequestContextKey, buf)
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+
+</a> 	switch r := req.(type) {
+ 	case *protocol.VersionRequest:
+ 		resp, hErr = s.handler.Version(ctx, r)
+<b>diff --git a/<a id="h1" href="../file/types.go">types.go</a> b/<a href="../file/types.go">types.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -6,6 +6,18 @@ import (
+</a> 	&quot;lib.kevinlin.info/mcrpc/protocol&quot;
+ )
+ 
+<a href="#h1-0-3" id="h1-0-3" class="i">+// contextKey is a type alias for keys in the context object passed to all RPC implementations.
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+type contextKey int
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+
+</a><a href="#h1-0-6" id="h1-0-6" class="i">+const (
+</a><a href="#h1-0-7" id="h1-0-7" class="i">+	// ClientConnContextKey identifies the client net.Conn connection associated with a request.
+</a><a href="#h1-0-8" id="h1-0-8" class="i">+	ClientConnContextKey contextKey = iota
+</a><a href="#h1-0-9" id="h1-0-9" class="i">+
+</a><a href="#h1-0-10" id="h1-0-10" class="i">+	// ClientRawRequestContextKey identifies the raw command byte buffer sent by the client from
+</a><a href="#h1-0-11" id="h1-0-11" class="i">+	// which a structured request was successfully parsed.
+</a><a href="#h1-0-12" id="h1-0-12" class="i">+	ClientRawRequestContextKey
+</a><a href="#h1-0-13" id="h1-0-13" class="i">+)
+</a><a href="#h1-0-14" id="h1-0-14" class="i">+
+</a> // Handler is an interface for a backend implementing the memcache RPC protocol as a frontend.
+ type Handler interface {
+ 	// Version implements the version command.
+</pre>
+</div>
+</body>
+</html>

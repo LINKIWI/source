@@ -1,0 +1,1716 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>pkg/protocol: ASCII serializer implementation - mcrpc - Library for building memcache protocol servers</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="mcrpc Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="mcrpc Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>mcrpc</h1><span class="desc">Library for building memcache protocol servers</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/mcrpc.git">https://source.static.kevinlin.info/mcrpc.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/a3998e59fdd564a55cda32d872edd5aed37bb212">a3998e59fdd564a55cda32d872edd5aed37bb212</a>
+<b>parent</b> <a href="../commit/6c10f05b4a006810d2b335d3d440ecf2fe7e0e63">6c10f05b4a006810d2b335d3d440ecf2fe7e0e63</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sun, 21 Nov 2021 22:12:46 -0800
+
+pkg/protocol: ASCII serializer implementation
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">go.mod</a></td><td> | </td><td class="num">15</td><td><span class="i">+++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="A">A</td><td><a href="#h1">go.sum</a></td><td> | </td><td class="num">42</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="A">A</td><td><a href="#h2">pkg/protocol/ascii.go</a></td><td> | </td><td class="num">363</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="A">A</td><td><a href="#h3">pkg/protocol/ascii_test.go</a></td><td> | </td><td class="num">1141</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+</table></pre><pre>4 files changed, 1561 insertions(+), 0 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/go.mod">go.mod</a> b/<a href="../file/go.mod">go.mod</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -1,3 +1,18 @@
+</a> module mcrpc
+ 
+ go 1.17
+<a href="#h0-0-3" id="h0-0-3" class="i">+
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+require (
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+	github.com/stretchr/testify v1.7.0
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+	golang.org/x/tools v0.1.7
+</a><a href="#h0-0-8" id="h0-0-8" class="i">+)
+</a><a href="#h0-0-9" id="h0-0-9" class="i">+
+</a><a href="#h0-0-10" id="h0-0-10" class="i">+require (
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+	github.com/davecgh/go-spew v1.1.0 // indirect
+</a><a href="#h0-0-12" id="h0-0-12" class="i">+	github.com/pmezard/go-difflib v1.0.0 // indirect
+</a><a href="#h0-0-13" id="h0-0-13" class="i">+	golang.org/x/mod v0.4.2 // indirect
+</a><a href="#h0-0-14" id="h0-0-14" class="i">+	golang.org/x/sys v0.0.0-20210809222454-d867a43fc93e // indirect
+</a><a href="#h0-0-15" id="h0-0-15" class="i">+	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
+</a><a href="#h0-0-16" id="h0-0-16" class="i">+	gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c // indirect
+</a><a href="#h0-0-17" id="h0-0-17" class="i">+)
+</a><b>diff --git a/<a id="h1" href="../file/go.sum">go.sum</a> b/<a href="../file/go.sum">go.sum</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -0,0 +1,42 @@
+</a><a href="#h1-0-0" id="h1-0-0" class="i">+github.com/davecgh/go-spew v1.1.0 h1:ZDRjVQ15GmhC3fiQ8ni8+OwkZQO4DARzQgrnXU1Liz8=
+</a><a href="#h1-0-1" id="h1-0-1" class="i">+github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
+</a><a href="#h1-0-2" id="h1-0-2" class="i">+github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
+</a><a href="#h1-0-3" id="h1-0-3" class="i">+github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+github.com/stretchr/testify v1.7.0 h1:nwc3DEeHmmLAfoZucVR881uASk0Mfjw8xYJ99tb5CcY=
+</a><a href="#h1-0-6" id="h1-0-6" class="i">+github.com/stretchr/testify v1.7.0/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
+</a><a href="#h1-0-7" id="h1-0-7" class="i">+github.com/yuin/goldmark v1.4.0/go.mod h1:mwnBkeHKe2W/ZEtQ+71ViKU8L12m81fl3OWwC1Zlc8k=
+</a><a href="#h1-0-8" id="h1-0-8" class="i">+golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
+</a><a href="#h1-0-9" id="h1-0-9" class="i">+golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550/go.mod h1:yigFU9vqHzYiE8UmvKecakEJjdnWj3jj499lnFckfCI=
+</a><a href="#h1-0-10" id="h1-0-10" class="i">+golang.org/x/lint v0.0.0-20210508222113-6edffad5e616 h1:VLliZ0d+/avPrXXH+OakdXhpJuEoBZuwh1m2j7U6Iug=
+</a><a href="#h1-0-11" id="h1-0-11" class="i">+golang.org/x/lint v0.0.0-20210508222113-6edffad5e616/go.mod h1:3xt1FjdF8hUf6vQPIChWIBhFzV8gjjsPE/fR3IyQdNY=
+</a><a href="#h1-0-12" id="h1-0-12" class="i">+golang.org/x/mod v0.1.1-0.20191105210325-c90efee705ee/go.mod h1:QqPTAvyqsEbceGzBzNggFXnrqF1CaUcvgkdR5Ot7KZg=
+</a><a href="#h1-0-13" id="h1-0-13" class="i">+golang.org/x/mod v0.4.2 h1:Gz96sIWK3OalVv/I/qNygP42zyoKp3xptRVCWRFEBvo=
+</a><a href="#h1-0-14" id="h1-0-14" class="i">+golang.org/x/mod v0.4.2/go.mod h1:s0Qsj1ACt9ePp/hMypM3fl4fZqREWJwdYDEqhRiZZUA=
+</a><a href="#h1-0-15" id="h1-0-15" class="i">+golang.org/x/net v0.0.0-20190404232315-eb5bcb51f2a3/go.mod h1:t9HGtf8HONx5eT2rtn7q6eTqICYqUVnKs3thJo3Qplg=
+</a><a href="#h1-0-16" id="h1-0-16" class="i">+golang.org/x/net v0.0.0-20190620200207-3b0461eec859/go.mod h1:z5CRVTTTmAJ677TzLLGU+0bjPO0LkuOLi4/5GtJWs/s=
+</a><a href="#h1-0-17" id="h1-0-17" class="i">+golang.org/x/net v0.0.0-20210805182204-aaa1db679c0d/go.mod h1:9nx3DQGgdP8bBQD5qxJ1jj9UTztislL4KSBs9R2vV5Y=
+</a><a href="#h1-0-18" id="h1-0-18" class="i">+golang.org/x/sync v0.0.0-20190423024810-112230192c58/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
+</a><a href="#h1-0-19" id="h1-0-19" class="i">+golang.org/x/sync v0.0.0-20210220032951-036812b2e83c/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
+</a><a href="#h1-0-20" id="h1-0-20" class="i">+golang.org/x/sys v0.0.0-20190215142949-d0b11bdaac8a/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
+</a><a href="#h1-0-21" id="h1-0-21" class="i">+golang.org/x/sys v0.0.0-20190412213103-97732733099d/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+</a><a href="#h1-0-22" id="h1-0-22" class="i">+golang.org/x/sys v0.0.0-20201119102817-f84b799fce68/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+</a><a href="#h1-0-23" id="h1-0-23" class="i">+golang.org/x/sys v0.0.0-20210423082822-04245dca01da/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+</a><a href="#h1-0-24" id="h1-0-24" class="i">+golang.org/x/sys v0.0.0-20210809222454-d867a43fc93e h1:WUoyKPm6nCo1BnNUvPGnFG3T5DUVem42yDJZZ4CNxMA=
+</a><a href="#h1-0-25" id="h1-0-25" class="i">+golang.org/x/sys v0.0.0-20210809222454-d867a43fc93e/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
+</a><a href="#h1-0-26" id="h1-0-26" class="i">+golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1/go.mod h1:bj7SfCRtBDWHUb9snDiAeCFNEtKQo2Wmx5Cou7ajbmo=
+</a><a href="#h1-0-27" id="h1-0-27" class="i">+golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
+</a><a href="#h1-0-28" id="h1-0-28" class="i">+golang.org/x/text v0.3.6/go.mod h1:5Zoc/QRtKVWzQhOtBMvqHzDpF6irO9z98xDceosuGiQ=
+</a><a href="#h1-0-29" id="h1-0-29" class="i">+golang.org/x/tools v0.0.0-20180917221912-90fa682c2a6e/go.mod h1:n7NCudcB/nEzxVGmLbDWY5pfWTLqBcC2KZ6jyYvM4mQ=
+</a><a href="#h1-0-30" id="h1-0-30" class="i">+golang.org/x/tools v0.0.0-20191119224855-298f0cb1881e/go.mod h1:b+2E5dAYhXwXZwtnZ6UAqBI28+e2cm9otk0dWdXHAEo=
+</a><a href="#h1-0-31" id="h1-0-31" class="i">+golang.org/x/tools v0.0.0-20200130002326-2f3ba24bd6e7/go.mod h1:TB2adYChydJhpapKDTa4BR/hXlZSLoq2Wpct/0txZ28=
+</a><a href="#h1-0-32" id="h1-0-32" class="i">+golang.org/x/tools v0.1.7 h1:6j8CgantCy3yc8JGBqkDLMKWqZ0RDU2g1HVgacojGWQ=
+</a><a href="#h1-0-33" id="h1-0-33" class="i">+golang.org/x/tools v0.1.7/go.mod h1:LGqMHiF4EqQNHR1JncWGqT5BVaXmza+X+BDGol+dOxo=
+</a><a href="#h1-0-34" id="h1-0-34" class="i">+golang.org/x/xerrors v0.0.0-20190717185122-a985d3407aa7/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
+</a><a href="#h1-0-35" id="h1-0-35" class="i">+golang.org/x/xerrors v0.0.0-20191011141410-1b5146add898/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
+</a><a href="#h1-0-36" id="h1-0-36" class="i">+golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 h1:go1bK/D/BFZV2I8cIQd1NKEZ+0owSTG1fDTci4IqFcE=
+</a><a href="#h1-0-37" id="h1-0-37" class="i">+golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
+</a><a href="#h1-0-38" id="h1-0-38" class="i">+gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405 h1:yhCVgyC4o1eVCa2tZl7eS0r+SDo693bJlVdllGtEeKM=
+</a><a href="#h1-0-39" id="h1-0-39" class="i">+gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
+</a><a href="#h1-0-40" id="h1-0-40" class="i">+gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c h1:dUUwHk2QECo/6vqA44rthZ8ie2QXMNeKRTHCNY2nXvo=
+</a><a href="#h1-0-41" id="h1-0-41" class="i">+gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
+</a><b>diff --git a/<a id="h2" href="../file/pkg/protocol/ascii.go">pkg/protocol/ascii.go</a> b/<a href="../file/pkg/protocol/ascii.go">pkg/protocol/ascii.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -0,0 +1,363 @@
+</a><a href="#h2-0-0" id="h2-0-0" class="i">+package protocol
+</a><a href="#h2-0-1" id="h2-0-1" class="i">+
+</a><a href="#h2-0-2" id="h2-0-2" class="i">+import (
+</a><a href="#h2-0-3" id="h2-0-3" class="i">+	&quot;fmt&quot;
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+	&quot;strings&quot;
+</a><a href="#h2-0-5" id="h2-0-5" class="i">+)
+</a><a href="#h2-0-6" id="h2-0-6" class="i">+
+</a><a href="#h2-0-7" id="h2-0-7" class="i">+func (e *Error) String() string {
+</a><a href="#h2-0-8" id="h2-0-8" class="i">+	return fmt.Sprintf(&quot;ERROR %v\r\n&quot;, e.Err)
+</a><a href="#h2-0-9" id="h2-0-9" class="i">+}
+</a><a href="#h2-0-10" id="h2-0-10" class="i">+
+</a><a href="#h2-0-11" id="h2-0-11" class="i">+func (e *Error) Error() string {
+</a><a href="#h2-0-12" id="h2-0-12" class="i">+	return e.String()
+</a><a href="#h2-0-13" id="h2-0-13" class="i">+}
+</a><a href="#h2-0-14" id="h2-0-14" class="i">+
+</a><a href="#h2-0-15" id="h2-0-15" class="i">+func (e *Error) Unwrap() error {
+</a><a href="#h2-0-16" id="h2-0-16" class="i">+	return e.Err
+</a><a href="#h2-0-17" id="h2-0-17" class="i">+}
+</a><a href="#h2-0-18" id="h2-0-18" class="i">+
+</a><a href="#h2-0-19" id="h2-0-19" class="i">+func (e *ClientError) String() string {
+</a><a href="#h2-0-20" id="h2-0-20" class="i">+	return fmt.Sprintf(&quot;CLIENT_ERROR %v\r\n&quot;, e.Err)
+</a><a href="#h2-0-21" id="h2-0-21" class="i">+}
+</a><a href="#h2-0-22" id="h2-0-22" class="i">+
+</a><a href="#h2-0-23" id="h2-0-23" class="i">+func (e *ClientError) Error() string {
+</a><a href="#h2-0-24" id="h2-0-24" class="i">+	return e.String()
+</a><a href="#h2-0-25" id="h2-0-25" class="i">+}
+</a><a href="#h2-0-26" id="h2-0-26" class="i">+
+</a><a href="#h2-0-27" id="h2-0-27" class="i">+func (e *ClientError) Unwrap() error {
+</a><a href="#h2-0-28" id="h2-0-28" class="i">+	return e.Err
+</a><a href="#h2-0-29" id="h2-0-29" class="i">+}
+</a><a href="#h2-0-30" id="h2-0-30" class="i">+
+</a><a href="#h2-0-31" id="h2-0-31" class="i">+func (e *ServerError) String() string {
+</a><a href="#h2-0-32" id="h2-0-32" class="i">+	return fmt.Sprintf(&quot;SERVER_ERROR %v\r\n&quot;, e.Err)
+</a><a href="#h2-0-33" id="h2-0-33" class="i">+}
+</a><a href="#h2-0-34" id="h2-0-34" class="i">+
+</a><a href="#h2-0-35" id="h2-0-35" class="i">+func (e *ServerError) Error() string {
+</a><a href="#h2-0-36" id="h2-0-36" class="i">+	return e.String()
+</a><a href="#h2-0-37" id="h2-0-37" class="i">+}
+</a><a href="#h2-0-38" id="h2-0-38" class="i">+
+</a><a href="#h2-0-39" id="h2-0-39" class="i">+func (e *ServerError) Unwrap() error {
+</a><a href="#h2-0-40" id="h2-0-40" class="i">+	return e.Err
+</a><a href="#h2-0-41" id="h2-0-41" class="i">+}
+</a><a href="#h2-0-42" id="h2-0-42" class="i">+
+</a><a href="#h2-0-43" id="h2-0-43" class="i">+func (v *VersionRequest) String() string {
+</a><a href="#h2-0-44" id="h2-0-44" class="i">+	return &quot;version\r\n&quot;
+</a><a href="#h2-0-45" id="h2-0-45" class="i">+}
+</a><a href="#h2-0-46" id="h2-0-46" class="i">+
+</a><a href="#h2-0-47" id="h2-0-47" class="i">+func (v *VersionResponse) String() string {
+</a><a href="#h2-0-48" id="h2-0-48" class="i">+	return fmt.Sprintf(&quot;VERSION %s\r\n&quot;, v.Version)
+</a><a href="#h2-0-49" id="h2-0-49" class="i">+}
+</a><a href="#h2-0-50" id="h2-0-50" class="i">+
+</a><a href="#h2-0-51" id="h2-0-51" class="i">+func (s *ShutdownRequest) String() string {
+</a><a href="#h2-0-52" id="h2-0-52" class="i">+	if s.Type == &quot;&quot; {
+</a><a href="#h2-0-53" id="h2-0-53" class="i">+		return &quot;shutdown\r\n&quot;
+</a><a href="#h2-0-54" id="h2-0-54" class="i">+	}
+</a><a href="#h2-0-55" id="h2-0-55" class="i">+
+</a><a href="#h2-0-56" id="h2-0-56" class="i">+	return fmt.Sprintf(&quot;shutdown %s\r\n&quot;, s.Type)
+</a><a href="#h2-0-57" id="h2-0-57" class="i">+}
+</a><a href="#h2-0-58" id="h2-0-58" class="i">+
+</a><a href="#h2-0-59" id="h2-0-59" class="i">+func (s *ShutdownResponse) String() string {
+</a><a href="#h2-0-60" id="h2-0-60" class="i">+	return &quot;OK\r\n&quot;
+</a><a href="#h2-0-61" id="h2-0-61" class="i">+}
+</a><a href="#h2-0-62" id="h2-0-62" class="i">+
+</a><a href="#h2-0-63" id="h2-0-63" class="i">+func (s *StatsRequest) String() string {
+</a><a href="#h2-0-64" id="h2-0-64" class="i">+	if s.Type == &quot;&quot; {
+</a><a href="#h2-0-65" id="h2-0-65" class="i">+		return &quot;stats\r\n&quot;
+</a><a href="#h2-0-66" id="h2-0-66" class="i">+	}
+</a><a href="#h2-0-67" id="h2-0-67" class="i">+
+</a><a href="#h2-0-68" id="h2-0-68" class="i">+	return fmt.Sprintf(&quot;stats %s\r\n&quot;, s.Type)
+</a><a href="#h2-0-69" id="h2-0-69" class="i">+}
+</a><a href="#h2-0-70" id="h2-0-70" class="i">+
+</a><a href="#h2-0-71" id="h2-0-71" class="i">+func (s *StatsResponse) String() string {
+</a><a href="#h2-0-72" id="h2-0-72" class="i">+	sb := strings.Builder{}
+</a><a href="#h2-0-73" id="h2-0-73" class="i">+
+</a><a href="#h2-0-74" id="h2-0-74" class="i">+	for _, stat := range s.Stats {
+</a><a href="#h2-0-75" id="h2-0-75" class="i">+		sb.WriteString(stat.String())
+</a><a href="#h2-0-76" id="h2-0-76" class="i">+	}
+</a><a href="#h2-0-77" id="h2-0-77" class="i">+
+</a><a href="#h2-0-78" id="h2-0-78" class="i">+	sb.WriteString(&quot;END\r\n&quot;)
+</a><a href="#h2-0-79" id="h2-0-79" class="i">+
+</a><a href="#h2-0-80" id="h2-0-80" class="i">+	return sb.String()
+</a><a href="#h2-0-81" id="h2-0-81" class="i">+}
+</a><a href="#h2-0-82" id="h2-0-82" class="i">+
+</a><a href="#h2-0-83" id="h2-0-83" class="i">+func (s *StatsItem) String() string {
+</a><a href="#h2-0-84" id="h2-0-84" class="i">+	return fmt.Sprintf(&quot;STAT %s %s\r\n&quot;, s.Name, s.Value)
+</a><a href="#h2-0-85" id="h2-0-85" class="i">+}
+</a><a href="#h2-0-86" id="h2-0-86" class="i">+
+</a><a href="#h2-0-87" id="h2-0-87" class="i">+func (w *WatchRequest) String() string {
+</a><a href="#h2-0-88" id="h2-0-88" class="i">+	if len(w.Loggers) == 0 {
+</a><a href="#h2-0-89" id="h2-0-89" class="i">+		return &quot;watch\r\n&quot;
+</a><a href="#h2-0-90" id="h2-0-90" class="i">+	}
+</a><a href="#h2-0-91" id="h2-0-91" class="i">+
+</a><a href="#h2-0-92" id="h2-0-92" class="i">+	return fmt.Sprintf(&quot;watch %s\r\n&quot;, strings.Join(w.Loggers, &quot; &quot;))
+</a><a href="#h2-0-93" id="h2-0-93" class="i">+}
+</a><a href="#h2-0-94" id="h2-0-94" class="i">+
+</a><a href="#h2-0-95" id="h2-0-95" class="i">+func (w *WatchResponse) String() string {
+</a><a href="#h2-0-96" id="h2-0-96" class="i">+	sb := strings.Builder{}
+</a><a href="#h2-0-97" id="h2-0-97" class="i">+
+</a><a href="#h2-0-98" id="h2-0-98" class="i">+	for _, entry := range w.Logs {
+</a><a href="#h2-0-99" id="h2-0-99" class="i">+		sb.WriteString(entry.String())
+</a><a href="#h2-0-100" id="h2-0-100" class="i">+	}
+</a><a href="#h2-0-101" id="h2-0-101" class="i">+
+</a><a href="#h2-0-102" id="h2-0-102" class="i">+	return sb.String()
+</a><a href="#h2-0-103" id="h2-0-103" class="i">+}
+</a><a href="#h2-0-104" id="h2-0-104" class="i">+
+</a><a href="#h2-0-105" id="h2-0-105" class="i">+func (l *LogAttribute) String() string {
+</a><a href="#h2-0-106" id="h2-0-106" class="i">+	return fmt.Sprintf(&quot;%s=%s&quot;, l.Key, l.Value)
+</a><a href="#h2-0-107" id="h2-0-107" class="i">+}
+</a><a href="#h2-0-108" id="h2-0-108" class="i">+
+</a><a href="#h2-0-109" id="h2-0-109" class="i">+func (l *LogEntry) String() string {
+</a><a href="#h2-0-110" id="h2-0-110" class="i">+	sb := strings.Builder{}
+</a><a href="#h2-0-111" id="h2-0-111" class="i">+
+</a><a href="#h2-0-112" id="h2-0-112" class="i">+	for idx, attribute := range l.Attributes {
+</a><a href="#h2-0-113" id="h2-0-113" class="i">+		sb.WriteString(attribute.String())
+</a><a href="#h2-0-114" id="h2-0-114" class="i">+
+</a><a href="#h2-0-115" id="h2-0-115" class="i">+		if idx &lt; len(l.Attributes)-1 {
+</a><a href="#h2-0-116" id="h2-0-116" class="i">+			sb.WriteString(&quot; &quot;)
+</a><a href="#h2-0-117" id="h2-0-117" class="i">+		}
+</a><a href="#h2-0-118" id="h2-0-118" class="i">+	}
+</a><a href="#h2-0-119" id="h2-0-119" class="i">+
+</a><a href="#h2-0-120" id="h2-0-120" class="i">+	sb.WriteString(&quot;\r\n&quot;)
+</a><a href="#h2-0-121" id="h2-0-121" class="i">+
+</a><a href="#h2-0-122" id="h2-0-122" class="i">+	return sb.String()
+</a><a href="#h2-0-123" id="h2-0-123" class="i">+}
+</a><a href="#h2-0-124" id="h2-0-124" class="i">+
+</a><a href="#h2-0-125" id="h2-0-125" class="i">+func (t *TouchRequest) String() string {
+</a><a href="#h2-0-126" id="h2-0-126" class="i">+	exptime := fmt.Sprintf(&quot;%.f&quot;, t.Expiration.Seconds())
+</a><a href="#h2-0-127" id="h2-0-127" class="i">+
+</a><a href="#h2-0-128" id="h2-0-128" class="i">+	if t.NoReply {
+</a><a href="#h2-0-129" id="h2-0-129" class="i">+		return fmt.Sprintf(&quot;touch %s %s noreply\r\n&quot;, t.Key, exptime)
+</a><a href="#h2-0-130" id="h2-0-130" class="i">+	}
+</a><a href="#h2-0-131" id="h2-0-131" class="i">+
+</a><a href="#h2-0-132" id="h2-0-132" class="i">+	return fmt.Sprintf(&quot;touch %s %s\r\n&quot;, t.Key, exptime)
+</a><a href="#h2-0-133" id="h2-0-133" class="i">+}
+</a><a href="#h2-0-134" id="h2-0-134" class="i">+
+</a><a href="#h2-0-135" id="h2-0-135" class="i">+func (t *TouchResponse) String() string {
+</a><a href="#h2-0-136" id="h2-0-136" class="i">+	if t.Found {
+</a><a href="#h2-0-137" id="h2-0-137" class="i">+		return &quot;TOUCHED\r\n&quot;
+</a><a href="#h2-0-138" id="h2-0-138" class="i">+	}
+</a><a href="#h2-0-139" id="h2-0-139" class="i">+
+</a><a href="#h2-0-140" id="h2-0-140" class="i">+	return &quot;NOT_FOUND\r\n&quot;
+</a><a href="#h2-0-141" id="h2-0-141" class="i">+}
+</a><a href="#h2-0-142" id="h2-0-142" class="i">+
+</a><a href="#h2-0-143" id="h2-0-143" class="i">+func (d *DeleteRequest) String() string {
+</a><a href="#h2-0-144" id="h2-0-144" class="i">+	if d.NoReply {
+</a><a href="#h2-0-145" id="h2-0-145" class="i">+		return fmt.Sprintf(&quot;delete %s noreply\r\n&quot;, d.Key)
+</a><a href="#h2-0-146" id="h2-0-146" class="i">+	}
+</a><a href="#h2-0-147" id="h2-0-147" class="i">+
+</a><a href="#h2-0-148" id="h2-0-148" class="i">+	return fmt.Sprintf(&quot;delete %s\r\n&quot;, d.Key)
+</a><a href="#h2-0-149" id="h2-0-149" class="i">+}
+</a><a href="#h2-0-150" id="h2-0-150" class="i">+
+</a><a href="#h2-0-151" id="h2-0-151" class="i">+func (d *DeleteResponse) String() string {
+</a><a href="#h2-0-152" id="h2-0-152" class="i">+	if d.Found {
+</a><a href="#h2-0-153" id="h2-0-153" class="i">+		return &quot;DELETED\r\n&quot;
+</a><a href="#h2-0-154" id="h2-0-154" class="i">+	}
+</a><a href="#h2-0-155" id="h2-0-155" class="i">+
+</a><a href="#h2-0-156" id="h2-0-156" class="i">+	return &quot;NOT_FOUND\r\n&quot;
+</a><a href="#h2-0-157" id="h2-0-157" class="i">+}
+</a><a href="#h2-0-158" id="h2-0-158" class="i">+
+</a><a href="#h2-0-159" id="h2-0-159" class="i">+func (i *IncrRequest) String() string {
+</a><a href="#h2-0-160" id="h2-0-160" class="i">+	if i.NoReply {
+</a><a href="#h2-0-161" id="h2-0-161" class="i">+		return fmt.Sprintf(&quot;incr %s %d noreply\r\n&quot;, i.Key, i.Delta)
+</a><a href="#h2-0-162" id="h2-0-162" class="i">+	}
+</a><a href="#h2-0-163" id="h2-0-163" class="i">+
+</a><a href="#h2-0-164" id="h2-0-164" class="i">+	return fmt.Sprintf(&quot;incr %s %d\r\n&quot;, i.Key, i.Delta)
+</a><a href="#h2-0-165" id="h2-0-165" class="i">+}
+</a><a href="#h2-0-166" id="h2-0-166" class="i">+
+</a><a href="#h2-0-167" id="h2-0-167" class="i">+func (i *IncrResponse) String() string {
+</a><a href="#h2-0-168" id="h2-0-168" class="i">+	if i.Found {
+</a><a href="#h2-0-169" id="h2-0-169" class="i">+		return fmt.Sprintf(&quot;%d\r\n&quot;, i.Value)
+</a><a href="#h2-0-170" id="h2-0-170" class="i">+	}
+</a><a href="#h2-0-171" id="h2-0-171" class="i">+
+</a><a href="#h2-0-172" id="h2-0-172" class="i">+	return &quot;NOT_FOUND\r\n&quot;
+</a><a href="#h2-0-173" id="h2-0-173" class="i">+}
+</a><a href="#h2-0-174" id="h2-0-174" class="i">+
+</a><a href="#h2-0-175" id="h2-0-175" class="i">+func (d *DecrRequest) String() string {
+</a><a href="#h2-0-176" id="h2-0-176" class="i">+	if d.NoReply {
+</a><a href="#h2-0-177" id="h2-0-177" class="i">+		return fmt.Sprintf(&quot;decr %s %d noreply\r\n&quot;, d.Key, d.Delta)
+</a><a href="#h2-0-178" id="h2-0-178" class="i">+	}
+</a><a href="#h2-0-179" id="h2-0-179" class="i">+
+</a><a href="#h2-0-180" id="h2-0-180" class="i">+	return fmt.Sprintf(&quot;decr %s %d\r\n&quot;, d.Key, d.Delta)
+</a><a href="#h2-0-181" id="h2-0-181" class="i">+}
+</a><a href="#h2-0-182" id="h2-0-182" class="i">+
+</a><a href="#h2-0-183" id="h2-0-183" class="i">+func (d *DecrResponse) String() string {
+</a><a href="#h2-0-184" id="h2-0-184" class="i">+	if d.Found {
+</a><a href="#h2-0-185" id="h2-0-185" class="i">+		return fmt.Sprintf(&quot;%d\r\n&quot;, d.Value)
+</a><a href="#h2-0-186" id="h2-0-186" class="i">+	}
+</a><a href="#h2-0-187" id="h2-0-187" class="i">+
+</a><a href="#h2-0-188" id="h2-0-188" class="i">+	return &quot;NOT_FOUND\r\n&quot;
+</a><a href="#h2-0-189" id="h2-0-189" class="i">+}
+</a><a href="#h2-0-190" id="h2-0-190" class="i">+
+</a><a href="#h2-0-191" id="h2-0-191" class="i">+func (g *GetRequest) String() string {
+</a><a href="#h2-0-192" id="h2-0-192" class="i">+	return fmt.Sprintf(&quot;get %s\r\n&quot;, strings.Join(g.Keys, &quot; &quot;))
+</a><a href="#h2-0-193" id="h2-0-193" class="i">+}
+</a><a href="#h2-0-194" id="h2-0-194" class="i">+
+</a><a href="#h2-0-195" id="h2-0-195" class="i">+func (g *GetResponse) String() string {
+</a><a href="#h2-0-196" id="h2-0-196" class="i">+	sb := strings.Builder{}
+</a><a href="#h2-0-197" id="h2-0-197" class="i">+
+</a><a href="#h2-0-198" id="h2-0-198" class="i">+	for _, value := range g.Values {
+</a><a href="#h2-0-199" id="h2-0-199" class="i">+		sb.WriteString(value.String())
+</a><a href="#h2-0-200" id="h2-0-200" class="i">+	}
+</a><a href="#h2-0-201" id="h2-0-201" class="i">+
+</a><a href="#h2-0-202" id="h2-0-202" class="i">+	sb.WriteString(&quot;END\r\n&quot;)
+</a><a href="#h2-0-203" id="h2-0-203" class="i">+
+</a><a href="#h2-0-204" id="h2-0-204" class="i">+	return sb.String()
+</a><a href="#h2-0-205" id="h2-0-205" class="i">+}
+</a><a href="#h2-0-206" id="h2-0-206" class="i">+
+</a><a href="#h2-0-207" id="h2-0-207" class="i">+func (g *GetsRequest) String() string {
+</a><a href="#h2-0-208" id="h2-0-208" class="i">+	return fmt.Sprintf(&quot;gets %s\r\n&quot;, strings.Join(g.Keys, &quot; &quot;))
+</a><a href="#h2-0-209" id="h2-0-209" class="i">+}
+</a><a href="#h2-0-210" id="h2-0-210" class="i">+
+</a><a href="#h2-0-211" id="h2-0-211" class="i">+func (g *GetsResponse) String() string {
+</a><a href="#h2-0-212" id="h2-0-212" class="i">+	return (&amp;GetResponse{Values: g.Values}).String()
+</a><a href="#h2-0-213" id="h2-0-213" class="i">+}
+</a><a href="#h2-0-214" id="h2-0-214" class="i">+
+</a><a href="#h2-0-215" id="h2-0-215" class="i">+func (g *GatRequest) String() string {
+</a><a href="#h2-0-216" id="h2-0-216" class="i">+	return fmt.Sprintf(
+</a><a href="#h2-0-217" id="h2-0-217" class="i">+		&quot;gat %s %s\r\n&quot;,
+</a><a href="#h2-0-218" id="h2-0-218" class="i">+		fmt.Sprintf(&quot;%.f&quot;, g.Expiration.Seconds()),
+</a><a href="#h2-0-219" id="h2-0-219" class="i">+		strings.Join(g.Keys, &quot; &quot;),
+</a><a href="#h2-0-220" id="h2-0-220" class="i">+	)
+</a><a href="#h2-0-221" id="h2-0-221" class="i">+}
+</a><a href="#h2-0-222" id="h2-0-222" class="i">+
+</a><a href="#h2-0-223" id="h2-0-223" class="i">+func (g *GatResponse) String() string {
+</a><a href="#h2-0-224" id="h2-0-224" class="i">+	return (&amp;GetResponse{Values: g.Values}).String()
+</a><a href="#h2-0-225" id="h2-0-225" class="i">+}
+</a><a href="#h2-0-226" id="h2-0-226" class="i">+
+</a><a href="#h2-0-227" id="h2-0-227" class="i">+func (g *GatsRequest) String() string {
+</a><a href="#h2-0-228" id="h2-0-228" class="i">+	return fmt.Sprintf(
+</a><a href="#h2-0-229" id="h2-0-229" class="i">+		&quot;gats %s %s\r\n&quot;,
+</a><a href="#h2-0-230" id="h2-0-230" class="i">+		fmt.Sprintf(&quot;%.f&quot;, g.Expiration.Seconds()),
+</a><a href="#h2-0-231" id="h2-0-231" class="i">+		strings.Join(g.Keys, &quot; &quot;),
+</a><a href="#h2-0-232" id="h2-0-232" class="i">+	)
+</a><a href="#h2-0-233" id="h2-0-233" class="i">+}
+</a><a href="#h2-0-234" id="h2-0-234" class="i">+
+</a><a href="#h2-0-235" id="h2-0-235" class="i">+func (g *GatsResponse) String() string {
+</a><a href="#h2-0-236" id="h2-0-236" class="i">+	return (&amp;GetResponse{Values: g.Values}).String()
+</a><a href="#h2-0-237" id="h2-0-237" class="i">+}
+</a><a href="#h2-0-238" id="h2-0-238" class="i">+
+</a><a href="#h2-0-239" id="h2-0-239" class="i">+func (r *RetrievalPayload) String() string {
+</a><a href="#h2-0-240" id="h2-0-240" class="i">+	if r.CasUnique == 0 {
+</a><a href="#h2-0-241" id="h2-0-241" class="i">+		return fmt.Sprintf(
+</a><a href="#h2-0-242" id="h2-0-242" class="i">+			&quot;VALUE %s %d %d\r\n%s\r\n&quot;,
+</a><a href="#h2-0-243" id="h2-0-243" class="i">+			r.Key,
+</a><a href="#h2-0-244" id="h2-0-244" class="i">+			r.Flags,
+</a><a href="#h2-0-245" id="h2-0-245" class="i">+			r.Size,
+</a><a href="#h2-0-246" id="h2-0-246" class="i">+			string(r.Data),
+</a><a href="#h2-0-247" id="h2-0-247" class="i">+		)
+</a><a href="#h2-0-248" id="h2-0-248" class="i">+	}
+</a><a href="#h2-0-249" id="h2-0-249" class="i">+
+</a><a href="#h2-0-250" id="h2-0-250" class="i">+	return fmt.Sprintf(
+</a><a href="#h2-0-251" id="h2-0-251" class="i">+		&quot;VALUE %s %d %d %d\r\n%s\r\n&quot;,
+</a><a href="#h2-0-252" id="h2-0-252" class="i">+		r.Key,
+</a><a href="#h2-0-253" id="h2-0-253" class="i">+		r.Flags,
+</a><a href="#h2-0-254" id="h2-0-254" class="i">+		r.Size,
+</a><a href="#h2-0-255" id="h2-0-255" class="i">+		r.CasUnique,
+</a><a href="#h2-0-256" id="h2-0-256" class="i">+		string(r.Data),
+</a><a href="#h2-0-257" id="h2-0-257" class="i">+	)
+</a><a href="#h2-0-258" id="h2-0-258" class="i">+}
+</a><a href="#h2-0-259" id="h2-0-259" class="i">+
+</a><a href="#h2-0-260" id="h2-0-260" class="i">+func (s *SetRequest) String() string {
+</a><a href="#h2-0-261" id="h2-0-261" class="i">+	return fmt.Sprintf(&quot;set %s&quot;, s.Payload.String())
+</a><a href="#h2-0-262" id="h2-0-262" class="i">+}
+</a><a href="#h2-0-263" id="h2-0-263" class="i">+
+</a><a href="#h2-0-264" id="h2-0-264" class="i">+func (s *SetResponse) String() string {
+</a><a href="#h2-0-265" id="h2-0-265" class="i">+	switch s.Status {
+</a><a href="#h2-0-266" id="h2-0-266" class="i">+	case Stored:
+</a><a href="#h2-0-267" id="h2-0-267" class="i">+		return &quot;STORED\r\n&quot;
+</a><a href="#h2-0-268" id="h2-0-268" class="i">+	case NotStored:
+</a><a href="#h2-0-269" id="h2-0-269" class="i">+		return &quot;NOT_STORED\r\n&quot;
+</a><a href="#h2-0-270" id="h2-0-270" class="i">+	case Exists:
+</a><a href="#h2-0-271" id="h2-0-271" class="i">+		return &quot;EXISTS\r\n&quot;
+</a><a href="#h2-0-272" id="h2-0-272" class="i">+	case NotFound:
+</a><a href="#h2-0-273" id="h2-0-273" class="i">+		return &quot;NOT_FOUND\r\n&quot;
+</a><a href="#h2-0-274" id="h2-0-274" class="i">+	default:
+</a><a href="#h2-0-275" id="h2-0-275" class="i">+		return &quot;OK\r\n&quot;
+</a><a href="#h2-0-276" id="h2-0-276" class="i">+	}
+</a><a href="#h2-0-277" id="h2-0-277" class="i">+}
+</a><a href="#h2-0-278" id="h2-0-278" class="i">+
+</a><a href="#h2-0-279" id="h2-0-279" class="i">+func (a *AddRequest) String() string {
+</a><a href="#h2-0-280" id="h2-0-280" class="i">+	return fmt.Sprintf(&quot;add %s&quot;, a.Payload.String())
+</a><a href="#h2-0-281" id="h2-0-281" class="i">+}
+</a><a href="#h2-0-282" id="h2-0-282" class="i">+
+</a><a href="#h2-0-283" id="h2-0-283" class="i">+func (a *AddResponse) String() string {
+</a><a href="#h2-0-284" id="h2-0-284" class="i">+	return (&amp;SetResponse{Status: a.Status}).String()
+</a><a href="#h2-0-285" id="h2-0-285" class="i">+}
+</a><a href="#h2-0-286" id="h2-0-286" class="i">+
+</a><a href="#h2-0-287" id="h2-0-287" class="i">+func (r *ReplaceRequest) String() string {
+</a><a href="#h2-0-288" id="h2-0-288" class="i">+	return fmt.Sprintf(&quot;replace %s&quot;, r.Payload.String())
+</a><a href="#h2-0-289" id="h2-0-289" class="i">+}
+</a><a href="#h2-0-290" id="h2-0-290" class="i">+
+</a><a href="#h2-0-291" id="h2-0-291" class="i">+func (r *ReplaceResponse) String() string {
+</a><a href="#h2-0-292" id="h2-0-292" class="i">+	return (&amp;SetResponse{Status: r.Status}).String()
+</a><a href="#h2-0-293" id="h2-0-293" class="i">+}
+</a><a href="#h2-0-294" id="h2-0-294" class="i">+
+</a><a href="#h2-0-295" id="h2-0-295" class="i">+func (a *AppendRequest) String() string {
+</a><a href="#h2-0-296" id="h2-0-296" class="i">+	return fmt.Sprintf(&quot;append %s&quot;, a.Payload.String())
+</a><a href="#h2-0-297" id="h2-0-297" class="i">+}
+</a><a href="#h2-0-298" id="h2-0-298" class="i">+
+</a><a href="#h2-0-299" id="h2-0-299" class="i">+func (a *AppendResponse) String() string {
+</a><a href="#h2-0-300" id="h2-0-300" class="i">+	return (&amp;SetResponse{Status: a.Status}).String()
+</a><a href="#h2-0-301" id="h2-0-301" class="i">+}
+</a><a href="#h2-0-302" id="h2-0-302" class="i">+
+</a><a href="#h2-0-303" id="h2-0-303" class="i">+func (p *PrependRequest) String() string {
+</a><a href="#h2-0-304" id="h2-0-304" class="i">+	return fmt.Sprintf(&quot;prepend %s&quot;, p.Payload.String())
+</a><a href="#h2-0-305" id="h2-0-305" class="i">+}
+</a><a href="#h2-0-306" id="h2-0-306" class="i">+
+</a><a href="#h2-0-307" id="h2-0-307" class="i">+func (p *PrependResponse) String() string {
+</a><a href="#h2-0-308" id="h2-0-308" class="i">+	return (&amp;SetResponse{Status: p.Status}).String()
+</a><a href="#h2-0-309" id="h2-0-309" class="i">+}
+</a><a href="#h2-0-310" id="h2-0-310" class="i">+
+</a><a href="#h2-0-311" id="h2-0-311" class="i">+func (c *CasRequest) String() string {
+</a><a href="#h2-0-312" id="h2-0-312" class="i">+	return fmt.Sprintf(&quot;cas %s&quot;, c.Payload.String())
+</a><a href="#h2-0-313" id="h2-0-313" class="i">+}
+</a><a href="#h2-0-314" id="h2-0-314" class="i">+
+</a><a href="#h2-0-315" id="h2-0-315" class="i">+func (c *CasResponse) String() string {
+</a><a href="#h2-0-316" id="h2-0-316" class="i">+	return (&amp;SetResponse{Status: c.Status}).String()
+</a><a href="#h2-0-317" id="h2-0-317" class="i">+}
+</a><a href="#h2-0-318" id="h2-0-318" class="i">+
+</a><a href="#h2-0-319" id="h2-0-319" class="i">+func (s *StoragePayload) String() string {
+</a><a href="#h2-0-320" id="h2-0-320" class="i">+	exptime := fmt.Sprintf(&quot;%.f&quot;, s.Expiration.Seconds())
+</a><a href="#h2-0-321" id="h2-0-321" class="i">+
+</a><a href="#h2-0-322" id="h2-0-322" class="i">+	switch {
+</a><a href="#h2-0-323" id="h2-0-323" class="i">+	case s.CasUnique != 0 &amp;&amp; s.NoReply:
+</a><a href="#h2-0-324" id="h2-0-324" class="i">+		return fmt.Sprintf(
+</a><a href="#h2-0-325" id="h2-0-325" class="i">+			&quot;%s %d %s %d %d noreply\r\n%s\r\n&quot;,
+</a><a href="#h2-0-326" id="h2-0-326" class="i">+			s.Key,
+</a><a href="#h2-0-327" id="h2-0-327" class="i">+			s.Flags,
+</a><a href="#h2-0-328" id="h2-0-328" class="i">+			exptime,
+</a><a href="#h2-0-329" id="h2-0-329" class="i">+			s.Size,
+</a><a href="#h2-0-330" id="h2-0-330" class="i">+			s.CasUnique,
+</a><a href="#h2-0-331" id="h2-0-331" class="i">+			string(s.Data),
+</a><a href="#h2-0-332" id="h2-0-332" class="i">+		)
+</a><a href="#h2-0-333" id="h2-0-333" class="i">+	case s.CasUnique != 0 &amp;&amp; !s.NoReply:
+</a><a href="#h2-0-334" id="h2-0-334" class="i">+		return fmt.Sprintf(
+</a><a href="#h2-0-335" id="h2-0-335" class="i">+			&quot;%s %d %s %d %d\r\n%s\r\n&quot;,
+</a><a href="#h2-0-336" id="h2-0-336" class="i">+			s.Key,
+</a><a href="#h2-0-337" id="h2-0-337" class="i">+			s.Flags,
+</a><a href="#h2-0-338" id="h2-0-338" class="i">+			exptime,
+</a><a href="#h2-0-339" id="h2-0-339" class="i">+			s.Size,
+</a><a href="#h2-0-340" id="h2-0-340" class="i">+			s.CasUnique,
+</a><a href="#h2-0-341" id="h2-0-341" class="i">+			string(s.Data),
+</a><a href="#h2-0-342" id="h2-0-342" class="i">+		)
+</a><a href="#h2-0-343" id="h2-0-343" class="i">+	case s.CasUnique == 0 &amp;&amp; s.NoReply:
+</a><a href="#h2-0-344" id="h2-0-344" class="i">+		return fmt.Sprintf(
+</a><a href="#h2-0-345" id="h2-0-345" class="i">+			&quot;%s %d %s %d noreply\r\n%s\r\n&quot;,
+</a><a href="#h2-0-346" id="h2-0-346" class="i">+			s.Key,
+</a><a href="#h2-0-347" id="h2-0-347" class="i">+			s.Flags,
+</a><a href="#h2-0-348" id="h2-0-348" class="i">+			exptime,
+</a><a href="#h2-0-349" id="h2-0-349" class="i">+			s.Size,
+</a><a href="#h2-0-350" id="h2-0-350" class="i">+			string(s.Data),
+</a><a href="#h2-0-351" id="h2-0-351" class="i">+		)
+</a><a href="#h2-0-352" id="h2-0-352" class="i">+	default:
+</a><a href="#h2-0-353" id="h2-0-353" class="i">+		return fmt.Sprintf(
+</a><a href="#h2-0-354" id="h2-0-354" class="i">+			&quot;%s %d %s %d\r\n%s\r\n&quot;,
+</a><a href="#h2-0-355" id="h2-0-355" class="i">+			s.Key,
+</a><a href="#h2-0-356" id="h2-0-356" class="i">+			s.Flags,
+</a><a href="#h2-0-357" id="h2-0-357" class="i">+			exptime,
+</a><a href="#h2-0-358" id="h2-0-358" class="i">+			s.Size,
+</a><a href="#h2-0-359" id="h2-0-359" class="i">+			string(s.Data),
+</a><a href="#h2-0-360" id="h2-0-360" class="i">+		)
+</a><a href="#h2-0-361" id="h2-0-361" class="i">+	}
+</a><a href="#h2-0-362" id="h2-0-362" class="i">+}
+</a><b>diff --git a/<a id="h3" href="../file/pkg/protocol/ascii_test.go">pkg/protocol/ascii_test.go</a> b/<a href="../file/pkg/protocol/ascii_test.go">pkg/protocol/ascii_test.go</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -0,0 +1,1141 @@
+</a><a href="#h3-0-0" id="h3-0-0" class="i">+package protocol
+</a><a href="#h3-0-1" id="h3-0-1" class="i">+
+</a><a href="#h3-0-2" id="h3-0-2" class="i">+import (
+</a><a href="#h3-0-3" id="h3-0-3" class="i">+	&quot;errors&quot;
+</a><a href="#h3-0-4" id="h3-0-4" class="i">+	&quot;testing&quot;
+</a><a href="#h3-0-5" id="h3-0-5" class="i">+	&quot;time&quot;
+</a><a href="#h3-0-6" id="h3-0-6" class="i">+
+</a><a href="#h3-0-7" id="h3-0-7" class="i">+	&quot;github.com/stretchr/testify/assert&quot;
+</a><a href="#h3-0-8" id="h3-0-8" class="i">+)
+</a><a href="#h3-0-9" id="h3-0-9" class="i">+
+</a><a href="#h3-0-10" id="h3-0-10" class="i">+func TestError(t *testing.T) {
+</a><a href="#h3-0-11" id="h3-0-11" class="i">+	t.Parallel()
+</a><a href="#h3-0-12" id="h3-0-12" class="i">+
+</a><a href="#h3-0-13" id="h3-0-13" class="i">+	assert.Equal(t, &quot;ERROR message\r\n&quot;, (&amp;Error{Err: errors.New(&quot;message&quot;)}).Error())
+</a><a href="#h3-0-14" id="h3-0-14" class="i">+}
+</a><a href="#h3-0-15" id="h3-0-15" class="i">+
+</a><a href="#h3-0-16" id="h3-0-16" class="i">+func TestClientError(t *testing.T) {
+</a><a href="#h3-0-17" id="h3-0-17" class="i">+	t.Parallel()
+</a><a href="#h3-0-18" id="h3-0-18" class="i">+
+</a><a href="#h3-0-19" id="h3-0-19" class="i">+	assert.Equal(
+</a><a href="#h3-0-20" id="h3-0-20" class="i">+		t,
+</a><a href="#h3-0-21" id="h3-0-21" class="i">+		&quot;CLIENT_ERROR message\r\n&quot;,
+</a><a href="#h3-0-22" id="h3-0-22" class="i">+		(&amp;ClientError{Err: errors.New(&quot;message&quot;)}).Error(),
+</a><a href="#h3-0-23" id="h3-0-23" class="i">+	)
+</a><a href="#h3-0-24" id="h3-0-24" class="i">+}
+</a><a href="#h3-0-25" id="h3-0-25" class="i">+
+</a><a href="#h3-0-26" id="h3-0-26" class="i">+func TestServerError(t *testing.T) {
+</a><a href="#h3-0-27" id="h3-0-27" class="i">+	t.Parallel()
+</a><a href="#h3-0-28" id="h3-0-28" class="i">+
+</a><a href="#h3-0-29" id="h3-0-29" class="i">+	assert.Equal(
+</a><a href="#h3-0-30" id="h3-0-30" class="i">+		t,
+</a><a href="#h3-0-31" id="h3-0-31" class="i">+		&quot;SERVER_ERROR message\r\n&quot;,
+</a><a href="#h3-0-32" id="h3-0-32" class="i">+		(&amp;ServerError{Err: errors.New(&quot;message&quot;)}).Error(),
+</a><a href="#h3-0-33" id="h3-0-33" class="i">+	)
+</a><a href="#h3-0-34" id="h3-0-34" class="i">+}
+</a><a href="#h3-0-35" id="h3-0-35" class="i">+
+</a><a href="#h3-0-36" id="h3-0-36" class="i">+func TestVersionRequest(t *testing.T) {
+</a><a href="#h3-0-37" id="h3-0-37" class="i">+	t.Parallel()
+</a><a href="#h3-0-38" id="h3-0-38" class="i">+
+</a><a href="#h3-0-39" id="h3-0-39" class="i">+	assert.Equal(t, &quot;version\r\n&quot;, (&amp;VersionRequest{}).String())
+</a><a href="#h3-0-40" id="h3-0-40" class="i">+}
+</a><a href="#h3-0-41" id="h3-0-41" class="i">+
+</a><a href="#h3-0-42" id="h3-0-42" class="i">+func TestVersionResponse(t *testing.T) {
+</a><a href="#h3-0-43" id="h3-0-43" class="i">+	t.Parallel()
+</a><a href="#h3-0-44" id="h3-0-44" class="i">+
+</a><a href="#h3-0-45" id="h3-0-45" class="i">+	assert.Equal(t, &quot;VERSION version\r\n&quot;, (&amp;VersionResponse{Version: &quot;version&quot;}).String())
+</a><a href="#h3-0-46" id="h3-0-46" class="i">+}
+</a><a href="#h3-0-47" id="h3-0-47" class="i">+
+</a><a href="#h3-0-48" id="h3-0-48" class="i">+func TestStatsRequest(t *testing.T) {
+</a><a href="#h3-0-49" id="h3-0-49" class="i">+	t.Parallel()
+</a><a href="#h3-0-50" id="h3-0-50" class="i">+
+</a><a href="#h3-0-51" id="h3-0-51" class="i">+	cases := []struct {
+</a><a href="#h3-0-52" id="h3-0-52" class="i">+		request    *StatsRequest
+</a><a href="#h3-0-53" id="h3-0-53" class="i">+		serialized string
+</a><a href="#h3-0-54" id="h3-0-54" class="i">+	}{
+</a><a href="#h3-0-55" id="h3-0-55" class="i">+		{
+</a><a href="#h3-0-56" id="h3-0-56" class="i">+			request:    &amp;StatsRequest{},
+</a><a href="#h3-0-57" id="h3-0-57" class="i">+			serialized: &quot;stats\r\n&quot;,
+</a><a href="#h3-0-58" id="h3-0-58" class="i">+		},
+</a><a href="#h3-0-59" id="h3-0-59" class="i">+		{
+</a><a href="#h3-0-60" id="h3-0-60" class="i">+			request:    &amp;StatsRequest{Type: &quot;settings&quot;},
+</a><a href="#h3-0-61" id="h3-0-61" class="i">+			serialized: &quot;stats settings\r\n&quot;,
+</a><a href="#h3-0-62" id="h3-0-62" class="i">+		},
+</a><a href="#h3-0-63" id="h3-0-63" class="i">+		{
+</a><a href="#h3-0-64" id="h3-0-64" class="i">+			request:    &amp;StatsRequest{Type: &quot;detail&quot;},
+</a><a href="#h3-0-65" id="h3-0-65" class="i">+			serialized: &quot;stats detail\r\n&quot;,
+</a><a href="#h3-0-66" id="h3-0-66" class="i">+		},
+</a><a href="#h3-0-67" id="h3-0-67" class="i">+	}
+</a><a href="#h3-0-68" id="h3-0-68" class="i">+
+</a><a href="#h3-0-69" id="h3-0-69" class="i">+	for _, testCase := range cases {
+</a><a href="#h3-0-70" id="h3-0-70" class="i">+		assert.Equal(t, testCase.serialized, testCase.request.String())
+</a><a href="#h3-0-71" id="h3-0-71" class="i">+	}
+</a><a href="#h3-0-72" id="h3-0-72" class="i">+}
+</a><a href="#h3-0-73" id="h3-0-73" class="i">+
+</a><a href="#h3-0-74" id="h3-0-74" class="i">+func TestStatsResponse(t *testing.T) {
+</a><a href="#h3-0-75" id="h3-0-75" class="i">+	t.Parallel()
+</a><a href="#h3-0-76" id="h3-0-76" class="i">+
+</a><a href="#h3-0-77" id="h3-0-77" class="i">+	cases := []struct {
+</a><a href="#h3-0-78" id="h3-0-78" class="i">+		response   *StatsResponse
+</a><a href="#h3-0-79" id="h3-0-79" class="i">+		serialized string
+</a><a href="#h3-0-80" id="h3-0-80" class="i">+	}{
+</a><a href="#h3-0-81" id="h3-0-81" class="i">+		{
+</a><a href="#h3-0-82" id="h3-0-82" class="i">+			response:   &amp;StatsResponse{},
+</a><a href="#h3-0-83" id="h3-0-83" class="i">+			serialized: &quot;END\r\n&quot;,
+</a><a href="#h3-0-84" id="h3-0-84" class="i">+		},
+</a><a href="#h3-0-85" id="h3-0-85" class="i">+		{
+</a><a href="#h3-0-86" id="h3-0-86" class="i">+			response: &amp;StatsResponse{
+</a><a href="#h3-0-87" id="h3-0-87" class="i">+				Stats: []StatsItem{
+</a><a href="#h3-0-88" id="h3-0-88" class="i">+					{Name: &quot;foo&quot;, Value: &quot;bar&quot;},
+</a><a href="#h3-0-89" id="h3-0-89" class="i">+				},
+</a><a href="#h3-0-90" id="h3-0-90" class="i">+			},
+</a><a href="#h3-0-91" id="h3-0-91" class="i">+			serialized: &quot;STAT foo bar\r\nEND\r\n&quot;,
+</a><a href="#h3-0-92" id="h3-0-92" class="i">+		},
+</a><a href="#h3-0-93" id="h3-0-93" class="i">+		{
+</a><a href="#h3-0-94" id="h3-0-94" class="i">+			response: &amp;StatsResponse{
+</a><a href="#h3-0-95" id="h3-0-95" class="i">+				Stats: []StatsItem{
+</a><a href="#h3-0-96" id="h3-0-96" class="i">+					{Name: &quot;foo&quot;, Value: &quot;bar&quot;},
+</a><a href="#h3-0-97" id="h3-0-97" class="i">+					{Name: &quot;baz&quot;, Value: &quot;qux&quot;},
+</a><a href="#h3-0-98" id="h3-0-98" class="i">+				},
+</a><a href="#h3-0-99" id="h3-0-99" class="i">+			},
+</a><a href="#h3-0-100" id="h3-0-100" class="i">+			serialized: &quot;STAT foo bar\r\nSTAT baz qux\r\nEND\r\n&quot;,
+</a><a href="#h3-0-101" id="h3-0-101" class="i">+		},
+</a><a href="#h3-0-102" id="h3-0-102" class="i">+	}
+</a><a href="#h3-0-103" id="h3-0-103" class="i">+
+</a><a href="#h3-0-104" id="h3-0-104" class="i">+	for _, testCase := range cases {
+</a><a href="#h3-0-105" id="h3-0-105" class="i">+		assert.Equal(t, testCase.serialized, testCase.response.String())
+</a><a href="#h3-0-106" id="h3-0-106" class="i">+	}
+</a><a href="#h3-0-107" id="h3-0-107" class="i">+}
+</a><a href="#h3-0-108" id="h3-0-108" class="i">+
+</a><a href="#h3-0-109" id="h3-0-109" class="i">+func TestWatchRequest(t *testing.T) {
+</a><a href="#h3-0-110" id="h3-0-110" class="i">+	t.Parallel()
+</a><a href="#h3-0-111" id="h3-0-111" class="i">+
+</a><a href="#h3-0-112" id="h3-0-112" class="i">+	cases := []struct {
+</a><a href="#h3-0-113" id="h3-0-113" class="i">+		request    *WatchRequest
+</a><a href="#h3-0-114" id="h3-0-114" class="i">+		serialized string
+</a><a href="#h3-0-115" id="h3-0-115" class="i">+	}{
+</a><a href="#h3-0-116" id="h3-0-116" class="i">+		{
+</a><a href="#h3-0-117" id="h3-0-117" class="i">+			request:    &amp;WatchRequest{},
+</a><a href="#h3-0-118" id="h3-0-118" class="i">+			serialized: &quot;watch\r\n&quot;,
+</a><a href="#h3-0-119" id="h3-0-119" class="i">+		},
+</a><a href="#h3-0-120" id="h3-0-120" class="i">+		{
+</a><a href="#h3-0-121" id="h3-0-121" class="i">+			request:    &amp;WatchRequest{Loggers: []string{&quot;fetchers&quot;}},
+</a><a href="#h3-0-122" id="h3-0-122" class="i">+			serialized: &quot;watch fetchers\r\n&quot;,
+</a><a href="#h3-0-123" id="h3-0-123" class="i">+		},
+</a><a href="#h3-0-124" id="h3-0-124" class="i">+		{
+</a><a href="#h3-0-125" id="h3-0-125" class="i">+			request:    &amp;WatchRequest{Loggers: []string{&quot;fetchers&quot;, &quot;mutations&quot;}},
+</a><a href="#h3-0-126" id="h3-0-126" class="i">+			serialized: &quot;watch fetchers mutations\r\n&quot;,
+</a><a href="#h3-0-127" id="h3-0-127" class="i">+		},
+</a><a href="#h3-0-128" id="h3-0-128" class="i">+	}
+</a><a href="#h3-0-129" id="h3-0-129" class="i">+
+</a><a href="#h3-0-130" id="h3-0-130" class="i">+	for _, testCase := range cases {
+</a><a href="#h3-0-131" id="h3-0-131" class="i">+		assert.Equal(t, testCase.serialized, testCase.request.String())
+</a><a href="#h3-0-132" id="h3-0-132" class="i">+	}
+</a><a href="#h3-0-133" id="h3-0-133" class="i">+}
+</a><a href="#h3-0-134" id="h3-0-134" class="i">+
+</a><a href="#h3-0-135" id="h3-0-135" class="i">+func TestWatchResponse(t *testing.T) {
+</a><a href="#h3-0-136" id="h3-0-136" class="i">+	t.Parallel()
+</a><a href="#h3-0-137" id="h3-0-137" class="i">+
+</a><a href="#h3-0-138" id="h3-0-138" class="i">+	cases := []struct {
+</a><a href="#h3-0-139" id="h3-0-139" class="i">+		response   *WatchResponse
+</a><a href="#h3-0-140" id="h3-0-140" class="i">+		serialized string
+</a><a href="#h3-0-141" id="h3-0-141" class="i">+	}{
+</a><a href="#h3-0-142" id="h3-0-142" class="i">+		{
+</a><a href="#h3-0-143" id="h3-0-143" class="i">+			response:   &amp;WatchResponse{},
+</a><a href="#h3-0-144" id="h3-0-144" class="i">+			serialized: &quot;&quot;,
+</a><a href="#h3-0-145" id="h3-0-145" class="i">+		},
+</a><a href="#h3-0-146" id="h3-0-146" class="i">+		{
+</a><a href="#h3-0-147" id="h3-0-147" class="i">+			response: &amp;WatchResponse{
+</a><a href="#h3-0-148" id="h3-0-148" class="i">+				Logs: []LogEntry{
+</a><a href="#h3-0-149" id="h3-0-149" class="i">+					{
+</a><a href="#h3-0-150" id="h3-0-150" class="i">+						Attributes: []LogAttribute{
+</a><a href="#h3-0-151" id="h3-0-151" class="i">+							{Key: &quot;gid&quot;, Value: &quot;foo&quot;},
+</a><a href="#h3-0-152" id="h3-0-152" class="i">+						},
+</a><a href="#h3-0-153" id="h3-0-153" class="i">+					},
+</a><a href="#h3-0-154" id="h3-0-154" class="i">+				},
+</a><a href="#h3-0-155" id="h3-0-155" class="i">+			},
+</a><a href="#h3-0-156" id="h3-0-156" class="i">+			serialized: &quot;gid=foo\r\n&quot;,
+</a><a href="#h3-0-157" id="h3-0-157" class="i">+		},
+</a><a href="#h3-0-158" id="h3-0-158" class="i">+		{
+</a><a href="#h3-0-159" id="h3-0-159" class="i">+			response: &amp;WatchResponse{
+</a><a href="#h3-0-160" id="h3-0-160" class="i">+				Logs: []LogEntry{
+</a><a href="#h3-0-161" id="h3-0-161" class="i">+					{
+</a><a href="#h3-0-162" id="h3-0-162" class="i">+						Attributes: []LogAttribute{
+</a><a href="#h3-0-163" id="h3-0-163" class="i">+							{Key: &quot;gid&quot;, Value: &quot;foo&quot;},
+</a><a href="#h3-0-164" id="h3-0-164" class="i">+							{Key: &quot;key&quot;, Value: &quot;bar&quot;},
+</a><a href="#h3-0-165" id="h3-0-165" class="i">+						},
+</a><a href="#h3-0-166" id="h3-0-166" class="i">+					},
+</a><a href="#h3-0-167" id="h3-0-167" class="i">+				},
+</a><a href="#h3-0-168" id="h3-0-168" class="i">+			},
+</a><a href="#h3-0-169" id="h3-0-169" class="i">+			serialized: &quot;gid=foo key=bar\r\n&quot;,
+</a><a href="#h3-0-170" id="h3-0-170" class="i">+		},
+</a><a href="#h3-0-171" id="h3-0-171" class="i">+		{
+</a><a href="#h3-0-172" id="h3-0-172" class="i">+			response: &amp;WatchResponse{
+</a><a href="#h3-0-173" id="h3-0-173" class="i">+				Logs: []LogEntry{
+</a><a href="#h3-0-174" id="h3-0-174" class="i">+					{
+</a><a href="#h3-0-175" id="h3-0-175" class="i">+						Attributes: []LogAttribute{
+</a><a href="#h3-0-176" id="h3-0-176" class="i">+							{Key: &quot;gid&quot;, Value: &quot;foo&quot;},
+</a><a href="#h3-0-177" id="h3-0-177" class="i">+							{Key: &quot;key&quot;, Value: &quot;bar&quot;},
+</a><a href="#h3-0-178" id="h3-0-178" class="i">+						},
+</a><a href="#h3-0-179" id="h3-0-179" class="i">+					},
+</a><a href="#h3-0-180" id="h3-0-180" class="i">+					{
+</a><a href="#h3-0-181" id="h3-0-181" class="i">+						Attributes: []LogAttribute{
+</a><a href="#h3-0-182" id="h3-0-182" class="i">+							{Key: &quot;gid&quot;, Value: &quot;baz&quot;},
+</a><a href="#h3-0-183" id="h3-0-183" class="i">+						},
+</a><a href="#h3-0-184" id="h3-0-184" class="i">+					},
+</a><a href="#h3-0-185" id="h3-0-185" class="i">+				},
+</a><a href="#h3-0-186" id="h3-0-186" class="i">+			},
+</a><a href="#h3-0-187" id="h3-0-187" class="i">+			serialized: &quot;gid=foo key=bar\r\ngid=baz\r\n&quot;,
+</a><a href="#h3-0-188" id="h3-0-188" class="i">+		},
+</a><a href="#h3-0-189" id="h3-0-189" class="i">+	}
+</a><a href="#h3-0-190" id="h3-0-190" class="i">+
+</a><a href="#h3-0-191" id="h3-0-191" class="i">+	for _, testCase := range cases {
+</a><a href="#h3-0-192" id="h3-0-192" class="i">+		assert.Equal(t, testCase.serialized, testCase.response.String())
+</a><a href="#h3-0-193" id="h3-0-193" class="i">+	}
+</a><a href="#h3-0-194" id="h3-0-194" class="i">+}
+</a><a href="#h3-0-195" id="h3-0-195" class="i">+
+</a><a href="#h3-0-196" id="h3-0-196" class="i">+func TestShutdownRequest(t *testing.T) {
+</a><a href="#h3-0-197" id="h3-0-197" class="i">+	t.Parallel()
+</a><a href="#h3-0-198" id="h3-0-198" class="i">+
+</a><a href="#h3-0-199" id="h3-0-199" class="i">+	cases := []struct {
+</a><a href="#h3-0-200" id="h3-0-200" class="i">+		request    *ShutdownRequest
+</a><a href="#h3-0-201" id="h3-0-201" class="i">+		serialized string
+</a><a href="#h3-0-202" id="h3-0-202" class="i">+	}{
+</a><a href="#h3-0-203" id="h3-0-203" class="i">+		{
+</a><a href="#h3-0-204" id="h3-0-204" class="i">+			request:    &amp;ShutdownRequest{},
+</a><a href="#h3-0-205" id="h3-0-205" class="i">+			serialized: &quot;shutdown\r\n&quot;,
+</a><a href="#h3-0-206" id="h3-0-206" class="i">+		},
+</a><a href="#h3-0-207" id="h3-0-207" class="i">+		{
+</a><a href="#h3-0-208" id="h3-0-208" class="i">+			request:    &amp;ShutdownRequest{Type: &quot;graceful&quot;},
+</a><a href="#h3-0-209" id="h3-0-209" class="i">+			serialized: &quot;shutdown graceful\r\n&quot;,
+</a><a href="#h3-0-210" id="h3-0-210" class="i">+		},
+</a><a href="#h3-0-211" id="h3-0-211" class="i">+	}
+</a><a href="#h3-0-212" id="h3-0-212" class="i">+
+</a><a href="#h3-0-213" id="h3-0-213" class="i">+	for _, testCase := range cases {
+</a><a href="#h3-0-214" id="h3-0-214" class="i">+		assert.Equal(t, testCase.serialized, testCase.request.String())
+</a><a href="#h3-0-215" id="h3-0-215" class="i">+	}
+</a><a href="#h3-0-216" id="h3-0-216" class="i">+}
+</a><a href="#h3-0-217" id="h3-0-217" class="i">+
+</a><a href="#h3-0-218" id="h3-0-218" class="i">+func TestShutdownResponse(t *testing.T) {
+</a><a href="#h3-0-219" id="h3-0-219" class="i">+	t.Parallel()
+</a><a href="#h3-0-220" id="h3-0-220" class="i">+
+</a><a href="#h3-0-221" id="h3-0-221" class="i">+	assert.Equal(t, &quot;OK\r\n&quot;, (&amp;ShutdownResponse{}).String())
+</a><a href="#h3-0-222" id="h3-0-222" class="i">+}
+</a><a href="#h3-0-223" id="h3-0-223" class="i">+
+</a><a href="#h3-0-224" id="h3-0-224" class="i">+func TestTouchRequest(t *testing.T) {
+</a><a href="#h3-0-225" id="h3-0-225" class="i">+	t.Parallel()
+</a><a href="#h3-0-226" id="h3-0-226" class="i">+
+</a><a href="#h3-0-227" id="h3-0-227" class="i">+	cases := []struct {
+</a><a href="#h3-0-228" id="h3-0-228" class="i">+		request    *TouchRequest
+</a><a href="#h3-0-229" id="h3-0-229" class="i">+		serialized string
+</a><a href="#h3-0-230" id="h3-0-230" class="i">+	}{
+</a><a href="#h3-0-231" id="h3-0-231" class="i">+		{
+</a><a href="#h3-0-232" id="h3-0-232" class="i">+			request: &amp;TouchRequest{
+</a><a href="#h3-0-233" id="h3-0-233" class="i">+				Key:        &quot;key&quot;,
+</a><a href="#h3-0-234" id="h3-0-234" class="i">+				Expiration: 5 * time.Second,
+</a><a href="#h3-0-235" id="h3-0-235" class="i">+				NoReply:    false,
+</a><a href="#h3-0-236" id="h3-0-236" class="i">+			},
+</a><a href="#h3-0-237" id="h3-0-237" class="i">+			serialized: &quot;touch key 5\r\n&quot;,
+</a><a href="#h3-0-238" id="h3-0-238" class="i">+		},
+</a><a href="#h3-0-239" id="h3-0-239" class="i">+		{
+</a><a href="#h3-0-240" id="h3-0-240" class="i">+			request: &amp;TouchRequest{
+</a><a href="#h3-0-241" id="h3-0-241" class="i">+				Key:        &quot;key&quot;,
+</a><a href="#h3-0-242" id="h3-0-242" class="i">+				Expiration: 5 * time.Second,
+</a><a href="#h3-0-243" id="h3-0-243" class="i">+				NoReply:    true,
+</a><a href="#h3-0-244" id="h3-0-244" class="i">+			},
+</a><a href="#h3-0-245" id="h3-0-245" class="i">+			serialized: &quot;touch key 5 noreply\r\n&quot;,
+</a><a href="#h3-0-246" id="h3-0-246" class="i">+		},
+</a><a href="#h3-0-247" id="h3-0-247" class="i">+	}
+</a><a href="#h3-0-248" id="h3-0-248" class="i">+
+</a><a href="#h3-0-249" id="h3-0-249" class="i">+	for _, testCase := range cases {
+</a><a href="#h3-0-250" id="h3-0-250" class="i">+		assert.Equal(t, testCase.serialized, testCase.request.String())
+</a><a href="#h3-0-251" id="h3-0-251" class="i">+	}
+</a><a href="#h3-0-252" id="h3-0-252" class="i">+}
+</a><a href="#h3-0-253" id="h3-0-253" class="i">+
+</a><a href="#h3-0-254" id="h3-0-254" class="i">+func TestTouchResponse(t *testing.T) {
+</a><a href="#h3-0-255" id="h3-0-255" class="i">+	t.Parallel()
+</a><a href="#h3-0-256" id="h3-0-256" class="i">+
+</a><a href="#h3-0-257" id="h3-0-257" class="i">+	cases := []struct {
+</a><a href="#h3-0-258" id="h3-0-258" class="i">+		response   *TouchResponse
+</a><a href="#h3-0-259" id="h3-0-259" class="i">+		serialized string
+</a><a href="#h3-0-260" id="h3-0-260" class="i">+	}{
+</a><a href="#h3-0-261" id="h3-0-261" class="i">+		{
+</a><a href="#h3-0-262" id="h3-0-262" class="i">+			response:   &amp;TouchResponse{Found: false},
+</a><a href="#h3-0-263" id="h3-0-263" class="i">+			serialized: &quot;NOT_FOUND\r\n&quot;,
+</a><a href="#h3-0-264" id="h3-0-264" class="i">+		},
+</a><a href="#h3-0-265" id="h3-0-265" class="i">+		{
+</a><a href="#h3-0-266" id="h3-0-266" class="i">+			response:   &amp;TouchResponse{Found: true},
+</a><a href="#h3-0-267" id="h3-0-267" class="i">+			serialized: &quot;TOUCHED\r\n&quot;,
+</a><a href="#h3-0-268" id="h3-0-268" class="i">+		},
+</a><a href="#h3-0-269" id="h3-0-269" class="i">+	}
+</a><a href="#h3-0-270" id="h3-0-270" class="i">+
+</a><a href="#h3-0-271" id="h3-0-271" class="i">+	for _, testCase := range cases {
+</a><a href="#h3-0-272" id="h3-0-272" class="i">+		assert.Equal(t, testCase.serialized, testCase.response.String())
+</a><a href="#h3-0-273" id="h3-0-273" class="i">+	}
+</a><a href="#h3-0-274" id="h3-0-274" class="i">+}
+</a><a href="#h3-0-275" id="h3-0-275" class="i">+
+</a><a href="#h3-0-276" id="h3-0-276" class="i">+func TestDeleteRequest(t *testing.T) {
+</a><a href="#h3-0-277" id="h3-0-277" class="i">+	t.Parallel()
+</a><a href="#h3-0-278" id="h3-0-278" class="i">+
+</a><a href="#h3-0-279" id="h3-0-279" class="i">+	cases := []struct {
+</a><a href="#h3-0-280" id="h3-0-280" class="i">+		request    *DeleteRequest
+</a><a href="#h3-0-281" id="h3-0-281" class="i">+		serialized string
+</a><a href="#h3-0-282" id="h3-0-282" class="i">+	}{
+</a><a href="#h3-0-283" id="h3-0-283" class="i">+		{
+</a><a href="#h3-0-284" id="h3-0-284" class="i">+			request: &amp;DeleteRequest{
+</a><a href="#h3-0-285" id="h3-0-285" class="i">+				Key:     &quot;key&quot;,
+</a><a href="#h3-0-286" id="h3-0-286" class="i">+				NoReply: false,
+</a><a href="#h3-0-287" id="h3-0-287" class="i">+			},
+</a><a href="#h3-0-288" id="h3-0-288" class="i">+			serialized: &quot;delete key\r\n&quot;,
+</a><a href="#h3-0-289" id="h3-0-289" class="i">+		},
+</a><a href="#h3-0-290" id="h3-0-290" class="i">+		{
+</a><a href="#h3-0-291" id="h3-0-291" class="i">+			request: &amp;DeleteRequest{
+</a><a href="#h3-0-292" id="h3-0-292" class="i">+				Key:     &quot;key&quot;,
+</a><a href="#h3-0-293" id="h3-0-293" class="i">+				NoReply: true,
+</a><a href="#h3-0-294" id="h3-0-294" class="i">+			},
+</a><a href="#h3-0-295" id="h3-0-295" class="i">+			serialized: &quot;delete key noreply\r\n&quot;,
+</a><a href="#h3-0-296" id="h3-0-296" class="i">+		},
+</a><a href="#h3-0-297" id="h3-0-297" class="i">+	}
+</a><a href="#h3-0-298" id="h3-0-298" class="i">+
+</a><a href="#h3-0-299" id="h3-0-299" class="i">+	for _, testCase := range cases {
+</a><a href="#h3-0-300" id="h3-0-300" class="i">+		assert.Equal(t, testCase.serialized, testCase.request.String())
+</a><a href="#h3-0-301" id="h3-0-301" class="i">+	}
+</a><a href="#h3-0-302" id="h3-0-302" class="i">+}
+</a><a href="#h3-0-303" id="h3-0-303" class="i">+
+</a><a href="#h3-0-304" id="h3-0-304" class="i">+func TestDeleteResponse(t *testing.T) {
+</a><a href="#h3-0-305" id="h3-0-305" class="i">+	t.Parallel()
+</a><a href="#h3-0-306" id="h3-0-306" class="i">+
+</a><a href="#h3-0-307" id="h3-0-307" class="i">+	cases := []struct {
+</a><a href="#h3-0-308" id="h3-0-308" class="i">+		response   *DeleteResponse
+</a><a href="#h3-0-309" id="h3-0-309" class="i">+		serialized string
+</a><a href="#h3-0-310" id="h3-0-310" class="i">+	}{
+</a><a href="#h3-0-311" id="h3-0-311" class="i">+		{
+</a><a href="#h3-0-312" id="h3-0-312" class="i">+			response:   &amp;DeleteResponse{Found: false},
+</a><a href="#h3-0-313" id="h3-0-313" class="i">+			serialized: &quot;NOT_FOUND\r\n&quot;,
+</a><a href="#h3-0-314" id="h3-0-314" class="i">+		},
+</a><a href="#h3-0-315" id="h3-0-315" class="i">+		{
+</a><a href="#h3-0-316" id="h3-0-316" class="i">+			response:   &amp;DeleteResponse{Found: true},
+</a><a href="#h3-0-317" id="h3-0-317" class="i">+			serialized: &quot;DELETED\r\n&quot;,
+</a><a href="#h3-0-318" id="h3-0-318" class="i">+		},
+</a><a href="#h3-0-319" id="h3-0-319" class="i">+	}
+</a><a href="#h3-0-320" id="h3-0-320" class="i">+
+</a><a href="#h3-0-321" id="h3-0-321" class="i">+	for _, testCase := range cases {
+</a><a href="#h3-0-322" id="h3-0-322" class="i">+		assert.Equal(t, testCase.serialized, testCase.response.String())
+</a><a href="#h3-0-323" id="h3-0-323" class="i">+	}
+</a><a href="#h3-0-324" id="h3-0-324" class="i">+}
+</a><a href="#h3-0-325" id="h3-0-325" class="i">+
+</a><a href="#h3-0-326" id="h3-0-326" class="i">+func TestIncrRequest(t *testing.T) {
+</a><a href="#h3-0-327" id="h3-0-327" class="i">+	t.Parallel()
+</a><a href="#h3-0-328" id="h3-0-328" class="i">+
+</a><a href="#h3-0-329" id="h3-0-329" class="i">+	cases := []struct {
+</a><a href="#h3-0-330" id="h3-0-330" class="i">+		request    *IncrRequest
+</a><a href="#h3-0-331" id="h3-0-331" class="i">+		serialized string
+</a><a href="#h3-0-332" id="h3-0-332" class="i">+	}{
+</a><a href="#h3-0-333" id="h3-0-333" class="i">+		{
+</a><a href="#h3-0-334" id="h3-0-334" class="i">+			request: &amp;IncrRequest{
+</a><a href="#h3-0-335" id="h3-0-335" class="i">+				Key:     &quot;key&quot;,
+</a><a href="#h3-0-336" id="h3-0-336" class="i">+				Delta:   5,
+</a><a href="#h3-0-337" id="h3-0-337" class="i">+				NoReply: false,
+</a><a href="#h3-0-338" id="h3-0-338" class="i">+			},
+</a><a href="#h3-0-339" id="h3-0-339" class="i">+			serialized: &quot;incr key 5\r\n&quot;,
+</a><a href="#h3-0-340" id="h3-0-340" class="i">+		},
+</a><a href="#h3-0-341" id="h3-0-341" class="i">+		{
+</a><a href="#h3-0-342" id="h3-0-342" class="i">+			request: &amp;IncrRequest{
+</a><a href="#h3-0-343" id="h3-0-343" class="i">+				Key:     &quot;key&quot;,
+</a><a href="#h3-0-344" id="h3-0-344" class="i">+				Delta:   5,
+</a><a href="#h3-0-345" id="h3-0-345" class="i">+				NoReply: true,
+</a><a href="#h3-0-346" id="h3-0-346" class="i">+			},
+</a><a href="#h3-0-347" id="h3-0-347" class="i">+			serialized: &quot;incr key 5 noreply\r\n&quot;,
+</a><a href="#h3-0-348" id="h3-0-348" class="i">+		},
+</a><a href="#h3-0-349" id="h3-0-349" class="i">+	}
+</a><a href="#h3-0-350" id="h3-0-350" class="i">+
+</a><a href="#h3-0-351" id="h3-0-351" class="i">+	for _, testCase := range cases {
+</a><a href="#h3-0-352" id="h3-0-352" class="i">+		assert.Equal(t, testCase.serialized, testCase.request.String())
+</a><a href="#h3-0-353" id="h3-0-353" class="i">+	}
+</a><a href="#h3-0-354" id="h3-0-354" class="i">+}
+</a><a href="#h3-0-355" id="h3-0-355" class="i">+
+</a><a href="#h3-0-356" id="h3-0-356" class="i">+func TestIncrResponse(t *testing.T) {
+</a><a href="#h3-0-357" id="h3-0-357" class="i">+	t.Parallel()
+</a><a href="#h3-0-358" id="h3-0-358" class="i">+
+</a><a href="#h3-0-359" id="h3-0-359" class="i">+	cases := []struct {
+</a><a href="#h3-0-360" id="h3-0-360" class="i">+		response   *IncrResponse
+</a><a href="#h3-0-361" id="h3-0-361" class="i">+		serialized string
+</a><a href="#h3-0-362" id="h3-0-362" class="i">+	}{
+</a><a href="#h3-0-363" id="h3-0-363" class="i">+		{
+</a><a href="#h3-0-364" id="h3-0-364" class="i">+			response:   &amp;IncrResponse{Found: false},
+</a><a href="#h3-0-365" id="h3-0-365" class="i">+			serialized: &quot;NOT_FOUND\r\n&quot;,
+</a><a href="#h3-0-366" id="h3-0-366" class="i">+		},
+</a><a href="#h3-0-367" id="h3-0-367" class="i">+		{
+</a><a href="#h3-0-368" id="h3-0-368" class="i">+			response:   &amp;IncrResponse{Found: true, Value: 6},
+</a><a href="#h3-0-369" id="h3-0-369" class="i">+			serialized: &quot;6\r\n&quot;,
+</a><a href="#h3-0-370" id="h3-0-370" class="i">+		},
+</a><a href="#h3-0-371" id="h3-0-371" class="i">+	}
+</a><a href="#h3-0-372" id="h3-0-372" class="i">+
+</a><a href="#h3-0-373" id="h3-0-373" class="i">+	for _, testCase := range cases {
+</a><a href="#h3-0-374" id="h3-0-374" class="i">+		assert.Equal(t, testCase.serialized, testCase.response.String())
+</a><a href="#h3-0-375" id="h3-0-375" class="i">+	}
+</a><a href="#h3-0-376" id="h3-0-376" class="i">+}
+</a><a href="#h3-0-377" id="h3-0-377" class="i">+
+</a><a href="#h3-0-378" id="h3-0-378" class="i">+func TestDecrRequest(t *testing.T) {
+</a><a href="#h3-0-379" id="h3-0-379" class="i">+	t.Parallel()
+</a><a href="#h3-0-380" id="h3-0-380" class="i">+
+</a><a href="#h3-0-381" id="h3-0-381" class="i">+	cases := []struct {
+</a><a href="#h3-0-382" id="h3-0-382" class="i">+		request    *DecrRequest
+</a><a href="#h3-0-383" id="h3-0-383" class="i">+		serialized string
+</a><a href="#h3-0-384" id="h3-0-384" class="i">+	}{
+</a><a href="#h3-0-385" id="h3-0-385" class="i">+		{
+</a><a href="#h3-0-386" id="h3-0-386" class="i">+			request: &amp;DecrRequest{
+</a><a href="#h3-0-387" id="h3-0-387" class="i">+				Key:     &quot;key&quot;,
+</a><a href="#h3-0-388" id="h3-0-388" class="i">+				Delta:   5,
+</a><a href="#h3-0-389" id="h3-0-389" class="i">+				NoReply: false,
+</a><a href="#h3-0-390" id="h3-0-390" class="i">+			},
+</a><a href="#h3-0-391" id="h3-0-391" class="i">+			serialized: &quot;decr key 5\r\n&quot;,
+</a><a href="#h3-0-392" id="h3-0-392" class="i">+		},
+</a><a href="#h3-0-393" id="h3-0-393" class="i">+		{
+</a><a href="#h3-0-394" id="h3-0-394" class="i">+			request: &amp;DecrRequest{
+</a><a href="#h3-0-395" id="h3-0-395" class="i">+				Key:     &quot;key&quot;,
+</a><a href="#h3-0-396" id="h3-0-396" class="i">+				Delta:   5,
+</a><a href="#h3-0-397" id="h3-0-397" class="i">+				NoReply: true,
+</a><a href="#h3-0-398" id="h3-0-398" class="i">+			},
+</a><a href="#h3-0-399" id="h3-0-399" class="i">+			serialized: &quot;decr key 5 noreply\r\n&quot;,
+</a><a href="#h3-0-400" id="h3-0-400" class="i">+		},
+</a><a href="#h3-0-401" id="h3-0-401" class="i">+	}
+</a><a href="#h3-0-402" id="h3-0-402" class="i">+
+</a><a href="#h3-0-403" id="h3-0-403" class="i">+	for _, testCase := range cases {
+</a><a href="#h3-0-404" id="h3-0-404" class="i">+		assert.Equal(t, testCase.serialized, testCase.request.String())
+</a><a href="#h3-0-405" id="h3-0-405" class="i">+	}
+</a><a href="#h3-0-406" id="h3-0-406" class="i">+}
+</a><a href="#h3-0-407" id="h3-0-407" class="i">+
+</a><a href="#h3-0-408" id="h3-0-408" class="i">+func TestDecrResponse(t *testing.T) {
+</a><a href="#h3-0-409" id="h3-0-409" class="i">+	t.Parallel()
+</a><a href="#h3-0-410" id="h3-0-410" class="i">+
+</a><a href="#h3-0-411" id="h3-0-411" class="i">+	cases := []struct {
+</a><a href="#h3-0-412" id="h3-0-412" class="i">+		response   *DecrResponse
+</a><a href="#h3-0-413" id="h3-0-413" class="i">+		serialized string
+</a><a href="#h3-0-414" id="h3-0-414" class="i">+	}{
+</a><a href="#h3-0-415" id="h3-0-415" class="i">+		{
+</a><a href="#h3-0-416" id="h3-0-416" class="i">+			response:   &amp;DecrResponse{Found: false},
+</a><a href="#h3-0-417" id="h3-0-417" class="i">+			serialized: &quot;NOT_FOUND\r\n&quot;,
+</a><a href="#h3-0-418" id="h3-0-418" class="i">+		},
+</a><a href="#h3-0-419" id="h3-0-419" class="i">+		{
+</a><a href="#h3-0-420" id="h3-0-420" class="i">+			response:   &amp;DecrResponse{Found: true, Value: 6},
+</a><a href="#h3-0-421" id="h3-0-421" class="i">+			serialized: &quot;6\r\n&quot;,
+</a><a href="#h3-0-422" id="h3-0-422" class="i">+		},
+</a><a href="#h3-0-423" id="h3-0-423" class="i">+	}
+</a><a href="#h3-0-424" id="h3-0-424" class="i">+
+</a><a href="#h3-0-425" id="h3-0-425" class="i">+	for _, testCase := range cases {
+</a><a href="#h3-0-426" id="h3-0-426" class="i">+		assert.Equal(t, testCase.serialized, testCase.response.String())
+</a><a href="#h3-0-427" id="h3-0-427" class="i">+	}
+</a><a href="#h3-0-428" id="h3-0-428" class="i">+}
+</a><a href="#h3-0-429" id="h3-0-429" class="i">+
+</a><a href="#h3-0-430" id="h3-0-430" class="i">+func TestGetRequest(t *testing.T) {
+</a><a href="#h3-0-431" id="h3-0-431" class="i">+	t.Parallel()
+</a><a href="#h3-0-432" id="h3-0-432" class="i">+
+</a><a href="#h3-0-433" id="h3-0-433" class="i">+	cases := []struct {
+</a><a href="#h3-0-434" id="h3-0-434" class="i">+		request    *GetRequest
+</a><a href="#h3-0-435" id="h3-0-435" class="i">+		serialized string
+</a><a href="#h3-0-436" id="h3-0-436" class="i">+	}{
+</a><a href="#h3-0-437" id="h3-0-437" class="i">+		{
+</a><a href="#h3-0-438" id="h3-0-438" class="i">+			request:    &amp;GetRequest{Keys: []string{&quot;foo&quot;}},
+</a><a href="#h3-0-439" id="h3-0-439" class="i">+			serialized: &quot;get foo\r\n&quot;,
+</a><a href="#h3-0-440" id="h3-0-440" class="i">+		},
+</a><a href="#h3-0-441" id="h3-0-441" class="i">+		{
+</a><a href="#h3-0-442" id="h3-0-442" class="i">+			request:    &amp;GetRequest{Keys: []string{&quot;foo&quot;, &quot;bar&quot;}},
+</a><a href="#h3-0-443" id="h3-0-443" class="i">+			serialized: &quot;get foo bar\r\n&quot;,
+</a><a href="#h3-0-444" id="h3-0-444" class="i">+		},
+</a><a href="#h3-0-445" id="h3-0-445" class="i">+	}
+</a><a href="#h3-0-446" id="h3-0-446" class="i">+
+</a><a href="#h3-0-447" id="h3-0-447" class="i">+	for _, testCase := range cases {
+</a><a href="#h3-0-448" id="h3-0-448" class="i">+		assert.Equal(t, testCase.serialized, testCase.request.String())
+</a><a href="#h3-0-449" id="h3-0-449" class="i">+	}
+</a><a href="#h3-0-450" id="h3-0-450" class="i">+}
+</a><a href="#h3-0-451" id="h3-0-451" class="i">+
+</a><a href="#h3-0-452" id="h3-0-452" class="i">+func TestGetResponse(t *testing.T) {
+</a><a href="#h3-0-453" id="h3-0-453" class="i">+	t.Parallel()
+</a><a href="#h3-0-454" id="h3-0-454" class="i">+
+</a><a href="#h3-0-455" id="h3-0-455" class="i">+	cases := []struct {
+</a><a href="#h3-0-456" id="h3-0-456" class="i">+		response   *GetResponse
+</a><a href="#h3-0-457" id="h3-0-457" class="i">+		serialized string
+</a><a href="#h3-0-458" id="h3-0-458" class="i">+	}{
+</a><a href="#h3-0-459" id="h3-0-459" class="i">+		{
+</a><a href="#h3-0-460" id="h3-0-460" class="i">+			response: &amp;GetResponse{
+</a><a href="#h3-0-461" id="h3-0-461" class="i">+				Values: []*RetrievalPayload{
+</a><a href="#h3-0-462" id="h3-0-462" class="i">+					{
+</a><a href="#h3-0-463" id="h3-0-463" class="i">+						Key:   &quot;foo&quot;,
+</a><a href="#h3-0-464" id="h3-0-464" class="i">+						Flags: 5,
+</a><a href="#h3-0-465" id="h3-0-465" class="i">+						Size:  3,
+</a><a href="#h3-0-466" id="h3-0-466" class="i">+						Data:  []byte(&quot;bar&quot;),
+</a><a href="#h3-0-467" id="h3-0-467" class="i">+					},
+</a><a href="#h3-0-468" id="h3-0-468" class="i">+				},
+</a><a href="#h3-0-469" id="h3-0-469" class="i">+			},
+</a><a href="#h3-0-470" id="h3-0-470" class="i">+			serialized: &quot;VALUE foo 5 3\r\nbar\r\nEND\r\n&quot;,
+</a><a href="#h3-0-471" id="h3-0-471" class="i">+		},
+</a><a href="#h3-0-472" id="h3-0-472" class="i">+		{
+</a><a href="#h3-0-473" id="h3-0-473" class="i">+			response: &amp;GetResponse{
+</a><a href="#h3-0-474" id="h3-0-474" class="i">+				Values: []*RetrievalPayload{
+</a><a href="#h3-0-475" id="h3-0-475" class="i">+					{
+</a><a href="#h3-0-476" id="h3-0-476" class="i">+						Key:   &quot;foo&quot;,
+</a><a href="#h3-0-477" id="h3-0-477" class="i">+						Flags: 5,
+</a><a href="#h3-0-478" id="h3-0-478" class="i">+						Size:  3,
+</a><a href="#h3-0-479" id="h3-0-479" class="i">+						Data:  []byte(&quot;bar&quot;),
+</a><a href="#h3-0-480" id="h3-0-480" class="i">+					},
+</a><a href="#h3-0-481" id="h3-0-481" class="i">+					{
+</a><a href="#h3-0-482" id="h3-0-482" class="i">+						Key:   &quot;baz&quot;,
+</a><a href="#h3-0-483" id="h3-0-483" class="i">+						Flags: 0,
+</a><a href="#h3-0-484" id="h3-0-484" class="i">+						Size:  3,
+</a><a href="#h3-0-485" id="h3-0-485" class="i">+						Data:  []byte(&quot;qux&quot;),
+</a><a href="#h3-0-486" id="h3-0-486" class="i">+					},
+</a><a href="#h3-0-487" id="h3-0-487" class="i">+				},
+</a><a href="#h3-0-488" id="h3-0-488" class="i">+			},
+</a><a href="#h3-0-489" id="h3-0-489" class="i">+			serialized: &quot;VALUE foo 5 3\r\nbar\r\nVALUE baz 0 3\r\nqux\r\nEND\r\n&quot;,
+</a><a href="#h3-0-490" id="h3-0-490" class="i">+		},
+</a><a href="#h3-0-491" id="h3-0-491" class="i">+	}
+</a><a href="#h3-0-492" id="h3-0-492" class="i">+
+</a><a href="#h3-0-493" id="h3-0-493" class="i">+	for _, testCase := range cases {
+</a><a href="#h3-0-494" id="h3-0-494" class="i">+		assert.Equal(t, testCase.serialized, testCase.response.String())
+</a><a href="#h3-0-495" id="h3-0-495" class="i">+	}
+</a><a href="#h3-0-496" id="h3-0-496" class="i">+}
+</a><a href="#h3-0-497" id="h3-0-497" class="i">+
+</a><a href="#h3-0-498" id="h3-0-498" class="i">+func TestGetsRequest(t *testing.T) {
+</a><a href="#h3-0-499" id="h3-0-499" class="i">+	t.Parallel()
+</a><a href="#h3-0-500" id="h3-0-500" class="i">+
+</a><a href="#h3-0-501" id="h3-0-501" class="i">+	cases := []struct {
+</a><a href="#h3-0-502" id="h3-0-502" class="i">+		request    *GetsRequest
+</a><a href="#h3-0-503" id="h3-0-503" class="i">+		serialized string
+</a><a href="#h3-0-504" id="h3-0-504" class="i">+	}{
+</a><a href="#h3-0-505" id="h3-0-505" class="i">+		{
+</a><a href="#h3-0-506" id="h3-0-506" class="i">+			request:    &amp;GetsRequest{Keys: []string{&quot;foo&quot;}},
+</a><a href="#h3-0-507" id="h3-0-507" class="i">+			serialized: &quot;gets foo\r\n&quot;,
+</a><a href="#h3-0-508" id="h3-0-508" class="i">+		},
+</a><a href="#h3-0-509" id="h3-0-509" class="i">+		{
+</a><a href="#h3-0-510" id="h3-0-510" class="i">+			request:    &amp;GetsRequest{Keys: []string{&quot;foo&quot;, &quot;bar&quot;}},
+</a><a href="#h3-0-511" id="h3-0-511" class="i">+			serialized: &quot;gets foo bar\r\n&quot;,
+</a><a href="#h3-0-512" id="h3-0-512" class="i">+		},
+</a><a href="#h3-0-513" id="h3-0-513" class="i">+	}
+</a><a href="#h3-0-514" id="h3-0-514" class="i">+
+</a><a href="#h3-0-515" id="h3-0-515" class="i">+	for _, testCase := range cases {
+</a><a href="#h3-0-516" id="h3-0-516" class="i">+		assert.Equal(t, testCase.serialized, testCase.request.String())
+</a><a href="#h3-0-517" id="h3-0-517" class="i">+	}
+</a><a href="#h3-0-518" id="h3-0-518" class="i">+}
+</a><a href="#h3-0-519" id="h3-0-519" class="i">+
+</a><a href="#h3-0-520" id="h3-0-520" class="i">+func TestGetsResponse(t *testing.T) {
+</a><a href="#h3-0-521" id="h3-0-521" class="i">+	t.Parallel()
+</a><a href="#h3-0-522" id="h3-0-522" class="i">+
+</a><a href="#h3-0-523" id="h3-0-523" class="i">+	cases := []struct {
+</a><a href="#h3-0-524" id="h3-0-524" class="i">+		response   *GetsResponse
+</a><a href="#h3-0-525" id="h3-0-525" class="i">+		serialized string
+</a><a href="#h3-0-526" id="h3-0-526" class="i">+	}{
+</a><a href="#h3-0-527" id="h3-0-527" class="i">+		{
+</a><a href="#h3-0-528" id="h3-0-528" class="i">+			response: &amp;GetsResponse{
+</a><a href="#h3-0-529" id="h3-0-529" class="i">+				Values: []*RetrievalPayload{
+</a><a href="#h3-0-530" id="h3-0-530" class="i">+					{
+</a><a href="#h3-0-531" id="h3-0-531" class="i">+						Key:       &quot;foo&quot;,
+</a><a href="#h3-0-532" id="h3-0-532" class="i">+						Flags:     5,
+</a><a href="#h3-0-533" id="h3-0-533" class="i">+						Size:      3,
+</a><a href="#h3-0-534" id="h3-0-534" class="i">+						CasUnique: 4,
+</a><a href="#h3-0-535" id="h3-0-535" class="i">+						Data:      []byte(&quot;bar&quot;),
+</a><a href="#h3-0-536" id="h3-0-536" class="i">+					},
+</a><a href="#h3-0-537" id="h3-0-537" class="i">+				},
+</a><a href="#h3-0-538" id="h3-0-538" class="i">+			},
+</a><a href="#h3-0-539" id="h3-0-539" class="i">+			serialized: &quot;VALUE foo 5 3 4\r\nbar\r\nEND\r\n&quot;,
+</a><a href="#h3-0-540" id="h3-0-540" class="i">+		},
+</a><a href="#h3-0-541" id="h3-0-541" class="i">+		{
+</a><a href="#h3-0-542" id="h3-0-542" class="i">+			response: &amp;GetsResponse{
+</a><a href="#h3-0-543" id="h3-0-543" class="i">+				Values: []*RetrievalPayload{
+</a><a href="#h3-0-544" id="h3-0-544" class="i">+					{
+</a><a href="#h3-0-545" id="h3-0-545" class="i">+						Key:       &quot;foo&quot;,
+</a><a href="#h3-0-546" id="h3-0-546" class="i">+						Flags:     5,
+</a><a href="#h3-0-547" id="h3-0-547" class="i">+						Size:      3,
+</a><a href="#h3-0-548" id="h3-0-548" class="i">+						CasUnique: 4,
+</a><a href="#h3-0-549" id="h3-0-549" class="i">+						Data:      []byte(&quot;bar&quot;),
+</a><a href="#h3-0-550" id="h3-0-550" class="i">+					},
+</a><a href="#h3-0-551" id="h3-0-551" class="i">+					{
+</a><a href="#h3-0-552" id="h3-0-552" class="i">+						Key:       &quot;baz&quot;,
+</a><a href="#h3-0-553" id="h3-0-553" class="i">+						Flags:     0,
+</a><a href="#h3-0-554" id="h3-0-554" class="i">+						Size:      3,
+</a><a href="#h3-0-555" id="h3-0-555" class="i">+						CasUnique: 8,
+</a><a href="#h3-0-556" id="h3-0-556" class="i">+						Data:      []byte(&quot;qux&quot;),
+</a><a href="#h3-0-557" id="h3-0-557" class="i">+					},
+</a><a href="#h3-0-558" id="h3-0-558" class="i">+				},
+</a><a href="#h3-0-559" id="h3-0-559" class="i">+			},
+</a><a href="#h3-0-560" id="h3-0-560" class="i">+			serialized: &quot;VALUE foo 5 3 4\r\nbar\r\nVALUE baz 0 3 8\r\nqux\r\nEND\r\n&quot;,
+</a><a href="#h3-0-561" id="h3-0-561" class="i">+		},
+</a><a href="#h3-0-562" id="h3-0-562" class="i">+	}
+</a><a href="#h3-0-563" id="h3-0-563" class="i">+
+</a><a href="#h3-0-564" id="h3-0-564" class="i">+	for _, testCase := range cases {
+</a><a href="#h3-0-565" id="h3-0-565" class="i">+		assert.Equal(t, testCase.serialized, testCase.response.String())
+</a><a href="#h3-0-566" id="h3-0-566" class="i">+	}
+</a><a href="#h3-0-567" id="h3-0-567" class="i">+}
+</a><a href="#h3-0-568" id="h3-0-568" class="i">+
+</a><a href="#h3-0-569" id="h3-0-569" class="i">+func TestGatRequest(t *testing.T) {
+</a><a href="#h3-0-570" id="h3-0-570" class="i">+	t.Parallel()
+</a><a href="#h3-0-571" id="h3-0-571" class="i">+
+</a><a href="#h3-0-572" id="h3-0-572" class="i">+	cases := []struct {
+</a><a href="#h3-0-573" id="h3-0-573" class="i">+		request    *GatRequest
+</a><a href="#h3-0-574" id="h3-0-574" class="i">+		serialized string
+</a><a href="#h3-0-575" id="h3-0-575" class="i">+	}{
+</a><a href="#h3-0-576" id="h3-0-576" class="i">+		{
+</a><a href="#h3-0-577" id="h3-0-577" class="i">+			request: &amp;GatRequest{
+</a><a href="#h3-0-578" id="h3-0-578" class="i">+				Expiration: 5 * time.Second,
+</a><a href="#h3-0-579" id="h3-0-579" class="i">+				Keys:       []string{&quot;foo&quot;},
+</a><a href="#h3-0-580" id="h3-0-580" class="i">+			},
+</a><a href="#h3-0-581" id="h3-0-581" class="i">+			serialized: &quot;gat 5 foo\r\n&quot;,
+</a><a href="#h3-0-582" id="h3-0-582" class="i">+		},
+</a><a href="#h3-0-583" id="h3-0-583" class="i">+		{
+</a><a href="#h3-0-584" id="h3-0-584" class="i">+			request: &amp;GatRequest{
+</a><a href="#h3-0-585" id="h3-0-585" class="i">+				Expiration: 5 * time.Second,
+</a><a href="#h3-0-586" id="h3-0-586" class="i">+				Keys:       []string{&quot;foo&quot;, &quot;bar&quot;},
+</a><a href="#h3-0-587" id="h3-0-587" class="i">+			},
+</a><a href="#h3-0-588" id="h3-0-588" class="i">+			serialized: &quot;gat 5 foo bar\r\n&quot;,
+</a><a href="#h3-0-589" id="h3-0-589" class="i">+		},
+</a><a href="#h3-0-590" id="h3-0-590" class="i">+	}
+</a><a href="#h3-0-591" id="h3-0-591" class="i">+
+</a><a href="#h3-0-592" id="h3-0-592" class="i">+	for _, testCase := range cases {
+</a><a href="#h3-0-593" id="h3-0-593" class="i">+		assert.Equal(t, testCase.serialized, testCase.request.String())
+</a><a href="#h3-0-594" id="h3-0-594" class="i">+	}
+</a><a href="#h3-0-595" id="h3-0-595" class="i">+}
+</a><a href="#h3-0-596" id="h3-0-596" class="i">+
+</a><a href="#h3-0-597" id="h3-0-597" class="i">+func TestGatResponse(t *testing.T) {
+</a><a href="#h3-0-598" id="h3-0-598" class="i">+	t.Parallel()
+</a><a href="#h3-0-599" id="h3-0-599" class="i">+
+</a><a href="#h3-0-600" id="h3-0-600" class="i">+	cases := []struct {
+</a><a href="#h3-0-601" id="h3-0-601" class="i">+		response   *GatResponse
+</a><a href="#h3-0-602" id="h3-0-602" class="i">+		serialized string
+</a><a href="#h3-0-603" id="h3-0-603" class="i">+	}{
+</a><a href="#h3-0-604" id="h3-0-604" class="i">+		{
+</a><a href="#h3-0-605" id="h3-0-605" class="i">+			response: &amp;GatResponse{
+</a><a href="#h3-0-606" id="h3-0-606" class="i">+				Values: []*RetrievalPayload{
+</a><a href="#h3-0-607" id="h3-0-607" class="i">+					{
+</a><a href="#h3-0-608" id="h3-0-608" class="i">+						Key:   &quot;foo&quot;,
+</a><a href="#h3-0-609" id="h3-0-609" class="i">+						Flags: 5,
+</a><a href="#h3-0-610" id="h3-0-610" class="i">+						Size:  3,
+</a><a href="#h3-0-611" id="h3-0-611" class="i">+						Data:  []byte(&quot;bar&quot;),
+</a><a href="#h3-0-612" id="h3-0-612" class="i">+					},
+</a><a href="#h3-0-613" id="h3-0-613" class="i">+				},
+</a><a href="#h3-0-614" id="h3-0-614" class="i">+			},
+</a><a href="#h3-0-615" id="h3-0-615" class="i">+			serialized: &quot;VALUE foo 5 3\r\nbar\r\nEND\r\n&quot;,
+</a><a href="#h3-0-616" id="h3-0-616" class="i">+		},
+</a><a href="#h3-0-617" id="h3-0-617" class="i">+		{
+</a><a href="#h3-0-618" id="h3-0-618" class="i">+			response: &amp;GatResponse{
+</a><a href="#h3-0-619" id="h3-0-619" class="i">+				Values: []*RetrievalPayload{
+</a><a href="#h3-0-620" id="h3-0-620" class="i">+					{
+</a><a href="#h3-0-621" id="h3-0-621" class="i">+						Key:   &quot;foo&quot;,
+</a><a href="#h3-0-622" id="h3-0-622" class="i">+						Flags: 5,
+</a><a href="#h3-0-623" id="h3-0-623" class="i">+						Size:  3,
+</a><a href="#h3-0-624" id="h3-0-624" class="i">+						Data:  []byte(&quot;bar&quot;),
+</a><a href="#h3-0-625" id="h3-0-625" class="i">+					},
+</a><a href="#h3-0-626" id="h3-0-626" class="i">+					{
+</a><a href="#h3-0-627" id="h3-0-627" class="i">+						Key:   &quot;baz&quot;,
+</a><a href="#h3-0-628" id="h3-0-628" class="i">+						Flags: 0,
+</a><a href="#h3-0-629" id="h3-0-629" class="i">+						Size:  3,
+</a><a href="#h3-0-630" id="h3-0-630" class="i">+						Data:  []byte(&quot;qux&quot;),
+</a><a href="#h3-0-631" id="h3-0-631" class="i">+					},
+</a><a href="#h3-0-632" id="h3-0-632" class="i">+				},
+</a><a href="#h3-0-633" id="h3-0-633" class="i">+			},
+</a><a href="#h3-0-634" id="h3-0-634" class="i">+			serialized: &quot;VALUE foo 5 3\r\nbar\r\nVALUE baz 0 3\r\nqux\r\nEND\r\n&quot;,
+</a><a href="#h3-0-635" id="h3-0-635" class="i">+		},
+</a><a href="#h3-0-636" id="h3-0-636" class="i">+	}
+</a><a href="#h3-0-637" id="h3-0-637" class="i">+
+</a><a href="#h3-0-638" id="h3-0-638" class="i">+	for _, testCase := range cases {
+</a><a href="#h3-0-639" id="h3-0-639" class="i">+		assert.Equal(t, testCase.serialized, testCase.response.String())
+</a><a href="#h3-0-640" id="h3-0-640" class="i">+	}
+</a><a href="#h3-0-641" id="h3-0-641" class="i">+}
+</a><a href="#h3-0-642" id="h3-0-642" class="i">+
+</a><a href="#h3-0-643" id="h3-0-643" class="i">+func TestGatsRequest(t *testing.T) {
+</a><a href="#h3-0-644" id="h3-0-644" class="i">+	t.Parallel()
+</a><a href="#h3-0-645" id="h3-0-645" class="i">+
+</a><a href="#h3-0-646" id="h3-0-646" class="i">+	cases := []struct {
+</a><a href="#h3-0-647" id="h3-0-647" class="i">+		request    *GatsRequest
+</a><a href="#h3-0-648" id="h3-0-648" class="i">+		serialized string
+</a><a href="#h3-0-649" id="h3-0-649" class="i">+	}{
+</a><a href="#h3-0-650" id="h3-0-650" class="i">+		{
+</a><a href="#h3-0-651" id="h3-0-651" class="i">+			request: &amp;GatsRequest{
+</a><a href="#h3-0-652" id="h3-0-652" class="i">+				Expiration: 5 * time.Second,
+</a><a href="#h3-0-653" id="h3-0-653" class="i">+				Keys:       []string{&quot;foo&quot;},
+</a><a href="#h3-0-654" id="h3-0-654" class="i">+			},
+</a><a href="#h3-0-655" id="h3-0-655" class="i">+			serialized: &quot;gats 5 foo\r\n&quot;,
+</a><a href="#h3-0-656" id="h3-0-656" class="i">+		},
+</a><a href="#h3-0-657" id="h3-0-657" class="i">+		{
+</a><a href="#h3-0-658" id="h3-0-658" class="i">+			request: &amp;GatsRequest{
+</a><a href="#h3-0-659" id="h3-0-659" class="i">+				Expiration: 5 * time.Second,
+</a><a href="#h3-0-660" id="h3-0-660" class="i">+				Keys:       []string{&quot;foo&quot;, &quot;bar&quot;},
+</a><a href="#h3-0-661" id="h3-0-661" class="i">+			},
+</a><a href="#h3-0-662" id="h3-0-662" class="i">+			serialized: &quot;gats 5 foo bar\r\n&quot;,
+</a><a href="#h3-0-663" id="h3-0-663" class="i">+		},
+</a><a href="#h3-0-664" id="h3-0-664" class="i">+	}
+</a><a href="#h3-0-665" id="h3-0-665" class="i">+
+</a><a href="#h3-0-666" id="h3-0-666" class="i">+	for _, testCase := range cases {
+</a><a href="#h3-0-667" id="h3-0-667" class="i">+		assert.Equal(t, testCase.serialized, testCase.request.String())
+</a><a href="#h3-0-668" id="h3-0-668" class="i">+	}
+</a><a href="#h3-0-669" id="h3-0-669" class="i">+}
+</a><a href="#h3-0-670" id="h3-0-670" class="i">+
+</a><a href="#h3-0-671" id="h3-0-671" class="i">+func TestGatsResponse(t *testing.T) {
+</a><a href="#h3-0-672" id="h3-0-672" class="i">+	t.Parallel()
+</a><a href="#h3-0-673" id="h3-0-673" class="i">+
+</a><a href="#h3-0-674" id="h3-0-674" class="i">+	cases := []struct {
+</a><a href="#h3-0-675" id="h3-0-675" class="i">+		response   *GatsResponse
+</a><a href="#h3-0-676" id="h3-0-676" class="i">+		serialized string
+</a><a href="#h3-0-677" id="h3-0-677" class="i">+	}{
+</a><a href="#h3-0-678" id="h3-0-678" class="i">+		{
+</a><a href="#h3-0-679" id="h3-0-679" class="i">+			response: &amp;GatsResponse{
+</a><a href="#h3-0-680" id="h3-0-680" class="i">+				Values: []*RetrievalPayload{
+</a><a href="#h3-0-681" id="h3-0-681" class="i">+					{
+</a><a href="#h3-0-682" id="h3-0-682" class="i">+						Key:       &quot;foo&quot;,
+</a><a href="#h3-0-683" id="h3-0-683" class="i">+						Flags:     5,
+</a><a href="#h3-0-684" id="h3-0-684" class="i">+						Size:      3,
+</a><a href="#h3-0-685" id="h3-0-685" class="i">+						CasUnique: 4,
+</a><a href="#h3-0-686" id="h3-0-686" class="i">+						Data:      []byte(&quot;bar&quot;),
+</a><a href="#h3-0-687" id="h3-0-687" class="i">+					},
+</a><a href="#h3-0-688" id="h3-0-688" class="i">+				},
+</a><a href="#h3-0-689" id="h3-0-689" class="i">+			},
+</a><a href="#h3-0-690" id="h3-0-690" class="i">+			serialized: &quot;VALUE foo 5 3 4\r\nbar\r\nEND\r\n&quot;,
+</a><a href="#h3-0-691" id="h3-0-691" class="i">+		},
+</a><a href="#h3-0-692" id="h3-0-692" class="i">+		{
+</a><a href="#h3-0-693" id="h3-0-693" class="i">+			response: &amp;GatsResponse{
+</a><a href="#h3-0-694" id="h3-0-694" class="i">+				Values: []*RetrievalPayload{
+</a><a href="#h3-0-695" id="h3-0-695" class="i">+					{
+</a><a href="#h3-0-696" id="h3-0-696" class="i">+						Key:       &quot;foo&quot;,
+</a><a href="#h3-0-697" id="h3-0-697" class="i">+						Flags:     5,
+</a><a href="#h3-0-698" id="h3-0-698" class="i">+						Size:      3,
+</a><a href="#h3-0-699" id="h3-0-699" class="i">+						CasUnique: 4,
+</a><a href="#h3-0-700" id="h3-0-700" class="i">+						Data:      []byte(&quot;bar&quot;),
+</a><a href="#h3-0-701" id="h3-0-701" class="i">+					},
+</a><a href="#h3-0-702" id="h3-0-702" class="i">+					{
+</a><a href="#h3-0-703" id="h3-0-703" class="i">+						Key:       &quot;baz&quot;,
+</a><a href="#h3-0-704" id="h3-0-704" class="i">+						Flags:     0,
+</a><a href="#h3-0-705" id="h3-0-705" class="i">+						Size:      3,
+</a><a href="#h3-0-706" id="h3-0-706" class="i">+						CasUnique: 8,
+</a><a href="#h3-0-707" id="h3-0-707" class="i">+						Data:      []byte(&quot;qux&quot;),
+</a><a href="#h3-0-708" id="h3-0-708" class="i">+					},
+</a><a href="#h3-0-709" id="h3-0-709" class="i">+				},
+</a><a href="#h3-0-710" id="h3-0-710" class="i">+			},
+</a><a href="#h3-0-711" id="h3-0-711" class="i">+			serialized: &quot;VALUE foo 5 3 4\r\nbar\r\nVALUE baz 0 3 8\r\nqux\r\nEND\r\n&quot;,
+</a><a href="#h3-0-712" id="h3-0-712" class="i">+		},
+</a><a href="#h3-0-713" id="h3-0-713" class="i">+	}
+</a><a href="#h3-0-714" id="h3-0-714" class="i">+
+</a><a href="#h3-0-715" id="h3-0-715" class="i">+	for _, testCase := range cases {
+</a><a href="#h3-0-716" id="h3-0-716" class="i">+		assert.Equal(t, testCase.serialized, testCase.response.String())
+</a><a href="#h3-0-717" id="h3-0-717" class="i">+	}
+</a><a href="#h3-0-718" id="h3-0-718" class="i">+}
+</a><a href="#h3-0-719" id="h3-0-719" class="i">+
+</a><a href="#h3-0-720" id="h3-0-720" class="i">+func TestSetRequest(t *testing.T) {
+</a><a href="#h3-0-721" id="h3-0-721" class="i">+	t.Parallel()
+</a><a href="#h3-0-722" id="h3-0-722" class="i">+
+</a><a href="#h3-0-723" id="h3-0-723" class="i">+	cases := []struct {
+</a><a href="#h3-0-724" id="h3-0-724" class="i">+		request    *SetRequest
+</a><a href="#h3-0-725" id="h3-0-725" class="i">+		serialized string
+</a><a href="#h3-0-726" id="h3-0-726" class="i">+	}{
+</a><a href="#h3-0-727" id="h3-0-727" class="i">+		{
+</a><a href="#h3-0-728" id="h3-0-728" class="i">+			request: &amp;SetRequest{
+</a><a href="#h3-0-729" id="h3-0-729" class="i">+				Payload: &amp;StoragePayload{
+</a><a href="#h3-0-730" id="h3-0-730" class="i">+					Key:        &quot;key&quot;,
+</a><a href="#h3-0-731" id="h3-0-731" class="i">+					Flags:      1,
+</a><a href="#h3-0-732" id="h3-0-732" class="i">+					Expiration: 2 * time.Second,
+</a><a href="#h3-0-733" id="h3-0-733" class="i">+					Size:       3,
+</a><a href="#h3-0-734" id="h3-0-734" class="i">+					Data:       []byte(&quot;foo&quot;),
+</a><a href="#h3-0-735" id="h3-0-735" class="i">+					NoReply:    false,
+</a><a href="#h3-0-736" id="h3-0-736" class="i">+				},
+</a><a href="#h3-0-737" id="h3-0-737" class="i">+			},
+</a><a href="#h3-0-738" id="h3-0-738" class="i">+			serialized: &quot;set key 1 2 3\r\nfoo\r\n&quot;,
+</a><a href="#h3-0-739" id="h3-0-739" class="i">+		},
+</a><a href="#h3-0-740" id="h3-0-740" class="i">+		{
+</a><a href="#h3-0-741" id="h3-0-741" class="i">+			request: &amp;SetRequest{
+</a><a href="#h3-0-742" id="h3-0-742" class="i">+				Payload: &amp;StoragePayload{
+</a><a href="#h3-0-743" id="h3-0-743" class="i">+					Key:        &quot;key&quot;,
+</a><a href="#h3-0-744" id="h3-0-744" class="i">+					Flags:      1,
+</a><a href="#h3-0-745" id="h3-0-745" class="i">+					Expiration: 2 * time.Second,
+</a><a href="#h3-0-746" id="h3-0-746" class="i">+					Size:       3,
+</a><a href="#h3-0-747" id="h3-0-747" class="i">+					Data:       []byte(&quot;foo&quot;),
+</a><a href="#h3-0-748" id="h3-0-748" class="i">+					NoReply:    true,
+</a><a href="#h3-0-749" id="h3-0-749" class="i">+				},
+</a><a href="#h3-0-750" id="h3-0-750" class="i">+			},
+</a><a href="#h3-0-751" id="h3-0-751" class="i">+			serialized: &quot;set key 1 2 3 noreply\r\nfoo\r\n&quot;,
+</a><a href="#h3-0-752" id="h3-0-752" class="i">+		},
+</a><a href="#h3-0-753" id="h3-0-753" class="i">+	}
+</a><a href="#h3-0-754" id="h3-0-754" class="i">+
+</a><a href="#h3-0-755" id="h3-0-755" class="i">+	for _, testCase := range cases {
+</a><a href="#h3-0-756" id="h3-0-756" class="i">+		assert.Equal(t, testCase.serialized, testCase.request.String())
+</a><a href="#h3-0-757" id="h3-0-757" class="i">+	}
+</a><a href="#h3-0-758" id="h3-0-758" class="i">+}
+</a><a href="#h3-0-759" id="h3-0-759" class="i">+
+</a><a href="#h3-0-760" id="h3-0-760" class="i">+func TestSetResponse(t *testing.T) {
+</a><a href="#h3-0-761" id="h3-0-761" class="i">+	t.Parallel()
+</a><a href="#h3-0-762" id="h3-0-762" class="i">+
+</a><a href="#h3-0-763" id="h3-0-763" class="i">+	cases := []struct {
+</a><a href="#h3-0-764" id="h3-0-764" class="i">+		response   *SetResponse
+</a><a href="#h3-0-765" id="h3-0-765" class="i">+		serialized string
+</a><a href="#h3-0-766" id="h3-0-766" class="i">+	}{
+</a><a href="#h3-0-767" id="h3-0-767" class="i">+		{
+</a><a href="#h3-0-768" id="h3-0-768" class="i">+			response:   &amp;SetResponse{Status: Stored},
+</a><a href="#h3-0-769" id="h3-0-769" class="i">+			serialized: &quot;STORED\r\n&quot;,
+</a><a href="#h3-0-770" id="h3-0-770" class="i">+		},
+</a><a href="#h3-0-771" id="h3-0-771" class="i">+		{
+</a><a href="#h3-0-772" id="h3-0-772" class="i">+			response:   &amp;SetResponse{Status: NotStored},
+</a><a href="#h3-0-773" id="h3-0-773" class="i">+			serialized: &quot;NOT_STORED\r\n&quot;,
+</a><a href="#h3-0-774" id="h3-0-774" class="i">+		},
+</a><a href="#h3-0-775" id="h3-0-775" class="i">+		{
+</a><a href="#h3-0-776" id="h3-0-776" class="i">+			response:   &amp;SetResponse{Status: Exists},
+</a><a href="#h3-0-777" id="h3-0-777" class="i">+			serialized: &quot;EXISTS\r\n&quot;,
+</a><a href="#h3-0-778" id="h3-0-778" class="i">+		},
+</a><a href="#h3-0-779" id="h3-0-779" class="i">+		{
+</a><a href="#h3-0-780" id="h3-0-780" class="i">+			response:   &amp;SetResponse{Status: NotFound},
+</a><a href="#h3-0-781" id="h3-0-781" class="i">+			serialized: &quot;NOT_FOUND\r\n&quot;,
+</a><a href="#h3-0-782" id="h3-0-782" class="i">+		},
+</a><a href="#h3-0-783" id="h3-0-783" class="i">+	}
+</a><a href="#h3-0-784" id="h3-0-784" class="i">+
+</a><a href="#h3-0-785" id="h3-0-785" class="i">+	for _, testCase := range cases {
+</a><a href="#h3-0-786" id="h3-0-786" class="i">+		assert.Equal(t, testCase.serialized, testCase.response.String())
+</a><a href="#h3-0-787" id="h3-0-787" class="i">+	}
+</a><a href="#h3-0-788" id="h3-0-788" class="i">+}
+</a><a href="#h3-0-789" id="h3-0-789" class="i">+
+</a><a href="#h3-0-790" id="h3-0-790" class="i">+func TestAddRequest(t *testing.T) {
+</a><a href="#h3-0-791" id="h3-0-791" class="i">+	t.Parallel()
+</a><a href="#h3-0-792" id="h3-0-792" class="i">+
+</a><a href="#h3-0-793" id="h3-0-793" class="i">+	cases := []struct {
+</a><a href="#h3-0-794" id="h3-0-794" class="i">+		request    *AddRequest
+</a><a href="#h3-0-795" id="h3-0-795" class="i">+		serialized string
+</a><a href="#h3-0-796" id="h3-0-796" class="i">+	}{
+</a><a href="#h3-0-797" id="h3-0-797" class="i">+		{
+</a><a href="#h3-0-798" id="h3-0-798" class="i">+			request: &amp;AddRequest{
+</a><a href="#h3-0-799" id="h3-0-799" class="i">+				Payload: &amp;StoragePayload{
+</a><a href="#h3-0-800" id="h3-0-800" class="i">+					Key:        &quot;key&quot;,
+</a><a href="#h3-0-801" id="h3-0-801" class="i">+					Flags:      1,
+</a><a href="#h3-0-802" id="h3-0-802" class="i">+					Expiration: 2 * time.Second,
+</a><a href="#h3-0-803" id="h3-0-803" class="i">+					Size:       3,
+</a><a href="#h3-0-804" id="h3-0-804" class="i">+					Data:       []byte(&quot;foo&quot;),
+</a><a href="#h3-0-805" id="h3-0-805" class="i">+					NoReply:    false,
+</a><a href="#h3-0-806" id="h3-0-806" class="i">+				},
+</a><a href="#h3-0-807" id="h3-0-807" class="i">+			},
+</a><a href="#h3-0-808" id="h3-0-808" class="i">+			serialized: &quot;add key 1 2 3\r\nfoo\r\n&quot;,
+</a><a href="#h3-0-809" id="h3-0-809" class="i">+		},
+</a><a href="#h3-0-810" id="h3-0-810" class="i">+		{
+</a><a href="#h3-0-811" id="h3-0-811" class="i">+			request: &amp;AddRequest{
+</a><a href="#h3-0-812" id="h3-0-812" class="i">+				Payload: &amp;StoragePayload{
+</a><a href="#h3-0-813" id="h3-0-813" class="i">+					Key:        &quot;key&quot;,
+</a><a href="#h3-0-814" id="h3-0-814" class="i">+					Flags:      1,
+</a><a href="#h3-0-815" id="h3-0-815" class="i">+					Expiration: 2 * time.Second,
+</a><a href="#h3-0-816" id="h3-0-816" class="i">+					Size:       3,
+</a><a href="#h3-0-817" id="h3-0-817" class="i">+					Data:       []byte(&quot;foo&quot;),
+</a><a href="#h3-0-818" id="h3-0-818" class="i">+					NoReply:    true,
+</a><a href="#h3-0-819" id="h3-0-819" class="i">+				},
+</a><a href="#h3-0-820" id="h3-0-820" class="i">+			},
+</a><a href="#h3-0-821" id="h3-0-821" class="i">+			serialized: &quot;add key 1 2 3 noreply\r\nfoo\r\n&quot;,
+</a><a href="#h3-0-822" id="h3-0-822" class="i">+		},
+</a><a href="#h3-0-823" id="h3-0-823" class="i">+	}
+</a><a href="#h3-0-824" id="h3-0-824" class="i">+
+</a><a href="#h3-0-825" id="h3-0-825" class="i">+	for _, testCase := range cases {
+</a><a href="#h3-0-826" id="h3-0-826" class="i">+		assert.Equal(t, testCase.serialized, testCase.request.String())
+</a><a href="#h3-0-827" id="h3-0-827" class="i">+	}
+</a><a href="#h3-0-828" id="h3-0-828" class="i">+}
+</a><a href="#h3-0-829" id="h3-0-829" class="i">+
+</a><a href="#h3-0-830" id="h3-0-830" class="i">+func TestAddResponse(t *testing.T) {
+</a><a href="#h3-0-831" id="h3-0-831" class="i">+	t.Parallel()
+</a><a href="#h3-0-832" id="h3-0-832" class="i">+
+</a><a href="#h3-0-833" id="h3-0-833" class="i">+	cases := []struct {
+</a><a href="#h3-0-834" id="h3-0-834" class="i">+		response   *AddResponse
+</a><a href="#h3-0-835" id="h3-0-835" class="i">+		serialized string
+</a><a href="#h3-0-836" id="h3-0-836" class="i">+	}{
+</a><a href="#h3-0-837" id="h3-0-837" class="i">+		{
+</a><a href="#h3-0-838" id="h3-0-838" class="i">+			response:   &amp;AddResponse{Status: Stored},
+</a><a href="#h3-0-839" id="h3-0-839" class="i">+			serialized: &quot;STORED\r\n&quot;,
+</a><a href="#h3-0-840" id="h3-0-840" class="i">+		},
+</a><a href="#h3-0-841" id="h3-0-841" class="i">+		{
+</a><a href="#h3-0-842" id="h3-0-842" class="i">+			response:   &amp;AddResponse{Status: NotStored},
+</a><a href="#h3-0-843" id="h3-0-843" class="i">+			serialized: &quot;NOT_STORED\r\n&quot;,
+</a><a href="#h3-0-844" id="h3-0-844" class="i">+		},
+</a><a href="#h3-0-845" id="h3-0-845" class="i">+		{
+</a><a href="#h3-0-846" id="h3-0-846" class="i">+			response:   &amp;AddResponse{Status: Exists},
+</a><a href="#h3-0-847" id="h3-0-847" class="i">+			serialized: &quot;EXISTS\r\n&quot;,
+</a><a href="#h3-0-848" id="h3-0-848" class="i">+		},
+</a><a href="#h3-0-849" id="h3-0-849" class="i">+		{
+</a><a href="#h3-0-850" id="h3-0-850" class="i">+			response:   &amp;AddResponse{Status: NotFound},
+</a><a href="#h3-0-851" id="h3-0-851" class="i">+			serialized: &quot;NOT_FOUND\r\n&quot;,
+</a><a href="#h3-0-852" id="h3-0-852" class="i">+		},
+</a><a href="#h3-0-853" id="h3-0-853" class="i">+	}
+</a><a href="#h3-0-854" id="h3-0-854" class="i">+
+</a><a href="#h3-0-855" id="h3-0-855" class="i">+	for _, testCase := range cases {
+</a><a href="#h3-0-856" id="h3-0-856" class="i">+		assert.Equal(t, testCase.serialized, testCase.response.String())
+</a><a href="#h3-0-857" id="h3-0-857" class="i">+	}
+</a><a href="#h3-0-858" id="h3-0-858" class="i">+}
+</a><a href="#h3-0-859" id="h3-0-859" class="i">+
+</a><a href="#h3-0-860" id="h3-0-860" class="i">+func TestReplaceRequest(t *testing.T) {
+</a><a href="#h3-0-861" id="h3-0-861" class="i">+	t.Parallel()
+</a><a href="#h3-0-862" id="h3-0-862" class="i">+
+</a><a href="#h3-0-863" id="h3-0-863" class="i">+	cases := []struct {
+</a><a href="#h3-0-864" id="h3-0-864" class="i">+		request    *ReplaceRequest
+</a><a href="#h3-0-865" id="h3-0-865" class="i">+		serialized string
+</a><a href="#h3-0-866" id="h3-0-866" class="i">+	}{
+</a><a href="#h3-0-867" id="h3-0-867" class="i">+		{
+</a><a href="#h3-0-868" id="h3-0-868" class="i">+			request: &amp;ReplaceRequest{
+</a><a href="#h3-0-869" id="h3-0-869" class="i">+				Payload: &amp;StoragePayload{
+</a><a href="#h3-0-870" id="h3-0-870" class="i">+					Key:        &quot;key&quot;,
+</a><a href="#h3-0-871" id="h3-0-871" class="i">+					Flags:      1,
+</a><a href="#h3-0-872" id="h3-0-872" class="i">+					Expiration: 2 * time.Second,
+</a><a href="#h3-0-873" id="h3-0-873" class="i">+					Size:       3,
+</a><a href="#h3-0-874" id="h3-0-874" class="i">+					Data:       []byte(&quot;foo&quot;),
+</a><a href="#h3-0-875" id="h3-0-875" class="i">+					NoReply:    false,
+</a><a href="#h3-0-876" id="h3-0-876" class="i">+				},
+</a><a href="#h3-0-877" id="h3-0-877" class="i">+			},
+</a><a href="#h3-0-878" id="h3-0-878" class="i">+			serialized: &quot;replace key 1 2 3\r\nfoo\r\n&quot;,
+</a><a href="#h3-0-879" id="h3-0-879" class="i">+		},
+</a><a href="#h3-0-880" id="h3-0-880" class="i">+		{
+</a><a href="#h3-0-881" id="h3-0-881" class="i">+			request: &amp;ReplaceRequest{
+</a><a href="#h3-0-882" id="h3-0-882" class="i">+				Payload: &amp;StoragePayload{
+</a><a href="#h3-0-883" id="h3-0-883" class="i">+					Key:        &quot;key&quot;,
+</a><a href="#h3-0-884" id="h3-0-884" class="i">+					Flags:      1,
+</a><a href="#h3-0-885" id="h3-0-885" class="i">+					Expiration: 2 * time.Second,
+</a><a href="#h3-0-886" id="h3-0-886" class="i">+					Size:       3,
+</a><a href="#h3-0-887" id="h3-0-887" class="i">+					Data:       []byte(&quot;foo&quot;),
+</a><a href="#h3-0-888" id="h3-0-888" class="i">+					NoReply:    true,
+</a><a href="#h3-0-889" id="h3-0-889" class="i">+				},
+</a><a href="#h3-0-890" id="h3-0-890" class="i">+			},
+</a><a href="#h3-0-891" id="h3-0-891" class="i">+			serialized: &quot;replace key 1 2 3 noreply\r\nfoo\r\n&quot;,
+</a><a href="#h3-0-892" id="h3-0-892" class="i">+		},
+</a><a href="#h3-0-893" id="h3-0-893" class="i">+	}
+</a><a href="#h3-0-894" id="h3-0-894" class="i">+
+</a><a href="#h3-0-895" id="h3-0-895" class="i">+	for _, testCase := range cases {
+</a><a href="#h3-0-896" id="h3-0-896" class="i">+		assert.Equal(t, testCase.serialized, testCase.request.String())
+</a><a href="#h3-0-897" id="h3-0-897" class="i">+	}
+</a><a href="#h3-0-898" id="h3-0-898" class="i">+}
+</a><a href="#h3-0-899" id="h3-0-899" class="i">+
+</a><a href="#h3-0-900" id="h3-0-900" class="i">+func TestReplaceResponse(t *testing.T) {
+</a><a href="#h3-0-901" id="h3-0-901" class="i">+	t.Parallel()
+</a><a href="#h3-0-902" id="h3-0-902" class="i">+
+</a><a href="#h3-0-903" id="h3-0-903" class="i">+	cases := []struct {
+</a><a href="#h3-0-904" id="h3-0-904" class="i">+		response   *ReplaceResponse
+</a><a href="#h3-0-905" id="h3-0-905" class="i">+		serialized string
+</a><a href="#h3-0-906" id="h3-0-906" class="i">+	}{
+</a><a href="#h3-0-907" id="h3-0-907" class="i">+		{
+</a><a href="#h3-0-908" id="h3-0-908" class="i">+			response:   &amp;ReplaceResponse{Status: Stored},
+</a><a href="#h3-0-909" id="h3-0-909" class="i">+			serialized: &quot;STORED\r\n&quot;,
+</a><a href="#h3-0-910" id="h3-0-910" class="i">+		},
+</a><a href="#h3-0-911" id="h3-0-911" class="i">+		{
+</a><a href="#h3-0-912" id="h3-0-912" class="i">+			response:   &amp;ReplaceResponse{Status: NotStored},
+</a><a href="#h3-0-913" id="h3-0-913" class="i">+			serialized: &quot;NOT_STORED\r\n&quot;,
+</a><a href="#h3-0-914" id="h3-0-914" class="i">+		},
+</a><a href="#h3-0-915" id="h3-0-915" class="i">+		{
+</a><a href="#h3-0-916" id="h3-0-916" class="i">+			response:   &amp;ReplaceResponse{Status: Exists},
+</a><a href="#h3-0-917" id="h3-0-917" class="i">+			serialized: &quot;EXISTS\r\n&quot;,
+</a><a href="#h3-0-918" id="h3-0-918" class="i">+		},
+</a><a href="#h3-0-919" id="h3-0-919" class="i">+		{
+</a><a href="#h3-0-920" id="h3-0-920" class="i">+			response:   &amp;ReplaceResponse{Status: NotFound},
+</a><a href="#h3-0-921" id="h3-0-921" class="i">+			serialized: &quot;NOT_FOUND\r\n&quot;,
+</a><a href="#h3-0-922" id="h3-0-922" class="i">+		},
+</a><a href="#h3-0-923" id="h3-0-923" class="i">+	}
+</a><a href="#h3-0-924" id="h3-0-924" class="i">+
+</a><a href="#h3-0-925" id="h3-0-925" class="i">+	for _, testCase := range cases {
+</a><a href="#h3-0-926" id="h3-0-926" class="i">+		assert.Equal(t, testCase.serialized, testCase.response.String())
+</a><a href="#h3-0-927" id="h3-0-927" class="i">+	}
+</a><a href="#h3-0-928" id="h3-0-928" class="i">+}
+</a><a href="#h3-0-929" id="h3-0-929" class="i">+
+</a><a href="#h3-0-930" id="h3-0-930" class="i">+func TestAppendRequest(t *testing.T) {
+</a><a href="#h3-0-931" id="h3-0-931" class="i">+	t.Parallel()
+</a><a href="#h3-0-932" id="h3-0-932" class="i">+
+</a><a href="#h3-0-933" id="h3-0-933" class="i">+	cases := []struct {
+</a><a href="#h3-0-934" id="h3-0-934" class="i">+		request    *AppendRequest
+</a><a href="#h3-0-935" id="h3-0-935" class="i">+		serialized string
+</a><a href="#h3-0-936" id="h3-0-936" class="i">+	}{
+</a><a href="#h3-0-937" id="h3-0-937" class="i">+		{
+</a><a href="#h3-0-938" id="h3-0-938" class="i">+			request: &amp;AppendRequest{
+</a><a href="#h3-0-939" id="h3-0-939" class="i">+				Payload: &amp;StoragePayload{
+</a><a href="#h3-0-940" id="h3-0-940" class="i">+					Key:        &quot;key&quot;,
+</a><a href="#h3-0-941" id="h3-0-941" class="i">+					Flags:      1,
+</a><a href="#h3-0-942" id="h3-0-942" class="i">+					Expiration: 2 * time.Second,
+</a><a href="#h3-0-943" id="h3-0-943" class="i">+					Size:       3,
+</a><a href="#h3-0-944" id="h3-0-944" class="i">+					Data:       []byte(&quot;foo&quot;),
+</a><a href="#h3-0-945" id="h3-0-945" class="i">+					NoReply:    false,
+</a><a href="#h3-0-946" id="h3-0-946" class="i">+				},
+</a><a href="#h3-0-947" id="h3-0-947" class="i">+			},
+</a><a href="#h3-0-948" id="h3-0-948" class="i">+			serialized: &quot;append key 1 2 3\r\nfoo\r\n&quot;,
+</a><a href="#h3-0-949" id="h3-0-949" class="i">+		},
+</a><a href="#h3-0-950" id="h3-0-950" class="i">+		{
+</a><a href="#h3-0-951" id="h3-0-951" class="i">+			request: &amp;AppendRequest{
+</a><a href="#h3-0-952" id="h3-0-952" class="i">+				Payload: &amp;StoragePayload{
+</a><a href="#h3-0-953" id="h3-0-953" class="i">+					Key:        &quot;key&quot;,
+</a><a href="#h3-0-954" id="h3-0-954" class="i">+					Flags:      1,
+</a><a href="#h3-0-955" id="h3-0-955" class="i">+					Expiration: 2 * time.Second,
+</a><a href="#h3-0-956" id="h3-0-956" class="i">+					Size:       3,
+</a><a href="#h3-0-957" id="h3-0-957" class="i">+					Data:       []byte(&quot;foo&quot;),
+</a><a href="#h3-0-958" id="h3-0-958" class="i">+					NoReply:    true,
+</a><a href="#h3-0-959" id="h3-0-959" class="i">+				},
+</a><a href="#h3-0-960" id="h3-0-960" class="i">+			},
+</a><a href="#h3-0-961" id="h3-0-961" class="i">+			serialized: &quot;append key 1 2 3 noreply\r\nfoo\r\n&quot;,
+</a><a href="#h3-0-962" id="h3-0-962" class="i">+		},
+</a><a href="#h3-0-963" id="h3-0-963" class="i">+	}
+</a><a href="#h3-0-964" id="h3-0-964" class="i">+
+</a><a href="#h3-0-965" id="h3-0-965" class="i">+	for _, testCase := range cases {
+</a><a href="#h3-0-966" id="h3-0-966" class="i">+		assert.Equal(t, testCase.serialized, testCase.request.String())
+</a><a href="#h3-0-967" id="h3-0-967" class="i">+	}
+</a><a href="#h3-0-968" id="h3-0-968" class="i">+}
+</a><a href="#h3-0-969" id="h3-0-969" class="i">+
+</a><a href="#h3-0-970" id="h3-0-970" class="i">+func TestAppendResponse(t *testing.T) {
+</a><a href="#h3-0-971" id="h3-0-971" class="i">+	t.Parallel()
+</a><a href="#h3-0-972" id="h3-0-972" class="i">+
+</a><a href="#h3-0-973" id="h3-0-973" class="i">+	cases := []struct {
+</a><a href="#h3-0-974" id="h3-0-974" class="i">+		response   *AppendResponse
+</a><a href="#h3-0-975" id="h3-0-975" class="i">+		serialized string
+</a><a href="#h3-0-976" id="h3-0-976" class="i">+	}{
+</a><a href="#h3-0-977" id="h3-0-977" class="i">+		{
+</a><a href="#h3-0-978" id="h3-0-978" class="i">+			response:   &amp;AppendResponse{Status: Stored},
+</a><a href="#h3-0-979" id="h3-0-979" class="i">+			serialized: &quot;STORED\r\n&quot;,
+</a><a href="#h3-0-980" id="h3-0-980" class="i">+		},
+</a><a href="#h3-0-981" id="h3-0-981" class="i">+		{
+</a><a href="#h3-0-982" id="h3-0-982" class="i">+			response:   &amp;AppendResponse{Status: NotStored},
+</a><a href="#h3-0-983" id="h3-0-983" class="i">+			serialized: &quot;NOT_STORED\r\n&quot;,
+</a><a href="#h3-0-984" id="h3-0-984" class="i">+		},
+</a><a href="#h3-0-985" id="h3-0-985" class="i">+		{
+</a><a href="#h3-0-986" id="h3-0-986" class="i">+			response:   &amp;AppendResponse{Status: Exists},
+</a><a href="#h3-0-987" id="h3-0-987" class="i">+			serialized: &quot;EXISTS\r\n&quot;,
+</a><a href="#h3-0-988" id="h3-0-988" class="i">+		},
+</a><a href="#h3-0-989" id="h3-0-989" class="i">+		{
+</a><a href="#h3-0-990" id="h3-0-990" class="i">+			response:   &amp;AppendResponse{Status: NotFound},
+</a><a href="#h3-0-991" id="h3-0-991" class="i">+			serialized: &quot;NOT_FOUND\r\n&quot;,
+</a><a href="#h3-0-992" id="h3-0-992" class="i">+		},
+</a><a href="#h3-0-993" id="h3-0-993" class="i">+	}
+</a><a href="#h3-0-994" id="h3-0-994" class="i">+
+</a><a href="#h3-0-995" id="h3-0-995" class="i">+	for _, testCase := range cases {
+</a><a href="#h3-0-996" id="h3-0-996" class="i">+		assert.Equal(t, testCase.serialized, testCase.response.String())
+</a><a href="#h3-0-997" id="h3-0-997" class="i">+	}
+</a><a href="#h3-0-998" id="h3-0-998" class="i">+}
+</a><a href="#h3-0-999" id="h3-0-999" class="i">+
+</a><a href="#h3-0-1000" id="h3-0-1000" class="i">+func TestPrependRequest(t *testing.T) {
+</a><a href="#h3-0-1001" id="h3-0-1001" class="i">+	t.Parallel()
+</a><a href="#h3-0-1002" id="h3-0-1002" class="i">+
+</a><a href="#h3-0-1003" id="h3-0-1003" class="i">+	cases := []struct {
+</a><a href="#h3-0-1004" id="h3-0-1004" class="i">+		request    *PrependRequest
+</a><a href="#h3-0-1005" id="h3-0-1005" class="i">+		serialized string
+</a><a href="#h3-0-1006" id="h3-0-1006" class="i">+	}{
+</a><a href="#h3-0-1007" id="h3-0-1007" class="i">+		{
+</a><a href="#h3-0-1008" id="h3-0-1008" class="i">+			request: &amp;PrependRequest{
+</a><a href="#h3-0-1009" id="h3-0-1009" class="i">+				Payload: &amp;StoragePayload{
+</a><a href="#h3-0-1010" id="h3-0-1010" class="i">+					Key:        &quot;key&quot;,
+</a><a href="#h3-0-1011" id="h3-0-1011" class="i">+					Flags:      1,
+</a><a href="#h3-0-1012" id="h3-0-1012" class="i">+					Expiration: 2 * time.Second,
+</a><a href="#h3-0-1013" id="h3-0-1013" class="i">+					Size:       3,
+</a><a href="#h3-0-1014" id="h3-0-1014" class="i">+					Data:       []byte(&quot;foo&quot;),
+</a><a href="#h3-0-1015" id="h3-0-1015" class="i">+					NoReply:    false,
+</a><a href="#h3-0-1016" id="h3-0-1016" class="i">+				},
+</a><a href="#h3-0-1017" id="h3-0-1017" class="i">+			},
+</a><a href="#h3-0-1018" id="h3-0-1018" class="i">+			serialized: &quot;prepend key 1 2 3\r\nfoo\r\n&quot;,
+</a><a href="#h3-0-1019" id="h3-0-1019" class="i">+		},
+</a><a href="#h3-0-1020" id="h3-0-1020" class="i">+		{
+</a><a href="#h3-0-1021" id="h3-0-1021" class="i">+			request: &amp;PrependRequest{
+</a><a href="#h3-0-1022" id="h3-0-1022" class="i">+				Payload: &amp;StoragePayload{
+</a><a href="#h3-0-1023" id="h3-0-1023" class="i">+					Key:        &quot;key&quot;,
+</a><a href="#h3-0-1024" id="h3-0-1024" class="i">+					Flags:      1,
+</a><a href="#h3-0-1025" id="h3-0-1025" class="i">+					Expiration: 2 * time.Second,
+</a><a href="#h3-0-1026" id="h3-0-1026" class="i">+					Size:       3,
+</a><a href="#h3-0-1027" id="h3-0-1027" class="i">+					Data:       []byte(&quot;foo&quot;),
+</a><a href="#h3-0-1028" id="h3-0-1028" class="i">+					NoReply:    true,
+</a><a href="#h3-0-1029" id="h3-0-1029" class="i">+				},
+</a><a href="#h3-0-1030" id="h3-0-1030" class="i">+			},
+</a><a href="#h3-0-1031" id="h3-0-1031" class="i">+			serialized: &quot;prepend key 1 2 3 noreply\r\nfoo\r\n&quot;,
+</a><a href="#h3-0-1032" id="h3-0-1032" class="i">+		},
+</a><a href="#h3-0-1033" id="h3-0-1033" class="i">+	}
+</a><a href="#h3-0-1034" id="h3-0-1034" class="i">+
+</a><a href="#h3-0-1035" id="h3-0-1035" class="i">+	for _, testCase := range cases {
+</a><a href="#h3-0-1036" id="h3-0-1036" class="i">+		assert.Equal(t, testCase.serialized, testCase.request.String())
+</a><a href="#h3-0-1037" id="h3-0-1037" class="i">+	}
+</a><a href="#h3-0-1038" id="h3-0-1038" class="i">+}
+</a><a href="#h3-0-1039" id="h3-0-1039" class="i">+
+</a><a href="#h3-0-1040" id="h3-0-1040" class="i">+func TestPrependResponse(t *testing.T) {
+</a><a href="#h3-0-1041" id="h3-0-1041" class="i">+	t.Parallel()
+</a><a href="#h3-0-1042" id="h3-0-1042" class="i">+
+</a><a href="#h3-0-1043" id="h3-0-1043" class="i">+	cases := []struct {
+</a><a href="#h3-0-1044" id="h3-0-1044" class="i">+		response   *PrependResponse
+</a><a href="#h3-0-1045" id="h3-0-1045" class="i">+		serialized string
+</a><a href="#h3-0-1046" id="h3-0-1046" class="i">+	}{
+</a><a href="#h3-0-1047" id="h3-0-1047" class="i">+		{
+</a><a href="#h3-0-1048" id="h3-0-1048" class="i">+			response:   &amp;PrependResponse{Status: Stored},
+</a><a href="#h3-0-1049" id="h3-0-1049" class="i">+			serialized: &quot;STORED\r\n&quot;,
+</a><a href="#h3-0-1050" id="h3-0-1050" class="i">+		},
+</a><a href="#h3-0-1051" id="h3-0-1051" class="i">+		{
+</a><a href="#h3-0-1052" id="h3-0-1052" class="i">+			response:   &amp;PrependResponse{Status: NotStored},
+</a><a href="#h3-0-1053" id="h3-0-1053" class="i">+			serialized: &quot;NOT_STORED\r\n&quot;,
+</a><a href="#h3-0-1054" id="h3-0-1054" class="i">+		},
+</a><a href="#h3-0-1055" id="h3-0-1055" class="i">+		{
+</a><a href="#h3-0-1056" id="h3-0-1056" class="i">+			response:   &amp;PrependResponse{Status: Exists},
+</a><a href="#h3-0-1057" id="h3-0-1057" class="i">+			serialized: &quot;EXISTS\r\n&quot;,
+</a><a href="#h3-0-1058" id="h3-0-1058" class="i">+		},
+</a><a href="#h3-0-1059" id="h3-0-1059" class="i">+		{
+</a><a href="#h3-0-1060" id="h3-0-1060" class="i">+			response:   &amp;PrependResponse{Status: NotFound},
+</a><a href="#h3-0-1061" id="h3-0-1061" class="i">+			serialized: &quot;NOT_FOUND\r\n&quot;,
+</a><a href="#h3-0-1062" id="h3-0-1062" class="i">+		},
+</a><a href="#h3-0-1063" id="h3-0-1063" class="i">+	}
+</a><a href="#h3-0-1064" id="h3-0-1064" class="i">+
+</a><a href="#h3-0-1065" id="h3-0-1065" class="i">+	for _, testCase := range cases {
+</a><a href="#h3-0-1066" id="h3-0-1066" class="i">+		assert.Equal(t, testCase.serialized, testCase.response.String())
+</a><a href="#h3-0-1067" id="h3-0-1067" class="i">+	}
+</a><a href="#h3-0-1068" id="h3-0-1068" class="i">+}
+</a><a href="#h3-0-1069" id="h3-0-1069" class="i">+
+</a><a href="#h3-0-1070" id="h3-0-1070" class="i">+func TestCasRequest(t *testing.T) {
+</a><a href="#h3-0-1071" id="h3-0-1071" class="i">+	t.Parallel()
+</a><a href="#h3-0-1072" id="h3-0-1072" class="i">+
+</a><a href="#h3-0-1073" id="h3-0-1073" class="i">+	cases := []struct {
+</a><a href="#h3-0-1074" id="h3-0-1074" class="i">+		request    *CasRequest
+</a><a href="#h3-0-1075" id="h3-0-1075" class="i">+		serialized string
+</a><a href="#h3-0-1076" id="h3-0-1076" class="i">+	}{
+</a><a href="#h3-0-1077" id="h3-0-1077" class="i">+		{
+</a><a href="#h3-0-1078" id="h3-0-1078" class="i">+			request: &amp;CasRequest{
+</a><a href="#h3-0-1079" id="h3-0-1079" class="i">+				Payload: &amp;StoragePayload{
+</a><a href="#h3-0-1080" id="h3-0-1080" class="i">+					Key:        &quot;key&quot;,
+</a><a href="#h3-0-1081" id="h3-0-1081" class="i">+					Flags:      1,
+</a><a href="#h3-0-1082" id="h3-0-1082" class="i">+					Expiration: 2 * time.Second,
+</a><a href="#h3-0-1083" id="h3-0-1083" class="i">+					Size:       3,
+</a><a href="#h3-0-1084" id="h3-0-1084" class="i">+					CasUnique:  4,
+</a><a href="#h3-0-1085" id="h3-0-1085" class="i">+					Data:       []byte(&quot;foo&quot;),
+</a><a href="#h3-0-1086" id="h3-0-1086" class="i">+					NoReply:    false,
+</a><a href="#h3-0-1087" id="h3-0-1087" class="i">+				},
+</a><a href="#h3-0-1088" id="h3-0-1088" class="i">+			},
+</a><a href="#h3-0-1089" id="h3-0-1089" class="i">+			serialized: &quot;cas key 1 2 3 4\r\nfoo\r\n&quot;,
+</a><a href="#h3-0-1090" id="h3-0-1090" class="i">+		},
+</a><a href="#h3-0-1091" id="h3-0-1091" class="i">+		{
+</a><a href="#h3-0-1092" id="h3-0-1092" class="i">+			request: &amp;CasRequest{
+</a><a href="#h3-0-1093" id="h3-0-1093" class="i">+				Payload: &amp;StoragePayload{
+</a><a href="#h3-0-1094" id="h3-0-1094" class="i">+					Key:        &quot;key&quot;,
+</a><a href="#h3-0-1095" id="h3-0-1095" class="i">+					Flags:      1,
+</a><a href="#h3-0-1096" id="h3-0-1096" class="i">+					Expiration: 2 * time.Second,
+</a><a href="#h3-0-1097" id="h3-0-1097" class="i">+					Size:       3,
+</a><a href="#h3-0-1098" id="h3-0-1098" class="i">+					CasUnique:  4,
+</a><a href="#h3-0-1099" id="h3-0-1099" class="i">+					Data:       []byte(&quot;foo&quot;),
+</a><a href="#h3-0-1100" id="h3-0-1100" class="i">+					NoReply:    true,
+</a><a href="#h3-0-1101" id="h3-0-1101" class="i">+				},
+</a><a href="#h3-0-1102" id="h3-0-1102" class="i">+			},
+</a><a href="#h3-0-1103" id="h3-0-1103" class="i">+			serialized: &quot;cas key 1 2 3 4 noreply\r\nfoo\r\n&quot;,
+</a><a href="#h3-0-1104" id="h3-0-1104" class="i">+		},
+</a><a href="#h3-0-1105" id="h3-0-1105" class="i">+	}
+</a><a href="#h3-0-1106" id="h3-0-1106" class="i">+
+</a><a href="#h3-0-1107" id="h3-0-1107" class="i">+	for _, testCase := range cases {
+</a><a href="#h3-0-1108" id="h3-0-1108" class="i">+		assert.Equal(t, testCase.serialized, testCase.request.String())
+</a><a href="#h3-0-1109" id="h3-0-1109" class="i">+	}
+</a><a href="#h3-0-1110" id="h3-0-1110" class="i">+}
+</a><a href="#h3-0-1111" id="h3-0-1111" class="i">+
+</a><a href="#h3-0-1112" id="h3-0-1112" class="i">+func TestCasResponse(t *testing.T) {
+</a><a href="#h3-0-1113" id="h3-0-1113" class="i">+	t.Parallel()
+</a><a href="#h3-0-1114" id="h3-0-1114" class="i">+
+</a><a href="#h3-0-1115" id="h3-0-1115" class="i">+	cases := []struct {
+</a><a href="#h3-0-1116" id="h3-0-1116" class="i">+		response   *CasResponse
+</a><a href="#h3-0-1117" id="h3-0-1117" class="i">+		serialized string
+</a><a href="#h3-0-1118" id="h3-0-1118" class="i">+	}{
+</a><a href="#h3-0-1119" id="h3-0-1119" class="i">+		{
+</a><a href="#h3-0-1120" id="h3-0-1120" class="i">+			response:   &amp;CasResponse{Status: Stored},
+</a><a href="#h3-0-1121" id="h3-0-1121" class="i">+			serialized: &quot;STORED\r\n&quot;,
+</a><a href="#h3-0-1122" id="h3-0-1122" class="i">+		},
+</a><a href="#h3-0-1123" id="h3-0-1123" class="i">+		{
+</a><a href="#h3-0-1124" id="h3-0-1124" class="i">+			response:   &amp;CasResponse{Status: NotStored},
+</a><a href="#h3-0-1125" id="h3-0-1125" class="i">+			serialized: &quot;NOT_STORED\r\n&quot;,
+</a><a href="#h3-0-1126" id="h3-0-1126" class="i">+		},
+</a><a href="#h3-0-1127" id="h3-0-1127" class="i">+		{
+</a><a href="#h3-0-1128" id="h3-0-1128" class="i">+			response:   &amp;CasResponse{Status: Exists},
+</a><a href="#h3-0-1129" id="h3-0-1129" class="i">+			serialized: &quot;EXISTS\r\n&quot;,
+</a><a href="#h3-0-1130" id="h3-0-1130" class="i">+		},
+</a><a href="#h3-0-1131" id="h3-0-1131" class="i">+		{
+</a><a href="#h3-0-1132" id="h3-0-1132" class="i">+			response:   &amp;CasResponse{Status: NotFound},
+</a><a href="#h3-0-1133" id="h3-0-1133" class="i">+			serialized: &quot;NOT_FOUND\r\n&quot;,
+</a><a href="#h3-0-1134" id="h3-0-1134" class="i">+		},
+</a><a href="#h3-0-1135" id="h3-0-1135" class="i">+	}
+</a><a href="#h3-0-1136" id="h3-0-1136" class="i">+
+</a><a href="#h3-0-1137" id="h3-0-1137" class="i">+	for _, testCase := range cases {
+</a><a href="#h3-0-1138" id="h3-0-1138" class="i">+		assert.Equal(t, testCase.serialized, testCase.response.String())
+</a><a href="#h3-0-1139" id="h3-0-1139" class="i">+	}
+</a><a href="#h3-0-1140" id="h3-0-1140" class="i">+}
+</a></pre>
+</div>
+</body>
+</html>
