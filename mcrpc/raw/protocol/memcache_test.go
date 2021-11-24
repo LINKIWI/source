@@ -122,6 +122,43 @@ func TestParseFlush(t *testing.T) {
 	}
 }
 
+func TestParseQuit(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		command string
+		request *QuitRequest
+	}{
+		{
+			command: "quit",
+			request: nil,
+		},
+		{
+			command: "quit \r\n",
+			request: nil,
+		},
+		{
+			command: "quit foo\r\n",
+			request: nil,
+		},
+		{
+			command: "quit\r\n",
+			request: &QuitRequest{},
+		},
+	}
+
+	for _, testCase := range cases {
+		parsed, err := NewASCIIParser().Parse([]byte(testCase.command))
+
+		if testCase.request != nil {
+			assert.NoError(t, err)
+			assert.Equal(t, parsed, testCase.request)
+		} else {
+			assert.Error(t, err)
+		}
+	}
+}
+
 func TestParseStats(t *testing.T) {
 	t.Parallel()
 

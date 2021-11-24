@@ -17,14 +17,20 @@ Define a server handler and start a server:
 package main
 
 import (
+	"context"
 	"net"
 
 	"lib.kevinlin.info/mcrpc"
 	"lib.kevinlin.info/mcrpc/lib"
+	"lib.kevinlin.info/mcrpc/protocol"
 )
 
 type dummyHandler struct {
 	lib.NoopHandler
+}
+
+func (d *dummyHandler) Version(ctx context.Context, request *protocol.VersionRequest) (*protocol.VersionResponse, error) {
+	return &protocol.VersionResponse{Version: "dummy"}, nil
 }
 
 func main() {
@@ -40,12 +46,11 @@ func main() {
 
 	srv.Serve(ln)
 }
-
 ```
 
 ## Development
 
-Generate code:
+Generate code (requires the [`ragel`](https://www.colm.net/open-source/ragel/) binary):
 
 ```bash
 $ make generate

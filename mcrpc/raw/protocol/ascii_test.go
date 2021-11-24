@@ -102,6 +102,18 @@ func TestFlushResponse(t *testing.T) {
 	assert.Equal(t, "OK\r\n", (&FlushResponse{}).String())
 }
 
+func TestQuitRequest(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, "quit\r\n", (&QuitRequest{}).String())
+}
+
+func TestQuitResponse(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, "OK\r\n", (&QuitResponse{}).String())
+}
+
 func TestStatsRequest(t *testing.T) {
 	t.Parallel()
 

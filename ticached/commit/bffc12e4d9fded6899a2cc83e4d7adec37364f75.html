@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>cmd/ticached: Support server TLS termination - ticached - Stateless memcache protocol server backed by TiKV for persistent storage</title>
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="ticached Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="ticached Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body {
+	color: #000;
+	background-color: #fff;
+	font-family: monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-size: 1em;
+	margin: 0;
+}
+
+img, h1, h2 {
+	vertical-align: middle;
+}
+
+img {
+	border: 0;
+}
+
+a:target {
+	background-color: #ccc;
+}
+
+a.d,
+a.h,
+a.i {
+	text-decoration: none;
+}
+
+a.line {
+	text-decoration: none;
+	user-select: none;
+}
+
+#blob a {
+	color: #555;
+}
+
+#blob a:hover {
+	color: blue;
+	text-decoration: none;
+}
+
+table thead td {
+	font-weight: bold;
+}
+
+table td {
+	padding: 0 0.4em;
+}
+
+#content table td {
+	vertical-align: top;
+	white-space: nowrap;
+}
+
+#branches tr:hover td,
+#tags tr:hover td,
+#index tr:hover td,
+#log tr:hover td,
+#files tr:hover td {
+	background-color: #eee;
+}
+
+#index tr td:nth-child(2),
+#tags tr td:nth-child(3),
+#branches tr td:nth-child(3),
+#log tr td:nth-child(2) {
+	white-space: normal;
+}
+
+td.num {
+	text-align: right;
+}
+
+.desc {
+	color: #555;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid #555;
+	height: 1px;
+}
+
+pre {
+	font-family: monospace;
+}
+
+pre a.h {
+	color: #00a;
+}
+
+.A,
+span.i,
+pre a.i {
+	color: #070;
+}
+
+.D,
+span.d,
+pre a.d {
+	color: #e00;
+}
+
+pre a.h:hover,
+pre a.i:hover,
+pre a.d:hover {
+	text-decoration: none;
+}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>ticached</h1><span class="desc">Stateless memcache protocol server backed by TiKV for persistent storage</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/ticached.git">https://source.static.kevinlin.info/ticached.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/bffc12e4d9fded6899a2cc83e4d7adec37364f75">bffc12e4d9fded6899a2cc83e4d7adec37364f75</a>
+<b>parent</b> <a href="../commit/72650187c5b1ee6b3f497cf01fed6fffeb57f157">72650187c5b1ee6b3f497cf01fed6fffeb57f157</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Wed, 24 Nov 2021 08:50:14 -0800
+
+cmd/ticached: Support server TLS termination
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">cmd/ticached/main.go</a></td><td> | </td><td class="num">31</td><td><span class="i">++++++++++++++++++++++++</span><span class="d">-------</span></td></tr>
+</table></pre><pre>1 file changed, 24 insertions(+), 7 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/cmd/ticached/main.go">cmd/ticached/main.go</a> b/<a href="../file/cmd/ticached/main.go">cmd/ticached/main.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -2,9 +2,9 @@ package main
+</a> 
+ import (
+ 	&quot;context&quot;
+<a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;crypto/tls&quot;
+</a> 	&quot;flag&quot;
+ 	&quot;log&quot;
+<a href="#h0-0-6" id="h0-0-6" class="d">-	&quot;net&quot;
+</a> 	&quot;strings&quot;
+ 
+ 	&quot;github.com/tikv/client-go/v2/config&quot;
+<a href="#h0-1" id="h0-1" class="h">@@ -16,11 +16,15 @@ import (
+</a> )
+ 
+ var (
+<a href="#h0-1-3" id="h0-1-3" class="d">-	flagListenAddress   = flag.String(&quot;listen-address&quot;, &quot;localhost:11211&quot;, &quot;server listen address&quot;)
+</a><a href="#h0-1-4" id="h0-1-4" class="d">-	flagPDAddress       = flag.String(&quot;pd-address&quot;, &quot;localhost:2379&quot;, &quot;comma-delimited PD addresses&quot;)
+</a><a href="#h0-1-5" id="h0-1-5" class="d">-	flagClientTLSKey    = flag.String(&quot;client-tls-key&quot;, &quot;&quot;, &quot;path to a client TLS key for TiKV cluster TLS&quot;)
+</a><a href="#h0-1-6" id="h0-1-6" class="d">-	flagClientTLSCert   = flag.String(&quot;client-tls-cert&quot;, &quot;&quot;, &quot;path to a client TLS certificate for TiKV cluster TLS&quot;)
+</a><a href="#h0-1-7" id="h0-1-7" class="d">-	flagClientTLSCACert = flag.String(&quot;client-tls-ca-cert&quot;, &quot;&quot;, &quot;path to a CA certificate for TiKV cluster TLS&quot;)
+</a><a href="#h0-1-8" id="h0-1-8" class="i">+	flagListenAddress       = flag.String(&quot;listen-address&quot;, &quot;localhost:11211&quot;, &quot;server listen address&quot;)
+</a><a href="#h0-1-9" id="h0-1-9" class="i">+	flagPDAddress           = flag.String(&quot;pd-address&quot;, &quot;localhost:2379&quot;, &quot;comma-delimited PD addresses&quot;)
+</a><a href="#h0-1-10" id="h0-1-10" class="i">+	flagServerTLSKey        = flag.String(&quot;server-tls-key&quot;, &quot;&quot;, &quot;path to a server TLS key for TLS termination&quot;)
+</a><a href="#h0-1-11" id="h0-1-11" class="i">+	flagServerTLSCert       = flag.String(&quot;server-tls-cert&quot;, &quot;&quot;, &quot;path to a server TLS certificate for TLS termination&quot;)
+</a><a href="#h0-1-12" id="h0-1-12" class="i">+	flagServerTLSCACert     = flag.String(&quot;server-tls-ca-cert&quot;, &quot;&quot;, &quot;path to a server TLS CA certificate for TLS termination&quot;)
+</a><a href="#h0-1-13" id="h0-1-13" class="i">+	flagServerTLSClientAuth = flag.Bool(&quot;server-tls-client-auth&quot;, false, &quot;enable and require valid client TLS authentication for TLS termination&quot;)
+</a><a href="#h0-1-14" id="h0-1-14" class="i">+	flagClientTLSKey        = flag.String(&quot;client-tls-key&quot;, &quot;&quot;, &quot;path to a client TLS key for TiKV cluster TLS&quot;)
+</a><a href="#h0-1-15" id="h0-1-15" class="i">+	flagClientTLSCert       = flag.String(&quot;client-tls-cert&quot;, &quot;&quot;, &quot;path to a client TLS certificate for TiKV cluster TLS&quot;)
+</a><a href="#h0-1-16" id="h0-1-16" class="i">+	flagClientTLSCACert     = flag.String(&quot;client-tls-ca-cert&quot;, &quot;&quot;, &quot;path to a TLS CA certificate for TiKV cluster TLS&quot;)
+</a> )
+ 
+ func init() {
+<a href="#h0-2" id="h0-2" class="h">@@ -30,7 +34,20 @@ func init() {
+</a> func main() {
+ 	log.Printf(&quot;main: starting ticached: version=%s&quot;, meta.Version)
+ 
+<a href="#h0-2-3" id="h0-2-3" class="d">-	ln, err := net.Listen(&quot;tcp&quot;, *flagListenAddress)
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+	listener := &amp;server.Listener{
+</a><a href="#h0-2-5" id="h0-2-5" class="i">+		Network:       &quot;tcp&quot;,
+</a><a href="#h0-2-6" id="h0-2-6" class="i">+		Address:       *flagListenAddress,
+</a><a href="#h0-2-7" id="h0-2-7" class="i">+		TLSKey:        *flagServerTLSKey,
+</a><a href="#h0-2-8" id="h0-2-8" class="i">+		TLSCert:       *flagServerTLSCert,
+</a><a href="#h0-2-9" id="h0-2-9" class="i">+		TLSCACert:     *flagServerTLSCACert,
+</a><a href="#h0-2-10" id="h0-2-10" class="i">+		TLSClientAuth: tls.NoClientCert,
+</a><a href="#h0-2-11" id="h0-2-11" class="i">+	}
+</a><a href="#h0-2-12" id="h0-2-12" class="i">+
+</a><a href="#h0-2-13" id="h0-2-13" class="i">+	if *flagServerTLSClientAuth {
+</a><a href="#h0-2-14" id="h0-2-14" class="i">+		listener.TLSClientAuth = tls.RequireAndVerifyClientCert
+</a><a href="#h0-2-15" id="h0-2-15" class="i">+	}
+</a><a href="#h0-2-16" id="h0-2-16" class="i">+
+</a><a href="#h0-2-17" id="h0-2-17" class="i">+	ln, err := listener.Listen()
+</a> 	if err != nil {
+ 		panic(err)
+ 	}
+</pre>
+</div>
+</body>
+</html>

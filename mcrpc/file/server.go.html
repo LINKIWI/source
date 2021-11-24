@@ -125,7 +125,7 @@ pre a.d:hover {
 <a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
 <hr/>
 <div id="content">
-<p> server.go (4715B) (<a href="../raw/server.go">raw</a>)</p><hr/><pre id="blob">
+<p> server.go (4939B) (<a href="../raw/server.go">raw</a>)</p><hr/><pre id="blob">
 <a href="#l1" class="line" id="l1">      1</a> package mcrpc
 <a href="#l2" class="line" id="l2">      2</a> 
 <a href="#l3" class="line" id="l3">      3</a> import (
@@ -249,75 +249,86 @@ pre a.d:hover {
 <a href="#l121" class="line" id="l121">    121</a> 		}
 <a href="#l122" class="line" id="l122">    122</a> 		return false, nil
 <a href="#l123" class="line" id="l123">    123</a> 	} else if err != nil {
-<a href="#l124" class="line" id="l124">    124</a> 		return true, fmt.Errorf(&quot;server: non-recoverable error parsing command: %v&quot;, err)
-<a href="#l125" class="line" id="l125">    125</a> 	}
-<a href="#l126" class="line" id="l126">    126</a> 
-<a href="#l127" class="line" id="l127">    127</a> 	if s.debugLog != nil {
-<a href="#l128" class="line" id="l128">    128</a> 		s.debugLog.Printf(&quot;server: parsed request: req=%#v&quot;, req)
-<a href="#l129" class="line" id="l129">    129</a> 	}
-<a href="#l130" class="line" id="l130">    130</a> 
-<a href="#l131" class="line" id="l131">    131</a> 	ctx := context.WithValue(context.Background(), ClientConnContextKey, conn)
-<a href="#l132" class="line" id="l132">    132</a> 	ctx = context.WithValue(ctx, ClientRawRequestContextKey, buf)
+<a href="#l124" class="line" id="l124">    124</a> 		return true, fmt.Errorf(
+<a href="#l125" class="line" id="l125">    125</a> 			&quot;server: non-recoverable error during command parsing: err=%v&quot;,
+<a href="#l126" class="line" id="l126">    126</a> 			err,
+<a href="#l127" class="line" id="l127">    127</a> 		)
+<a href="#l128" class="line" id="l128">    128</a> 	}
+<a href="#l129" class="line" id="l129">    129</a> 
+<a href="#l130" class="line" id="l130">    130</a> 	if s.debugLog != nil {
+<a href="#l131" class="line" id="l131">    131</a> 		s.debugLog.Printf(&quot;server: parsed request: request=%#v&quot;, req)
+<a href="#l132" class="line" id="l132">    132</a> 	}
 <a href="#l133" class="line" id="l133">    133</a> 
-<a href="#l134" class="line" id="l134">    134</a> 	switch r := req.(type) {
-<a href="#l135" class="line" id="l135">    135</a> 	case *protocol.VersionRequest:
-<a href="#l136" class="line" id="l136">    136</a> 		resp, hErr = s.handler.Version(ctx, r)
-<a href="#l137" class="line" id="l137">    137</a> 	case *protocol.ShutdownRequest:
-<a href="#l138" class="line" id="l138">    138</a> 		resp, hErr = s.handler.Shutdown(ctx, r)
-<a href="#l139" class="line" id="l139">    139</a> 	case *protocol.FlushRequest:
-<a href="#l140" class="line" id="l140">    140</a> 		resp, hErr = s.handler.Flush(ctx, r)
-<a href="#l141" class="line" id="l141">    141</a> 	case *protocol.StatsRequest:
-<a href="#l142" class="line" id="l142">    142</a> 		resp, hErr = s.handler.Stats(ctx, r)
-<a href="#l143" class="line" id="l143">    143</a> 	case *protocol.WatchRequest:
-<a href="#l144" class="line" id="l144">    144</a> 		resp, hErr = s.handler.Watch(ctx, r)
-<a href="#l145" class="line" id="l145">    145</a> 	case *protocol.TouchRequest:
-<a href="#l146" class="line" id="l146">    146</a> 		resp, hErr = s.handler.Touch(ctx, r)
-<a href="#l147" class="line" id="l147">    147</a> 	case *protocol.DeleteRequest:
-<a href="#l148" class="line" id="l148">    148</a> 		resp, hErr = s.handler.Delete(ctx, r)
-<a href="#l149" class="line" id="l149">    149</a> 	case *protocol.IncrRequest:
-<a href="#l150" class="line" id="l150">    150</a> 		resp, hErr = s.handler.Incr(ctx, r)
-<a href="#l151" class="line" id="l151">    151</a> 	case *protocol.DecrRequest:
-<a href="#l152" class="line" id="l152">    152</a> 		resp, hErr = s.handler.Decr(ctx, r)
-<a href="#l153" class="line" id="l153">    153</a> 	case *protocol.GetRequest:
-<a href="#l154" class="line" id="l154">    154</a> 		resp, hErr = s.handler.Get(ctx, r)
-<a href="#l155" class="line" id="l155">    155</a> 	case *protocol.GetsRequest:
-<a href="#l156" class="line" id="l156">    156</a> 		resp, hErr = s.handler.Gets(ctx, r)
-<a href="#l157" class="line" id="l157">    157</a> 	case *protocol.GatRequest:
-<a href="#l158" class="line" id="l158">    158</a> 		resp, hErr = s.handler.Gat(ctx, r)
-<a href="#l159" class="line" id="l159">    159</a> 	case *protocol.GatsRequest:
-<a href="#l160" class="line" id="l160">    160</a> 		resp, hErr = s.handler.Gats(ctx, r)
-<a href="#l161" class="line" id="l161">    161</a> 	case *protocol.SetRequest:
-<a href="#l162" class="line" id="l162">    162</a> 		resp, hErr = s.handler.Set(ctx, r)
-<a href="#l163" class="line" id="l163">    163</a> 	case *protocol.AddRequest:
-<a href="#l164" class="line" id="l164">    164</a> 		resp, hErr = s.handler.Add(ctx, r)
-<a href="#l165" class="line" id="l165">    165</a> 	case *protocol.ReplaceRequest:
-<a href="#l166" class="line" id="l166">    166</a> 		resp, hErr = s.handler.Replace(ctx, r)
-<a href="#l167" class="line" id="l167">    167</a> 	case *protocol.AppendRequest:
-<a href="#l168" class="line" id="l168">    168</a> 		resp, hErr = s.handler.Append(ctx, r)
-<a href="#l169" class="line" id="l169">    169</a> 	case *protocol.PrependRequest:
-<a href="#l170" class="line" id="l170">    170</a> 		resp, hErr = s.handler.Prepend(ctx, r)
-<a href="#l171" class="line" id="l171">    171</a> 	case *protocol.CasRequest:
-<a href="#l172" class="line" id="l172">    172</a> 		resp, hErr = s.handler.Cas(ctx, r)
-<a href="#l173" class="line" id="l173">    173</a> 	default:
-<a href="#l174" class="line" id="l174">    174</a> 		return false, fmt.Errorf(&quot;server: unsupported request type: request=%T&quot;, req)
-<a href="#l175" class="line" id="l175">    175</a> 	}
-<a href="#l176" class="line" id="l176">    176</a> 
-<a href="#l177" class="line" id="l177">    177</a> 	if req.IsNoReply() {
-<a href="#l178" class="line" id="l178">    178</a> 		return false, nil
-<a href="#l179" class="line" id="l179">    179</a> 	}
-<a href="#l180" class="line" id="l180">    180</a> 
-<a href="#l181" class="line" id="l181">    181</a> 	if hErr != nil {
-<a href="#l182" class="line" id="l182">    182</a> 		if _, cErr := conn.Write([]byte(hErr.Error())); cErr != nil {
-<a href="#l183" class="line" id="l183">    183</a> 			return true, cErr
-<a href="#l184" class="line" id="l184">    184</a> 		}
-<a href="#l185" class="line" id="l185">    185</a> 	} else {
-<a href="#l186" class="line" id="l186">    186</a> 		if _, cErr := conn.Write([]byte(resp.String())); cErr != nil {
-<a href="#l187" class="line" id="l187">    187</a> 			return true, cErr
-<a href="#l188" class="line" id="l188">    188</a> 		}
-<a href="#l189" class="line" id="l189">    189</a> 	}
-<a href="#l190" class="line" id="l190">    190</a> 
-<a href="#l191" class="line" id="l191">    191</a> 	return false, nil
-<a href="#l192" class="line" id="l192">    192</a> }
+<a href="#l134" class="line" id="l134">    134</a> 	ctx := context.WithValue(context.Background(), ClientConnContextKey, conn)
+<a href="#l135" class="line" id="l135">    135</a> 	ctx = context.WithValue(ctx, ClientRawRequestContextKey, buf)
+<a href="#l136" class="line" id="l136">    136</a> 
+<a href="#l137" class="line" id="l137">    137</a> 	switch r := req.(type) {
+<a href="#l138" class="line" id="l138">    138</a> 	case *protocol.VersionRequest:
+<a href="#l139" class="line" id="l139">    139</a> 		resp, hErr = s.handler.Version(ctx, r)
+<a href="#l140" class="line" id="l140">    140</a> 	case *protocol.ShutdownRequest:
+<a href="#l141" class="line" id="l141">    141</a> 		resp, hErr = s.handler.Shutdown(ctx, r)
+<a href="#l142" class="line" id="l142">    142</a> 	case *protocol.FlushRequest:
+<a href="#l143" class="line" id="l143">    143</a> 		resp, hErr = s.handler.Flush(ctx, r)
+<a href="#l144" class="line" id="l144">    144</a> 	case *protocol.StatsRequest:
+<a href="#l145" class="line" id="l145">    145</a> 		resp, hErr = s.handler.Stats(ctx, r)
+<a href="#l146" class="line" id="l146">    146</a> 	case *protocol.WatchRequest:
+<a href="#l147" class="line" id="l147">    147</a> 		resp, hErr = s.handler.Watch(ctx, r)
+<a href="#l148" class="line" id="l148">    148</a> 	case *protocol.TouchRequest:
+<a href="#l149" class="line" id="l149">    149</a> 		resp, hErr = s.handler.Touch(ctx, r)
+<a href="#l150" class="line" id="l150">    150</a> 	case *protocol.DeleteRequest:
+<a href="#l151" class="line" id="l151">    151</a> 		resp, hErr = s.handler.Delete(ctx, r)
+<a href="#l152" class="line" id="l152">    152</a> 	case *protocol.IncrRequest:
+<a href="#l153" class="line" id="l153">    153</a> 		resp, hErr = s.handler.Incr(ctx, r)
+<a href="#l154" class="line" id="l154">    154</a> 	case *protocol.DecrRequest:
+<a href="#l155" class="line" id="l155">    155</a> 		resp, hErr = s.handler.Decr(ctx, r)
+<a href="#l156" class="line" id="l156">    156</a> 	case *protocol.GetRequest:
+<a href="#l157" class="line" id="l157">    157</a> 		resp, hErr = s.handler.Get(ctx, r)
+<a href="#l158" class="line" id="l158">    158</a> 	case *protocol.GetsRequest:
+<a href="#l159" class="line" id="l159">    159</a> 		resp, hErr = s.handler.Gets(ctx, r)
+<a href="#l160" class="line" id="l160">    160</a> 	case *protocol.GatRequest:
+<a href="#l161" class="line" id="l161">    161</a> 		resp, hErr = s.handler.Gat(ctx, r)
+<a href="#l162" class="line" id="l162">    162</a> 	case *protocol.GatsRequest:
+<a href="#l163" class="line" id="l163">    163</a> 		resp, hErr = s.handler.Gats(ctx, r)
+<a href="#l164" class="line" id="l164">    164</a> 	case *protocol.SetRequest:
+<a href="#l165" class="line" id="l165">    165</a> 		resp, hErr = s.handler.Set(ctx, r)
+<a href="#l166" class="line" id="l166">    166</a> 	case *protocol.AddRequest:
+<a href="#l167" class="line" id="l167">    167</a> 		resp, hErr = s.handler.Add(ctx, r)
+<a href="#l168" class="line" id="l168">    168</a> 	case *protocol.ReplaceRequest:
+<a href="#l169" class="line" id="l169">    169</a> 		resp, hErr = s.handler.Replace(ctx, r)
+<a href="#l170" class="line" id="l170">    170</a> 	case *protocol.AppendRequest:
+<a href="#l171" class="line" id="l171">    171</a> 		resp, hErr = s.handler.Append(ctx, r)
+<a href="#l172" class="line" id="l172">    172</a> 	case *protocol.PrependRequest:
+<a href="#l173" class="line" id="l173">    173</a> 		resp, hErr = s.handler.Prepend(ctx, r)
+<a href="#l174" class="line" id="l174">    174</a> 	case *protocol.CasRequest:
+<a href="#l175" class="line" id="l175">    175</a> 		resp, hErr = s.handler.Cas(ctx, r)
+<a href="#l176" class="line" id="l176">    176</a> 	default:
+<a href="#l177" class="line" id="l177">    177</a> 		return false, fmt.Errorf(&quot;server: unsupported request type: request=%T&quot;, req)
+<a href="#l178" class="line" id="l178">    178</a> 	}
+<a href="#l179" class="line" id="l179">    179</a> 
+<a href="#l180" class="line" id="l180">    180</a> 	if req.IsNoReply() {
+<a href="#l181" class="line" id="l181">    181</a> 		return false, nil
+<a href="#l182" class="line" id="l182">    182</a> 	}
+<a href="#l183" class="line" id="l183">    183</a> 
+<a href="#l184" class="line" id="l184">    184</a> 	if hErr != nil {
+<a href="#l185" class="line" id="l185">    185</a> 		if s.debugLog != nil {
+<a href="#l186" class="line" id="l186">    186</a> 			s.debugLog.Printf(&quot;server: handler error response: err=%v&quot;, hErr)
+<a href="#l187" class="line" id="l187">    187</a> 		}
+<a href="#l188" class="line" id="l188">    188</a> 
+<a href="#l189" class="line" id="l189">    189</a> 		if _, cErr := conn.Write([]byte(hErr.Error())); cErr != nil {
+<a href="#l190" class="line" id="l190">    190</a> 			return true, cErr
+<a href="#l191" class="line" id="l191">    191</a> 		}
+<a href="#l192" class="line" id="l192">    192</a> 	} else {
+<a href="#l193" class="line" id="l193">    193</a> 		if s.debugLog != nil {
+<a href="#l194" class="line" id="l194">    194</a> 			s.debugLog.Printf(&quot;server: handler response: response=%#v&quot;, resp)
+<a href="#l195" class="line" id="l195">    195</a> 		}
+<a href="#l196" class="line" id="l196">    196</a> 
+<a href="#l197" class="line" id="l197">    197</a> 		if _, cErr := conn.Write([]byte(resp.String())); cErr != nil {
+<a href="#l198" class="line" id="l198">    198</a> 			return true, cErr
+<a href="#l199" class="line" id="l199">    199</a> 		}
+<a href="#l200" class="line" id="l200">    200</a> 	}
+<a href="#l201" class="line" id="l201">    201</a> 
+<a href="#l202" class="line" id="l202">    202</a> 	return false, nil
+<a href="#l203" class="line" id="l203">    203</a> }
 </pre>
 </div>
 </body>

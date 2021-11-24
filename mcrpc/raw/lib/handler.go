@@ -30,6 +30,11 @@ func (nh *NoopHandler) Flush(ctx context.Context, request *protocol.FlushRequest
 	return nil, errNotImplemented
 }
 
+// Quit is unimplemented.
+func (nh *NoopHandler) Quit(ctx context.Context, request *protocol.QuitRequest) (*protocol.QuitResponse, error) {
+	return nil, errNotImplemented
+}
+
 // Stats is unimplemented.
 func (nh *NoopHandler) Stats(ctx context.Context, request *protocol.StatsRequest) (*protocol.StatsResponse, error) {
 	return nil, errNotImplemented

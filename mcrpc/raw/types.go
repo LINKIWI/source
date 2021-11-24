@@ -29,6 +29,9 @@ type Handler interface {
 	// Flush implements the flush_all command.
 	Flush(ctx context.Context, request *protocol.FlushRequest) (*protocol.FlushResponse, error)
 
+	// Quit implements the quit command.
+	Quit(ctx context.Context, request *protocol.QuitRequest) (*protocol.QuitResponse, error)
+
 	// Stats implements the stats command.
 	Stats(ctx context.Context, request *protocol.StatsRequest) (*protocol.StatsResponse, error)
 

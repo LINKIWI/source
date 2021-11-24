@@ -125,7 +125,7 @@ pre a.d:hover {
 <a href="../../log">Log</a> | <a href="../../files">Files</a> | <a href="../../refs">Refs</a> | <a href="../../file/README.md">README</a></td></tr></table>
 <hr/>
 <div id="content">
-<p> memcache.rl (6801B) (<a href="../../raw/protocol/memcache.rl">raw</a>)</p><hr/><pre id="blob">
+<p> memcache.rl (6932B) (<a href="../../raw/protocol/memcache.rl">raw</a>)</p><hr/><pre id="blob">
 <a href="#l1" class="line" id="l1">      1</a> package protocol
 <a href="#l2" class="line" id="l2">      2</a> 
 <a href="#l3" class="line" id="l3">      3</a> import (
@@ -214,191 +214,199 @@ pre a.d:hover {
 <a href="#l86" class="line" id="l86">     86</a>     shutdown = &#39;shutdown&#39; (sp subcommand)? crlf %{ cmd = Shutdown };
 <a href="#l87" class="line" id="l87">     87</a>     flush = &#39;flush_all&#39; (sp exptime)? crlf %{ cmd = Flush };
 <a href="#l88" class="line" id="l88">     88</a> 
-<a href="#l89" class="line" id="l89">     89</a>     # Main entry point
+<a href="#l89" class="line" id="l89">     89</a>     # Control commands
 <a href="#l90" class="line" id="l90">     90</a> 
-<a href="#l91" class="line" id="l91">     91</a>     command :=
-<a href="#l92" class="line" id="l92">     92</a>         set |
-<a href="#l93" class="line" id="l93">     93</a>         add |
-<a href="#l94" class="line" id="l94">     94</a>         replace |
-<a href="#l95" class="line" id="l95">     95</a>         append |
-<a href="#l96" class="line" id="l96">     96</a>         prepend |
-<a href="#l97" class="line" id="l97">     97</a>         cas |
-<a href="#l98" class="line" id="l98">     98</a>         get |
-<a href="#l99" class="line" id="l99">     99</a>         gets |
-<a href="#l100" class="line" id="l100">    100</a>         gat |
-<a href="#l101" class="line" id="l101">    101</a>         gats |
-<a href="#l102" class="line" id="l102">    102</a>         incr |
-<a href="#l103" class="line" id="l103">    103</a>         decr |
-<a href="#l104" class="line" id="l104">    104</a>         delete |
-<a href="#l105" class="line" id="l105">    105</a>         touch |
-<a href="#l106" class="line" id="l106">    106</a>         stats |
-<a href="#l107" class="line" id="l107">    107</a>         watch |
-<a href="#l108" class="line" id="l108">    108</a>         version |
-<a href="#l109" class="line" id="l109">    109</a>         shutdown |
-<a href="#l110" class="line" id="l110">    110</a>         flush;
-<a href="#l111" class="line" id="l111">    111</a> }%%
-<a href="#l112" class="line" id="l112">    112</a> 
-<a href="#l113" class="line" id="l113">    113</a> %% write data noerror nofinal noentry noprefix;
-<a href="#l114" class="line" id="l114">    114</a> 
-<a href="#l115" class="line" id="l115">    115</a> var (
-<a href="#l116" class="line" id="l116">    116</a>     // ErrInvalidParse is returned when the input data cannot be parsed according to the defined
-<a href="#l117" class="line" id="l117">    117</a>     // ASCII protocol state machine.
-<a href="#l118" class="line" id="l118">    118</a>     ErrInvalidParse = errors.New(&quot;protocol: command does not parse as a valid request&quot;)
-<a href="#l119" class="line" id="l119">    119</a> )
-<a href="#l120" class="line" id="l120">    120</a> 
-<a href="#l121" class="line" id="l121">    121</a> type machine struct {
-<a href="#l122" class="line" id="l122">    122</a>     data []byte
-<a href="#l123" class="line" id="l123">    123</a>     cs int
-<a href="#l124" class="line" id="l124">    124</a>     p int
-<a href="#l125" class="line" id="l125">    125</a>     pb int
-<a href="#l126" class="line" id="l126">    126</a>     pe int
-<a href="#l127" class="line" id="l127">    127</a>     eof int
-<a href="#l128" class="line" id="l128">    128</a> }
-<a href="#l129" class="line" id="l129">    129</a> 
-<a href="#l130" class="line" id="l130">    130</a> // NewASCIIParser creates a new state machine representing the memcache ASCII protocol.
-<a href="#l131" class="line" id="l131">    131</a> func NewASCIIParser() Parser {
-<a href="#l132" class="line" id="l132">    132</a>     m := &amp;machine{}
-<a href="#l133" class="line" id="l133">    133</a> 
-<a href="#l134" class="line" id="l134">    134</a>     %% access m.;
-<a href="#l135" class="line" id="l135">    135</a>     %% variable p m.p;
-<a href="#l136" class="line" id="l136">    136</a>     %% variable pe m.pe;
-<a href="#l137" class="line" id="l137">    137</a>     %% variable eof m.eof;
-<a href="#l138" class="line" id="l138">    138</a>     %% variable data m.data;
-<a href="#l139" class="line" id="l139">    139</a> 
-<a href="#l140" class="line" id="l140">    140</a>     return m
-<a href="#l141" class="line" id="l141">    141</a> }
-<a href="#l142" class="line" id="l142">    142</a> 
-<a href="#l143" class="line" id="l143">    143</a> func (m *machine) Parse(command []byte) (Request, error) {
-<a href="#l144" class="line" id="l144">    144</a>     var cmd Command
-<a href="#l145" class="line" id="l145">    145</a>     var keys []string
-<a href="#l146" class="line" id="l146">    146</a>     var exptime time.Duration
-<a href="#l147" class="line" id="l147">    147</a>     var flags uint16
-<a href="#l148" class="line" id="l148">    148</a>     var size int
-<a href="#l149" class="line" id="l149">    149</a>     var casUnique uint64
-<a href="#l150" class="line" id="l150">    150</a>     var delta uint64
-<a href="#l151" class="line" id="l151">    151</a>     var subcommands []string
-<a href="#l152" class="line" id="l152">    152</a>     var noreply bool
-<a href="#l153" class="line" id="l153">    153</a>     var data []byte
-<a href="#l154" class="line" id="l154">    154</a> 
-<a href="#l155" class="line" id="l155">    155</a>     m.data = command
-<a href="#l156" class="line" id="l156">    156</a>     m.p = 0
-<a href="#l157" class="line" id="l157">    157</a>     m.pb = 0
-<a href="#l158" class="line" id="l158">    158</a>     m.pe = len(command)
-<a href="#l159" class="line" id="l159">    159</a>     m.eof = len(command)
-<a href="#l160" class="line" id="l160">    160</a> 
-<a href="#l161" class="line" id="l161">    161</a>     %% write init;
-<a href="#l162" class="line" id="l162">    162</a>     %% write exec;
-<a href="#l163" class="line" id="l163">    163</a> 
-<a href="#l164" class="line" id="l164">    164</a>     switch cmd {
-<a href="#l165" class="line" id="l165">    165</a>     case Version:
-<a href="#l166" class="line" id="l166">    166</a>         return &amp;VersionRequest{}, nil
-<a href="#l167" class="line" id="l167">    167</a> 
-<a href="#l168" class="line" id="l168">    168</a>     case Shutdown:
-<a href="#l169" class="line" id="l169">    169</a>         if len(subcommands) == 0 {
-<a href="#l170" class="line" id="l170">    170</a>             return &amp;ShutdownRequest{}, nil
-<a href="#l171" class="line" id="l171">    171</a>         }
+<a href="#l91" class="line" id="l91">     91</a>     quit = &#39;quit&#39; crlf %{ cmd = Quit };
+<a href="#l92" class="line" id="l92">     92</a> 
+<a href="#l93" class="line" id="l93">     93</a>     # Main entry point
+<a href="#l94" class="line" id="l94">     94</a> 
+<a href="#l95" class="line" id="l95">     95</a>     command :=
+<a href="#l96" class="line" id="l96">     96</a>         set |
+<a href="#l97" class="line" id="l97">     97</a>         add |
+<a href="#l98" class="line" id="l98">     98</a>         replace |
+<a href="#l99" class="line" id="l99">     99</a>         append |
+<a href="#l100" class="line" id="l100">    100</a>         prepend |
+<a href="#l101" class="line" id="l101">    101</a>         cas |
+<a href="#l102" class="line" id="l102">    102</a>         get |
+<a href="#l103" class="line" id="l103">    103</a>         gets |
+<a href="#l104" class="line" id="l104">    104</a>         gat |
+<a href="#l105" class="line" id="l105">    105</a>         gats |
+<a href="#l106" class="line" id="l106">    106</a>         incr |
+<a href="#l107" class="line" id="l107">    107</a>         decr |
+<a href="#l108" class="line" id="l108">    108</a>         delete |
+<a href="#l109" class="line" id="l109">    109</a>         touch |
+<a href="#l110" class="line" id="l110">    110</a>         stats |
+<a href="#l111" class="line" id="l111">    111</a>         watch |
+<a href="#l112" class="line" id="l112">    112</a>         version |
+<a href="#l113" class="line" id="l113">    113</a>         shutdown |
+<a href="#l114" class="line" id="l114">    114</a>         flush |
+<a href="#l115" class="line" id="l115">    115</a>         quit;
+<a href="#l116" class="line" id="l116">    116</a> }%%
+<a href="#l117" class="line" id="l117">    117</a> 
+<a href="#l118" class="line" id="l118">    118</a> %% write data noerror nofinal noentry noprefix;
+<a href="#l119" class="line" id="l119">    119</a> 
+<a href="#l120" class="line" id="l120">    120</a> var (
+<a href="#l121" class="line" id="l121">    121</a>     // ErrInvalidParse is returned when the input data cannot be parsed according to the defined
+<a href="#l122" class="line" id="l122">    122</a>     // ASCII protocol state machine.
+<a href="#l123" class="line" id="l123">    123</a>     ErrInvalidParse = errors.New(&quot;protocol: command does not parse as a valid request&quot;)
+<a href="#l124" class="line" id="l124">    124</a> )
+<a href="#l125" class="line" id="l125">    125</a> 
+<a href="#l126" class="line" id="l126">    126</a> type machine struct {
+<a href="#l127" class="line" id="l127">    127</a>     data []byte
+<a href="#l128" class="line" id="l128">    128</a>     cs int
+<a href="#l129" class="line" id="l129">    129</a>     p int
+<a href="#l130" class="line" id="l130">    130</a>     pb int
+<a href="#l131" class="line" id="l131">    131</a>     pe int
+<a href="#l132" class="line" id="l132">    132</a>     eof int
+<a href="#l133" class="line" id="l133">    133</a> }
+<a href="#l134" class="line" id="l134">    134</a> 
+<a href="#l135" class="line" id="l135">    135</a> // NewASCIIParser creates a new state machine representing the memcache ASCII protocol.
+<a href="#l136" class="line" id="l136">    136</a> func NewASCIIParser() Parser {
+<a href="#l137" class="line" id="l137">    137</a>     m := &amp;machine{}
+<a href="#l138" class="line" id="l138">    138</a> 
+<a href="#l139" class="line" id="l139">    139</a>     %% access m.;
+<a href="#l140" class="line" id="l140">    140</a>     %% variable p m.p;
+<a href="#l141" class="line" id="l141">    141</a>     %% variable pe m.pe;
+<a href="#l142" class="line" id="l142">    142</a>     %% variable eof m.eof;
+<a href="#l143" class="line" id="l143">    143</a>     %% variable data m.data;
+<a href="#l144" class="line" id="l144">    144</a> 
+<a href="#l145" class="line" id="l145">    145</a>     return m
+<a href="#l146" class="line" id="l146">    146</a> }
+<a href="#l147" class="line" id="l147">    147</a> 
+<a href="#l148" class="line" id="l148">    148</a> func (m *machine) Parse(command []byte) (Request, error) {
+<a href="#l149" class="line" id="l149">    149</a>     var cmd Command
+<a href="#l150" class="line" id="l150">    150</a>     var keys []string
+<a href="#l151" class="line" id="l151">    151</a>     var exptime time.Duration
+<a href="#l152" class="line" id="l152">    152</a>     var flags uint16
+<a href="#l153" class="line" id="l153">    153</a>     var size int
+<a href="#l154" class="line" id="l154">    154</a>     var casUnique uint64
+<a href="#l155" class="line" id="l155">    155</a>     var delta uint64
+<a href="#l156" class="line" id="l156">    156</a>     var subcommands []string
+<a href="#l157" class="line" id="l157">    157</a>     var noreply bool
+<a href="#l158" class="line" id="l158">    158</a>     var data []byte
+<a href="#l159" class="line" id="l159">    159</a> 
+<a href="#l160" class="line" id="l160">    160</a>     m.data = command
+<a href="#l161" class="line" id="l161">    161</a>     m.p = 0
+<a href="#l162" class="line" id="l162">    162</a>     m.pb = 0
+<a href="#l163" class="line" id="l163">    163</a>     m.pe = len(command)
+<a href="#l164" class="line" id="l164">    164</a>     m.eof = len(command)
+<a href="#l165" class="line" id="l165">    165</a> 
+<a href="#l166" class="line" id="l166">    166</a>     %% write init;
+<a href="#l167" class="line" id="l167">    167</a>     %% write exec;
+<a href="#l168" class="line" id="l168">    168</a> 
+<a href="#l169" class="line" id="l169">    169</a>     switch cmd {
+<a href="#l170" class="line" id="l170">    170</a>     case Version:
+<a href="#l171" class="line" id="l171">    171</a>         return &amp;VersionRequest{}, nil
 <a href="#l172" class="line" id="l172">    172</a> 
-<a href="#l173" class="line" id="l173">    173</a>         return &amp;ShutdownRequest{Type: subcommands[0]}, nil
-<a href="#l174" class="line" id="l174">    174</a> 
-<a href="#l175" class="line" id="l175">    175</a>     case Flush:
-<a href="#l176" class="line" id="l176">    176</a>         return &amp;FlushRequest{Delay: exptime}, nil
+<a href="#l173" class="line" id="l173">    173</a>     case Shutdown:
+<a href="#l174" class="line" id="l174">    174</a>         if len(subcommands) == 0 {
+<a href="#l175" class="line" id="l175">    175</a>             return &amp;ShutdownRequest{}, nil
+<a href="#l176" class="line" id="l176">    176</a>         }
 <a href="#l177" class="line" id="l177">    177</a> 
-<a href="#l178" class="line" id="l178">    178</a>     case Stats:
-<a href="#l179" class="line" id="l179">    179</a>         if len(subcommands) == 0 {
-<a href="#l180" class="line" id="l180">    180</a>             return &amp;StatsRequest{}, nil
-<a href="#l181" class="line" id="l181">    181</a>         }
+<a href="#l178" class="line" id="l178">    178</a>         return &amp;ShutdownRequest{Type: subcommands[0]}, nil
+<a href="#l179" class="line" id="l179">    179</a> 
+<a href="#l180" class="line" id="l180">    180</a>     case Flush:
+<a href="#l181" class="line" id="l181">    181</a>         return &amp;FlushRequest{Delay: exptime}, nil
 <a href="#l182" class="line" id="l182">    182</a> 
-<a href="#l183" class="line" id="l183">    183</a>         return &amp;StatsRequest{Type: subcommands[0]}, nil
-<a href="#l184" class="line" id="l184">    184</a> 
-<a href="#l185" class="line" id="l185">    185</a>     case Watch:
-<a href="#l186" class="line" id="l186">    186</a>         return &amp;WatchRequest{Loggers: subcommands}, nil
-<a href="#l187" class="line" id="l187">    187</a> 
-<a href="#l188" class="line" id="l188">    188</a>     case Touch:
-<a href="#l189" class="line" id="l189">    189</a>         return &amp;TouchRequest{
-<a href="#l190" class="line" id="l190">    190</a>             Key: keys[0],
-<a href="#l191" class="line" id="l191">    191</a>             Expiration: exptime,
-<a href="#l192" class="line" id="l192">    192</a>             NoReply: noreply,
-<a href="#l193" class="line" id="l193">    193</a>         }, nil
-<a href="#l194" class="line" id="l194">    194</a> 
-<a href="#l195" class="line" id="l195">    195</a>     case Delete:
-<a href="#l196" class="line" id="l196">    196</a>         return &amp;DeleteRequest{
-<a href="#l197" class="line" id="l197">    197</a>             Key: keys[0],
-<a href="#l198" class="line" id="l198">    198</a>             NoReply: noreply,
-<a href="#l199" class="line" id="l199">    199</a>         }, nil
-<a href="#l200" class="line" id="l200">    200</a> 
-<a href="#l201" class="line" id="l201">    201</a>     case Incr:
-<a href="#l202" class="line" id="l202">    202</a>         return &amp;IncrRequest{
-<a href="#l203" class="line" id="l203">    203</a>             Key: keys[0],
-<a href="#l204" class="line" id="l204">    204</a>             Delta: delta,
-<a href="#l205" class="line" id="l205">    205</a>             NoReply: noreply,
-<a href="#l206" class="line" id="l206">    206</a>         }, nil
-<a href="#l207" class="line" id="l207">    207</a> 
-<a href="#l208" class="line" id="l208">    208</a>     case Decr:
-<a href="#l209" class="line" id="l209">    209</a>         return &amp;DecrRequest{
-<a href="#l210" class="line" id="l210">    210</a>             Key: keys[0],
-<a href="#l211" class="line" id="l211">    211</a>             Delta: delta,
-<a href="#l212" class="line" id="l212">    212</a>             NoReply: noreply,
-<a href="#l213" class="line" id="l213">    213</a>         }, nil
-<a href="#l214" class="line" id="l214">    214</a> 
-<a href="#l215" class="line" id="l215">    215</a>     case Get:
-<a href="#l216" class="line" id="l216">    216</a>         return &amp;GetRequest{Keys: keys}, nil
-<a href="#l217" class="line" id="l217">    217</a> 
-<a href="#l218" class="line" id="l218">    218</a>     case Gets:
-<a href="#l219" class="line" id="l219">    219</a>         return &amp;GetsRequest{Keys: keys}, nil
-<a href="#l220" class="line" id="l220">    220</a> 
-<a href="#l221" class="line" id="l221">    221</a>     case Gat:
-<a href="#l222" class="line" id="l222">    222</a>         return &amp;GatRequest{
-<a href="#l223" class="line" id="l223">    223</a>             Expiration: exptime,
-<a href="#l224" class="line" id="l224">    224</a>             Keys: keys,
-<a href="#l225" class="line" id="l225">    225</a>         }, nil
-<a href="#l226" class="line" id="l226">    226</a> 
-<a href="#l227" class="line" id="l227">    227</a>     case Gats:
-<a href="#l228" class="line" id="l228">    228</a>         return &amp;GatsRequest{
-<a href="#l229" class="line" id="l229">    229</a>             Expiration: exptime,
-<a href="#l230" class="line" id="l230">    230</a>             Keys: keys,
-<a href="#l231" class="line" id="l231">    231</a>         }, nil
-<a href="#l232" class="line" id="l232">    232</a> 
-<a href="#l233" class="line" id="l233">    233</a>     case Set, Add, Replace, Append, Prepend, Cas:
-<a href="#l234" class="line" id="l234">    234</a>         payload := &amp;Storage{
-<a href="#l235" class="line" id="l235">    235</a>             Key: keys[0],
-<a href="#l236" class="line" id="l236">    236</a>             Flags: flags,
+<a href="#l183" class="line" id="l183">    183</a>     case Quit:
+<a href="#l184" class="line" id="l184">    184</a>         return &amp;QuitRequest{}, nil
+<a href="#l185" class="line" id="l185">    185</a> 
+<a href="#l186" class="line" id="l186">    186</a>     case Stats:
+<a href="#l187" class="line" id="l187">    187</a>         if len(subcommands) == 0 {
+<a href="#l188" class="line" id="l188">    188</a>             return &amp;StatsRequest{}, nil
+<a href="#l189" class="line" id="l189">    189</a>         }
+<a href="#l190" class="line" id="l190">    190</a> 
+<a href="#l191" class="line" id="l191">    191</a>         return &amp;StatsRequest{Type: subcommands[0]}, nil
+<a href="#l192" class="line" id="l192">    192</a> 
+<a href="#l193" class="line" id="l193">    193</a>     case Watch:
+<a href="#l194" class="line" id="l194">    194</a>         return &amp;WatchRequest{Loggers: subcommands}, nil
+<a href="#l195" class="line" id="l195">    195</a> 
+<a href="#l196" class="line" id="l196">    196</a>     case Touch:
+<a href="#l197" class="line" id="l197">    197</a>         return &amp;TouchRequest{
+<a href="#l198" class="line" id="l198">    198</a>             Key: keys[0],
+<a href="#l199" class="line" id="l199">    199</a>             Expiration: exptime,
+<a href="#l200" class="line" id="l200">    200</a>             NoReply: noreply,
+<a href="#l201" class="line" id="l201">    201</a>         }, nil
+<a href="#l202" class="line" id="l202">    202</a> 
+<a href="#l203" class="line" id="l203">    203</a>     case Delete:
+<a href="#l204" class="line" id="l204">    204</a>         return &amp;DeleteRequest{
+<a href="#l205" class="line" id="l205">    205</a>             Key: keys[0],
+<a href="#l206" class="line" id="l206">    206</a>             NoReply: noreply,
+<a href="#l207" class="line" id="l207">    207</a>         }, nil
+<a href="#l208" class="line" id="l208">    208</a> 
+<a href="#l209" class="line" id="l209">    209</a>     case Incr:
+<a href="#l210" class="line" id="l210">    210</a>         return &amp;IncrRequest{
+<a href="#l211" class="line" id="l211">    211</a>             Key: keys[0],
+<a href="#l212" class="line" id="l212">    212</a>             Delta: delta,
+<a href="#l213" class="line" id="l213">    213</a>             NoReply: noreply,
+<a href="#l214" class="line" id="l214">    214</a>         }, nil
+<a href="#l215" class="line" id="l215">    215</a> 
+<a href="#l216" class="line" id="l216">    216</a>     case Decr:
+<a href="#l217" class="line" id="l217">    217</a>         return &amp;DecrRequest{
+<a href="#l218" class="line" id="l218">    218</a>             Key: keys[0],
+<a href="#l219" class="line" id="l219">    219</a>             Delta: delta,
+<a href="#l220" class="line" id="l220">    220</a>             NoReply: noreply,
+<a href="#l221" class="line" id="l221">    221</a>         }, nil
+<a href="#l222" class="line" id="l222">    222</a> 
+<a href="#l223" class="line" id="l223">    223</a>     case Get:
+<a href="#l224" class="line" id="l224">    224</a>         return &amp;GetRequest{Keys: keys}, nil
+<a href="#l225" class="line" id="l225">    225</a> 
+<a href="#l226" class="line" id="l226">    226</a>     case Gets:
+<a href="#l227" class="line" id="l227">    227</a>         return &amp;GetsRequest{Keys: keys}, nil
+<a href="#l228" class="line" id="l228">    228</a> 
+<a href="#l229" class="line" id="l229">    229</a>     case Gat:
+<a href="#l230" class="line" id="l230">    230</a>         return &amp;GatRequest{
+<a href="#l231" class="line" id="l231">    231</a>             Expiration: exptime,
+<a href="#l232" class="line" id="l232">    232</a>             Keys: keys,
+<a href="#l233" class="line" id="l233">    233</a>         }, nil
+<a href="#l234" class="line" id="l234">    234</a> 
+<a href="#l235" class="line" id="l235">    235</a>     case Gats:
+<a href="#l236" class="line" id="l236">    236</a>         return &amp;GatsRequest{
 <a href="#l237" class="line" id="l237">    237</a>             Expiration: exptime,
-<a href="#l238" class="line" id="l238">    238</a>             Size: size,
-<a href="#l239" class="line" id="l239">    239</a>             CasUnique: casUnique,
-<a href="#l240" class="line" id="l240">    240</a>             Data: data,
-<a href="#l241" class="line" id="l241">    241</a>             NoReply: noreply,
-<a href="#l242" class="line" id="l242">    242</a>         }
-<a href="#l243" class="line" id="l243">    243</a> 
-<a href="#l244" class="line" id="l244">    244</a>         switch cmd {
-<a href="#l245" class="line" id="l245">    245</a>             case Set:
-<a href="#l246" class="line" id="l246">    246</a>                 return &amp;SetRequest{Payload: payload}, nil
-<a href="#l247" class="line" id="l247">    247</a>             case Add:
-<a href="#l248" class="line" id="l248">    248</a>                 return &amp;AddRequest{Payload: payload}, nil
-<a href="#l249" class="line" id="l249">    249</a>             case Replace:
-<a href="#l250" class="line" id="l250">    250</a>                 return &amp;ReplaceRequest{Payload: payload}, nil
-<a href="#l251" class="line" id="l251">    251</a>             case Append:
-<a href="#l252" class="line" id="l252">    252</a>                 return &amp;AppendRequest{Payload: payload}, nil
-<a href="#l253" class="line" id="l253">    253</a>             case Prepend:
-<a href="#l254" class="line" id="l254">    254</a>                 return &amp;PrependRequest{Payload: payload}, nil
-<a href="#l255" class="line" id="l255">    255</a>             case Cas:
-<a href="#l256" class="line" id="l256">    256</a>                 return &amp;CasRequest{Payload: payload}, nil
-<a href="#l257" class="line" id="l257">    257</a>         }
-<a href="#l258" class="line" id="l258">    258</a>     }
-<a href="#l259" class="line" id="l259">    259</a> 
-<a href="#l260" class="line" id="l260">    260</a>     return nil, ErrInvalidParse
-<a href="#l261" class="line" id="l261">    261</a> }
-<a href="#l262" class="line" id="l262">    262</a> 
-<a href="#l263" class="line" id="l263">    263</a> func (m *machine) mark() {
-<a href="#l264" class="line" id="l264">    264</a>     m.pb = m.p
-<a href="#l265" class="line" id="l265">    265</a> }
-<a href="#l266" class="line" id="l266">    266</a> 
-<a href="#l267" class="line" id="l267">    267</a> func (m *machine) bytes() []byte {
-<a href="#l268" class="line" id="l268">    268</a>     return m.data[m.pb:m.p]
+<a href="#l238" class="line" id="l238">    238</a>             Keys: keys,
+<a href="#l239" class="line" id="l239">    239</a>         }, nil
+<a href="#l240" class="line" id="l240">    240</a> 
+<a href="#l241" class="line" id="l241">    241</a>     case Set, Add, Replace, Append, Prepend, Cas:
+<a href="#l242" class="line" id="l242">    242</a>         payload := &amp;Storage{
+<a href="#l243" class="line" id="l243">    243</a>             Key: keys[0],
+<a href="#l244" class="line" id="l244">    244</a>             Flags: flags,
+<a href="#l245" class="line" id="l245">    245</a>             Expiration: exptime,
+<a href="#l246" class="line" id="l246">    246</a>             Size: size,
+<a href="#l247" class="line" id="l247">    247</a>             CasUnique: casUnique,
+<a href="#l248" class="line" id="l248">    248</a>             Data: data,
+<a href="#l249" class="line" id="l249">    249</a>             NoReply: noreply,
+<a href="#l250" class="line" id="l250">    250</a>         }
+<a href="#l251" class="line" id="l251">    251</a> 
+<a href="#l252" class="line" id="l252">    252</a>         switch cmd {
+<a href="#l253" class="line" id="l253">    253</a>             case Set:
+<a href="#l254" class="line" id="l254">    254</a>                 return &amp;SetRequest{Payload: payload}, nil
+<a href="#l255" class="line" id="l255">    255</a>             case Add:
+<a href="#l256" class="line" id="l256">    256</a>                 return &amp;AddRequest{Payload: payload}, nil
+<a href="#l257" class="line" id="l257">    257</a>             case Replace:
+<a href="#l258" class="line" id="l258">    258</a>                 return &amp;ReplaceRequest{Payload: payload}, nil
+<a href="#l259" class="line" id="l259">    259</a>             case Append:
+<a href="#l260" class="line" id="l260">    260</a>                 return &amp;AppendRequest{Payload: payload}, nil
+<a href="#l261" class="line" id="l261">    261</a>             case Prepend:
+<a href="#l262" class="line" id="l262">    262</a>                 return &amp;PrependRequest{Payload: payload}, nil
+<a href="#l263" class="line" id="l263">    263</a>             case Cas:
+<a href="#l264" class="line" id="l264">    264</a>                 return &amp;CasRequest{Payload: payload}, nil
+<a href="#l265" class="line" id="l265">    265</a>         }
+<a href="#l266" class="line" id="l266">    266</a>     }
+<a href="#l267" class="line" id="l267">    267</a> 
+<a href="#l268" class="line" id="l268">    268</a>     return nil, ErrInvalidParse
 <a href="#l269" class="line" id="l269">    269</a> }
 <a href="#l270" class="line" id="l270">    270</a> 
-<a href="#l271" class="line" id="l271">    271</a> func (m *machine) text() string {
-<a href="#l272" class="line" id="l272">    272</a>     return string(m.bytes())
+<a href="#l271" class="line" id="l271">    271</a> func (m *machine) mark() {
+<a href="#l272" class="line" id="l272">    272</a>     m.pb = m.p
 <a href="#l273" class="line" id="l273">    273</a> }
+<a href="#l274" class="line" id="l274">    274</a> 
+<a href="#l275" class="line" id="l275">    275</a> func (m *machine) bytes() []byte {
+<a href="#l276" class="line" id="l276">    276</a>     return m.data[m.pb:m.p]
+<a href="#l277" class="line" id="l277">    277</a> }
+<a href="#l278" class="line" id="l278">    278</a> 
+<a href="#l279" class="line" id="l279">    279</a> func (m *machine) text() string {
+<a href="#l280" class="line" id="l280">    280</a>     return string(m.bytes())
+<a href="#l281" class="line" id="l281">    281</a> }
 </pre>
 </div>
 </body>

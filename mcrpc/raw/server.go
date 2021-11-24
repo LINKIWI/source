@@ -121,11 +121,14 @@ func (s *Server) dispatch(conn net.Conn, reader *protocol.Reader) (bool, error) 
 		}
 		return false, nil
 	} else if err != nil {
-		return true, fmt.Errorf("server: non-recoverable error parsing command: %v", err)
+		return true, fmt.Errorf(
+			"server: non-recoverable error during command parsing: err=%v",
+			err,
+		)
 	}
 
 	if s.debugLog != nil {
-		s.debugLog.Printf("server: parsed request: req=%#v", req)
+		s.debugLog.Printf("server: parsed request: request=%#v", req)
 	}
 
 	ctx := context.WithValue(context.Background(), ClientConnContextKey, conn)
@@ -179,10 +182,18 @@ func (s *Server) dispatch(conn net.Conn, reader *protocol.Reader) (bool, error) 
 	}
 
 	if hErr != nil {
+		if s.debugLog != nil {
+			s.debugLog.Printf("server: handler error response: err=%v", hErr)
+		}
+
 		if _, cErr := conn.Write([]byte(hErr.Error())); cErr != nil {
 			return true, cErr
 		}
 	} else {
+		if s.debugLog != nil {
+			s.debugLog.Printf("server: handler response: response=%#v", resp)
+		}
+
 		if _, cErr := conn.Write([]byte(resp.String())); cErr != nil {
 			return true, cErr
 		}

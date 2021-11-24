@@ -86,6 +86,10 @@ import (
     shutdown = 'shutdown' (sp subcommand)? crlf %{ cmd = Shutdown };
     flush = 'flush_all' (sp exptime)? crlf %{ cmd = Flush };
 
+    # Control commands
+
+    quit = 'quit' crlf %{ cmd = Quit };
+
     # Main entry point
 
     command :=
@@ -107,7 +111,8 @@ import (
         watch |
         version |
         shutdown |
-        flush;
+        flush |
+        quit;
 }%%
 
 %% write data noerror nofinal noentry noprefix;
@@ -174,6 +179,9 @@ func (m *machine) Parse(command []byte) (Request, error) {
 
     case Flush:
         return &FlushRequest{Delay: exptime}, nil
+
+    case Quit:
+        return &QuitRequest{}, nil
 
     case Stats:
         if len(subcommands) == 0 {

@@ -10,6 +10,7 @@ $(APP_NAME):
 	go build \
 	    -ldflags "-w -s -X ticached/internal/meta.Version=$(VERSION)" \
 	    -o $(BIN_DIR)/$(APP_NAME)-$(GOOS)-$(GOARCH) \
+	    -trimpath \
 	    cmd/ticached/main.go
 
 lint:

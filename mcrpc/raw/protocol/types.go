@@ -14,6 +14,7 @@ const (
 	Version
 	Shutdown
 	Flush
+	Quit
 	Stats
 	Watch
 	Touch
@@ -107,6 +108,12 @@ type FlushRequest struct {
 
 // FlushResponse is the Response counterpart to FlushRequest.
 type FlushResponse struct{}
+
+// QuitRequest is a Request to close the active connection.
+type QuitRequest struct{}
+
+// QuitResponse is the Response counterpart to QuitRequest.
+type QuitResponse struct{}
 
 // StatsRequest is a Request for application statistics.
 type StatsRequest struct {

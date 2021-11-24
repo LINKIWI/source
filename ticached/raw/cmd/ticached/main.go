@@ -2,9 +2,9 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"flag"
 	"log"
-	"net"
 	"strings"
 
 	"github.com/tikv/client-go/v2/config"
@@ -16,11 +16,15 @@ import (
 )
 
 var (
-	flagListenAddress   = flag.String("listen-address", "localhost:11211", "server listen address")
-	flagPDAddress       = flag.String("pd-address", "localhost:2379", "comma-delimited PD addresses")
-	flagClientTLSKey    = flag.String("client-tls-key", "", "path to a client TLS key for TiKV cluster TLS")
-	flagClientTLSCert   = flag.String("client-tls-cert", "", "path to a client TLS certificate for TiKV cluster TLS")
-	flagClientTLSCACert = flag.String("client-tls-ca-cert", "", "path to a CA certificate for TiKV cluster TLS")
+	flagListenAddress       = flag.String("listen-address", "localhost:11211", "server listen address")
+	flagPDAddress           = flag.String("pd-address", "http://localhost:2379", "comma-delimited PD URL addresses")
+	flagServerTLSKey        = flag.String("server-tls-key", "", "path to a server TLS key for TLS termination")
+	flagServerTLSCert       = flag.String("server-tls-cert", "", "path to a server TLS certificate for TLS termination")
+	flagServerTLSCACert     = flag.String("server-tls-ca-cert", "", "path to a server TLS CA certificate for TLS termination")
+	flagServerTLSClientAuth = flag.Bool("server-tls-client-auth", false, "enable and require valid client TLS authentication for TLS termination")
+	flagClientTLSKey        = flag.String("client-tls-key", "", "path to a client TLS key for TiKV cluster TLS")
+	flagClientTLSCert       = flag.String("client-tls-cert", "", "path to a client TLS certificate for TiKV cluster TLS")
+	flagClientTLSCACert     = flag.String("client-tls-ca-cert", "", "path to a TLS CA certificate for TiKV cluster TLS")
 )
 
 func init() {
@@ -30,7 +34,20 @@ func init() {
 func main() {
 	log.Printf("main: starting ticached: version=%s", meta.Version)
 
-	ln, err := net.Listen("tcp", *flagListenAddress)
+	listener := &server.Listener{
+		Network:       "tcp",
+		Address:       *flagListenAddress,
+		TLSKey:        *flagServerTLSKey,
+		TLSCert:       *flagServerTLSCert,
+		TLSCACert:     *flagServerTLSCACert,
+		TLSClientAuth: tls.NoClientCert,
+	}
+
+	if *flagServerTLSClientAuth {
+		listener.TLSClientAuth = tls.RequireAndVerifyClientCert
+	}
+
+	ln, err := listener.Listen()
 	if err != nil {
 		panic(err)
 	}

@@ -91,6 +91,20 @@ func (f *FlushResponse) String() string {
 	return "OK\r\n"
 }
 
+// IsNoReply is always true. The server should close the connection immediately without sending back
+// a response to the client.
+func (f *QuitRequest) IsNoReply() bool {
+	return true
+}
+
+func (f *QuitRequest) String() string {
+	return "quit\r\n"
+}
+
+func (f *QuitResponse) String() string {
+	return "OK\r\n"
+}
+
 // IsNoReply is always false.
 func (s *StatsRequest) IsNoReply() bool {
 	return false
