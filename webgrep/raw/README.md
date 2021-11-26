@@ -20,7 +20,8 @@ The following documents each field and its expected value:
 
 |Key|Required|Description|
 |-|-|-|
-|`server.listen_addr`|Yes|IP address and port on which to bind for listening for incoming HTTP requests|
+|`server.listen.transport`|Yes|Network transport on which to bind the server HTTP listener; one of `tcp` or `unix`|
+|`server.listen.address`|Yes|IP address and port pair for TCP transports, or a socket path for Unix domain socket transports|
 |`server.livegrep.load_balancing_policy`|No|Load balancing policy to use among multiple livegrep replicas; one of `round-robin` (rotate through all servers on each request), `failover` (prefer earlier servers, failing over to next servers on request errors) (default exclusive use of first server with no load balancing)|
 |`server.livegrep.request_timeout`|No|Per-request RPC invocation timeout in milliseconds (default 3000)|
 |`server.livegrep.servers[].authority`|No|Livegrep codesearch gRPC server HTTP/2 authority header|

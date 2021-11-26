@@ -52,7 +52,27 @@ import (
             casUnique = parsed
         }
     };
-    storage_data = (any - crlf)+ >mark %{ data = m.bytes() };
+    storage_data = any+ >{
+        // Storage data is sized dynamically depending on the size value expressed in the header.
+        // This routine populates the payload and manipulates the data pointer manually based on the
+        // previously-parsed header.
+
+        // Command cannot be valid if the value size plus terminating CRLF extends beyond the entire
+        // command buffer.
+        if m.p + size + 2 > m.pe {
+            return nil, ErrInvalidParse
+        }
+
+        m.pb = m.p
+        data = m.data[m.p:m.p + size]
+    } %{
+        m.p = m.pb + size
+
+        // Remaining buffer should accommodate only the terminating CRLF.
+        if m.p + 2 != m.pe {
+            return nil, ErrInvalidParse
+        }
+    };
     storage_header = key sp flags sp exptime sp size;
 
     set = 'set' sp storage_header (sp noreply)? crlf storage_data crlf %{ cmd = Set };

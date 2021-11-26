@@ -4,7 +4,9 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
+	"strconv"
 )
 
 var (
@@ -56,19 +58,49 @@ func (r *Reader) Read(p []byte) (int, error) {
 func (r *Reader) ReadASCIICommand() ([]byte, error) {
 	buf, err := r.readUntil(crlf)
 	if err != nil {
-		return nil, err
+		return buf, err
 	}
 
-	// Storage commands are the only protocol request messages that conclude on the second CRLF
-	// sequence, which is treated as a separate case.
+	// Storage commands are the only protocol request messages that do conclude on the first
+	// CRLF sequence. The read length following the first CRLF is context-dependent on the
+	// claimed data size in the storage header. This routine performs a low-fidelity parse of
+	// the storage header and, assuming it is valid, attempts to read ahead exactly the number
+	// of bytes stated in the header for the data size.
 	for _, cmd := range storageCommands {
 		if bytes.HasPrefix(buf, cmd) {
-			data, err := r.readUntil(crlf)
-			if err != nil {
-				return nil, err
+			components := bytes.Fields(buf)
+			if len(components) < 5 {
+				return buf, fmt.Errorf(
+					"protocol: bad storage header format: components=%d",
+					len(components),
+				)
 			}
 
-			return append(buf, data...), nil
+			size, err := strconv.Atoi(string(components[4]))
+			if err != nil {
+				return buf, fmt.Errorf(
+					"protocol: error parsing size in storage header: err=%v",
+					err,
+				)
+			}
+
+			data := make([]byte, size)
+			n, err := r.Read(data)
+			buf = append(buf, data...)
+
+			if n != size {
+				return buf, fmt.Errorf(
+					"protocol: cannot accommodate purported storage data "+
+						"size from buffer: expect=%d actual=%d",
+					size,
+					n,
+				)
+			}
+
+			tailer, err := r.readUntil(crlf)
+			buf = append(buf, tailer...)
+
+			return buf, err
 		}
 	}
 
@@ -80,8 +112,9 @@ func (r *Reader) ReadASCIICommand() ([]byte, error) {
 // reader. If the sequence is located before EOF, a byte slice with the full message contents is
 // returned; otherwise, an error indicates the command is malformed.
 func (r *Reader) readUntil(sequence []byte) ([]byte, error) {
-	var buf []byte
 	var terminate bool
+
+	buf := make([]byte, 0, 512)
 
 	for !terminate {
 		chunk, err := r.b.Peek(scanChunkSize)
@@ -91,7 +124,7 @@ func (r *Reader) readUntil(sequence []byte) ([]byte, error) {
 				// only when a nonzero buffer has already been accumulated.
 				terminate = true
 			} else {
-				return nil, err
+				return buf, err
 			}
 		}
 
@@ -107,5 +140,5 @@ func (r *Reader) readUntil(sequence []byte) ([]byte, error) {
 		r.b.Discard(len(chunk))
 	}
 
-	return nil, ErrMalformedRequest
+	return buf, ErrMalformedRequest
 }

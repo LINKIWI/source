@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>protocol: Update stream reader to dynamically read data size for storage-like commands - mcrpc - Library for building memcache protocol servers</title>
+<meta name="description" content="Library for building memcache protocol servers" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="mcrpc Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="mcrpc Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}/*# sourceMappingURL=style.css.min.map */
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>mcrpc</h1><span class="desc">Library for building memcache protocol servers</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/mcrpc.git">https://source.static.kevinlin.info/mcrpc.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/c61c6ad5696a085c822d5d91f912f8832eba87fd">c61c6ad5696a085c822d5d91f912f8832eba87fd</a>
+<b>parent</b> <a href="../commit/ff91bb08b9b6c84dfab65309bcdb536cd0d4cd8e">ff91bb08b9b6c84dfab65309bcdb536cd0d4cd8e</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Thu, 25 Nov 2021 16:34:06 -0800
+
+protocol: Update stream reader to dynamically read data size for storage-like commands
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">protocol/reader.go</a></td><td> | </td><td class="num">44</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++</span><span class="d">----</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">protocol/reader_test.go</a></td><td> | </td><td class="num">9</td><td><span class="i">++++++</span><span class="d">---</span></td></tr>
+</table></pre><pre>2 files changed, 46 insertions(+), 7 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/protocol/reader.go">protocol/reader.go</a> b/<a href="../file/protocol/reader.go">protocol/reader.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -4,7 +4,9 @@ import (
+</a> 	&quot;bufio&quot;
+ 	&quot;bytes&quot;
+ 	&quot;errors&quot;
+<a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;fmt&quot;
+</a> 	&quot;io&quot;
+<a href="#h0-0-5" id="h0-0-5" class="i">+	&quot;strconv&quot;
+</a> )
+ 
+ var (
+<a href="#h0-1" id="h0-1" class="h">@@ -59,12 +61,46 @@ func (r *Reader) ReadASCIICommand() ([]byte, error) {
+</a> 		return buf, err
+ 	}
+ 
+<a href="#h0-1-3" id="h0-1-3" class="d">-	// Storage commands are the only protocol request messages that conclude on the second CRLF
+</a><a href="#h0-1-4" id="h0-1-4" class="d">-	// sequence, which is treated as a separate case.
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+	// Storage commands are the only protocol request messages that do conclude on the first
+</a><a href="#h0-1-6" id="h0-1-6" class="i">+	// CRLF sequence. The read length following the first CRLF is context-dependent on the
+</a><a href="#h0-1-7" id="h0-1-7" class="i">+	// claimed data size in the storage header. This routine performs a low-fidelity parse of
+</a><a href="#h0-1-8" id="h0-1-8" class="i">+	// the storage header and, assuming it is valid, attempts to read ahead exactly the number
+</a><a href="#h0-1-9" id="h0-1-9" class="i">+	// of bytes stated in the header for the data size.
+</a> 	for _, cmd := range storageCommands {
+ 		if bytes.HasPrefix(buf, cmd) {
+<a href="#h0-1-12" id="h0-1-12" class="d">-			data, err := r.readUntil(crlf)
+</a><a href="#h0-1-13" id="h0-1-13" class="d">-			return append(buf, data...), err
+</a><a href="#h0-1-14" id="h0-1-14" class="i">+			components := bytes.Fields(buf)
+</a><a href="#h0-1-15" id="h0-1-15" class="i">+			if len(components) &lt; 5 {
+</a><a href="#h0-1-16" id="h0-1-16" class="i">+				return buf, fmt.Errorf(
+</a><a href="#h0-1-17" id="h0-1-17" class="i">+					&quot;protocol: bad storage header format: components=%d&quot;,
+</a><a href="#h0-1-18" id="h0-1-18" class="i">+					len(components),
+</a><a href="#h0-1-19" id="h0-1-19" class="i">+				)
+</a><a href="#h0-1-20" id="h0-1-20" class="i">+			}
+</a><a href="#h0-1-21" id="h0-1-21" class="i">+
+</a><a href="#h0-1-22" id="h0-1-22" class="i">+			size, err := strconv.Atoi(string(components[4]))
+</a><a href="#h0-1-23" id="h0-1-23" class="i">+			if err != nil {
+</a><a href="#h0-1-24" id="h0-1-24" class="i">+				return buf, fmt.Errorf(
+</a><a href="#h0-1-25" id="h0-1-25" class="i">+					&quot;protocol: error parsing size in storage header: err=%v&quot;,
+</a><a href="#h0-1-26" id="h0-1-26" class="i">+					err,
+</a><a href="#h0-1-27" id="h0-1-27" class="i">+				)
+</a><a href="#h0-1-28" id="h0-1-28" class="i">+			}
+</a><a href="#h0-1-29" id="h0-1-29" class="i">+
+</a><a href="#h0-1-30" id="h0-1-30" class="i">+			data := make([]byte, size)
+</a><a href="#h0-1-31" id="h0-1-31" class="i">+			n, err := r.Read(data)
+</a><a href="#h0-1-32" id="h0-1-32" class="i">+			buf = append(buf, data...)
+</a><a href="#h0-1-33" id="h0-1-33" class="i">+
+</a><a href="#h0-1-34" id="h0-1-34" class="i">+			if n != size {
+</a><a href="#h0-1-35" id="h0-1-35" class="i">+				return buf, fmt.Errorf(
+</a><a href="#h0-1-36" id="h0-1-36" class="i">+					&quot;protocol: cannot accommodate purported storage data &quot;+
+</a><a href="#h0-1-37" id="h0-1-37" class="i">+						&quot;size from buffer: expect=%d actual=%d&quot;,
+</a><a href="#h0-1-38" id="h0-1-38" class="i">+					size+2,
+</a><a href="#h0-1-39" id="h0-1-39" class="i">+					n,
+</a><a href="#h0-1-40" id="h0-1-40" class="i">+				)
+</a><a href="#h0-1-41" id="h0-1-41" class="i">+			}
+</a><a href="#h0-1-42" id="h0-1-42" class="i">+
+</a><a href="#h0-1-43" id="h0-1-43" class="i">+			tailer, err := r.readUntil(crlf)
+</a><a href="#h0-1-44" id="h0-1-44" class="i">+			buf = append(buf, tailer...)
+</a><a href="#h0-1-45" id="h0-1-45" class="i">+
+</a><a href="#h0-1-46" id="h0-1-46" class="i">+			return buf, err
+</a> 		}
+ 	}
+ 
+<b>diff --git a/<a id="h1" href="../file/protocol/reader_test.go">protocol/reader_test.go</a> b/<a href="../file/protocol/reader_test.go">protocol/reader_test.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -15,6 +15,9 @@ func TestReaderReadRequestError(t *testing.T) {
+</a> 	streams := []io.Reader{
+ 		strings.NewReader(&quot;&quot;),
+ 		strings.NewReader(&quot;none&quot;),
+<a href="#h1-0-3" id="h1-0-3" class="i">+		strings.NewReader(&quot;set key 1 10&quot;),
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+		strings.NewReader(&quot;set key 1 10\r\ndata\r\ndata\r\n&quot;),
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+		strings.NewReader(&quot;set key 1 2 12\r\ndata\r\ndata\r\n&quot;),
+</a> 	}
+ 
+ 	for _, stream := range streams {
+<a href="#h1-1" id="h1-1" class="h">@@ -56,16 +59,16 @@ func TestReaderReadRequestSingleDelimiter(t *testing.T) {
+</a> 	}
+ }
+ 
+<a href="#h1-1-3" id="h1-1-3" class="d">-func TestReaderReadRequestDoubleDelimiter(t *testing.T) {
+</a><a href="#h1-1-4" id="h1-1-4" class="i">+func TestReaderReadRequestStorageCommand(t *testing.T) {
+</a> 	t.Parallel()
+ 
+ 	payload := &amp;Storage{
+ 		Key:        &quot;key&quot;,
+ 		Flags:      1,
+ 		Expiration: 2 * time.Second,
+<a href="#h1-1-11" id="h1-1-11" class="d">-		Size:       3,
+</a><a href="#h1-1-12" id="h1-1-12" class="i">+		Size:       10,
+</a> 		CasUnique:  4,
+<a href="#h1-1-14" id="h1-1-14" class="d">-		Data:       []byte(&quot;data&quot;),
+</a><a href="#h1-1-15" id="h1-1-15" class="i">+		Data:       []byte(&quot;data\r\ndata&quot;),
+</a> 		NoReply:    true,
+ 	}
+ 
+</pre>
+</div>
+</body>
+</html>

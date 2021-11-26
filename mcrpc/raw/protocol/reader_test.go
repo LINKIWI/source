@@ -15,13 +15,16 @@ func TestReaderReadRequestError(t *testing.T) {
 	streams := []io.Reader{
 		strings.NewReader(""),
 		strings.NewReader("none"),
+		strings.NewReader("set key 1 10"),
+		strings.NewReader("set key 1 10\r\ndata\r\ndata\r\n"),
+		strings.NewReader("set key 1 2 12\r\ndata\r\ndata\r\n"),
 	}
 
 	for _, stream := range streams {
 		cmd, err := NewReader(stream).ReadASCIICommand()
 
 		assert.Error(t, err)
-		assert.Nil(t, cmd)
+		assert.NotNil(t, cmd)
 	}
 }
 
@@ -32,6 +35,7 @@ func TestReaderReadRequestSingleDelimiter(t *testing.T) {
 		&VersionRequest{},
 		&ShutdownRequest{Type: "graceful"},
 		&FlushRequest{Delay: 5 * time.Second},
+		&QuitRequest{},
 		&StatsRequest{},
 		&StatsRequest{Type: "settings"},
 		&WatchRequest{Loggers: []string{"fetchers", "mutations"}},
@@ -55,16 +59,16 @@ func TestReaderReadRequestSingleDelimiter(t *testing.T) {
 	}
 }
 
-func TestReaderReadRequestDoubleDelimiter(t *testing.T) {
+func TestReaderReadRequestStorageCommand(t *testing.T) {
 	t.Parallel()
 
 	payload := &Storage{
 		Key:        "key",
 		Flags:      1,
 		Expiration: 2 * time.Second,
-		Size:       3,
+		Size:       10,
 		CasUnique:  4,
-		Data:       []byte("data"),
+		Data:       []byte("data\r\ndata"),
 		NoReply:    true,
 	}
 

@@ -31,7 +31,12 @@ const main = () => {
     verbosity: params.verbosity,
   });
 
-  ctx.log.info('main: starting webgrep');
+  ctx.log.info(
+    'main: starting webgrep: version=%s config=%s verbosity=%s',
+    VERSION,
+    params.config,
+    params.verbosity,
+  );
 
   const sentryDSN = ctx.config.get('server.sentry_dsn');
   if (sentryDSN) {
@@ -50,9 +55,26 @@ const main = () => {
   });
   app.use(Sentry.Handlers.errorHandler());
 
-  const [host, port] = ctx.config.get('server.listen_addr').split(':', 2);
-  ctx.log.info('main: serving indefinitely: host=%s port=%d', host, port);
-  app.listen(port, host);
+  const transport = ctx.config.get('server.listen.transport');
+  const address = ctx.config.get('server.listen.address');
+  switch (transport) {
+    case 'tcp': {
+      const [host, port] = address.split(':', 2);
+      ctx.log.info('main: serving indefinitely over TCP: host=%s port=%d', host, port);
+      app.listen(port, host);
+      return 0;
+    }
+    case 'unix':
+      ctx.log.info('main: serving indefinitely over Unix domain socket: socket=%s', address);
+      app.listen(address);
+      return 0;
+    default:
+      ctx.log.error('main: unsupported server listen transport: transport=%s', transport);
+      return 1;
+  }
 };
 
-main();
+const code = main();
+if (code) {
+  process.exit(code);
+}

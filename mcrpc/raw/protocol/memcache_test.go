@@ -707,6 +707,14 @@ func TestParseSet(t *testing.T) {
 			request: nil,
 		},
 		{
+			command: "set key 1 2 2\r\nfoo\r\n",
+			request: nil,
+		},
+		{
+			command: "set key 1 2 4\r\nfoo\r\n",
+			request: nil,
+		},
+		{
 			command: "set key 1 2 3\r\nfoo\r\n",
 			request: &SetRequest{
 				Payload: &Storage{
@@ -728,6 +736,19 @@ func TestParseSet(t *testing.T) {
 					Expiration: 2 * time.Second,
 					Size:       3,
 					Data:       []byte("foo"),
+					NoReply:    true,
+				},
+			},
+		},
+		{
+			command: "set key 1 2 8 noreply\r\nfoo\r\nbar\r\n",
+			request: &SetRequest{
+				Payload: &Storage{
+					Key:        "key",
+					Flags:      1,
+					Expiration: 2 * time.Second,
+					Size:       8,
+					Data:       []byte("foo\r\nbar"),
 					NoReply:    true,
 				},
 			},
@@ -790,6 +811,14 @@ func TestParseReplace(t *testing.T) {
 			request: nil,
 		},
 		{
+			command: "replace key 1 2 2\r\nfoo\r\n",
+			request: nil,
+		},
+		{
+			command: "replace key 1 2 4\r\nfoo\r\n",
+			request: nil,
+		},
+		{
 			command: "replace key 1 2 3\r\nfoo\r\n",
 			request: &ReplaceRequest{
 				Payload: &Storage{
@@ -811,6 +840,19 @@ func TestParseReplace(t *testing.T) {
 					Expiration: 2 * time.Second,
 					Size:       3,
 					Data:       []byte("foo"),
+					NoReply:    true,
+				},
+			},
+		},
+		{
+			command: "replace key 1 2 8 noreply\r\nfoo\r\nbar\r\n",
+			request: &ReplaceRequest{
+				Payload: &Storage{
+					Key:        "key",
+					Flags:      1,
+					Expiration: 2 * time.Second,
+					Size:       8,
+					Data:       []byte("foo\r\nbar"),
 					NoReply:    true,
 				},
 			},
@@ -873,6 +915,14 @@ func TestParseAppend(t *testing.T) {
 			request: nil,
 		},
 		{
+			command: "append key 1 2 2\r\nfoo\r\n",
+			request: nil,
+		},
+		{
+			command: "append key 1 2 4\r\nfoo\r\n",
+			request: nil,
+		},
+		{
 			command: "append key 1 2 3\r\nfoo\r\n",
 			request: &AppendRequest{
 				Payload: &Storage{
@@ -894,6 +944,19 @@ func TestParseAppend(t *testing.T) {
 					Expiration: 2 * time.Second,
 					Size:       3,
 					Data:       []byte("foo"),
+					NoReply:    true,
+				},
+			},
+		},
+		{
+			command: "append key 1 2 8 noreply\r\nfoo\r\nbar\r\n",
+			request: &AppendRequest{
+				Payload: &Storage{
+					Key:        "key",
+					Flags:      1,
+					Expiration: 2 * time.Second,
+					Size:       8,
+					Data:       []byte("foo\r\nbar"),
 					NoReply:    true,
 				},
 			},
@@ -956,6 +1019,14 @@ func TestParsePrepend(t *testing.T) {
 			request: nil,
 		},
 		{
+			command: "prepend key 1 2 2\r\nfoo\r\n",
+			request: nil,
+		},
+		{
+			command: "prepend key 1 2 4\r\nfoo\r\n",
+			request: nil,
+		},
+		{
 			command: "prepend key 1 2 3\r\nfoo\r\n",
 			request: &PrependRequest{
 				Payload: &Storage{
@@ -977,6 +1048,19 @@ func TestParsePrepend(t *testing.T) {
 					Expiration: 2 * time.Second,
 					Size:       3,
 					Data:       []byte("foo"),
+					NoReply:    true,
+				},
+			},
+		},
+		{
+			command: "prepend key 1 2 8 noreply\r\nfoo\r\nbar\r\n",
+			request: &PrependRequest{
+				Payload: &Storage{
+					Key:        "key",
+					Flags:      1,
+					Expiration: 2 * time.Second,
+					Size:       8,
+					Data:       []byte("foo\r\nbar"),
 					NoReply:    true,
 				},
 			},
@@ -1043,6 +1127,14 @@ func TestParseCas(t *testing.T) {
 			request: nil,
 		},
 		{
+			command: "cas key 1 2 2 4\r\nfoo\r\n",
+			request: nil,
+		},
+		{
+			command: "cas key 1 2 4 4\r\nfoo\r\n",
+			request: nil,
+		},
+		{
 			command: "cas key 1 2 3 4\r\nfoo\r\n",
 			request: &CasRequest{
 				Payload: &Storage{
@@ -1066,6 +1158,20 @@ func TestParseCas(t *testing.T) {
 					Size:       3,
 					CasUnique:  4,
 					Data:       []byte("foo"),
+					NoReply:    true,
+				},
+			},
+		},
+		{
+			command: "cas key 1 2 8 4 noreply\r\nfoo\r\nbar\r\n",
+			request: &CasRequest{
+				Payload: &Storage{
+					Key:        "key",
+					Flags:      1,
+					Expiration: 2 * time.Second,
+					Size:       8,
+					CasUnique:  4,
+					Data:       []byte("foo\r\nbar"),
 					NoReply:    true,
 				},
 			},

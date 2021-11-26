@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"net"
 	"time"
 
 	"github.com/tikv/client-go/v2/rawkv"
@@ -32,6 +33,13 @@ func NewTiKVHandler(kv *rawkv.Client) mcrpc.Handler {
 // Version reports the current application version.
 func (t *TiKVHandler) Version(ctx context.Context, request *protocol.VersionRequest) (*protocol.VersionResponse, error) {
 	return &protocol.VersionResponse{Version: meta.Version}, nil
+}
+
+// Quit closes the client connection.
+func (t *TiKVHandler) Quit(ctx context.Context, request *protocol.QuitRequest) (*protocol.QuitResponse, error) {
+	ctx.Value(mcrpc.ClientConnContextKey).(net.Conn).Close()
+
+	return &protocol.QuitResponse{}, nil
 }
 
 // Get performs a non-transactional lookup of the requested key.

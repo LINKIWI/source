@@ -110,12 +110,16 @@ func (s *Server) dispatch(conn net.Conn, reader *protocol.Reader) (bool, error) 
 	if err == io.EOF {
 		return true, nil
 	} else if err != nil {
-		return true, fmt.Errorf("server: error buffering command for parse: err=%v", err)
+		return true, fmt.Errorf(
+			"server: error buffering command for parse: buf=%#v err=%v",
+			string(buf),
+			err,
+		)
 	}
 
 	req, err = protocol.NewASCIIParser().Parse(buf)
 	if err == protocol.ErrInvalidParse {
-		resp = &protocol.Error{Err: err}
+		resp = &protocol.ClientError{Err: err}
 		if _, cErr := conn.Write([]byte(resp.String())); cErr != nil {
 			return true, cErr
 		}
@@ -141,6 +145,8 @@ func (s *Server) dispatch(conn net.Conn, reader *protocol.Reader) (bool, error) 
 		resp, hErr = s.handler.Shutdown(ctx, r)
 	case *protocol.FlushRequest:
 		resp, hErr = s.handler.Flush(ctx, r)
+	case *protocol.QuitRequest:
+		resp, hErr = s.handler.Quit(ctx, r)
 	case *protocol.StatsRequest:
 		resp, hErr = s.handler.Stats(ctx, r)
 	case *protocol.WatchRequest:
