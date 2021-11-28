@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>tail.go - piper - Realtime log file to Kafka relay daemon</title>
+<meta name="description" content="Realtime log file to Kafka relay daemon" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="piper Atom Feed" href="atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="piper Atom Feed (tags)" href="tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>piper</h1><span class="desc">Realtime log file to Kafka relay daemon</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/piper.git">https://source.static.kevinlin.info/piper.git</a></td></tr><tr><td></td><td>
+<a href="log">Log</a> | <a href="files">Files</a> | <a href="refs">Refs</a> | <a href="file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<p>tail.go (10578B)</p><hr/>
+<table id="blob">
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l1" class="line" id="l1">      1</a> package tail</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l2" class="line" id="l2">      2</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l3" class="line" id="l3">      3</a> import (</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l4" class="line" id="l4">      4</a> 	&quot;bufio&quot;</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l5" class="line" id="l5">      5</a> 	&quot;fmt&quot;</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l6" class="line" id="l6">      6</a> 	&quot;io&quot;</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l7" class="line" id="l7">      7</a> 	&quot;os&quot;</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l8" class="line" id="l8">      8</a> 	&quot;strings&quot;</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l9" class="line" id="l9">      9</a> 	&quot;syscall&quot;</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l10" class="line" id="l10">     10</a> 	&quot;time&quot;</td></tr>
+<tr>
+<td><a href="../../../../commit/fa87c94a73617d9fe6b741355eafdd504744d3be">fa87c94a73617d9fe6b741355eafdd504744d3be</a></td><td>[Thu,  7 Jan 2021 19:47:24 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l11" class="line" id="l11">     11</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/fa87c94a73617d9fe6b741355eafdd504744d3be">fa87c94a73617d9fe6b741355eafdd504744d3be</a></td><td>[Thu,  7 Jan 2021 19:47:24 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l12" class="line" id="l12">     12</a> 	&quot;piper/internal/config&quot;</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l13" class="line" id="l13">     13</a> )</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l14" class="line" id="l14">     14</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l15" class="line" id="l15">     15</a> // State is an enum that describes the current state of the client within its finite state machine</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l16" class="line" id="l16">     16</a> // logic. Note that certain operations are only permitted when the client is in a particular state.</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l17" class="line" id="l17">     17</a> type State int</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l18" class="line" id="l18">     18</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l19" class="line" id="l19">     19</a> const (</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l20" class="line" id="l20">     20</a> 	// Idle is a newly or partially instantiated Tail that does not yet have one or both of a</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l21" class="line" id="l21">     21</a> 	// file descriptor on the log file open or an inotify watch registered on the log file.</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l22" class="line" id="l22">     22</a> 	Idle State = iota</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l23" class="line" id="l23">     23</a> 	// Consuming indicates that a file descriptor is opened and an inotify watch has been</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l24" class="line" id="l24">     24</a> 	// successfully registered, and the client is either ready to send tail events or is</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l25" class="line" id="l25">     25</a> 	// currently sending tail events to a consumer.</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l26" class="line" id="l26">     26</a> 	Consuming</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l27" class="line" id="l27">     27</a> 	// Errored indicates that the client has encountered an error. Consumption cannot proceed</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l28" class="line" id="l28">     28</a> 	// in this state.</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l29" class="line" id="l29">     29</a> 	Errored</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l30" class="line" id="l30">     30</a> )</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l31" class="line" id="l31">     31</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l32" class="line" id="l32">     32</a> var (</td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l33" class="line" id="l33">     33</a> 	// errNoData indicates that a read was attempted on a buffer with an incomplete log line,</td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l34" class="line" id="l34">     34</a> 	// and thus no new lines are available for consumption.</td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l35" class="line" id="l35">     35</a> 	errNoData = fmt.Errorf(&quot;tail: no line currently available due to incomplete data&quot;)</td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l36" class="line" id="l36">     36</a> )</td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l37" class="line" id="l37">     37</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l38" class="line" id="l38">     38</a> // Tail provides an abstraction for realtime consumption of a log file on disk.</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l39" class="line" id="l39">     39</a> //</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l40" class="line" id="l40">     40</a> // By default, on initialization, it opens a handle to a file and initializes a filesystem watch</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l41" class="line" id="l41">     41</a> // on the associated inode with inotify. Tail seeks to the end of the file and attempts to read a</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l42" class="line" id="l42">     42</a> // new line (defined as a sequence of bytes terminating in the newline character &#39;\n&#39;) every time</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l43" class="line" id="l43">     43</a> // inotify reports a write event on the file.</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l44" class="line" id="l44">     44</a> //</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l45" class="line" id="l45">     45</a> // Internally, Tail is a state machine that transitions between Idle, Consuming, and Errored states.</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l46" class="line" id="l46">     46</a> // All errors encountered during consumption bring Tail into the Errored state, and the latest error</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l47" class="line" id="l47">     47</a> // is available via Error method. Most notably, io.EOF is raised when the consumption reads past the</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l48" class="line" id="l48">     48</a> // end of the file: this can happen if the log file was truncated (e.g. with a logrotate rule that</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l49" class="line" id="l49">     49</a> // uses the copytruncate directive). It is expected that the client handle such errors, which</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l50" class="line" id="l50">     50</a> // usually involves either re-creating the Tail instance or calling its Reset method.</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l51" class="line" id="l51">     51</a> type Tail struct {</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l52" class="line" id="l52">     52</a> 	path    string</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l53" class="line" id="l53">     53</a> 	file    *os.File</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l54" class="line" id="l54">     54</a> 	reader  *bufio.Reader</td></tr>
+<tr>
+<td><a href="../../../../commit/e15d1e3517346a5e85fe0c7cec011ec4974d55d7">e15d1e3517346a5e85fe0c7cec011ec4974d55d7</a></td><td>[Wed,  6 Jan 2021 22:06:13 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l55" class="line" id="l55">     55</a> 	watcher *Watcher</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l56" class="line" id="l56">     56</a> 	state   State</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l57" class="line" id="l57">     57</a> 	opts    Options</td></tr>
+<tr>
+<td><a href="../../../../commit/32e28f5cf45b1573be601a3c5b0d2eb4a578b726">32e28f5cf45b1573be601a3c5b0d2eb4a578b726</a></td><td>[Wed,  6 Jan 2021 23:27:14 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l58" class="line" id="l58">     58</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/32e28f5cf45b1573be601a3c5b0d2eb4a578b726">32e28f5cf45b1573be601a3c5b0d2eb4a578b726</a></td><td>[Wed,  6 Jan 2021 23:27:14 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l59" class="line" id="l59">     59</a> 	pending string</td></tr>
+<tr>
+<td><a href="../../../../commit/32e28f5cf45b1573be601a3c5b0d2eb4a578b726">32e28f5cf45b1573be601a3c5b0d2eb4a578b726</a></td><td>[Wed,  6 Jan 2021 23:27:14 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l60" class="line" id="l60">     60</a> 	err     error</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l61" class="line" id="l61">     61</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l62" class="line" id="l62">     62</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l63" class="line" id="l63">     63</a> // Options provides parameters for tuning the runtime behavior of a Tail.</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l64" class="line" id="l64">     64</a> type Options struct {</td></tr>
+<tr>
+<td><a href="../../../../commit/9cd1cf6601244aa54e01f3d97f3f3251fd75155f">9cd1cf6601244aa54e01f3d97f3f3251fd75155f</a></td><td>[Tue,  5 Jan 2021 20:34:54 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l65" class="line" id="l65">     65</a> 	// Delimiter is the character constant separating new lines in the log file.</td></tr>
+<tr>
+<td><a href="../../../../commit/9cd1cf6601244aa54e01f3d97f3f3251fd75155f">9cd1cf6601244aa54e01f3d97f3f3251fd75155f</a></td><td>[Tue,  5 Jan 2021 20:34:54 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l66" class="line" id="l66">     66</a> 	Delimiter byte</td></tr>
+<tr>
+<td><a href="../../../../commit/4524367c331b3c8db248304d8dc232d7e7f41206">4524367c331b3c8db248304d8dc232d7e7f41206</a></td><td>[Thu,  7 Jan 2021 18:55:55 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l67" class="line" id="l67">     67</a> 	// BufferLength is the maximum capacity of the message channel into which messages can be</td></tr>
+<tr>
+<td><a href="../../../../commit/4524367c331b3c8db248304d8dc232d7e7f41206">4524367c331b3c8db248304d8dc232d7e7f41206</a></td><td>[Thu,  7 Jan 2021 18:55:55 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l68" class="line" id="l68">     68</a> 	// inserted without consumption. This allows for temporal decoupling of file I/O and</td></tr>
+<tr>
+<td><a href="../../../../commit/4524367c331b3c8db248304d8dc232d7e7f41206">4524367c331b3c8db248304d8dc232d7e7f41206</a></td><td>[Thu,  7 Jan 2021 18:55:55 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l69" class="line" id="l69">     69</a> 	// downstream consumption; i.e., a new tailed line can be read from the file immediately</td></tr>
+<tr>
+<td><a href="../../../../commit/4524367c331b3c8db248304d8dc232d7e7f41206">4524367c331b3c8db248304d8dc232d7e7f41206</a></td><td>[Thu,  7 Jan 2021 18:55:55 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l70" class="line" id="l70">     70</a> 	// without waiting for the consumer to finish processing the previous line. However, no</td></tr>
+<tr>
+<td><a href="../../../../commit/4524367c331b3c8db248304d8dc232d7e7f41206">4524367c331b3c8db248304d8dc232d7e7f41206</a></td><td>[Thu,  7 Jan 2021 18:55:55 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l71" class="line" id="l71">     71</a> 	// matter the buffer length, messages will still be published for every append change</td></tr>
+<tr>
+<td><a href="../../../../commit/4524367c331b3c8db248304d8dc232d7e7f41206">4524367c331b3c8db248304d8dc232d7e7f41206</a></td><td>[Thu,  7 Jan 2021 18:55:55 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l72" class="line" id="l72">     72</a> 	// notification.</td></tr>
+<tr>
+<td><a href="../../../../commit/4524367c331b3c8db248304d8dc232d7e7f41206">4524367c331b3c8db248304d8dc232d7e7f41206</a></td><td>[Thu,  7 Jan 2021 18:55:55 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l73" class="line" id="l73">     73</a> 	BufferLength int</td></tr>
+<tr>
+<td><a href="../../../../commit/fa87c94a73617d9fe6b741355eafdd504744d3be">fa87c94a73617d9fe6b741355eafdd504744d3be</a></td><td>[Thu,  7 Jan 2021 19:47:24 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l74" class="line" id="l74">     74</a> 	// SeekPosition describes the file seek behavior to employ before consuming tail events.</td></tr>
+<tr>
+<td><a href="../../../../commit/fa87c94a73617d9fe6b741355eafdd504744d3be">fa87c94a73617d9fe6b741355eafdd504744d3be</a></td><td>[Thu,  7 Jan 2021 19:47:24 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l75" class="line" id="l75">     75</a> 	SeekPosition config.SeekPosition</td></tr>
+<tr>
+<td><a href="../../../../commit/1927dae9c112caecd5ad53d3688cbdebae396049">1927dae9c112caecd5ad53d3688cbdebae396049</a></td><td>[Thu,  7 Jan 2021 18:36:08 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l76" class="line" id="l76">     76</a> 	// Tags is an arbitrary key-value map of metadata to attach to every published message.</td></tr>
+<tr>
+<td><a href="../../../../commit/1927dae9c112caecd5ad53d3688cbdebae396049">1927dae9c112caecd5ad53d3688cbdebae396049</a></td><td>[Thu,  7 Jan 2021 18:36:08 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l77" class="line" id="l77">     77</a> 	Tags map[string]string `json:&quot;tags&quot;`</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l78" class="line" id="l78">     78</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l79" class="line" id="l79">     79</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l80" class="line" id="l80">     80</a> // Message is a structured event representing a new tailed line in the log file.</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l81" class="line" id="l81">     81</a> type Message struct {</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l82" class="line" id="l82">     82</a> 	// Timestamp is the timestamp at which the line was written.</td></tr>
+<tr>
+<td><a href="../../../../commit/4a74bddefbd995c76ca4cf1011dbd6d7812c11c8">4a74bddefbd995c76ca4cf1011dbd6d7812c11c8</a></td><td>[Wed,  6 Jan 2021 22:51:57 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l83" class="line" id="l83">     83</a> 	Timestamp time.Time `json:&quot;timestamp&quot;`</td></tr>
+<tr>
+<td><a href="../../../../commit/e6f623ef7d051bd2b409a514971998ea41e12568">e6f623ef7d051bd2b409a514971998ea41e12568</a></td><td>[Wed,  6 Jan 2021 21:50:31 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l84" class="line" id="l84">     84</a> 	// SequenceID is an incrementing counter that indicates the number of lines read from the</td></tr>
+<tr>
+<td><a href="../../../../commit/e6f623ef7d051bd2b409a514971998ea41e12568">e6f623ef7d051bd2b409a514971998ea41e12568</a></td><td>[Wed,  6 Jan 2021 21:50:31 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l85" class="line" id="l85">     85</a> 	// file since the line associated with this message.</td></tr>
+<tr>
+<td><a href="../../../../commit/4a74bddefbd995c76ca4cf1011dbd6d7812c11c8">4a74bddefbd995c76ca4cf1011dbd6d7812c11c8</a></td><td>[Wed,  6 Jan 2021 22:51:57 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l86" class="line" id="l86">     86</a> 	SequenceID int `json:&quot;sequence_id&quot;`</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l87" class="line" id="l87">     87</a> 	// Path is the path to the file that raised the associated inotify event.</td></tr>
+<tr>
+<td><a href="../../../../commit/4a74bddefbd995c76ca4cf1011dbd6d7812c11c8">4a74bddefbd995c76ca4cf1011dbd6d7812c11c8</a></td><td>[Wed,  6 Jan 2021 22:51:57 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l88" class="line" id="l88">     88</a> 	Path string `json:&quot;path&quot;`</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l89" class="line" id="l89">     89</a> 	// Line is the string contents of the newly written line.</td></tr>
+<tr>
+<td><a href="../../../../commit/4a74bddefbd995c76ca4cf1011dbd6d7812c11c8">4a74bddefbd995c76ca4cf1011dbd6d7812c11c8</a></td><td>[Wed,  6 Jan 2021 22:51:57 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l90" class="line" id="l90">     90</a> 	Line string `json:&quot;line&quot;`</td></tr>
+<tr>
+<td><a href="../../../../commit/1927dae9c112caecd5ad53d3688cbdebae396049">1927dae9c112caecd5ad53d3688cbdebae396049</a></td><td>[Thu,  7 Jan 2021 18:36:08 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l91" class="line" id="l91">     91</a> 	// Tags is an arbitrary key-value map of metadata supplied by the client.</td></tr>
+<tr>
+<td><a href="../../../../commit/1927dae9c112caecd5ad53d3688cbdebae396049">1927dae9c112caecd5ad53d3688cbdebae396049</a></td><td>[Thu,  7 Jan 2021 18:36:08 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l92" class="line" id="l92">     92</a> 	Tags map[string]string `json:&quot;tags&quot;`</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l93" class="line" id="l93">     93</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l94" class="line" id="l94">     94</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l95" class="line" id="l95">     95</a> // New creates and attempts to initialize a Tail.</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l96" class="line" id="l96">     96</a> // A successful initialization will transition the Tail into a Consuming state; otherwise, an error</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l97" class="line" id="l97">     97</a> // is returned.</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l98" class="line" id="l98">     98</a> func New(path string, opts Options) (*Tail, error) {</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l99" class="line" id="l99">     99</a> 	tail := &amp;Tail{</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l100" class="line" id="l100">    100</a> 		path:  path,</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l101" class="line" id="l101">    101</a> 		state: Idle,</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l102" class="line" id="l102">    102</a> 		opts:  opts,</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l103" class="line" id="l103">    103</a> 	}</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l104" class="line" id="l104">    104</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/9cd1cf6601244aa54e01f3d97f3f3251fd75155f">9cd1cf6601244aa54e01f3d97f3f3251fd75155f</a></td><td>[Tue,  5 Jan 2021 20:34:54 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l105" class="line" id="l105">    105</a> 	if tail.opts.Delimiter == 0 {</td></tr>
+<tr>
+<td><a href="../../../../commit/9cd1cf6601244aa54e01f3d97f3f3251fd75155f">9cd1cf6601244aa54e01f3d97f3f3251fd75155f</a></td><td>[Tue,  5 Jan 2021 20:34:54 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l106" class="line" id="l106">    106</a> 		tail.opts.Delimiter = &#39;\n&#39;</td></tr>
+<tr>
+<td><a href="../../../../commit/9cd1cf6601244aa54e01f3d97f3f3251fd75155f">9cd1cf6601244aa54e01f3d97f3f3251fd75155f</a></td><td>[Tue,  5 Jan 2021 20:34:54 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l107" class="line" id="l107">    107</a> 	}</td></tr>
+<tr>
+<td><a href="../../../../commit/9cd1cf6601244aa54e01f3d97f3f3251fd75155f">9cd1cf6601244aa54e01f3d97f3f3251fd75155f</a></td><td>[Tue,  5 Jan 2021 20:34:54 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l108" class="line" id="l108">    108</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l109" class="line" id="l109">    109</a> 	if err := tail.Reset(); err != nil {</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l110" class="line" id="l110">    110</a> 		return nil, err</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l111" class="line" id="l111">    111</a> 	}</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l112" class="line" id="l112">    112</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l113" class="line" id="l113">    113</a> 	return tail, nil</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l114" class="line" id="l114">    114</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l115" class="line" id="l115">    115</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l116" class="line" id="l116">    116</a> // Reset attempts to re-initialize a Tail by closing and reopening all necessary file handles and</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l117" class="line" id="l117">    117</a> // filesystem watches.</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l118" class="line" id="l118">    118</a> func (t *Tail) Reset() error {</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l119" class="line" id="l119">    119</a> 	var err error</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l120" class="line" id="l120">    120</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l121" class="line" id="l121">    121</a> 	t.file = nil</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l122" class="line" id="l122">    122</a> 	t.watcher = nil</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l123" class="line" id="l123">    123</a> 	t.reader = nil</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l124" class="line" id="l124">    124</a> 	t.err = nil</td></tr>
+<tr>
+<td><a href="../../../../commit/32e28f5cf45b1573be601a3c5b0d2eb4a578b726">32e28f5cf45b1573be601a3c5b0d2eb4a578b726</a></td><td>[Wed,  6 Jan 2021 23:27:14 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l125" class="line" id="l125">    125</a> 	t.pending = &quot;&quot;</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l126" class="line" id="l126">    126</a> 	t.state = Idle</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l127" class="line" id="l127">    127</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l128" class="line" id="l128">    128</a> 	if err := t.Close(); err != nil {</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l129" class="line" id="l129">    129</a> 		return err</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l130" class="line" id="l130">    130</a> 	}</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l131" class="line" id="l131">    131</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l132" class="line" id="l132">    132</a> 	t.file, err = os.OpenFile(t.path, syscall.O_RDONLY|syscall.O_NONBLOCK, 0)</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l133" class="line" id="l133">    133</a> 	if err != nil {</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l134" class="line" id="l134">    134</a> 		return err</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l135" class="line" id="l135">    135</a> 	}</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l136" class="line" id="l136">    136</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l137" class="line" id="l137">    137</a> 	stat, err := t.file.Stat()</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l138" class="line" id="l138">    138</a> 	if err != nil {</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l139" class="line" id="l139">    139</a> 		return err</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l140" class="line" id="l140">    140</a> 	}</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l141" class="line" id="l141">    141</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l142" class="line" id="l142">    142</a> 	if stat.Mode().IsRegular() {</td></tr>
+<tr>
+<td><a href="../../../../commit/fa87c94a73617d9fe6b741355eafdd504744d3be">fa87c94a73617d9fe6b741355eafdd504744d3be</a></td><td>[Thu,  7 Jan 2021 19:47:24 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l143" class="line" id="l143">    143</a> 		if t.opts.SeekPosition == config.SeekPositionEnd {</td></tr>
+<tr>
+<td><a href="../../../../commit/fa87c94a73617d9fe6b741355eafdd504744d3be">fa87c94a73617d9fe6b741355eafdd504744d3be</a></td><td>[Thu,  7 Jan 2021 19:47:24 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l144" class="line" id="l144">    144</a> 			_, err = t.file.Seek(0, io.SeekEnd)</td></tr>
+<tr>
+<td><a href="../../../../commit/fa87c94a73617d9fe6b741355eafdd504744d3be">fa87c94a73617d9fe6b741355eafdd504744d3be</a></td><td>[Thu,  7 Jan 2021 19:47:24 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l145" class="line" id="l145">    145</a> 			if err != nil {</td></tr>
+<tr>
+<td><a href="../../../../commit/fa87c94a73617d9fe6b741355eafdd504744d3be">fa87c94a73617d9fe6b741355eafdd504744d3be</a></td><td>[Thu,  7 Jan 2021 19:47:24 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l146" class="line" id="l146">    146</a> 				return err</td></tr>
+<tr>
+<td><a href="../../../../commit/fa87c94a73617d9fe6b741355eafdd504744d3be">fa87c94a73617d9fe6b741355eafdd504744d3be</a></td><td>[Thu,  7 Jan 2021 19:47:24 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l147" class="line" id="l147">    147</a> 			}</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l148" class="line" id="l148">    148</a> 		}</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l149" class="line" id="l149">    149</a> 	} else if stat.Mode()&amp;os.ModeNamedPipe != os.ModeNamedPipe {</td></tr>
+<tr>
+<td><a href="../../../../commit/4a3996df98f6cb8af0ec48d7616efb73b0206edb">4a3996df98f6cb8af0ec48d7616efb73b0206edb</a></td><td>[Tue,  5 Jan 2021 22:36:20 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l150" class="line" id="l150">    150</a> 		return fmt.Errorf(&quot;tail: file is not a regular file nor a named pipe&quot;)</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l151" class="line" id="l151">    151</a> 	}</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l152" class="line" id="l152">    152</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/e15d1e3517346a5e85fe0c7cec011ec4974d55d7">e15d1e3517346a5e85fe0c7cec011ec4974d55d7</a></td><td>[Wed,  6 Jan 2021 22:06:13 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l153" class="line" id="l153">    153</a> 	t.watcher, err = NewWatcher(t.path)</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l154" class="line" id="l154">    154</a> 	if err != nil {</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l155" class="line" id="l155">    155</a> 		return err</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l156" class="line" id="l156">    156</a> 	}</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l157" class="line" id="l157">    157</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l158" class="line" id="l158">    158</a> 	t.reader = bufio.NewReader(t.file)</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l159" class="line" id="l159">    159</a> 	t.state = Consuming</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l160" class="line" id="l160">    160</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l161" class="line" id="l161">    161</a> 	return nil</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l162" class="line" id="l162">    162</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l163" class="line" id="l163">    163</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l164" class="line" id="l164">    164</a> // Consume allows realtime consumption of tailed lines from a log file over an asynchronous channel.</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l165" class="line" id="l165">    165</a> // Starting consumption reads inotify events from the file watcher and extracts lines that end with</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l166" class="line" id="l166">    166</a> // the newline delimiter for transmission over the channel. The channel is closed when an error is</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l167" class="line" id="l167">    167</a> // encountered or when the inotify watch is removed.</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l168" class="line" id="l168">    168</a> func (t *Tail) Consume() (&lt;-chan Message, error) {</td></tr>
+<tr>
+<td><a href="../../../../commit/4524367c331b3c8db248304d8dc232d7e7f41206">4524367c331b3c8db248304d8dc232d7e7f41206</a></td><td>[Thu,  7 Jan 2021 18:55:55 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l169" class="line" id="l169">    169</a> 	messages := make(chan Message, t.opts.BufferLength)</td></tr>
+<tr>
+<td><a href="../../../../commit/e6f623ef7d051bd2b409a514971998ea41e12568">e6f623ef7d051bd2b409a514971998ea41e12568</a></td><td>[Wed,  6 Jan 2021 21:50:31 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l170" class="line" id="l170">    170</a> 	sequenceID := 0</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l171" class="line" id="l171">    171</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l172" class="line" id="l172">    172</a> 	if t.state != Consuming {</td></tr>
+<tr>
+<td><a href="../../../../commit/4a3996df98f6cb8af0ec48d7616efb73b0206edb">4a3996df98f6cb8af0ec48d7616efb73b0206edb</a></td><td>[Tue,  5 Jan 2021 22:36:20 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l173" class="line" id="l173">    173</a> 		return nil, fmt.Errorf(</td></tr>
+<tr>
+<td><a href="../../../../commit/4a3996df98f6cb8af0ec48d7616efb73b0206edb">4a3996df98f6cb8af0ec48d7616efb73b0206edb</a></td><td>[Tue,  5 Jan 2021 22:36:20 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l174" class="line" id="l174">    174</a> 			&quot;tail: consumption is not permitted in the current state: state=%v&quot;,</td></tr>
+<tr>
+<td><a href="../../../../commit/4a3996df98f6cb8af0ec48d7616efb73b0206edb">4a3996df98f6cb8af0ec48d7616efb73b0206edb</a></td><td>[Tue,  5 Jan 2021 22:36:20 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l175" class="line" id="l175">    175</a> 			t.state,</td></tr>
+<tr>
+<td><a href="../../../../commit/4a3996df98f6cb8af0ec48d7616efb73b0206edb">4a3996df98f6cb8af0ec48d7616efb73b0206edb</a></td><td>[Tue,  5 Jan 2021 22:36:20 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l176" class="line" id="l176">    176</a> 		)</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l177" class="line" id="l177">    177</a> 	}</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l178" class="line" id="l178">    178</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l179" class="line" id="l179">    179</a> 	go func() {</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l180" class="line" id="l180">    180</a> 		for {</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l181" class="line" id="l181">    181</a> 			select {</td></tr>
+<tr>
+<td><a href="../../../../commit/e15d1e3517346a5e85fe0c7cec011ec4974d55d7">e15d1e3517346a5e85fe0c7cec011ec4974d55d7</a></td><td>[Wed,  6 Jan 2021 22:06:13 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l182" class="line" id="l182">    182</a> 			case event, ok := &lt;-t.watcher.Events():</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l183" class="line" id="l183">    183</a> 				if !ok {</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l184" class="line" id="l184">    184</a> 					close(messages)</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l185" class="line" id="l185">    185</a> 					return</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l186" class="line" id="l186">    186</a> 				}</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l187" class="line" id="l187">    187</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/e15d1e3517346a5e85fe0c7cec011ec4974d55d7">e15d1e3517346a5e85fe0c7cec011ec4974d55d7</a></td><td>[Wed,  6 Jan 2021 22:06:13 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l188" class="line" id="l188">    188</a> 				switch event {</td></tr>
+<tr>
+<td><a href="../../../../commit/e15d1e3517346a5e85fe0c7cec011ec4974d55d7">e15d1e3517346a5e85fe0c7cec011ec4974d55d7</a></td><td>[Wed,  6 Jan 2021 22:06:13 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l189" class="line" id="l189">    189</a> 				case FsRemove, FsRename:</td></tr>
+<tr>
+<td><a href="../../../../commit/e15d1e3517346a5e85fe0c7cec011ec4974d55d7">e15d1e3517346a5e85fe0c7cec011ec4974d55d7</a></td><td>[Wed,  6 Jan 2021 22:06:13 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l190" class="line" id="l190">    190</a> 					t.err = fmt.Errorf(&quot;tail: file relocated&quot;)</td></tr>
+<tr>
+<td><a href="../../../../commit/e15d1e3517346a5e85fe0c7cec011ec4974d55d7">e15d1e3517346a5e85fe0c7cec011ec4974d55d7</a></td><td>[Wed,  6 Jan 2021 22:06:13 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l191" class="line" id="l191">    191</a> 					t.state = Errored</td></tr>
+<tr>
+<td><a href="../../../../commit/e15d1e3517346a5e85fe0c7cec011ec4974d55d7">e15d1e3517346a5e85fe0c7cec011ec4974d55d7</a></td><td>[Wed,  6 Jan 2021 22:06:13 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l192" class="line" id="l192">    192</a> 					close(messages)</td></tr>
+<tr>
+<td><a href="../../../../commit/e15d1e3517346a5e85fe0c7cec011ec4974d55d7">e15d1e3517346a5e85fe0c7cec011ec4974d55d7</a></td><td>[Wed,  6 Jan 2021 22:06:13 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l193" class="line" id="l193">    193</a> 					return</td></tr>
+<tr>
+<td><a href="../../../../commit/e15d1e3517346a5e85fe0c7cec011ec4974d55d7">e15d1e3517346a5e85fe0c7cec011ec4974d55d7</a></td><td>[Wed,  6 Jan 2021 22:06:13 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l194" class="line" id="l194">    194</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/e15d1e3517346a5e85fe0c7cec011ec4974d55d7">e15d1e3517346a5e85fe0c7cec011ec4974d55d7</a></td><td>[Wed,  6 Jan 2021 22:06:13 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l195" class="line" id="l195">    195</a> 				case FsTruncate:</td></tr>
+<tr>
+<td><a href="../../../../commit/e15d1e3517346a5e85fe0c7cec011ec4974d55d7">e15d1e3517346a5e85fe0c7cec011ec4974d55d7</a></td><td>[Wed,  6 Jan 2021 22:06:13 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l196" class="line" id="l196">    196</a> 					t.err = fmt.Errorf(&quot;tail: file truncated&quot;)</td></tr>
+<tr>
+<td><a href="../../../../commit/e15d1e3517346a5e85fe0c7cec011ec4974d55d7">e15d1e3517346a5e85fe0c7cec011ec4974d55d7</a></td><td>[Wed,  6 Jan 2021 22:06:13 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l197" class="line" id="l197">    197</a> 					t.state = Errored</td></tr>
+<tr>
+<td><a href="../../../../commit/e15d1e3517346a5e85fe0c7cec011ec4974d55d7">e15d1e3517346a5e85fe0c7cec011ec4974d55d7</a></td><td>[Wed,  6 Jan 2021 22:06:13 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l198" class="line" id="l198">    198</a> 					close(messages)</td></tr>
+<tr>
+<td><a href="../../../../commit/e15d1e3517346a5e85fe0c7cec011ec4974d55d7">e15d1e3517346a5e85fe0c7cec011ec4974d55d7</a></td><td>[Wed,  6 Jan 2021 22:06:13 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l199" class="line" id="l199">    199</a> 					return</td></tr>
+<tr>
+<td><a href="../../../../commit/e15d1e3517346a5e85fe0c7cec011ec4974d55d7">e15d1e3517346a5e85fe0c7cec011ec4974d55d7</a></td><td>[Wed,  6 Jan 2021 22:06:13 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l200" class="line" id="l200">    200</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/fa87c94a73617d9fe6b741355eafdd504744d3be">fa87c94a73617d9fe6b741355eafdd504744d3be</a></td><td>[Thu,  7 Jan 2021 19:47:24 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l201" class="line" id="l201">    201</a> 				case FsOpen:</td></tr>
+<tr>
+<td><a href="../../../../commit/fa87c94a73617d9fe6b741355eafdd504744d3be">fa87c94a73617d9fe6b741355eafdd504744d3be</a></td><td>[Thu,  7 Jan 2021 19:47:24 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l202" class="line" id="l202">    202</a> 					// When using config.SeekPositionStart, existing lines in</td></tr>
+<tr>
+<td><a href="../../../../commit/fa87c94a73617d9fe6b741355eafdd504744d3be">fa87c94a73617d9fe6b741355eafdd504744d3be</a></td><td>[Thu,  7 Jan 2021 19:47:24 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l203" class="line" id="l203">    203</a> 					// the file should be consumed. Thus, a file open event</td></tr>
+<tr>
+<td><a href="../../../../commit/fa87c94a73617d9fe6b741355eafdd504744d3be">fa87c94a73617d9fe6b741355eafdd504744d3be</a></td><td>[Thu,  7 Jan 2021 19:47:24 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l204" class="line" id="l204">    204</a> 					// should be treated identically to an append event.</td></tr>
+<tr>
+<td><a href="../../../../commit/fa87c94a73617d9fe6b741355eafdd504744d3be">fa87c94a73617d9fe6b741355eafdd504744d3be</a></td><td>[Thu,  7 Jan 2021 19:47:24 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l205" class="line" id="l205">    205</a> 					// When config.SeekPositionEnd, file open events should be</td></tr>
+<tr>
+<td><a href="../../../../commit/fa87c94a73617d9fe6b741355eafdd504744d3be">fa87c94a73617d9fe6b741355eafdd504744d3be</a></td><td>[Thu,  7 Jan 2021 19:47:24 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l206" class="line" id="l206">    206</a> 					// ignored since only newly appended lines since the end of</td></tr>
+<tr>
+<td><a href="../../../../commit/fa87c94a73617d9fe6b741355eafdd504744d3be">fa87c94a73617d9fe6b741355eafdd504744d3be</a></td><td>[Thu,  7 Jan 2021 19:47:24 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l207" class="line" id="l207">    207</a> 					// the file should be consumed.</td></tr>
+<tr>
+<td><a href="../../../../commit/fa87c94a73617d9fe6b741355eafdd504744d3be">fa87c94a73617d9fe6b741355eafdd504744d3be</a></td><td>[Thu,  7 Jan 2021 19:47:24 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l208" class="line" id="l208">    208</a> 					if t.opts.SeekPosition == config.SeekPositionEnd {</td></tr>
+<tr>
+<td><a href="../../../../commit/fa87c94a73617d9fe6b741355eafdd504744d3be">fa87c94a73617d9fe6b741355eafdd504744d3be</a></td><td>[Thu,  7 Jan 2021 19:47:24 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l209" class="line" id="l209">    209</a> 						break</td></tr>
+<tr>
+<td><a href="../../../../commit/fa87c94a73617d9fe6b741355eafdd504744d3be">fa87c94a73617d9fe6b741355eafdd504744d3be</a></td><td>[Thu,  7 Jan 2021 19:47:24 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l210" class="line" id="l210">    210</a> 					}</td></tr>
+<tr>
+<td><a href="../../../../commit/fa87c94a73617d9fe6b741355eafdd504744d3be">fa87c94a73617d9fe6b741355eafdd504744d3be</a></td><td>[Thu,  7 Jan 2021 19:47:24 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l211" class="line" id="l211">    211</a> 					fallthrough</td></tr>
+<tr>
+<td><a href="../../../../commit/fa87c94a73617d9fe6b741355eafdd504744d3be">fa87c94a73617d9fe6b741355eafdd504744d3be</a></td><td>[Thu,  7 Jan 2021 19:47:24 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l212" class="line" id="l212">    212</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/e15d1e3517346a5e85fe0c7cec011ec4974d55d7">e15d1e3517346a5e85fe0c7cec011ec4974d55d7</a></td><td>[Wed,  6 Jan 2021 22:06:13 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l213" class="line" id="l213">    213</a> 				case FsAppend:</td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l214" class="line" id="l214">    214</a> 					lines, err := t.readLines()</td></tr>
+<tr>
+<td><a href="../../../../commit/e15d1e3517346a5e85fe0c7cec011ec4974d55d7">e15d1e3517346a5e85fe0c7cec011ec4974d55d7</a></td><td>[Wed,  6 Jan 2021 22:06:13 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l215" class="line" id="l215">    215</a> 					if err == errNoData || err == io.EOF {</td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l216" class="line" id="l216">    216</a> 						// No new log lines are currently available; wait</td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l217" class="line" id="l217">    217</a> 						// until the next write and try again.</td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l218" class="line" id="l218">    218</a> 						break</td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l219" class="line" id="l219">    219</a> 					} else if err != nil {</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l220" class="line" id="l220">    220</a> 						t.err = err</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l221" class="line" id="l221">    221</a> 						t.state = Errored</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l222" class="line" id="l222">    222</a> 						close(messages)</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l223" class="line" id="l223">    223</a> 						return</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l224" class="line" id="l224">    224</a> 					}</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l225" class="line" id="l225">    225</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l226" class="line" id="l226">    226</a> 					for _, line := range lines {</td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l227" class="line" id="l227">    227</a> 						messages &lt;- Message{</td></tr>
+<tr>
+<td><a href="../../../../commit/e6f623ef7d051bd2b409a514971998ea41e12568">e6f623ef7d051bd2b409a514971998ea41e12568</a></td><td>[Wed,  6 Jan 2021 21:50:31 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l228" class="line" id="l228">    228</a> 							Timestamp:  time.Now(),</td></tr>
+<tr>
+<td><a href="../../../../commit/e6f623ef7d051bd2b409a514971998ea41e12568">e6f623ef7d051bd2b409a514971998ea41e12568</a></td><td>[Wed,  6 Jan 2021 21:50:31 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l229" class="line" id="l229">    229</a> 							SequenceID: sequenceID,</td></tr>
+<tr>
+<td><a href="../../../../commit/e6f623ef7d051bd2b409a514971998ea41e12568">e6f623ef7d051bd2b409a514971998ea41e12568</a></td><td>[Wed,  6 Jan 2021 21:50:31 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l230" class="line" id="l230">    230</a> 							Path:       t.path,</td></tr>
+<tr>
+<td><a href="../../../../commit/e6f623ef7d051bd2b409a514971998ea41e12568">e6f623ef7d051bd2b409a514971998ea41e12568</a></td><td>[Wed,  6 Jan 2021 21:50:31 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l231" class="line" id="l231">    231</a> 							Line:       line,</td></tr>
+<tr>
+<td><a href="../../../../commit/1927dae9c112caecd5ad53d3688cbdebae396049">1927dae9c112caecd5ad53d3688cbdebae396049</a></td><td>[Thu,  7 Jan 2021 18:36:08 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l232" class="line" id="l232">    232</a> 							Tags:       t.opts.Tags,</td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l233" class="line" id="l233">    233</a> 						}</td></tr>
+<tr>
+<td><a href="../../../../commit/e6f623ef7d051bd2b409a514971998ea41e12568">e6f623ef7d051bd2b409a514971998ea41e12568</a></td><td>[Wed,  6 Jan 2021 21:50:31 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l234" class="line" id="l234">    234</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/e6f623ef7d051bd2b409a514971998ea41e12568">e6f623ef7d051bd2b409a514971998ea41e12568</a></td><td>[Wed,  6 Jan 2021 21:50:31 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l235" class="line" id="l235">    235</a> 						sequenceID++</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l236" class="line" id="l236">    236</a> 					}</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l237" class="line" id="l237">    237</a> 				}</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l238" class="line" id="l238">    238</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/e15d1e3517346a5e85fe0c7cec011ec4974d55d7">e15d1e3517346a5e85fe0c7cec011ec4974d55d7</a></td><td>[Wed,  6 Jan 2021 22:06:13 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l239" class="line" id="l239">    239</a> 			case err := &lt;-t.watcher.Errors():</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l240" class="line" id="l240">    240</a> 				if err != nil {</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l241" class="line" id="l241">    241</a> 					t.err = err</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l242" class="line" id="l242">    242</a> 					t.state = Errored</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l243" class="line" id="l243">    243</a> 				}</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l244" class="line" id="l244">    244</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l245" class="line" id="l245">    245</a> 				close(messages)</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l246" class="line" id="l246">    246</a> 				return</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l247" class="line" id="l247">    247</a> 			}</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l248" class="line" id="l248">    248</a> 		}</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l249" class="line" id="l249">    249</a> 	}()</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l250" class="line" id="l250">    250</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l251" class="line" id="l251">    251</a> 	return messages, nil</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l252" class="line" id="l252">    252</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l253" class="line" id="l253">    253</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l254" class="line" id="l254">    254</a> // readLines attempts to read as many complete log lines as possible from the current seek position.</td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l255" class="line" id="l255">    255</a> // errNoData is returned when zero log lines were read from the buffer while the seek position is</td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l256" class="line" id="l256">    256</a> // not yet at the end of the file; this indicates an incomplete log line was written that may be</td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l257" class="line" id="l257">    257</a> // processed on the next read attempt. All other errors, including io.EOF, should be considered</td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l258" class="line" id="l258">    258</a> // unexpected and thus handled accordingly.</td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l259" class="line" id="l259">    259</a> func (t *Tail) readLines() ([]string, error) {</td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l260" class="line" id="l260">    260</a> 	var lines []string</td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l261" class="line" id="l261">    261</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l262" class="line" id="l262">    262</a> 	line, err := t.reader.ReadString(t.opts.Delimiter)</td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l263" class="line" id="l263">    263</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l264" class="line" id="l264">    264</a> 	if err == io.EOF &amp;&amp; len(line) == 0 {</td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l265" class="line" id="l265">    265</a> 		// Immediately encountering io.EOF without reading any bytes from the stream is a</td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l266" class="line" id="l266">    266</a> 		// fairly reliable indicator that the current seek position is invalid. This could,</td></tr>
+<tr>
+<td><a href="../../../../commit/e15d1e3517346a5e85fe0c7cec011ec4974d55d7">e15d1e3517346a5e85fe0c7cec011ec4974d55d7</a></td><td>[Wed,  6 Jan 2021 22:06:13 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l267" class="line" id="l267">    267</a> 		// for example, be due to truncation caused by log rotation, or a duplicated</td></tr>
+<tr>
+<td><a href="../../../../commit/e15d1e3517346a5e85fe0c7cec011ec4974d55d7">e15d1e3517346a5e85fe0c7cec011ec4974d55d7</a></td><td>[Wed,  6 Jan 2021 22:06:13 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l268" class="line" id="l268">    268</a> 		// filesystem notification event fired on file whose seek position is already at the</td></tr>
+<tr>
+<td><a href="../../../../commit/e15d1e3517346a5e85fe0c7cec011ec4974d55d7">e15d1e3517346a5e85fe0c7cec011ec4974d55d7</a></td><td>[Wed,  6 Jan 2021 22:06:13 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l269" class="line" id="l269">    269</a> 		// end of the file. In any case, the Tail client has no ability to determine the</td></tr>
+<tr>
+<td><a href="../../../../commit/e15d1e3517346a5e85fe0c7cec011ec4974d55d7">e15d1e3517346a5e85fe0c7cec011ec4974d55d7</a></td><td>[Wed,  6 Jan 2021 22:06:13 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l270" class="line" id="l270">    270</a> 		// reason for the error (and thus has no heuristics available to recover the</td></tr>
+<tr>
+<td><a href="../../../../commit/e15d1e3517346a5e85fe0c7cec011ec4974d55d7">e15d1e3517346a5e85fe0c7cec011ec4974d55d7</a></td><td>[Wed,  6 Jan 2021 22:06:13 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l271" class="line" id="l271">    271</a> 		// consumption) so the error is simply propagated downstream as-is.</td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l272" class="line" id="l272">    272</a> 		return lines, io.EOF</td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l273" class="line" id="l273">    273</a> 	} else if err == io.EOF &amp;&amp; len(line) &gt; 0 {</td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l274" class="line" id="l274">    274</a> 		// Encountering io.EOF while successfully reading back a nonzero number of bytes</td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l275" class="line" id="l275">    275</a> 		// from the stream indicates absence of the specified delimiter before reaching the</td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l276" class="line" id="l276">    276</a> 		// end of the file. This could, for example, arise from an incomplete or partially</td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l277" class="line" id="l277">    277</a> 		// written log line. It&#39;s likely that a future write will populate the delimiter, so</td></tr>
+<tr>
+<td><a href="../../../../commit/32e28f5cf45b1573be601a3c5b0d2eb4a578b726">32e28f5cf45b1573be601a3c5b0d2eb4a578b726</a></td><td>[Wed,  6 Jan 2021 23:27:14 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l278" class="line" id="l278">    278</a> 		// cache the data into a temporary buffer for consumption on subsequent reads that</td></tr>
+<tr>
+<td><a href="../../../../commit/32e28f5cf45b1573be601a3c5b0d2eb4a578b726">32e28f5cf45b1573be601a3c5b0d2eb4a578b726</a></td><td>[Wed,  6 Jan 2021 23:27:14 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l279" class="line" id="l279">    279</a> 		// do encounter a valid delimiter.</td></tr>
+<tr>
+<td><a href="../../../../commit/32e28f5cf45b1573be601a3c5b0d2eb4a578b726">32e28f5cf45b1573be601a3c5b0d2eb4a578b726</a></td><td>[Wed,  6 Jan 2021 23:27:14 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l280" class="line" id="l280">    280</a> 		t.pending += line</td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l281" class="line" id="l281">    281</a> 		return lines, errNoData</td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l282" class="line" id="l282">    282</a> 	} else if err != nil {</td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l283" class="line" id="l283">    283</a> 		// Unexpected error condition; propagate to downstream.</td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l284" class="line" id="l284">    284</a> 		return lines, err</td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l285" class="line" id="l285">    285</a> 	}</td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l286" class="line" id="l286">    286</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/32e28f5cf45b1573be601a3c5b0d2eb4a578b726">32e28f5cf45b1573be601a3c5b0d2eb4a578b726</a></td><td>[Wed,  6 Jan 2021 23:27:14 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l287" class="line" id="l287">    287</a> 	// A line was read successfully. Any pending data from a previous read attempt should also</td></tr>
+<tr>
+<td><a href="../../../../commit/32e28f5cf45b1573be601a3c5b0d2eb4a578b726">32e28f5cf45b1573be601a3c5b0d2eb4a578b726</a></td><td>[Wed,  6 Jan 2021 23:27:14 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l288" class="line" id="l288">    288</a> 	// be finalized at this stage.</td></tr>
+<tr>
+<td><a href="../../../../commit/32e28f5cf45b1573be601a3c5b0d2eb4a578b726">32e28f5cf45b1573be601a3c5b0d2eb4a578b726</a></td><td>[Wed,  6 Jan 2021 23:27:14 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l289" class="line" id="l289">    289</a> 	lines = append(lines, t.pending+strings.TrimRight(line, string(t.opts.Delimiter)))</td></tr>
+<tr>
+<td><a href="../../../../commit/32e28f5cf45b1573be601a3c5b0d2eb4a578b726">32e28f5cf45b1573be601a3c5b0d2eb4a578b726</a></td><td>[Wed,  6 Jan 2021 23:27:14 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l290" class="line" id="l290">    290</a> 	t.pending = &quot;&quot;</td></tr>
+<tr>
+<td><a href="../../../../commit/32e28f5cf45b1573be601a3c5b0d2eb4a578b726">32e28f5cf45b1573be601a3c5b0d2eb4a578b726</a></td><td>[Wed,  6 Jan 2021 23:27:14 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l291" class="line" id="l291">    291</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/32e28f5cf45b1573be601a3c5b0d2eb4a578b726">32e28f5cf45b1573be601a3c5b0d2eb4a578b726</a></td><td>[Wed,  6 Jan 2021 23:27:14 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l292" class="line" id="l292">    292</a> 	// However, there may be additional lines left in the buffer, accessible by recursion.</td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l293" class="line" id="l293">    293</a> 	// At this point, both an EOF and errNoData are graceful failure modes that indicate there</td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l294" class="line" id="l294">    294</a> 	// does not exist any more lines to read from the buffer.</td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l295" class="line" id="l295">    295</a> 	additionalLines, err := t.readLines()</td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l296" class="line" id="l296">    296</a> 	if err != nil &amp;&amp; err != io.EOF &amp;&amp; err != errNoData {</td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l297" class="line" id="l297">    297</a> 		return lines, err</td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l298" class="line" id="l298">    298</a> 	}</td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l299" class="line" id="l299">    299</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l300" class="line" id="l300">    300</a> 	return append(lines, additionalLines...), nil</td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l301" class="line" id="l301">    301</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/b345f098fb052032530dcb6e9fe57655b1eb05fd">b345f098fb052032530dcb6e9fe57655b1eb05fd</a></td><td>[Tue,  5 Jan 2021 22:13:45 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l302" class="line" id="l302">    302</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l303" class="line" id="l303">    303</a> // State provides the current state of the client.</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l304" class="line" id="l304">    304</a> func (t *Tail) State() State {</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l305" class="line" id="l305">    305</a> 	return t.state</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l306" class="line" id="l306">    306</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l307" class="line" id="l307">    307</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l308" class="line" id="l308">    308</a> // Error reports the most recent error encountered by the client during consumption. if available.</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l309" class="line" id="l309">    309</a> // The error is guaranteed to be non-nil when the client is in the Errored state.</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l310" class="line" id="l310">    310</a> func (t *Tail) Error() error {</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l311" class="line" id="l311">    311</a> 	return t.err</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l312" class="line" id="l312">    312</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l313" class="line" id="l313">    313</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l314" class="line" id="l314">    314</a> // Close attempts to gracefully release file descriptors currently held by the client.</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l315" class="line" id="l315">    315</a> func (t *Tail) Close() error {</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l316" class="line" id="l316">    316</a> 	if t.watcher != nil {</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l317" class="line" id="l317">    317</a> 		if err := t.watcher.Close(); err != nil {</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l318" class="line" id="l318">    318</a> 			return err</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l319" class="line" id="l319">    319</a> 		}</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l320" class="line" id="l320">    320</a> 	}</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l321" class="line" id="l321">    321</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l322" class="line" id="l322">    322</a> 	if t.file != nil {</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l323" class="line" id="l323">    323</a> 		return t.file.Close()</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l324" class="line" id="l324">    324</a> 	}</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l325" class="line" id="l325">    325</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l326" class="line" id="l326">    326</a> 	return nil</td></tr>
+<tr>
+<td><a href="../../../../commit/250769aff237f8bd057ea8e18d0adc86d27bf2b5">250769aff237f8bd057ea8e18d0adc86d27bf2b5</a></td><td>[Sun,  3 Jan 2021 22:23:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l327" class="line" id="l327">    327</a> }</td></tr>
+</table>
+</div>
+</body>
+</html>

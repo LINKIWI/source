@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>hook.go - dotproxy - High performance DNS-over-TLS proxy</title>
+<meta name="description" content="High performance DNS-over-TLS proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="dotproxy Atom Feed" href="atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="dotproxy Atom Feed (tags)" href="tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>dotproxy</h1><span class="desc">High performance DNS-over-TLS proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/dotproxy.git">https://source.static.kevinlin.info/dotproxy.git</a></td></tr><tr><td></td><td>
+<a href="log">Log</a> | <a href="files">Files</a> | <a href="refs">Refs</a> | <a href="file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<p>hook.go (12330B)</p><hr/>
+<table id="blob">
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l1" class="line" id="l1">      1</a> package metrics</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l2" class="line" id="l2">      2</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l3" class="line" id="l3">      3</a> import (</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l4" class="line" id="l4">      4</a> 	&quot;fmt&quot;</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l5" class="line" id="l5">      5</a> 	&quot;net&quot;</td></tr>
+<tr>
+<td><a href="../../../../commit/dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6">dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6</a></td><td>[Sat, 23 Jan 2021 16:47:32 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l6" class="line" id="l6">      6</a> 	&quot;sync/atomic&quot;</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l7" class="line" id="l7">      7</a> 	&quot;time&quot;</td></tr>
+<tr>
+<td><a href="../../../../commit/430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd">430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd</a></td><td>[Sat, 28 Dec 2019 17:50:12 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l8" class="line" id="l8">      8</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd">430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd</a></td><td>[Sat, 28 Dec 2019 17:50:12 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l9" class="line" id="l9">      9</a> 	&quot;lib.kevinlin.info/aperture&quot;</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l10" class="line" id="l10">     10</a> )</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l11" class="line" id="l11">     11</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l12" class="line" id="l12">     12</a> // ConnectionLifecycleHook is a metrics hook interface for reporting events that occur during a TCP</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l13" class="line" id="l13">     13</a> // connection lifecycle. Note that it is not pertinent to UDP transports, since it is an inherently</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l14" class="line" id="l14">     14</a> // connectionless protocol.</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l15" class="line" id="l15">     15</a> type ConnectionLifecycleHook interface {</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l16" class="line" id="l16">     16</a> 	// EmitConnectionOpen reports the event that a connection was successfully opened.</td></tr>
+<tr>
+<td><a href="../../../../commit/7e9609f3b101144f6f109cd63e79e84e7f6720f9">7e9609f3b101144f6f109cd63e79e84e7f6720f9</a></td><td>[Tue,  5 Mar 2019 19:37:29 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l17" class="line" id="l17">     17</a> 	EmitConnectionOpen(latency time.Duration, addr net.Addr)</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l18" class="line" id="l18">     18</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l19" class="line" id="l19">     19</a> 	// EmitConnectionClose reports the event that a connection was closed.</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l20" class="line" id="l20">     20</a> 	EmitConnectionClose(addr net.Addr)</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l21" class="line" id="l21">     21</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l22" class="line" id="l22">     22</a> 	// EmitConnectionError reports occurrence of an error establishing a connection.</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l23" class="line" id="l23">     23</a> 	EmitConnectionError()</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l24" class="line" id="l24">     24</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l25" class="line" id="l25">     25</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l26" class="line" id="l26">     26</a> // ConnectionIOHook is a metrics hook interface for reporting events related to I/O with an</td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l27" class="line" id="l27">     27</a> // established TCP or UDP connection.</td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l28" class="line" id="l28">     28</a> type ConnectionIOHook interface {</td></tr>
+<tr>
+<td><a href="../../../../commit/65eef06aeaffc8a604828f562e0ef8c3ee3aef3e">65eef06aeaffc8a604828f562e0ef8c3ee3aef3e</a></td><td>[Thu,  7 Mar 2019 19:33:16 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l29" class="line" id="l29">     29</a> 	// EmitRead reports a successful connection read.</td></tr>
+<tr>
+<td><a href="../../../../commit/65eef06aeaffc8a604828f562e0ef8c3ee3aef3e">65eef06aeaffc8a604828f562e0ef8c3ee3aef3e</a></td><td>[Thu,  7 Mar 2019 19:33:16 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l30" class="line" id="l30">     30</a> 	EmitRead(latency time.Duration, addr net.Addr)</td></tr>
+<tr>
+<td><a href="../../../../commit/65eef06aeaffc8a604828f562e0ef8c3ee3aef3e">65eef06aeaffc8a604828f562e0ef8c3ee3aef3e</a></td><td>[Thu,  7 Mar 2019 19:33:16 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l31" class="line" id="l31">     31</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l32" class="line" id="l32">     32</a> 	// EmitReadError reports the event that a connection read failed.</td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l33" class="line" id="l33">     33</a> 	EmitReadError(addr net.Addr)</td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l34" class="line" id="l34">     34</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/65eef06aeaffc8a604828f562e0ef8c3ee3aef3e">65eef06aeaffc8a604828f562e0ef8c3ee3aef3e</a></td><td>[Thu,  7 Mar 2019 19:33:16 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l35" class="line" id="l35">     35</a> 	// EmitWrite reports a successful connection write.</td></tr>
+<tr>
+<td><a href="../../../../commit/65eef06aeaffc8a604828f562e0ef8c3ee3aef3e">65eef06aeaffc8a604828f562e0ef8c3ee3aef3e</a></td><td>[Thu,  7 Mar 2019 19:33:16 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l36" class="line" id="l36">     36</a> 	EmitWrite(latency time.Duration, addr net.Addr)</td></tr>
+<tr>
+<td><a href="../../../../commit/65eef06aeaffc8a604828f562e0ef8c3ee3aef3e">65eef06aeaffc8a604828f562e0ef8c3ee3aef3e</a></td><td>[Thu,  7 Mar 2019 19:33:16 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l37" class="line" id="l37">     37</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l38" class="line" id="l38">     38</a> 	// EmitWriteError reports the event that a connection write failed.</td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l39" class="line" id="l39">     39</a> 	EmitWriteError(addr net.Addr)</td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l40" class="line" id="l40">     40</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l41" class="line" id="l41">     41</a> 	// EmitRetry reports the event that an I/O operation was retried due to failure.</td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l42" class="line" id="l42">     42</a> 	EmitRetry(addr net.Addr)</td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l43" class="line" id="l43">     43</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l44" class="line" id="l44">     44</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l45" class="line" id="l45">     45</a> // ProxyHook is a metrics hook interface for reporting events and latencies related to end-to-end</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l46" class="line" id="l46">     46</a> // proxying of a client request with an upstream server.</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l47" class="line" id="l47">     47</a> type ProxyHook interface {</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l48" class="line" id="l48">     48</a> 	// EmitRequestSize reports the size of the proxied request on the wire.</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l49" class="line" id="l49">     49</a> 	EmitRequestSize(bytes int64, client net.Addr)</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l50" class="line" id="l50">     50</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l51" class="line" id="l51">     51</a> 	// EmitResponseSize reports the size of the proxied response on the wire.</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l52" class="line" id="l52">     52</a> 	EmitResponseSize(bytes int64, upstream net.Addr)</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l53" class="line" id="l53">     53</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l54" class="line" id="l54">     54</a> 	// EmitRTT reports the total, end-to-end latency associated with serving a single request</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l55" class="line" id="l55">     55</a> 	// from a client. This includes the time to establish/teardown all connections, transact</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l56" class="line" id="l56">     56</a> 	// with the upstream, and proxy the response to/from the client.</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l57" class="line" id="l57">     57</a> 	EmitRTT(latency time.Duration, client net.Addr, upstream net.Addr)</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l58" class="line" id="l58">     58</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l59" class="line" id="l59">     59</a> 	// EmitUpstreamLatency reports the latency associated with transacting with the upstream</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l60" class="line" id="l60">     60</a> 	// to serve a single request.</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l61" class="line" id="l61">     61</a> 	EmitUpstreamLatency(latency time.Duration, client net.Addr, upstream net.Addr)</td></tr>
+<tr>
+<td><a href="../../../../commit/f5e805dc0ca07d0d5a6602e1d34be03b33d7a408">f5e805dc0ca07d0d5a6602e1d34be03b33d7a408</a></td><td>[Sun,  3 Mar 2019 19:14:14 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l62" class="line" id="l62">     62</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6">dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6</a></td><td>[Sat, 23 Jan 2021 16:47:32 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l63" class="line" id="l63">     63</a> 	// EmitProcess reports the occurrence of a processed proxy request.</td></tr>
+<tr>
+<td><a href="../../../../commit/dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6">dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6</a></td><td>[Sat, 23 Jan 2021 16:47:32 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l64" class="line" id="l64">     64</a> 	EmitProcess(client net.Addr, upstream net.Addr)</td></tr>
+<tr>
+<td><a href="../../../../commit/dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6">dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6</a></td><td>[Sat, 23 Jan 2021 16:47:32 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l65" class="line" id="l65">     65</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/f5e805dc0ca07d0d5a6602e1d34be03b33d7a408">f5e805dc0ca07d0d5a6602e1d34be03b33d7a408</a></td><td>[Sun,  3 Mar 2019 19:14:14 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l66" class="line" id="l66">     66</a> 	// EmitError reports the occurrence of a critical error in the proxy lifecycle that causes</td></tr>
+<tr>
+<td><a href="../../../../commit/f5e805dc0ca07d0d5a6602e1d34be03b33d7a408">f5e805dc0ca07d0d5a6602e1d34be03b33d7a408</a></td><td>[Sun,  3 Mar 2019 19:14:14 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l67" class="line" id="l67">     67</a> 	// the request to not be correctly served.</td></tr>
+<tr>
+<td><a href="../../../../commit/f5e805dc0ca07d0d5a6602e1d34be03b33d7a408">f5e805dc0ca07d0d5a6602e1d34be03b33d7a408</a></td><td>[Sun,  3 Mar 2019 19:14:14 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l68" class="line" id="l68">     68</a> 	EmitError()</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l69" class="line" id="l69">     69</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l70" class="line" id="l70">     70</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l71" class="line" id="l71">     71</a> // AsyncStatsdConnectionLifecycleHook is an implementation of ConnectionLifecycleHook that outputs</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l72" class="line" id="l72">     72</a> // metrics asynchronously to statsd.</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l73" class="line" id="l73">     73</a> type AsyncStatsdConnectionLifecycleHook struct {</td></tr>
+<tr>
+<td><a href="../../../../commit/430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd">430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd</a></td><td>[Sat, 28 Dec 2019 17:50:12 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l74" class="line" id="l74">     74</a> 	client aperture.Statsd</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l75" class="line" id="l75">     75</a> 	source string</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l76" class="line" id="l76">     76</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l77" class="line" id="l77">     77</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l78" class="line" id="l78">     78</a> // AsyncStatsdConnectionIOHook is an implementation of ConnectionIOHook that outputs metrics</td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l79" class="line" id="l79">     79</a> // asynchronously to statsd.</td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l80" class="line" id="l80">     80</a> type AsyncStatsdConnectionIOHook struct {</td></tr>
+<tr>
+<td><a href="../../../../commit/430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd">430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd</a></td><td>[Sat, 28 Dec 2019 17:50:12 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l81" class="line" id="l81">     81</a> 	client aperture.Statsd</td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l82" class="line" id="l82">     82</a> 	source string</td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l83" class="line" id="l83">     83</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l84" class="line" id="l84">     84</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l85" class="line" id="l85">     85</a> // AsyncStatsdProxyHook is an implementation of ProxyHook that outputs metrics asynchronously to</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l86" class="line" id="l86">     86</a> // statsd.</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l87" class="line" id="l87">     87</a> type AsyncStatsdProxyHook struct {</td></tr>
+<tr>
+<td><a href="../../../../commit/dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6">dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6</a></td><td>[Sat, 23 Jan 2021 16:47:32 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l88" class="line" id="l88">     88</a> 	client     aperture.Statsd</td></tr>
+<tr>
+<td><a href="../../../../commit/dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6">dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6</a></td><td>[Sat, 23 Jan 2021 16:47:32 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l89" class="line" id="l89">     89</a> 	sequenceID int64</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l90" class="line" id="l90">     90</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l91" class="line" id="l91">     91</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00">c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00</a></td><td>[Sat,  2 Mar 2019 15:24:48 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l92" class="line" id="l92">     92</a> // NoopConnectionLifecycleHook implements the ConnectionLifecycleHook interface but noops on all</td></tr>
+<tr>
+<td><a href="../../../../commit/c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00">c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00</a></td><td>[Sat,  2 Mar 2019 15:24:48 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l93" class="line" id="l93">     93</a> // emissions.</td></tr>
+<tr>
+<td><a href="../../../../commit/c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00">c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00</a></td><td>[Sat,  2 Mar 2019 15:24:48 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l94" class="line" id="l94">     94</a> type NoopConnectionLifecycleHook struct{}</td></tr>
+<tr>
+<td><a href="../../../../commit/c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00">c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00</a></td><td>[Sat,  2 Mar 2019 15:24:48 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l95" class="line" id="l95">     95</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00">c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00</a></td><td>[Sat,  2 Mar 2019 15:24:48 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l96" class="line" id="l96">     96</a> // NoopConnectionIOHook implements the ConnectionIOHook interface but noops on all emissions.</td></tr>
+<tr>
+<td><a href="../../../../commit/c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00">c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00</a></td><td>[Sat,  2 Mar 2019 15:24:48 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l97" class="line" id="l97">     97</a> type NoopConnectionIOHook struct{}</td></tr>
+<tr>
+<td><a href="../../../../commit/c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00">c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00</a></td><td>[Sat,  2 Mar 2019 15:24:48 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l98" class="line" id="l98">     98</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00">c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00</a></td><td>[Sat,  2 Mar 2019 15:24:48 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l99" class="line" id="l99">     99</a> // NoopProxyHook implements the ProxyHook interface but noops on all emissions.</td></tr>
+<tr>
+<td><a href="../../../../commit/c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00">c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00</a></td><td>[Sat,  2 Mar 2019 15:24:48 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l100" class="line" id="l100">    100</a> type NoopProxyHook struct{}</td></tr>
+<tr>
+<td><a href="../../../../commit/c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00">c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00</a></td><td>[Sat,  2 Mar 2019 15:24:48 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l101" class="line" id="l101">    101</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l102" class="line" id="l102">    102</a> // NewAsyncStatsdConnectionLifecycleHook creates a new client with the specified source, statsd</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l103" class="line" id="l103">    103</a> // address, and statsd sample rate. The source denotes the entity with whom the server is opening</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l104" class="line" id="l104">    104</a> // and closing TCP connections.</td></tr>
+<tr>
+<td><a href="../../../../commit/430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd">430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd</a></td><td>[Sat, 28 Dec 2019 17:50:12 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l105" class="line" id="l105">    105</a> func NewAsyncStatsdConnectionLifecycleHook(source string, addr string, sampleRate float64, version string) (ConnectionLifecycleHook, error) {</td></tr>
+<tr>
+<td><a href="../../../../commit/6edd54f81cb3802e74b97dff3bef6835427cbcc7">6edd54f81cb3802e74b97dff3bef6835427cbcc7</a></td><td>[Thu,  7 Mar 2019 19:44:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l106" class="line" id="l106">    106</a> 	client, err := statsdClientFactory(addr, sampleRate, version)</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l107" class="line" id="l107">    107</a> 	if err != nil {</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l108" class="line" id="l108">    108</a> 		return nil, err</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l109" class="line" id="l109">    109</a> 	}</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l110" class="line" id="l110">    110</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l111" class="line" id="l111">    111</a> 	return &amp;AsyncStatsdConnectionLifecycleHook{</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l112" class="line" id="l112">    112</a> 		client: client,</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l113" class="line" id="l113">    113</a> 		source: source,</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l114" class="line" id="l114">    114</a> 	}, nil</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l115" class="line" id="l115">    115</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l116" class="line" id="l116">    116</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/00d06e40fbeddaaf004dbf4d79edccd5d67f8762">00d06e40fbeddaaf004dbf4d79edccd5d67f8762</a></td><td>[Sat,  2 Mar 2019 16:48:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l117" class="line" id="l117">    117</a> // EmitConnectionOpen statsd implementation</td></tr>
+<tr>
+<td><a href="../../../../commit/7e9609f3b101144f6f109cd63e79e84e7f6720f9">7e9609f3b101144f6f109cd63e79e84e7f6720f9</a></td><td>[Tue,  5 Mar 2019 19:37:29 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l118" class="line" id="l118">    118</a> func (h *AsyncStatsdConnectionLifecycleHook) EmitConnectionOpen(latency time.Duration, addr net.Addr) {</td></tr>
+<tr>
+<td><a href="../../../../commit/7e9609f3b101144f6f109cd63e79e84e7f6720f9">7e9609f3b101144f6f109cd63e79e84e7f6720f9</a></td><td>[Tue,  5 Mar 2019 19:37:29 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l119" class="line" id="l119">    119</a> 	go func() {</td></tr>
+<tr>
+<td><a href="../../../../commit/430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd">430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd</a></td><td>[Sat, 28 Dec 2019 17:50:12 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l120" class="line" id="l120">    120</a> 		tags := map[string]interface{}{</td></tr>
+<tr>
+<td><a href="../../../../commit/7e9609f3b101144f6f109cd63e79e84e7f6720f9">7e9609f3b101144f6f109cd63e79e84e7f6720f9</a></td><td>[Tue,  5 Mar 2019 19:37:29 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l121" class="line" id="l121">    121</a> 			&quot;addr&quot;:      ipFromAddr(addr),</td></tr>
+<tr>
+<td><a href="../../../../commit/7e9609f3b101144f6f109cd63e79e84e7f6720f9">7e9609f3b101144f6f109cd63e79e84e7f6720f9</a></td><td>[Tue,  5 Mar 2019 19:37:29 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l122" class="line" id="l122">    122</a> 			&quot;transport&quot;: transportFromAddr(addr),</td></tr>
+<tr>
+<td><a href="../../../../commit/7e9609f3b101144f6f109cd63e79e84e7f6720f9">7e9609f3b101144f6f109cd63e79e84e7f6720f9</a></td><td>[Tue,  5 Mar 2019 19:37:29 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l123" class="line" id="l123">    123</a> 		}</td></tr>
+<tr>
+<td><a href="../../../../commit/7e9609f3b101144f6f109cd63e79e84e7f6720f9">7e9609f3b101144f6f109cd63e79e84e7f6720f9</a></td><td>[Tue,  5 Mar 2019 19:37:29 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l124" class="line" id="l124">    124</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/7e9609f3b101144f6f109cd63e79e84e7f6720f9">7e9609f3b101144f6f109cd63e79e84e7f6720f9</a></td><td>[Tue,  5 Mar 2019 19:37:29 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l125" class="line" id="l125">    125</a> 		h.client.Count(fmt.Sprintf(&quot;event.%s.cx_open&quot;, h.source), 1, tags)</td></tr>
+<tr>
+<td><a href="../../../../commit/7e9609f3b101144f6f109cd63e79e84e7f6720f9">7e9609f3b101144f6f109cd63e79e84e7f6720f9</a></td><td>[Tue,  5 Mar 2019 19:37:29 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l126" class="line" id="l126">    126</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/7e9609f3b101144f6f109cd63e79e84e7f6720f9">7e9609f3b101144f6f109cd63e79e84e7f6720f9</a></td><td>[Tue,  5 Mar 2019 19:37:29 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l127" class="line" id="l127">    127</a> 		if latency &gt; 0 {</td></tr>
+<tr>
+<td><a href="../../../../commit/7e9609f3b101144f6f109cd63e79e84e7f6720f9">7e9609f3b101144f6f109cd63e79e84e7f6720f9</a></td><td>[Tue,  5 Mar 2019 19:37:29 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l128" class="line" id="l128">    128</a> 			h.client.Timing(fmt.Sprintf(&quot;latency.%s.cx_open&quot;, h.source), latency, tags)</td></tr>
+<tr>
+<td><a href="../../../../commit/7e9609f3b101144f6f109cd63e79e84e7f6720f9">7e9609f3b101144f6f109cd63e79e84e7f6720f9</a></td><td>[Tue,  5 Mar 2019 19:37:29 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l129" class="line" id="l129">    129</a> 		}</td></tr>
+<tr>
+<td><a href="../../../../commit/7e9609f3b101144f6f109cd63e79e84e7f6720f9">7e9609f3b101144f6f109cd63e79e84e7f6720f9</a></td><td>[Tue,  5 Mar 2019 19:37:29 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l130" class="line" id="l130">    130</a> 	}()</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l131" class="line" id="l131">    131</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l132" class="line" id="l132">    132</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/00d06e40fbeddaaf004dbf4d79edccd5d67f8762">00d06e40fbeddaaf004dbf4d79edccd5d67f8762</a></td><td>[Sat,  2 Mar 2019 16:48:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l133" class="line" id="l133">    133</a> // EmitConnectionClose statsd implementation</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l134" class="line" id="l134">    134</a> func (h *AsyncStatsdConnectionLifecycleHook) EmitConnectionClose(addr net.Addr) {</td></tr>
+<tr>
+<td><a href="../../../../commit/430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd">430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd</a></td><td>[Sat, 28 Dec 2019 17:50:12 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l135" class="line" id="l135">    135</a> 	go h.client.Count(fmt.Sprintf(&quot;event.%s.cx_close&quot;, h.source), 1, map[string]interface{}{</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l136" class="line" id="l136">    136</a> 		&quot;addr&quot;:      ipFromAddr(addr),</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l137" class="line" id="l137">    137</a> 		&quot;transport&quot;: transportFromAddr(addr),</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l138" class="line" id="l138">    138</a> 	})</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l139" class="line" id="l139">    139</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l140" class="line" id="l140">    140</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/00d06e40fbeddaaf004dbf4d79edccd5d67f8762">00d06e40fbeddaaf004dbf4d79edccd5d67f8762</a></td><td>[Sat,  2 Mar 2019 16:48:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l141" class="line" id="l141">    141</a> // EmitConnectionError statsd implementation</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l142" class="line" id="l142">    142</a> func (h *AsyncStatsdConnectionLifecycleHook) EmitConnectionError() {</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l143" class="line" id="l143">    143</a> 	go h.client.Count(fmt.Sprintf(&quot;event.%s.cx_error&quot;, h.source), 1, nil)</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l144" class="line" id="l144">    144</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l145" class="line" id="l145">    145</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/0cd32a37df99703a6d4d004031f7040e4f7fbe85">0cd32a37df99703a6d4d004031f7040e4f7fbe85</a></td><td>[Sat,  2 Mar 2019 16:33:50 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l146" class="line" id="l146">    146</a> // NewNoopConnectionLifecycleHook creates a noop implementation of ConnectionLifecycleHook.</td></tr>
+<tr>
+<td><a href="../../../../commit/0cd32a37df99703a6d4d004031f7040e4f7fbe85">0cd32a37df99703a6d4d004031f7040e4f7fbe85</a></td><td>[Sat,  2 Mar 2019 16:33:50 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l147" class="line" id="l147">    147</a> func NewNoopConnectionLifecycleHook() ConnectionLifecycleHook {</td></tr>
+<tr>
+<td><a href="../../../../commit/0cd32a37df99703a6d4d004031f7040e4f7fbe85">0cd32a37df99703a6d4d004031f7040e4f7fbe85</a></td><td>[Sat,  2 Mar 2019 16:33:50 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l148" class="line" id="l148">    148</a> 	return &amp;NoopConnectionLifecycleHook{}</td></tr>
+<tr>
+<td><a href="../../../../commit/0cd32a37df99703a6d4d004031f7040e4f7fbe85">0cd32a37df99703a6d4d004031f7040e4f7fbe85</a></td><td>[Sat,  2 Mar 2019 16:33:50 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l149" class="line" id="l149">    149</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/0cd32a37df99703a6d4d004031f7040e4f7fbe85">0cd32a37df99703a6d4d004031f7040e4f7fbe85</a></td><td>[Sat,  2 Mar 2019 16:33:50 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l150" class="line" id="l150">    150</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/00d06e40fbeddaaf004dbf4d79edccd5d67f8762">00d06e40fbeddaaf004dbf4d79edccd5d67f8762</a></td><td>[Sat,  2 Mar 2019 16:48:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l151" class="line" id="l151">    151</a> // EmitConnectionOpen noops.</td></tr>
+<tr>
+<td><a href="../../../../commit/7e9609f3b101144f6f109cd63e79e84e7f6720f9">7e9609f3b101144f6f109cd63e79e84e7f6720f9</a></td><td>[Tue,  5 Mar 2019 19:37:29 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l152" class="line" id="l152">    152</a> func (h *NoopConnectionLifecycleHook) EmitConnectionOpen(latency time.Duration, addr net.Addr) {}</td></tr>
+<tr>
+<td><a href="../../../../commit/c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00">c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00</a></td><td>[Sat,  2 Mar 2019 15:24:48 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l153" class="line" id="l153">    153</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/00d06e40fbeddaaf004dbf4d79edccd5d67f8762">00d06e40fbeddaaf004dbf4d79edccd5d67f8762</a></td><td>[Sat,  2 Mar 2019 16:48:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l154" class="line" id="l154">    154</a> // EmitConnectionClose noops.</td></tr>
+<tr>
+<td><a href="../../../../commit/c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00">c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00</a></td><td>[Sat,  2 Mar 2019 15:24:48 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l155" class="line" id="l155">    155</a> func (h *NoopConnectionLifecycleHook) EmitConnectionClose(addr net.Addr) {}</td></tr>
+<tr>
+<td><a href="../../../../commit/c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00">c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00</a></td><td>[Sat,  2 Mar 2019 15:24:48 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l156" class="line" id="l156">    156</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/00d06e40fbeddaaf004dbf4d79edccd5d67f8762">00d06e40fbeddaaf004dbf4d79edccd5d67f8762</a></td><td>[Sat,  2 Mar 2019 16:48:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l157" class="line" id="l157">    157</a> // EmitConnectionError noops.</td></tr>
+<tr>
+<td><a href="../../../../commit/c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00">c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00</a></td><td>[Sat,  2 Mar 2019 15:24:48 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l158" class="line" id="l158">    158</a> func (h *NoopConnectionLifecycleHook) EmitConnectionError() {}</td></tr>
+<tr>
+<td><a href="../../../../commit/c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00">c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00</a></td><td>[Sat,  2 Mar 2019 15:24:48 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l159" class="line" id="l159">    159</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l160" class="line" id="l160">    160</a> // NewAsyncStatsdConnectionIOHook creates a new client with the specified source, statsd address,</td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l161" class="line" id="l161">    161</a> // and statsd sample rate. The source denotes the entity with whom the server is performing I/O.</td></tr>
+<tr>
+<td><a href="../../../../commit/430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd">430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd</a></td><td>[Sat, 28 Dec 2019 17:50:12 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l162" class="line" id="l162">    162</a> func NewAsyncStatsdConnectionIOHook(source string, addr string, sampleRate float64, version string) (ConnectionIOHook, error) {</td></tr>
+<tr>
+<td><a href="../../../../commit/6edd54f81cb3802e74b97dff3bef6835427cbcc7">6edd54f81cb3802e74b97dff3bef6835427cbcc7</a></td><td>[Thu,  7 Mar 2019 19:44:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l163" class="line" id="l163">    163</a> 	client, err := statsdClientFactory(addr, sampleRate, version)</td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l164" class="line" id="l164">    164</a> 	if err != nil {</td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l165" class="line" id="l165">    165</a> 		return nil, err</td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l166" class="line" id="l166">    166</a> 	}</td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l167" class="line" id="l167">    167</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l168" class="line" id="l168">    168</a> 	return &amp;AsyncStatsdConnectionIOHook{</td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l169" class="line" id="l169">    169</a> 		client: client,</td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l170" class="line" id="l170">    170</a> 		source: source,</td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l171" class="line" id="l171">    171</a> 	}, nil</td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l172" class="line" id="l172">    172</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l173" class="line" id="l173">    173</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/65eef06aeaffc8a604828f562e0ef8c3ee3aef3e">65eef06aeaffc8a604828f562e0ef8c3ee3aef3e</a></td><td>[Thu,  7 Mar 2019 19:33:16 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l174" class="line" id="l174">    174</a> // EmitRead statsd implementation.</td></tr>
+<tr>
+<td><a href="../../../../commit/65eef06aeaffc8a604828f562e0ef8c3ee3aef3e">65eef06aeaffc8a604828f562e0ef8c3ee3aef3e</a></td><td>[Thu,  7 Mar 2019 19:33:16 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l175" class="line" id="l175">    175</a> func (h *AsyncStatsdConnectionIOHook) EmitRead(latency time.Duration, addr net.Addr) {</td></tr>
+<tr>
+<td><a href="../../../../commit/65eef06aeaffc8a604828f562e0ef8c3ee3aef3e">65eef06aeaffc8a604828f562e0ef8c3ee3aef3e</a></td><td>[Thu,  7 Mar 2019 19:33:16 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l176" class="line" id="l176">    176</a> 	go func() {</td></tr>
+<tr>
+<td><a href="../../../../commit/430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd">430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd</a></td><td>[Sat, 28 Dec 2019 17:50:12 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l177" class="line" id="l177">    177</a> 		tags := map[string]interface{}{</td></tr>
+<tr>
+<td><a href="../../../../commit/65eef06aeaffc8a604828f562e0ef8c3ee3aef3e">65eef06aeaffc8a604828f562e0ef8c3ee3aef3e</a></td><td>[Thu,  7 Mar 2019 19:33:16 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l178" class="line" id="l178">    178</a> 			&quot;addr&quot;:      ipFromAddr(addr),</td></tr>
+<tr>
+<td><a href="../../../../commit/65eef06aeaffc8a604828f562e0ef8c3ee3aef3e">65eef06aeaffc8a604828f562e0ef8c3ee3aef3e</a></td><td>[Thu,  7 Mar 2019 19:33:16 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l179" class="line" id="l179">    179</a> 			&quot;transport&quot;: transportFromAddr(addr),</td></tr>
+<tr>
+<td><a href="../../../../commit/65eef06aeaffc8a604828f562e0ef8c3ee3aef3e">65eef06aeaffc8a604828f562e0ef8c3ee3aef3e</a></td><td>[Thu,  7 Mar 2019 19:33:16 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l180" class="line" id="l180">    180</a> 		}</td></tr>
+<tr>
+<td><a href="../../../../commit/65eef06aeaffc8a604828f562e0ef8c3ee3aef3e">65eef06aeaffc8a604828f562e0ef8c3ee3aef3e</a></td><td>[Thu,  7 Mar 2019 19:33:16 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l181" class="line" id="l181">    181</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/65eef06aeaffc8a604828f562e0ef8c3ee3aef3e">65eef06aeaffc8a604828f562e0ef8c3ee3aef3e</a></td><td>[Thu,  7 Mar 2019 19:33:16 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l182" class="line" id="l182">    182</a> 		h.client.Count(fmt.Sprintf(&quot;event.%s.cx_read&quot;, h.source), 1, tags)</td></tr>
+<tr>
+<td><a href="../../../../commit/65eef06aeaffc8a604828f562e0ef8c3ee3aef3e">65eef06aeaffc8a604828f562e0ef8c3ee3aef3e</a></td><td>[Thu,  7 Mar 2019 19:33:16 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l183" class="line" id="l183">    183</a> 		h.client.Timing(fmt.Sprintf(&quot;latency.%s.cx_read&quot;, h.source), latency, tags)</td></tr>
+<tr>
+<td><a href="../../../../commit/65eef06aeaffc8a604828f562e0ef8c3ee3aef3e">65eef06aeaffc8a604828f562e0ef8c3ee3aef3e</a></td><td>[Thu,  7 Mar 2019 19:33:16 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l184" class="line" id="l184">    184</a> 	}()</td></tr>
+<tr>
+<td><a href="../../../../commit/65eef06aeaffc8a604828f562e0ef8c3ee3aef3e">65eef06aeaffc8a604828f562e0ef8c3ee3aef3e</a></td><td>[Thu,  7 Mar 2019 19:33:16 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l185" class="line" id="l185">    185</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/65eef06aeaffc8a604828f562e0ef8c3ee3aef3e">65eef06aeaffc8a604828f562e0ef8c3ee3aef3e</a></td><td>[Thu,  7 Mar 2019 19:33:16 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l186" class="line" id="l186">    186</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/00d06e40fbeddaaf004dbf4d79edccd5d67f8762">00d06e40fbeddaaf004dbf4d79edccd5d67f8762</a></td><td>[Sat,  2 Mar 2019 16:48:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l187" class="line" id="l187">    187</a> // EmitReadError statsd implementation.</td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l188" class="line" id="l188">    188</a> func (h *AsyncStatsdConnectionIOHook) EmitReadError(addr net.Addr) {</td></tr>
+<tr>
+<td><a href="../../../../commit/430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd">430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd</a></td><td>[Sat, 28 Dec 2019 17:50:12 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l189" class="line" id="l189">    189</a> 	go h.client.Count(fmt.Sprintf(&quot;event.%s.cx_read_error&quot;, h.source), 1, map[string]interface{}{</td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l190" class="line" id="l190">    190</a> 		&quot;addr&quot;:      ipFromAddr(addr),</td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l191" class="line" id="l191">    191</a> 		&quot;transport&quot;: transportFromAddr(addr),</td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l192" class="line" id="l192">    192</a> 	})</td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l193" class="line" id="l193">    193</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l194" class="line" id="l194">    194</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/65eef06aeaffc8a604828f562e0ef8c3ee3aef3e">65eef06aeaffc8a604828f562e0ef8c3ee3aef3e</a></td><td>[Thu,  7 Mar 2019 19:33:16 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l195" class="line" id="l195">    195</a> // EmitWrite statsd implementation.</td></tr>
+<tr>
+<td><a href="../../../../commit/65eef06aeaffc8a604828f562e0ef8c3ee3aef3e">65eef06aeaffc8a604828f562e0ef8c3ee3aef3e</a></td><td>[Thu,  7 Mar 2019 19:33:16 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l196" class="line" id="l196">    196</a> func (h *AsyncStatsdConnectionIOHook) EmitWrite(latency time.Duration, addr net.Addr) {</td></tr>
+<tr>
+<td><a href="../../../../commit/65eef06aeaffc8a604828f562e0ef8c3ee3aef3e">65eef06aeaffc8a604828f562e0ef8c3ee3aef3e</a></td><td>[Thu,  7 Mar 2019 19:33:16 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l197" class="line" id="l197">    197</a> 	go func() {</td></tr>
+<tr>
+<td><a href="../../../../commit/430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd">430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd</a></td><td>[Sat, 28 Dec 2019 17:50:12 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l198" class="line" id="l198">    198</a> 		tags := map[string]interface{}{</td></tr>
+<tr>
+<td><a href="../../../../commit/65eef06aeaffc8a604828f562e0ef8c3ee3aef3e">65eef06aeaffc8a604828f562e0ef8c3ee3aef3e</a></td><td>[Thu,  7 Mar 2019 19:33:16 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l199" class="line" id="l199">    199</a> 			&quot;addr&quot;:      ipFromAddr(addr),</td></tr>
+<tr>
+<td><a href="../../../../commit/65eef06aeaffc8a604828f562e0ef8c3ee3aef3e">65eef06aeaffc8a604828f562e0ef8c3ee3aef3e</a></td><td>[Thu,  7 Mar 2019 19:33:16 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l200" class="line" id="l200">    200</a> 			&quot;transport&quot;: transportFromAddr(addr),</td></tr>
+<tr>
+<td><a href="../../../../commit/65eef06aeaffc8a604828f562e0ef8c3ee3aef3e">65eef06aeaffc8a604828f562e0ef8c3ee3aef3e</a></td><td>[Thu,  7 Mar 2019 19:33:16 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l201" class="line" id="l201">    201</a> 		}</td></tr>
+<tr>
+<td><a href="../../../../commit/65eef06aeaffc8a604828f562e0ef8c3ee3aef3e">65eef06aeaffc8a604828f562e0ef8c3ee3aef3e</a></td><td>[Thu,  7 Mar 2019 19:33:16 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l202" class="line" id="l202">    202</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/65eef06aeaffc8a604828f562e0ef8c3ee3aef3e">65eef06aeaffc8a604828f562e0ef8c3ee3aef3e</a></td><td>[Thu,  7 Mar 2019 19:33:16 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l203" class="line" id="l203">    203</a> 		h.client.Count(fmt.Sprintf(&quot;event.%s.cx_write&quot;, h.source), 1, tags)</td></tr>
+<tr>
+<td><a href="../../../../commit/65eef06aeaffc8a604828f562e0ef8c3ee3aef3e">65eef06aeaffc8a604828f562e0ef8c3ee3aef3e</a></td><td>[Thu,  7 Mar 2019 19:33:16 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l204" class="line" id="l204">    204</a> 		h.client.Timing(fmt.Sprintf(&quot;latency.%s.cx_write&quot;, h.source), latency, tags)</td></tr>
+<tr>
+<td><a href="../../../../commit/65eef06aeaffc8a604828f562e0ef8c3ee3aef3e">65eef06aeaffc8a604828f562e0ef8c3ee3aef3e</a></td><td>[Thu,  7 Mar 2019 19:33:16 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l205" class="line" id="l205">    205</a> 	}()</td></tr>
+<tr>
+<td><a href="../../../../commit/65eef06aeaffc8a604828f562e0ef8c3ee3aef3e">65eef06aeaffc8a604828f562e0ef8c3ee3aef3e</a></td><td>[Thu,  7 Mar 2019 19:33:16 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l206" class="line" id="l206">    206</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/65eef06aeaffc8a604828f562e0ef8c3ee3aef3e">65eef06aeaffc8a604828f562e0ef8c3ee3aef3e</a></td><td>[Thu,  7 Mar 2019 19:33:16 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l207" class="line" id="l207">    207</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/00d06e40fbeddaaf004dbf4d79edccd5d67f8762">00d06e40fbeddaaf004dbf4d79edccd5d67f8762</a></td><td>[Sat,  2 Mar 2019 16:48:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l208" class="line" id="l208">    208</a> // EmitWriteError statsd implementation.</td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l209" class="line" id="l209">    209</a> func (h *AsyncStatsdConnectionIOHook) EmitWriteError(addr net.Addr) {</td></tr>
+<tr>
+<td><a href="../../../../commit/430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd">430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd</a></td><td>[Sat, 28 Dec 2019 17:50:12 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l210" class="line" id="l210">    210</a> 	go h.client.Count(fmt.Sprintf(&quot;event.%s.cx_write_error&quot;, h.source), 1, map[string]interface{}{</td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l211" class="line" id="l211">    211</a> 		&quot;addr&quot;:      ipFromAddr(addr),</td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l212" class="line" id="l212">    212</a> 		&quot;transport&quot;: transportFromAddr(addr),</td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l213" class="line" id="l213">    213</a> 	})</td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l214" class="line" id="l214">    214</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l215" class="line" id="l215">    215</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/00d06e40fbeddaaf004dbf4d79edccd5d67f8762">00d06e40fbeddaaf004dbf4d79edccd5d67f8762</a></td><td>[Sat,  2 Mar 2019 16:48:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l216" class="line" id="l216">    216</a> // EmitRetry statsd implementation.</td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l217" class="line" id="l217">    217</a> func (h *AsyncStatsdConnectionIOHook) EmitRetry(addr net.Addr) {</td></tr>
+<tr>
+<td><a href="../../../../commit/430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd">430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd</a></td><td>[Sat, 28 Dec 2019 17:50:12 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l218" class="line" id="l218">    218</a> 	go h.client.Count(fmt.Sprintf(&quot;event.%s.cx_io_retry&quot;, h.source), 1, map[string]interface{}{</td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l219" class="line" id="l219">    219</a> 		&quot;addr&quot;:      ipFromAddr(addr),</td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l220" class="line" id="l220">    220</a> 		&quot;transport&quot;: transportFromAddr(addr),</td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l221" class="line" id="l221">    221</a> 	})</td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l222" class="line" id="l222">    222</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/75507b0acd72e7db7fe3eceb4f8a579c336a16e9">75507b0acd72e7db7fe3eceb4f8a579c336a16e9</a></td><td>[Sat,  2 Mar 2019 14:58:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l223" class="line" id="l223">    223</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/00d06e40fbeddaaf004dbf4d79edccd5d67f8762">00d06e40fbeddaaf004dbf4d79edccd5d67f8762</a></td><td>[Sat,  2 Mar 2019 16:48:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l224" class="line" id="l224">    224</a> // NewNoopConnectionIOHook creates a noop implementation of ConnectionIOHook.</td></tr>
+<tr>
+<td><a href="../../../../commit/0cd32a37df99703a6d4d004031f7040e4f7fbe85">0cd32a37df99703a6d4d004031f7040e4f7fbe85</a></td><td>[Sat,  2 Mar 2019 16:33:50 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l225" class="line" id="l225">    225</a> func NewNoopConnectionIOHook() ConnectionIOHook {</td></tr>
+<tr>
+<td><a href="../../../../commit/0cd32a37df99703a6d4d004031f7040e4f7fbe85">0cd32a37df99703a6d4d004031f7040e4f7fbe85</a></td><td>[Sat,  2 Mar 2019 16:33:50 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l226" class="line" id="l226">    226</a> 	return &amp;NoopConnectionIOHook{}</td></tr>
+<tr>
+<td><a href="../../../../commit/0cd32a37df99703a6d4d004031f7040e4f7fbe85">0cd32a37df99703a6d4d004031f7040e4f7fbe85</a></td><td>[Sat,  2 Mar 2019 16:33:50 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l227" class="line" id="l227">    227</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/0cd32a37df99703a6d4d004031f7040e4f7fbe85">0cd32a37df99703a6d4d004031f7040e4f7fbe85</a></td><td>[Sat,  2 Mar 2019 16:33:50 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l228" class="line" id="l228">    228</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/65eef06aeaffc8a604828f562e0ef8c3ee3aef3e">65eef06aeaffc8a604828f562e0ef8c3ee3aef3e</a></td><td>[Thu,  7 Mar 2019 19:33:16 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l229" class="line" id="l229">    229</a> // EmitRead noops.</td></tr>
+<tr>
+<td><a href="../../../../commit/65eef06aeaffc8a604828f562e0ef8c3ee3aef3e">65eef06aeaffc8a604828f562e0ef8c3ee3aef3e</a></td><td>[Thu,  7 Mar 2019 19:33:16 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l230" class="line" id="l230">    230</a> func (h *NoopConnectionIOHook) EmitRead(latency time.Duration, addr net.Addr) {}</td></tr>
+<tr>
+<td><a href="../../../../commit/65eef06aeaffc8a604828f562e0ef8c3ee3aef3e">65eef06aeaffc8a604828f562e0ef8c3ee3aef3e</a></td><td>[Thu,  7 Mar 2019 19:33:16 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l231" class="line" id="l231">    231</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/00d06e40fbeddaaf004dbf4d79edccd5d67f8762">00d06e40fbeddaaf004dbf4d79edccd5d67f8762</a></td><td>[Sat,  2 Mar 2019 16:48:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l232" class="line" id="l232">    232</a> // EmitReadError noops.</td></tr>
+<tr>
+<td><a href="../../../../commit/c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00">c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00</a></td><td>[Sat,  2 Mar 2019 15:24:48 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l233" class="line" id="l233">    233</a> func (h *NoopConnectionIOHook) EmitReadError(addr net.Addr) {}</td></tr>
+<tr>
+<td><a href="../../../../commit/c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00">c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00</a></td><td>[Sat,  2 Mar 2019 15:24:48 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l234" class="line" id="l234">    234</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/65eef06aeaffc8a604828f562e0ef8c3ee3aef3e">65eef06aeaffc8a604828f562e0ef8c3ee3aef3e</a></td><td>[Thu,  7 Mar 2019 19:33:16 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l235" class="line" id="l235">    235</a> // EmitWrite noops.</td></tr>
+<tr>
+<td><a href="../../../../commit/65eef06aeaffc8a604828f562e0ef8c3ee3aef3e">65eef06aeaffc8a604828f562e0ef8c3ee3aef3e</a></td><td>[Thu,  7 Mar 2019 19:33:16 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l236" class="line" id="l236">    236</a> func (h *NoopConnectionIOHook) EmitWrite(latency time.Duration, addr net.Addr) {}</td></tr>
+<tr>
+<td><a href="../../../../commit/65eef06aeaffc8a604828f562e0ef8c3ee3aef3e">65eef06aeaffc8a604828f562e0ef8c3ee3aef3e</a></td><td>[Thu,  7 Mar 2019 19:33:16 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l237" class="line" id="l237">    237</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/00d06e40fbeddaaf004dbf4d79edccd5d67f8762">00d06e40fbeddaaf004dbf4d79edccd5d67f8762</a></td><td>[Sat,  2 Mar 2019 16:48:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l238" class="line" id="l238">    238</a> // EmitWriteError noops.</td></tr>
+<tr>
+<td><a href="../../../../commit/c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00">c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00</a></td><td>[Sat,  2 Mar 2019 15:24:48 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l239" class="line" id="l239">    239</a> func (h *NoopConnectionIOHook) EmitWriteError(addr net.Addr) {}</td></tr>
+<tr>
+<td><a href="../../../../commit/c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00">c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00</a></td><td>[Sat,  2 Mar 2019 15:24:48 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l240" class="line" id="l240">    240</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/00d06e40fbeddaaf004dbf4d79edccd5d67f8762">00d06e40fbeddaaf004dbf4d79edccd5d67f8762</a></td><td>[Sat,  2 Mar 2019 16:48:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l241" class="line" id="l241">    241</a> // EmitRetry noops.</td></tr>
+<tr>
+<td><a href="../../../../commit/c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00">c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00</a></td><td>[Sat,  2 Mar 2019 15:24:48 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l242" class="line" id="l242">    242</a> func (h *NoopConnectionIOHook) EmitRetry(addr net.Addr) {}</td></tr>
+<tr>
+<td><a href="../../../../commit/c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00">c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00</a></td><td>[Sat,  2 Mar 2019 15:24:48 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l243" class="line" id="l243">    243</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l244" class="line" id="l244">    244</a> // NewAsyncStatsdProxyHook creates a new client with the specified statsd address and sample rate.</td></tr>
+<tr>
+<td><a href="../../../../commit/430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd">430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd</a></td><td>[Sat, 28 Dec 2019 17:50:12 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l245" class="line" id="l245">    245</a> func NewAsyncStatsdProxyHook(addr string, sampleRate float64, version string) (ProxyHook, error) {</td></tr>
+<tr>
+<td><a href="../../../../commit/6edd54f81cb3802e74b97dff3bef6835427cbcc7">6edd54f81cb3802e74b97dff3bef6835427cbcc7</a></td><td>[Thu,  7 Mar 2019 19:44:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l246" class="line" id="l246">    246</a> 	client, err := statsdClientFactory(addr, sampleRate, version)</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l247" class="line" id="l247">    247</a> 	if err != nil {</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l248" class="line" id="l248">    248</a> 		return nil, err</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l249" class="line" id="l249">    249</a> 	}</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l250" class="line" id="l250">    250</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6">dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6</a></td><td>[Sat, 23 Jan 2021 16:47:32 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l251" class="line" id="l251">    251</a> 	return &amp;AsyncStatsdProxyHook{client: client}, nil</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l252" class="line" id="l252">    252</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l253" class="line" id="l253">    253</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/00d06e40fbeddaaf004dbf4d79edccd5d67f8762">00d06e40fbeddaaf004dbf4d79edccd5d67f8762</a></td><td>[Sat,  2 Mar 2019 16:48:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l254" class="line" id="l254">    254</a> // EmitRequestSize statsd implementation</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l255" class="line" id="l255">    255</a> func (h *AsyncStatsdProxyHook) EmitRequestSize(bytes int64, client net.Addr) {</td></tr>
+<tr>
+<td><a href="../../../../commit/430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd">430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd</a></td><td>[Sat, 28 Dec 2019 17:50:12 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l256" class="line" id="l256">    256</a> 	go h.client.Size(&quot;size.proxy.request&quot;, bytes, map[string]interface{}{</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l257" class="line" id="l257">    257</a> 		&quot;addr&quot;: ipFromAddr(client),</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l258" class="line" id="l258">    258</a> 	})</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l259" class="line" id="l259">    259</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l260" class="line" id="l260">    260</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/00d06e40fbeddaaf004dbf4d79edccd5d67f8762">00d06e40fbeddaaf004dbf4d79edccd5d67f8762</a></td><td>[Sat,  2 Mar 2019 16:48:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l261" class="line" id="l261">    261</a> // EmitResponseSize statsd implementation</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l262" class="line" id="l262">    262</a> func (h *AsyncStatsdProxyHook) EmitResponseSize(bytes int64, upstream net.Addr) {</td></tr>
+<tr>
+<td><a href="../../../../commit/430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd">430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd</a></td><td>[Sat, 28 Dec 2019 17:50:12 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l263" class="line" id="l263">    263</a> 	go h.client.Size(&quot;size.proxy.response&quot;, bytes, map[string]interface{}{</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l264" class="line" id="l264">    264</a> 		&quot;addr&quot;: ipFromAddr(upstream),</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l265" class="line" id="l265">    265</a> 	})</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l266" class="line" id="l266">    266</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l267" class="line" id="l267">    267</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/00d06e40fbeddaaf004dbf4d79edccd5d67f8762">00d06e40fbeddaaf004dbf4d79edccd5d67f8762</a></td><td>[Sat,  2 Mar 2019 16:48:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l268" class="line" id="l268">    268</a> // EmitRTT statsd implementation</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l269" class="line" id="l269">    269</a> func (h *AsyncStatsdProxyHook) EmitRTT(latency time.Duration, client net.Addr, upstream net.Addr) {</td></tr>
+<tr>
+<td><a href="../../../../commit/430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd">430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd</a></td><td>[Sat, 28 Dec 2019 17:50:12 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l270" class="line" id="l270">    270</a> 	go h.client.Timing(&quot;latency.proxy.tx_rtt&quot;, latency, map[string]interface{}{</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l271" class="line" id="l271">    271</a> 		&quot;client&quot;:    ipFromAddr(client),</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l272" class="line" id="l272">    272</a> 		&quot;upstream&quot;:  ipFromAddr(upstream),</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l273" class="line" id="l273">    273</a> 		&quot;transport&quot;: transportFromAddr(client),</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l274" class="line" id="l274">    274</a> 	})</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l275" class="line" id="l275">    275</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l276" class="line" id="l276">    276</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/00d06e40fbeddaaf004dbf4d79edccd5d67f8762">00d06e40fbeddaaf004dbf4d79edccd5d67f8762</a></td><td>[Sat,  2 Mar 2019 16:48:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l277" class="line" id="l277">    277</a> // EmitUpstreamLatency statsd implementation</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l278" class="line" id="l278">    278</a> func (h *AsyncStatsdProxyHook) EmitUpstreamLatency(latency time.Duration, client net.Addr, upstream net.Addr) {</td></tr>
+<tr>
+<td><a href="../../../../commit/430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd">430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd</a></td><td>[Sat, 28 Dec 2019 17:50:12 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l279" class="line" id="l279">    279</a> 	go h.client.Timing(&quot;latency.proxy.tx_upstream&quot;, latency, map[string]interface{}{</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l280" class="line" id="l280">    280</a> 		&quot;client&quot;:   ipFromAddr(client),</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l281" class="line" id="l281">    281</a> 		&quot;upstream&quot;: ipFromAddr(upstream),</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l282" class="line" id="l282">    282</a> 	})</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l283" class="line" id="l283">    283</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/9a043e3092a2311c00b598a4f806503bdb63f845">9a043e3092a2311c00b598a4f806503bdb63f845</a></td><td>[Sat,  2 Mar 2019 15:12:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l284" class="line" id="l284">    284</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6">dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6</a></td><td>[Sat, 23 Jan 2021 16:47:32 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l285" class="line" id="l285">    285</a> // EmitProcess statsd implementation</td></tr>
+<tr>
+<td><a href="../../../../commit/dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6">dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6</a></td><td>[Sat, 23 Jan 2021 16:47:32 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l286" class="line" id="l286">    286</a> func (h *AsyncStatsdProxyHook) EmitProcess(client net.Addr, upstream net.Addr) {</td></tr>
+<tr>
+<td><a href="../../../../commit/dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6">dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6</a></td><td>[Sat, 23 Jan 2021 16:47:32 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l287" class="line" id="l287">    287</a> 	go func() {</td></tr>
+<tr>
+<td><a href="../../../../commit/dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6">dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6</a></td><td>[Sat, 23 Jan 2021 16:47:32 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l288" class="line" id="l288">    288</a> 		tags := map[string]interface{}{</td></tr>
+<tr>
+<td><a href="../../../../commit/dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6">dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6</a></td><td>[Sat, 23 Jan 2021 16:47:32 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l289" class="line" id="l289">    289</a> 			&quot;client&quot;:   ipFromAddr(client),</td></tr>
+<tr>
+<td><a href="../../../../commit/dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6">dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6</a></td><td>[Sat, 23 Jan 2021 16:47:32 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l290" class="line" id="l290">    290</a> 			&quot;upstream&quot;: ipFromAddr(upstream),</td></tr>
+<tr>
+<td><a href="../../../../commit/dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6">dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6</a></td><td>[Sat, 23 Jan 2021 16:47:32 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l291" class="line" id="l291">    291</a> 		}</td></tr>
+<tr>
+<td><a href="../../../../commit/dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6">dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6</a></td><td>[Sat, 23 Jan 2021 16:47:32 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l292" class="line" id="l292">    292</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6">dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6</a></td><td>[Sat, 23 Jan 2021 16:47:32 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l293" class="line" id="l293">    293</a> 		h.client.Count(&quot;event.proxy.process&quot;, 1, tags)</td></tr>
+<tr>
+<td><a href="../../../../commit/dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6">dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6</a></td><td>[Sat, 23 Jan 2021 16:47:32 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l294" class="line" id="l294">    294</a> 		h.client.Gauge(</td></tr>
+<tr>
+<td><a href="../../../../commit/dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6">dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6</a></td><td>[Sat, 23 Jan 2021 16:47:32 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l295" class="line" id="l295">    295</a> 			&quot;gauge.proxy.sequence_id&quot;,</td></tr>
+<tr>
+<td><a href="../../../../commit/dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6">dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6</a></td><td>[Sat, 23 Jan 2021 16:47:32 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l296" class="line" id="l296">    296</a> 			float64(atomic.LoadInt64(&amp;h.sequenceID)),</td></tr>
+<tr>
+<td><a href="../../../../commit/dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6">dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6</a></td><td>[Sat, 23 Jan 2021 16:47:32 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l297" class="line" id="l297">    297</a> 			tags,</td></tr>
+<tr>
+<td><a href="../../../../commit/dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6">dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6</a></td><td>[Sat, 23 Jan 2021 16:47:32 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l298" class="line" id="l298">    298</a> 		)</td></tr>
+<tr>
+<td><a href="../../../../commit/dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6">dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6</a></td><td>[Sat, 23 Jan 2021 16:47:32 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l299" class="line" id="l299">    299</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6">dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6</a></td><td>[Sat, 23 Jan 2021 16:47:32 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l300" class="line" id="l300">    300</a> 		atomic.AddInt64(&amp;h.sequenceID, 1)</td></tr>
+<tr>
+<td><a href="../../../../commit/dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6">dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6</a></td><td>[Sat, 23 Jan 2021 16:47:32 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l301" class="line" id="l301">    301</a> 	}()</td></tr>
+<tr>
+<td><a href="../../../../commit/dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6">dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6</a></td><td>[Sat, 23 Jan 2021 16:47:32 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l302" class="line" id="l302">    302</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6">dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6</a></td><td>[Sat, 23 Jan 2021 16:47:32 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l303" class="line" id="l303">    303</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/f5e805dc0ca07d0d5a6602e1d34be03b33d7a408">f5e805dc0ca07d0d5a6602e1d34be03b33d7a408</a></td><td>[Sun,  3 Mar 2019 19:14:14 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l304" class="line" id="l304">    304</a> // EmitError statsd implementation</td></tr>
+<tr>
+<td><a href="../../../../commit/f5e805dc0ca07d0d5a6602e1d34be03b33d7a408">f5e805dc0ca07d0d5a6602e1d34be03b33d7a408</a></td><td>[Sun,  3 Mar 2019 19:14:14 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l305" class="line" id="l305">    305</a> func (h *AsyncStatsdProxyHook) EmitError() {</td></tr>
+<tr>
+<td><a href="../../../../commit/f5e805dc0ca07d0d5a6602e1d34be03b33d7a408">f5e805dc0ca07d0d5a6602e1d34be03b33d7a408</a></td><td>[Sun,  3 Mar 2019 19:14:14 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l306" class="line" id="l306">    306</a> 	go h.client.Count(&quot;event.proxy.error&quot;, 1, nil)</td></tr>
+<tr>
+<td><a href="../../../../commit/f5e805dc0ca07d0d5a6602e1d34be03b33d7a408">f5e805dc0ca07d0d5a6602e1d34be03b33d7a408</a></td><td>[Sun,  3 Mar 2019 19:14:14 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l307" class="line" id="l307">    307</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/f5e805dc0ca07d0d5a6602e1d34be03b33d7a408">f5e805dc0ca07d0d5a6602e1d34be03b33d7a408</a></td><td>[Sun,  3 Mar 2019 19:14:14 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l308" class="line" id="l308">    308</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/0cd32a37df99703a6d4d004031f7040e4f7fbe85">0cd32a37df99703a6d4d004031f7040e4f7fbe85</a></td><td>[Sat,  2 Mar 2019 16:33:50 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l309" class="line" id="l309">    309</a> // NewNoopProxyHook creates a noop implementation of ProxyHook.</td></tr>
+<tr>
+<td><a href="../../../../commit/0cd32a37df99703a6d4d004031f7040e4f7fbe85">0cd32a37df99703a6d4d004031f7040e4f7fbe85</a></td><td>[Sat,  2 Mar 2019 16:33:50 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l310" class="line" id="l310">    310</a> func NewNoopProxyHook() ProxyHook {</td></tr>
+<tr>
+<td><a href="../../../../commit/0cd32a37df99703a6d4d004031f7040e4f7fbe85">0cd32a37df99703a6d4d004031f7040e4f7fbe85</a></td><td>[Sat,  2 Mar 2019 16:33:50 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l311" class="line" id="l311">    311</a> 	return &amp;NoopProxyHook{}</td></tr>
+<tr>
+<td><a href="../../../../commit/0cd32a37df99703a6d4d004031f7040e4f7fbe85">0cd32a37df99703a6d4d004031f7040e4f7fbe85</a></td><td>[Sat,  2 Mar 2019 16:33:50 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l312" class="line" id="l312">    312</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/0cd32a37df99703a6d4d004031f7040e4f7fbe85">0cd32a37df99703a6d4d004031f7040e4f7fbe85</a></td><td>[Sat,  2 Mar 2019 16:33:50 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l313" class="line" id="l313">    313</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/00d06e40fbeddaaf004dbf4d79edccd5d67f8762">00d06e40fbeddaaf004dbf4d79edccd5d67f8762</a></td><td>[Sat,  2 Mar 2019 16:48:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l314" class="line" id="l314">    314</a> // EmitRequestSize noops.</td></tr>
+<tr>
+<td><a href="../../../../commit/c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00">c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00</a></td><td>[Sat,  2 Mar 2019 15:24:48 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l315" class="line" id="l315">    315</a> func (h *NoopProxyHook) EmitRequestSize(bytes int64, client net.Addr) {}</td></tr>
+<tr>
+<td><a href="../../../../commit/c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00">c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00</a></td><td>[Sat,  2 Mar 2019 15:24:48 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l316" class="line" id="l316">    316</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/00d06e40fbeddaaf004dbf4d79edccd5d67f8762">00d06e40fbeddaaf004dbf4d79edccd5d67f8762</a></td><td>[Sat,  2 Mar 2019 16:48:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l317" class="line" id="l317">    317</a> // EmitResponseSize noops.</td></tr>
+<tr>
+<td><a href="../../../../commit/c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00">c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00</a></td><td>[Sat,  2 Mar 2019 15:24:48 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l318" class="line" id="l318">    318</a> func (h *NoopProxyHook) EmitResponseSize(bytes int64, upstream net.Addr) {}</td></tr>
+<tr>
+<td><a href="../../../../commit/c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00">c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00</a></td><td>[Sat,  2 Mar 2019 15:24:48 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l319" class="line" id="l319">    319</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/00d06e40fbeddaaf004dbf4d79edccd5d67f8762">00d06e40fbeddaaf004dbf4d79edccd5d67f8762</a></td><td>[Sat,  2 Mar 2019 16:48:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l320" class="line" id="l320">    320</a> // EmitRTT noops.</td></tr>
+<tr>
+<td><a href="../../../../commit/c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00">c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00</a></td><td>[Sat,  2 Mar 2019 15:24:48 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l321" class="line" id="l321">    321</a> func (h *NoopProxyHook) EmitRTT(latency time.Duration, client net.Addr, upstream net.Addr) {}</td></tr>
+<tr>
+<td><a href="../../../../commit/c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00">c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00</a></td><td>[Sat,  2 Mar 2019 15:24:48 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l322" class="line" id="l322">    322</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/00d06e40fbeddaaf004dbf4d79edccd5d67f8762">00d06e40fbeddaaf004dbf4d79edccd5d67f8762</a></td><td>[Sat,  2 Mar 2019 16:48:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l323" class="line" id="l323">    323</a> // EmitUpstreamLatency noops.</td></tr>
+<tr>
+<td><a href="../../../../commit/c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00">c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00</a></td><td>[Sat,  2 Mar 2019 15:24:48 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l324" class="line" id="l324">    324</a> func (h *NoopProxyHook) EmitUpstreamLatency(latency time.Duration, client net.Addr, upstream net.Addr) {</td></tr>
+<tr>
+<td><a href="../../../../commit/c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00">c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00</a></td><td>[Sat,  2 Mar 2019 15:24:48 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l325" class="line" id="l325">    325</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00">c3aa5e279ac83dca2c9aaee93525b1f6e70d9b00</a></td><td>[Sat,  2 Mar 2019 15:24:48 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l326" class="line" id="l326">    326</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6">dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6</a></td><td>[Sat, 23 Jan 2021 16:47:32 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l327" class="line" id="l327">    327</a> // EmitProcess noops.</td></tr>
+<tr>
+<td><a href="../../../../commit/dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6">dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6</a></td><td>[Sat, 23 Jan 2021 16:47:32 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l328" class="line" id="l328">    328</a> func (h *NoopProxyHook) EmitProcess(client net.Addr, upstream net.Addr) {}</td></tr>
+<tr>
+<td><a href="../../../../commit/dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6">dacf8a34667f8dd3f5d76f4cae5a2484e49ae7e6</a></td><td>[Sat, 23 Jan 2021 16:47:32 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l329" class="line" id="l329">    329</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/f5e805dc0ca07d0d5a6602e1d34be03b33d7a408">f5e805dc0ca07d0d5a6602e1d34be03b33d7a408</a></td><td>[Sun,  3 Mar 2019 19:14:14 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l330" class="line" id="l330">    330</a> // EmitError noops.</td></tr>
+<tr>
+<td><a href="../../../../commit/f5e805dc0ca07d0d5a6602e1d34be03b33d7a408">f5e805dc0ca07d0d5a6602e1d34be03b33d7a408</a></td><td>[Sun,  3 Mar 2019 19:14:14 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l331" class="line" id="l331">    331</a> func (h *NoopProxyHook) EmitError() {}</td></tr>
+<tr>
+<td><a href="../../../../commit/f5e805dc0ca07d0d5a6602e1d34be03b33d7a408">f5e805dc0ca07d0d5a6602e1d34be03b33d7a408</a></td><td>[Sun,  3 Mar 2019 19:14:14 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l332" class="line" id="l332">    332</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd">430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd</a></td><td>[Sat, 28 Dec 2019 17:50:12 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l333" class="line" id="l333">    333</a> // statsdClientFactory creates a configured statsd client with reasonable defaults for the given</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l334" class="line" id="l334">    334</a> // statsd server address and sample rate.</td></tr>
+<tr>
+<td><a href="../../../../commit/430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd">430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd</a></td><td>[Sat, 28 Dec 2019 17:50:12 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l335" class="line" id="l335">    335</a> func statsdClientFactory(addr string, sampleRate float64, version string) (*aperture.Client, error) {</td></tr>
+<tr>
+<td><a href="../../../../commit/430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd">430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd</a></td><td>[Sat, 28 Dec 2019 17:50:12 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l336" class="line" id="l336">    336</a> 	return aperture.NewClient(&amp;aperture.Config{</td></tr>
+<tr>
+<td><a href="../../../../commit/a56ef7772cef072136f9fa505568e1f230692109">a56ef7772cef072136f9fa505568e1f230692109</a></td><td>[Fri, 22 Jan 2021 22:32:16 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l337" class="line" id="l337">    337</a> 		Address:                addr,</td></tr>
+<tr>
+<td><a href="../../../../commit/a56ef7772cef072136f9fa505568e1f230692109">a56ef7772cef072136f9fa505568e1f230692109</a></td><td>[Fri, 22 Jan 2021 22:32:16 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l338" class="line" id="l338">    338</a> 		Prefix:                 &quot;dotproxy&quot;,</td></tr>
+<tr>
+<td><a href="../../../../commit/a56ef7772cef072136f9fa505568e1f230692109">a56ef7772cef072136f9fa505568e1f230692109</a></td><td>[Fri, 22 Jan 2021 22:32:16 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l339" class="line" id="l339">    339</a> 		SampleRate:             sampleRate,</td></tr>
+<tr>
+<td><a href="../../../../commit/a56ef7772cef072136f9fa505568e1f230692109">a56ef7772cef072136f9fa505568e1f230692109</a></td><td>[Fri, 22 Jan 2021 22:32:16 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l340" class="line" id="l340">    340</a> 		TransportProbeInterval: 10 * time.Second,</td></tr>
+<tr>
+<td><a href="../../../../commit/430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd">430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd</a></td><td>[Sat, 28 Dec 2019 17:50:12 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l341" class="line" id="l341">    341</a> 		DefaultTags: map[string]interface{}{</td></tr>
+<tr>
+<td><a href="../../../../commit/430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd">430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd</a></td><td>[Sat, 28 Dec 2019 17:50:12 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l342" class="line" id="l342">    342</a> 			&quot;version&quot;: version,</td></tr>
+<tr>
+<td><a href="../../../../commit/430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd">430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd</a></td><td>[Sat, 28 Dec 2019 17:50:12 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l343" class="line" id="l343">    343</a> 		},</td></tr>
+<tr>
+<td><a href="../../../../commit/430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd">430b7f37c8739a3c7bcc0ffe8dd3348de88bc9cd</a></td><td>[Sat, 28 Dec 2019 17:50:12 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l344" class="line" id="l344">    344</a> 	})</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l345" class="line" id="l345">    345</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l346" class="line" id="l346">    346</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l347" class="line" id="l347">    347</a> // ipFromAddr returns the IP address from a full net.Addr, or null if unavailable.</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l348" class="line" id="l348">    348</a> func ipFromAddr(addr net.Addr) string {</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l349" class="line" id="l349">    349</a> 	switch networkAddr := addr.(type) {</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l350" class="line" id="l350">    350</a> 	case *net.UDPAddr:</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l351" class="line" id="l351">    351</a> 		return networkAddr.IP.String()</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l352" class="line" id="l352">    352</a> 	case *net.TCPAddr:</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l353" class="line" id="l353">    353</a> 		return networkAddr.IP.String()</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l354" class="line" id="l354">    354</a> 	default:</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l355" class="line" id="l355">    355</a> 		return &quot;null&quot;</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l356" class="line" id="l356">    356</a> 	}</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l357" class="line" id="l357">    357</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l358" class="line" id="l358">    358</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l359" class="line" id="l359">    359</a> // transportFromAddr returns the transport protocol (as a string) behind a net.Addr, or null if</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l360" class="line" id="l360">    360</a> // unavailable.</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l361" class="line" id="l361">    361</a> func transportFromAddr(addr net.Addr) string {</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l362" class="line" id="l362">    362</a> 	switch addr.(type) {</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l363" class="line" id="l363">    363</a> 	case *net.UDPAddr:</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l364" class="line" id="l364">    364</a> 		return &quot;udp&quot;</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l365" class="line" id="l365">    365</a> 	case *net.TCPAddr:</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l366" class="line" id="l366">    366</a> 		return &quot;tcp&quot;</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l367" class="line" id="l367">    367</a> 	default:</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l368" class="line" id="l368">    368</a> 		return &quot;null&quot;</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l369" class="line" id="l369">    369</a> 	}</td></tr>
+<tr>
+<td><a href="../../../../commit/5211ad84fa365e3b634518cb697584312228799c">5211ad84fa365e3b634518cb697584312228799c</a></td><td>[Sat,  2 Mar 2019 14:33:52 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l370" class="line" id="l370">    370</a> }</td></tr>
+</table>
+</div>
+</body>
+</html>

@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>grpc_server.cc - livegrep - Fast, regular expression code search service</title>
+<meta name="description" content="Fast, regular expression code search service" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="log">Log</a> | <a href="files">Files</a> | <a href="refs">Refs</a> | <a href="file/README.md">README</a> | <a href="file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<p>grpc_server.cc (14097B)</p><hr/>
+<table id="blob">
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l1" class="line" id="l1">      1</a> #include &quot;src/lib/debug.h&quot;</td></tr>
+<tr>
+<td><a href="../../../../commit/a8f048f7f56092df00efc7ff5dca8486f535e646">a8f048f7f56092df00efc7ff5dca8486f535e646</a></td><td>[Sat, 22 Oct 2016 16:24:40 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l2" class="line" id="l2">      2</a> #include &quot;src/lib/timer.h&quot;</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l3" class="line" id="l3">      3</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l4" class="line" id="l4">      4</a> #include &quot;src/codesearch.h&quot;</td></tr>
+<tr>
+<td><a href="../../../../commit/dcce4bb31be47ed35a9a86c1fce291997039a214">dcce4bb31be47ed35a9a86c1fce291997039a214</a></td><td>[Sat, 22 Oct 2016 15:53:24 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l5" class="line" id="l5">      5</a> #include &quot;src/tagsearch.h&quot;</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l6" class="line" id="l6">      6</a> #include &quot;src/re_width.h&quot;</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l7" class="line" id="l7">      7</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l8" class="line" id="l8">      8</a> #include &quot;src/tools/limits.h&quot;</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l9" class="line" id="l9">      9</a> #include &quot;src/tools/grpc_server.h&quot;</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l10" class="line" id="l10">     10</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/87c73f4b8e7add10c22ddceb312cdb7aa7e78b75">87c73f4b8e7add10c22ddceb312cdb7aa7e78b75</a></td><td>[Mon,  3 Sep 2018 22:30:27 +0000]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l11" class="line" id="l11">     11</a> #include &quot;google/protobuf/repeated_field.h&quot;</td></tr>
+<tr>
+<td><a href="../../../../commit/87c73f4b8e7add10c22ddceb312cdb7aa7e78b75">87c73f4b8e7add10c22ddceb312cdb7aa7e78b75</a></td><td>[Mon,  3 Sep 2018 22:30:27 +0000]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l12" class="line" id="l12">     12</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l13" class="line" id="l13">     13</a> #include &quot;gflags/gflags.h&quot;</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l14" class="line" id="l14">     14</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l15" class="line" id="l15">     15</a> #include &lt;algorithm&gt;</td></tr>
+<tr>
+<td><a href="../../../../commit/7383d6db4add1b8e01e9ffd49d689e2894c2429b">7383d6db4add1b8e01e9ffd49d689e2894c2429b</a></td><td>[Sat, 24 Jun 2017 11:21:16 -0500]</td><td>[Ted Wang &lt;tpc.wang@gmail.com&gt;]</td><td><a href="#l16" class="line" id="l16">     16</a> #include &lt;cctype&gt;</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l17" class="line" id="l17">     17</a> #include &lt;functional&gt;</td></tr>
+<tr>
+<td><a href="../../../../commit/ca728c7c05a662289f0f0d50c0e64b09e3a3c54c">ca728c7c05a662289f0f0d50c0e64b09e3a3c54c</a></td><td>[Wed, 31 May 2017 08:52:30 +0000]</td><td>[Josiah Boning &lt;josiah@dropbox.com&gt;]</td><td><a href="#l18" class="line" id="l18">     18</a> #include &lt;future&gt;</td></tr>
+<tr>
+<td><a href="../../../../commit/7383d6db4add1b8e01e9ffd49d689e2894c2429b">7383d6db4add1b8e01e9ffd49d689e2894c2429b</a></td><td>[Sat, 24 Jun 2017 11:21:16 -0500]</td><td>[Ted Wang &lt;tpc.wang@gmail.com&gt;]</td><td><a href="#l19" class="line" id="l19">     19</a> #include &lt;string&gt;</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l20" class="line" id="l20">     20</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/87c73f4b8e7add10c22ddceb312cdb7aa7e78b75">87c73f4b8e7add10c22ddceb312cdb7aa7e78b75</a></td><td>[Mon,  3 Sep 2018 22:30:27 +0000]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l21" class="line" id="l21">     21</a> #include &quot;utf8.h&quot;</td></tr>
+<tr>
+<td><a href="../../../../commit/87c73f4b8e7add10c22ddceb312cdb7aa7e78b75">87c73f4b8e7add10c22ddceb312cdb7aa7e78b75</a></td><td>[Mon,  3 Sep 2018 22:30:27 +0000]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l22" class="line" id="l22">     22</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/dcce4bb31be47ed35a9a86c1fce291997039a214">dcce4bb31be47ed35a9a86c1fce291997039a214</a></td><td>[Sat, 22 Oct 2016 15:53:24 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l23" class="line" id="l23">     23</a> #include &lt;boost/bind.hpp&gt;</td></tr>
+<tr>
+<td><a href="../../../../commit/dcce4bb31be47ed35a9a86c1fce291997039a214">dcce4bb31be47ed35a9a86c1fce291997039a214</a></td><td>[Sat, 22 Oct 2016 15:53:24 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l24" class="line" id="l24">     24</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l25" class="line" id="l25">     25</a> using grpc::ServerContext;</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l26" class="line" id="l26">     26</a> using grpc::Status;</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l27" class="line" id="l27">     27</a> using grpc::StatusCode;</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l28" class="line" id="l28">     28</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l29" class="line" id="l29">     29</a> using std::string;</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l30" class="line" id="l30">     30</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/06012740162b7bf359ce678cb36ece2d44044027">06012740162b7bf359ce678cb36ece2d44044027</a></td><td>[Sat, 10 Aug 2019 16:37:51 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l31" class="line" id="l31">     31</a> DEFINE_int32(context_lines, 3, &quot;The default number of result context lines to provide for a single query.&quot;);</td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l32" class="line" id="l32">     32</a> DEFINE_int32(max_matches, 50, &quot;The default maximum number of matches to return for a single query.&quot;);</td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l33" class="line" id="l33">     33</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/d4285745b4dfeeb7a8bc0e0812bb5edba2547c92">d4285745b4dfeeb7a8bc0e0812bb5edba2547c92</a></td><td>[Tue, 14 Feb 2017 13:16:38 -0800]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l34" class="line" id="l34">     34</a> class CodeSearchImpl final : public CodeSearch::Service {</td></tr>
+<tr>
+<td><a href="../../../../commit/d4285745b4dfeeb7a8bc0e0812bb5edba2547c92">d4285745b4dfeeb7a8bc0e0812bb5edba2547c92</a></td><td>[Tue, 14 Feb 2017 13:16:38 -0800]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l35" class="line" id="l35">     35</a>  public:</td></tr>
+<tr>
+<td><a href="../../../../commit/ca728c7c05a662289f0f0d50c0e64b09e3a3c54c">ca728c7c05a662289f0f0d50c0e64b09e3a3c54c</a></td><td>[Wed, 31 May 2017 08:52:30 +0000]</td><td>[Josiah Boning &lt;josiah@dropbox.com&gt;]</td><td><a href="#l36" class="line" id="l36">     36</a>     explicit CodeSearchImpl(code_searcher *cs, code_searcher *tagdata, std::promise&lt;void&gt; *reload_request);</td></tr>
+<tr>
+<td><a href="../../../../commit/d4285745b4dfeeb7a8bc0e0812bb5edba2547c92">d4285745b4dfeeb7a8bc0e0812bb5edba2547c92</a></td><td>[Tue, 14 Feb 2017 13:16:38 -0800]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l37" class="line" id="l37">     37</a>     virtual ~CodeSearchImpl();</td></tr>
+<tr>
+<td><a href="../../../../commit/d4285745b4dfeeb7a8bc0e0812bb5edba2547c92">d4285745b4dfeeb7a8bc0e0812bb5edba2547c92</a></td><td>[Tue, 14 Feb 2017 13:16:38 -0800]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l38" class="line" id="l38">     38</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/d4285745b4dfeeb7a8bc0e0812bb5edba2547c92">d4285745b4dfeeb7a8bc0e0812bb5edba2547c92</a></td><td>[Tue, 14 Feb 2017 13:16:38 -0800]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l39" class="line" id="l39">     39</a>     virtual grpc::Status Info(grpc::ServerContext* context, const ::InfoRequest* request, ::ServerInfo* response);</td></tr>
+<tr>
+<td><a href="../../../../commit/6addd608f7a24f06bf450020e7f1d37389b0b68d">6addd608f7a24f06bf450020e7f1d37389b0b68d</a></td><td>[Mon,  5 Feb 2018 15:27:12 -0500]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l40" class="line" id="l40">     40</a>     void TagsFirstSearch_(::CodeSearchResult* response, query&amp; q, match_stats&amp; stats);</td></tr>
+<tr>
+<td><a href="../../../../commit/d4285745b4dfeeb7a8bc0e0812bb5edba2547c92">d4285745b4dfeeb7a8bc0e0812bb5edba2547c92</a></td><td>[Tue, 14 Feb 2017 13:16:38 -0800]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l41" class="line" id="l41">     41</a>     virtual grpc::Status Search(grpc::ServerContext* context, const ::Query* request, ::CodeSearchResult* response);</td></tr>
+<tr>
+<td><a href="../../../../commit/ca728c7c05a662289f0f0d50c0e64b09e3a3c54c">ca728c7c05a662289f0f0d50c0e64b09e3a3c54c</a></td><td>[Wed, 31 May 2017 08:52:30 +0000]</td><td>[Josiah Boning &lt;josiah@dropbox.com&gt;]</td><td><a href="#l42" class="line" id="l42">     42</a>     virtual grpc::Status Reload(grpc::ServerContext* context, const ::Empty* request, ::Empty* response);</td></tr>
+<tr>
+<td><a href="../../../../commit/d4285745b4dfeeb7a8bc0e0812bb5edba2547c92">d4285745b4dfeeb7a8bc0e0812bb5edba2547c92</a></td><td>[Tue, 14 Feb 2017 13:16:38 -0800]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l43" class="line" id="l43">     43</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/d4285745b4dfeeb7a8bc0e0812bb5edba2547c92">d4285745b4dfeeb7a8bc0e0812bb5edba2547c92</a></td><td>[Tue, 14 Feb 2017 13:16:38 -0800]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l44" class="line" id="l44">     44</a>  private:</td></tr>
+<tr>
+<td><a href="../../../../commit/d4285745b4dfeeb7a8bc0e0812bb5edba2547c92">d4285745b4dfeeb7a8bc0e0812bb5edba2547c92</a></td><td>[Tue, 14 Feb 2017 13:16:38 -0800]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l45" class="line" id="l45">     45</a>     code_searcher *cs_;</td></tr>
+<tr>
+<td><a href="../../../../commit/d4285745b4dfeeb7a8bc0e0812bb5edba2547c92">d4285745b4dfeeb7a8bc0e0812bb5edba2547c92</a></td><td>[Tue, 14 Feb 2017 13:16:38 -0800]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l46" class="line" id="l46">     46</a>     code_searcher *tagdata_;</td></tr>
+<tr>
+<td><a href="../../../../commit/ca728c7c05a662289f0f0d50c0e64b09e3a3c54c">ca728c7c05a662289f0f0d50c0e64b09e3a3c54c</a></td><td>[Wed, 31 May 2017 08:52:30 +0000]</td><td>[Josiah Boning &lt;josiah@dropbox.com&gt;]</td><td><a href="#l47" class="line" id="l47">     47</a>     std::promise&lt;void&gt; *reload_request_;</td></tr>
+<tr>
+<td><a href="../../../../commit/d4285745b4dfeeb7a8bc0e0812bb5edba2547c92">d4285745b4dfeeb7a8bc0e0812bb5edba2547c92</a></td><td>[Tue, 14 Feb 2017 13:16:38 -0800]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l48" class="line" id="l48">     48</a>     tag_searcher *tagmatch_;</td></tr>
+<tr>
+<td><a href="../../../../commit/fa8874131539f7fed813d5a1703617c95d198309">fa8874131539f7fed813d5a1703617c95d198309</a></td><td>[Tue, 14 Feb 2017 19:09:43 -0800]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l49" class="line" id="l49">     49</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/fa8874131539f7fed813d5a1703617c95d198309">fa8874131539f7fed813d5a1703617c95d198309</a></td><td>[Tue, 14 Feb 2017 19:09:43 -0800]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l50" class="line" id="l50">     50</a>     thread_queue &lt;code_searcher::search_thread*&gt; pool_;</td></tr>
+<tr>
+<td><a href="../../../../commit/d4285745b4dfeeb7a8bc0e0812bb5edba2547c92">d4285745b4dfeeb7a8bc0e0812bb5edba2547c92</a></td><td>[Tue, 14 Feb 2017 13:16:38 -0800]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l51" class="line" id="l51">     51</a> };</td></tr>
+<tr>
+<td><a href="../../../../commit/d4285745b4dfeeb7a8bc0e0812bb5edba2547c92">d4285745b4dfeeb7a8bc0e0812bb5edba2547c92</a></td><td>[Tue, 14 Feb 2017 13:16:38 -0800]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l52" class="line" id="l52">     52</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/ca728c7c05a662289f0f0d50c0e64b09e3a3c54c">ca728c7c05a662289f0f0d50c0e64b09e3a3c54c</a></td><td>[Wed, 31 May 2017 08:52:30 +0000]</td><td>[Josiah Boning &lt;josiah@dropbox.com&gt;]</td><td><a href="#l53" class="line" id="l53">     53</a> std::unique_ptr&lt;CodeSearch::Service&gt; build_grpc_server(code_searcher *cs,</td></tr>
+<tr>
+<td><a href="../../../../commit/ca728c7c05a662289f0f0d50c0e64b09e3a3c54c">ca728c7c05a662289f0f0d50c0e64b09e3a3c54c</a></td><td>[Wed, 31 May 2017 08:52:30 +0000]</td><td>[Josiah Boning &lt;josiah@dropbox.com&gt;]</td><td><a href="#l54" class="line" id="l54">     54</a>                                                        code_searcher *tagdata,</td></tr>
+<tr>
+<td><a href="../../../../commit/ca728c7c05a662289f0f0d50c0e64b09e3a3c54c">ca728c7c05a662289f0f0d50c0e64b09e3a3c54c</a></td><td>[Wed, 31 May 2017 08:52:30 +0000]</td><td>[Josiah Boning &lt;josiah@dropbox.com&gt;]</td><td><a href="#l55" class="line" id="l55">     55</a>                                                        std::promise&lt;void&gt; *reload_request) {</td></tr>
+<tr>
+<td><a href="../../../../commit/ca728c7c05a662289f0f0d50c0e64b09e3a3c54c">ca728c7c05a662289f0f0d50c0e64b09e3a3c54c</a></td><td>[Wed, 31 May 2017 08:52:30 +0000]</td><td>[Josiah Boning &lt;josiah@dropbox.com&gt;]</td><td><a href="#l56" class="line" id="l56">     56</a>     return std::unique_ptr&lt;CodeSearch::Service&gt;(new CodeSearchImpl(cs, tagdata, reload_request));</td></tr>
+<tr>
+<td><a href="../../../../commit/d4285745b4dfeeb7a8bc0e0812bb5edba2547c92">d4285745b4dfeeb7a8bc0e0812bb5edba2547c92</a></td><td>[Tue, 14 Feb 2017 13:16:38 -0800]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l57" class="line" id="l57">     57</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/d4285745b4dfeeb7a8bc0e0812bb5edba2547c92">d4285745b4dfeeb7a8bc0e0812bb5edba2547c92</a></td><td>[Tue, 14 Feb 2017 13:16:38 -0800]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l58" class="line" id="l58">     58</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/ca728c7c05a662289f0f0d50c0e64b09e3a3c54c">ca728c7c05a662289f0f0d50c0e64b09e3a3c54c</a></td><td>[Wed, 31 May 2017 08:52:30 +0000]</td><td>[Josiah Boning &lt;josiah@dropbox.com&gt;]</td><td><a href="#l59" class="line" id="l59">     59</a> CodeSearchImpl::CodeSearchImpl(code_searcher *cs, code_searcher *tagdata, std::promise&lt;void&gt; *reload_request)</td></tr>
+<tr>
+<td><a href="../../../../commit/ca728c7c05a662289f0f0d50c0e64b09e3a3c54c">ca728c7c05a662289f0f0d50c0e64b09e3a3c54c</a></td><td>[Wed, 31 May 2017 08:52:30 +0000]</td><td>[Josiah Boning &lt;josiah@dropbox.com&gt;]</td><td><a href="#l60" class="line" id="l60">     60</a>     : cs_(cs), tagdata_(tagdata), reload_request_(reload_request), tagmatch_(nullptr) {</td></tr>
+<tr>
+<td><a href="../../../../commit/614b03e4490de4c22433043b5e326e55a8c76a96">614b03e4490de4c22433043b5e326e55a8c76a96</a></td><td>[Sun, 30 Oct 2016 16:16:45 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l61" class="line" id="l61">     61</a>     if (tagdata != nullptr) {</td></tr>
+<tr>
+<td><a href="../../../../commit/614b03e4490de4c22433043b5e326e55a8c76a96">614b03e4490de4c22433043b5e326e55a8c76a96</a></td><td>[Sun, 30 Oct 2016 16:16:45 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l62" class="line" id="l62">     62</a>         tagmatch_ = new tag_searcher;</td></tr>
+<tr>
+<td><a href="../../../../commit/614b03e4490de4c22433043b5e326e55a8c76a96">614b03e4490de4c22433043b5e326e55a8c76a96</a></td><td>[Sun, 30 Oct 2016 16:16:45 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l63" class="line" id="l63">     63</a>         tagmatch_-&gt;cache_indexed_files(cs_);</td></tr>
+<tr>
+<td><a href="../../../../commit/614b03e4490de4c22433043b5e326e55a8c76a96">614b03e4490de4c22433043b5e326e55a8c76a96</a></td><td>[Sun, 30 Oct 2016 16:16:45 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l64" class="line" id="l64">     64</a>     }</td></tr>
+<tr>
+<td><a href="../../../../commit/614b03e4490de4c22433043b5e326e55a8c76a96">614b03e4490de4c22433043b5e326e55a8c76a96</a></td><td>[Sun, 30 Oct 2016 16:16:45 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l65" class="line" id="l65">     65</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/614b03e4490de4c22433043b5e326e55a8c76a96">614b03e4490de4c22433043b5e326e55a8c76a96</a></td><td>[Sun, 30 Oct 2016 16:16:45 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l66" class="line" id="l66">     66</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/614b03e4490de4c22433043b5e326e55a8c76a96">614b03e4490de4c22433043b5e326e55a8c76a96</a></td><td>[Sun, 30 Oct 2016 16:16:45 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l67" class="line" id="l67">     67</a> CodeSearchImpl::~CodeSearchImpl() {</td></tr>
+<tr>
+<td><a href="../../../../commit/4317fb3ed6393af28c38d39aafe1d10943667818">4317fb3ed6393af28c38d39aafe1d10943667818</a></td><td>[Wed, 15 Feb 2017 10:41:32 -0800]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l68" class="line" id="l68">     68</a>     pool_.close();</td></tr>
+<tr>
+<td><a href="../../../../commit/4317fb3ed6393af28c38d39aafe1d10943667818">4317fb3ed6393af28c38d39aafe1d10943667818</a></td><td>[Wed, 15 Feb 2017 10:41:32 -0800]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l69" class="line" id="l69">     69</a>     code_searcher::search_thread* thread;</td></tr>
+<tr>
+<td><a href="../../../../commit/4317fb3ed6393af28c38d39aafe1d10943667818">4317fb3ed6393af28c38d39aafe1d10943667818</a></td><td>[Wed, 15 Feb 2017 10:41:32 -0800]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l70" class="line" id="l70">     70</a>     while (pool_.pop(&amp;thread))</td></tr>
+<tr>
+<td><a href="../../../../commit/4317fb3ed6393af28c38d39aafe1d10943667818">4317fb3ed6393af28c38d39aafe1d10943667818</a></td><td>[Wed, 15 Feb 2017 10:41:32 -0800]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l71" class="line" id="l71">     71</a>         delete thread;</td></tr>
+<tr>
+<td><a href="../../../../commit/614b03e4490de4c22433043b5e326e55a8c76a96">614b03e4490de4c22433043b5e326e55a8c76a96</a></td><td>[Sun, 30 Oct 2016 16:16:45 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l72" class="line" id="l72">     72</a>     delete tagmatch_;</td></tr>
+<tr>
+<td><a href="../../../../commit/614b03e4490de4c22433043b5e326e55a8c76a96">614b03e4490de4c22433043b5e326e55a8c76a96</a></td><td>[Sun, 30 Oct 2016 16:16:45 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l73" class="line" id="l73">     73</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/614b03e4490de4c22433043b5e326e55a8c76a96">614b03e4490de4c22433043b5e326e55a8c76a96</a></td><td>[Sun, 30 Oct 2016 16:16:45 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l74" class="line" id="l74">     74</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/81401b445382549991277a455916d28e8ddf6157">81401b445382549991277a455916d28e8ddf6157</a></td><td>[Thu, 25 Aug 2016 21:15:27 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l75" class="line" id="l75">     75</a> string trace_id_from_request(ServerContext *ctx) {</td></tr>
+<tr>
+<td><a href="../../../../commit/81401b445382549991277a455916d28e8ddf6157">81401b445382549991277a455916d28e8ddf6157</a></td><td>[Thu, 25 Aug 2016 21:15:27 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l76" class="line" id="l76">     76</a>     auto it = ctx-&gt;client_metadata().find(&quot;request-id&quot;);</td></tr>
+<tr>
+<td><a href="../../../../commit/81401b445382549991277a455916d28e8ddf6157">81401b445382549991277a455916d28e8ddf6157</a></td><td>[Thu, 25 Aug 2016 21:15:27 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l77" class="line" id="l77">     77</a>     if (it == ctx-&gt;client_metadata().end())</td></tr>
+<tr>
+<td><a href="../../../../commit/81401b445382549991277a455916d28e8ddf6157">81401b445382549991277a455916d28e8ddf6157</a></td><td>[Thu, 25 Aug 2016 21:15:27 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l78" class="line" id="l78">     78</a>         return string(&quot;&quot;);</td></tr>
+<tr>
+<td><a href="../../../../commit/81401b445382549991277a455916d28e8ddf6157">81401b445382549991277a455916d28e8ddf6157</a></td><td>[Thu, 25 Aug 2016 21:15:27 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l79" class="line" id="l79">     79</a>     return string(it-&gt;second.data(), it-&gt;second.size());</td></tr>
+<tr>
+<td><a href="../../../../commit/81401b445382549991277a455916d28e8ddf6157">81401b445382549991277a455916d28e8ddf6157</a></td><td>[Thu, 25 Aug 2016 21:15:27 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l80" class="line" id="l80">     80</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/81401b445382549991277a455916d28e8ddf6157">81401b445382549991277a455916d28e8ddf6157</a></td><td>[Thu, 25 Aug 2016 21:15:27 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l81" class="line" id="l81">     81</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l82" class="line" id="l82">     82</a> Status CodeSearchImpl::Info(ServerContext* context, const ::InfoRequest* request, ::ServerInfo* response) {</td></tr>
+<tr>
+<td><a href="../../../../commit/81401b445382549991277a455916d28e8ddf6157">81401b445382549991277a455916d28e8ddf6157</a></td><td>[Thu, 25 Aug 2016 21:15:27 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l83" class="line" id="l83">     83</a>     scoped_trace_id trace(trace_id_from_request(context));</td></tr>
+<tr>
+<td><a href="../../../../commit/81401b445382549991277a455916d28e8ddf6157">81401b445382549991277a455916d28e8ddf6157</a></td><td>[Thu, 25 Aug 2016 21:15:27 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l84" class="line" id="l84">     84</a>     log(&quot;Info()&quot;);</td></tr>
+<tr>
+<td><a href="../../../../commit/81401b445382549991277a455916d28e8ddf6157">81401b445382549991277a455916d28e8ddf6157</a></td><td>[Thu, 25 Aug 2016 21:15:27 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l85" class="line" id="l85">     85</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l86" class="line" id="l86">     86</a>     response-&gt;set_name(cs_-&gt;name());</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l87" class="line" id="l87">     87</a>     std::vector&lt;indexed_tree&gt; trees = cs_-&gt;trees();</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l88" class="line" id="l88">     88</a>     for (auto it = trees.begin(); it != trees.end(); ++it) {</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l89" class="line" id="l89">     89</a>         auto insert = response-&gt;add_trees();</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l90" class="line" id="l90">     90</a>         insert-&gt;set_name(it-&gt;name);</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l91" class="line" id="l91">     91</a>         insert-&gt;set_version(it-&gt;version);</td></tr>
+<tr>
+<td><a href="../../../../commit/056b33965704c3e9467d987c1686abea190e25bb">056b33965704c3e9467d987c1686abea190e25bb</a></td><td>[Wed, 27 Feb 2019 15:27:09 +0000]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l92" class="line" id="l92">     92</a>         insert-&gt;mutable_metadata()-&gt;CopyFrom(it-&gt;metadata);</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l93" class="line" id="l93">     93</a>     }</td></tr>
+<tr>
+<td><a href="../../../../commit/614b03e4490de4c22433043b5e326e55a8c76a96">614b03e4490de4c22433043b5e326e55a8c76a96</a></td><td>[Sun, 30 Oct 2016 16:16:45 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l94" class="line" id="l94">     94</a>     response-&gt;set_has_tags(tagdata_ != nullptr);</td></tr>
+<tr>
+<td><a href="../../../../commit/1cf9f5c4567d8543261956de2c1ae2f113b801f4">1cf9f5c4567d8543261956de2c1ae2f113b801f4</a></td><td>[Wed,  5 Jul 2017 17:06:26 +0000]</td><td>[Josiah Boning &lt;josiah@dropbox.com&gt;]</td><td><a href="#l95" class="line" id="l95">     95</a>     response-&gt;set_index_time(cs_-&gt;index_timestamp());</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l96" class="line" id="l96">     96</a>     return Status::OK;</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l97" class="line" id="l97">     97</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l98" class="line" id="l98">     98</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l99" class="line" id="l99">     99</a> Status extract_regex(std::shared_ptr&lt;RE2&gt; *out,</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l100" class="line" id="l100">    100</a>                      const std::string &amp;label,</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l101" class="line" id="l101">    101</a>                      const std::string &amp;input,</td></tr>
+<tr>
+<td><a href="../../../../commit/7383d6db4add1b8e01e9ffd49d689e2894c2429b">7383d6db4add1b8e01e9ffd49d689e2894c2429b</a></td><td>[Sat, 24 Jun 2017 11:21:16 -0500]</td><td>[Ted Wang &lt;tpc.wang@gmail.com&gt;]</td><td><a href="#l102" class="line" id="l102">    102</a>                      bool case_sensitive) {</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l103" class="line" id="l103">    103</a>     if (input.empty()) {</td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l104" class="line" id="l104">    104</a>         out-&gt;reset();</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l105" class="line" id="l105">    105</a>         return Status::OK;</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l106" class="line" id="l106">    106</a>     }</td></tr>
+<tr>
+<td><a href="../../../../commit/7383d6db4add1b8e01e9ffd49d689e2894c2429b">7383d6db4add1b8e01e9ffd49d689e2894c2429b</a></td><td>[Sat, 24 Jun 2017 11:21:16 -0500]</td><td>[Ted Wang &lt;tpc.wang@gmail.com&gt;]</td><td><a href="#l107" class="line" id="l107">    107</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/7383d6db4add1b8e01e9ffd49d689e2894c2429b">7383d6db4add1b8e01e9ffd49d689e2894c2429b</a></td><td>[Sat, 24 Jun 2017 11:21:16 -0500]</td><td>[Ted Wang &lt;tpc.wang@gmail.com&gt;]</td><td><a href="#l108" class="line" id="l108">    108</a>     RE2::Options opts;</td></tr>
+<tr>
+<td><a href="../../../../commit/7383d6db4add1b8e01e9ffd49d689e2894c2429b">7383d6db4add1b8e01e9ffd49d689e2894c2429b</a></td><td>[Sat, 24 Jun 2017 11:21:16 -0500]</td><td>[Ted Wang &lt;tpc.wang@gmail.com&gt;]</td><td><a href="#l109" class="line" id="l109">    109</a>     default_re2_options(opts);</td></tr>
+<tr>
+<td><a href="../../../../commit/7383d6db4add1b8e01e9ffd49d689e2894c2429b">7383d6db4add1b8e01e9ffd49d689e2894c2429b</a></td><td>[Sat, 24 Jun 2017 11:21:16 -0500]</td><td>[Ted Wang &lt;tpc.wang@gmail.com&gt;]</td><td><a href="#l110" class="line" id="l110">    110</a>     opts.set_case_sensitive(case_sensitive);</td></tr>
+<tr>
+<td><a href="../../../../commit/7383d6db4add1b8e01e9ffd49d689e2894c2429b">7383d6db4add1b8e01e9ffd49d689e2894c2429b</a></td><td>[Sat, 24 Jun 2017 11:21:16 -0500]</td><td>[Ted Wang &lt;tpc.wang@gmail.com&gt;]</td><td><a href="#l111" class="line" id="l111">    111</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l112" class="line" id="l112">    112</a>     std::shared_ptr&lt;RE2&gt; re(new RE2(input, opts));</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l113" class="line" id="l113">    113</a>     if (!re-&gt;ok()) {</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l114" class="line" id="l114">    114</a>         return Status(StatusCode::INVALID_ARGUMENT, label + &quot;: &quot; + re-&gt;error());</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l115" class="line" id="l115">    115</a>     }</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l116" class="line" id="l116">    116</a>     *out = std::move(re);</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l117" class="line" id="l117">    117</a>     return Status::OK;</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l118" class="line" id="l118">    118</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l119" class="line" id="l119">    119</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l120" class="line" id="l120">    120</a> Status extract_regex(std::shared_ptr&lt;RE2&gt; *out,</td></tr>
+<tr>
+<td><a href="../../../../commit/7383d6db4add1b8e01e9ffd49d689e2894c2429b">7383d6db4add1b8e01e9ffd49d689e2894c2429b</a></td><td>[Sat, 24 Jun 2017 11:21:16 -0500]</td><td>[Ted Wang &lt;tpc.wang@gmail.com&gt;]</td><td><a href="#l121" class="line" id="l121">    121</a>                      const std::string &amp;label,</td></tr>
+<tr>
+<td><a href="../../../../commit/7383d6db4add1b8e01e9ffd49d689e2894c2429b">7383d6db4add1b8e01e9ffd49d689e2894c2429b</a></td><td>[Sat, 24 Jun 2017 11:21:16 -0500]</td><td>[Ted Wang &lt;tpc.wang@gmail.com&gt;]</td><td><a href="#l122" class="line" id="l122">    122</a>                      const std::string &amp;input) {</td></tr>
+<tr>
+<td><a href="../../../../commit/7383d6db4add1b8e01e9ffd49d689e2894c2429b">7383d6db4add1b8e01e9ffd49d689e2894c2429b</a></td><td>[Sat, 24 Jun 2017 11:21:16 -0500]</td><td>[Ted Wang &lt;tpc.wang@gmail.com&gt;]</td><td><a href="#l123" class="line" id="l123">    123</a>     if (input.empty()) {</td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l124" class="line" id="l124">    124</a>         out-&gt;reset();</td></tr>
+<tr>
+<td><a href="../../../../commit/7383d6db4add1b8e01e9ffd49d689e2894c2429b">7383d6db4add1b8e01e9ffd49d689e2894c2429b</a></td><td>[Sat, 24 Jun 2017 11:21:16 -0500]</td><td>[Ted Wang &lt;tpc.wang@gmail.com&gt;]</td><td><a href="#l125" class="line" id="l125">    125</a>         return Status::OK;</td></tr>
+<tr>
+<td><a href="../../../../commit/7383d6db4add1b8e01e9ffd49d689e2894c2429b">7383d6db4add1b8e01e9ffd49d689e2894c2429b</a></td><td>[Sat, 24 Jun 2017 11:21:16 -0500]</td><td>[Ted Wang &lt;tpc.wang@gmail.com&gt;]</td><td><a href="#l126" class="line" id="l126">    126</a>     }</td></tr>
+<tr>
+<td><a href="../../../../commit/7383d6db4add1b8e01e9ffd49d689e2894c2429b">7383d6db4add1b8e01e9ffd49d689e2894c2429b</a></td><td>[Sat, 24 Jun 2017 11:21:16 -0500]</td><td>[Ted Wang &lt;tpc.wang@gmail.com&gt;]</td><td><a href="#l127" class="line" id="l127">    127</a>     bool case_sensitive = std::any_of(input.begin(), input.end(), isupper);</td></tr>
+<tr>
+<td><a href="../../../../commit/7383d6db4add1b8e01e9ffd49d689e2894c2429b">7383d6db4add1b8e01e9ffd49d689e2894c2429b</a></td><td>[Sat, 24 Jun 2017 11:21:16 -0500]</td><td>[Ted Wang &lt;tpc.wang@gmail.com&gt;]</td><td><a href="#l128" class="line" id="l128">    128</a>     return extract_regex(out, label, input, case_sensitive);</td></tr>
+<tr>
+<td><a href="../../../../commit/7383d6db4add1b8e01e9ffd49d689e2894c2429b">7383d6db4add1b8e01e9ffd49d689e2894c2429b</a></td><td>[Sat, 24 Jun 2017 11:21:16 -0500]</td><td>[Ted Wang &lt;tpc.wang@gmail.com&gt;]</td><td><a href="#l129" class="line" id="l129">    129</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l130" class="line" id="l130">    130</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/7383d6db4add1b8e01e9ffd49d689e2894c2429b">7383d6db4add1b8e01e9ffd49d689e2894c2429b</a></td><td>[Sat, 24 Jun 2017 11:21:16 -0500]</td><td>[Ted Wang &lt;tpc.wang@gmail.com&gt;]</td><td><a href="#l131" class="line" id="l131">    131</a> Status parse_query(query *q, const ::Query* request, ::CodeSearchResult* response) {</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l132" class="line" id="l132">    132</a>     Status status = Status::OK;</td></tr>
+<tr>
+<td><a href="../../../../commit/7383d6db4add1b8e01e9ffd49d689e2894c2429b">7383d6db4add1b8e01e9ffd49d689e2894c2429b</a></td><td>[Sat, 24 Jun 2017 11:21:16 -0500]</td><td>[Ted Wang &lt;tpc.wang@gmail.com&gt;]</td><td><a href="#l133" class="line" id="l133">    133</a>     status = extract_regex(&amp;q-&gt;line_pat, &quot;line&quot;, request-&gt;line(), !request-&gt;fold_case());</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l134" class="line" id="l134">    134</a>     if (status.ok())</td></tr>
+<tr>
+<td><a href="../../../../commit/7383d6db4add1b8e01e9ffd49d689e2894c2429b">7383d6db4add1b8e01e9ffd49d689e2894c2429b</a></td><td>[Sat, 24 Jun 2017 11:21:16 -0500]</td><td>[Ted Wang &lt;tpc.wang@gmail.com&gt;]</td><td><a href="#l135" class="line" id="l135">    135</a>         status = extract_regex(&amp;q-&gt;file_pat, &quot;file&quot;, request-&gt;file());</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l136" class="line" id="l136">    136</a>     if (status.ok())</td></tr>
+<tr>
+<td><a href="../../../../commit/7383d6db4add1b8e01e9ffd49d689e2894c2429b">7383d6db4add1b8e01e9ffd49d689e2894c2429b</a></td><td>[Sat, 24 Jun 2017 11:21:16 -0500]</td><td>[Ted Wang &lt;tpc.wang@gmail.com&gt;]</td><td><a href="#l137" class="line" id="l137">    137</a>         status = extract_regex(&amp;q-&gt;tree_pat, &quot;repo&quot;, request-&gt;repo());</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l138" class="line" id="l138">    138</a>     if (status.ok())</td></tr>
+<tr>
+<td><a href="../../../../commit/7383d6db4add1b8e01e9ffd49d689e2894c2429b">7383d6db4add1b8e01e9ffd49d689e2894c2429b</a></td><td>[Sat, 24 Jun 2017 11:21:16 -0500]</td><td>[Ted Wang &lt;tpc.wang@gmail.com&gt;]</td><td><a href="#l139" class="line" id="l139">    139</a>         status = extract_regex(&amp;q-&gt;tags_pat, &quot;tags&quot;, request-&gt;tags());</td></tr>
+<tr>
+<td><a href="../../../../commit/0cdf8e64ecfa8380b26df9f6cc82986b679c19ef">0cdf8e64ecfa8380b26df9f6cc82986b679c19ef</a></td><td>[Mon,  5 Sep 2016 16:46:15 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l140" class="line" id="l140">    140</a>     if (status.ok())</td></tr>
+<tr>
+<td><a href="../../../../commit/7383d6db4add1b8e01e9ffd49d689e2894c2429b">7383d6db4add1b8e01e9ffd49d689e2894c2429b</a></td><td>[Sat, 24 Jun 2017 11:21:16 -0500]</td><td>[Ted Wang &lt;tpc.wang@gmail.com&gt;]</td><td><a href="#l141" class="line" id="l141">    141</a>         status = extract_regex(&amp;q-&gt;negate.file_pat, &quot;-file&quot;, request-&gt;not_file());</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l142" class="line" id="l142">    142</a>     if (status.ok())</td></tr>
+<tr>
+<td><a href="../../../../commit/7383d6db4add1b8e01e9ffd49d689e2894c2429b">7383d6db4add1b8e01e9ffd49d689e2894c2429b</a></td><td>[Sat, 24 Jun 2017 11:21:16 -0500]</td><td>[Ted Wang &lt;tpc.wang@gmail.com&gt;]</td><td><a href="#l143" class="line" id="l143">    143</a>         status = extract_regex(&amp;q-&gt;negate.tree_pat, &quot;-repo&quot;, request-&gt;not_repo());</td></tr>
+<tr>
+<td><a href="../../../../commit/0cdf8e64ecfa8380b26df9f6cc82986b679c19ef">0cdf8e64ecfa8380b26df9f6cc82986b679c19ef</a></td><td>[Mon,  5 Sep 2016 16:46:15 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l144" class="line" id="l144">    144</a>     if (status.ok())</td></tr>
+<tr>
+<td><a href="../../../../commit/7383d6db4add1b8e01e9ffd49d689e2894c2429b">7383d6db4add1b8e01e9ffd49d689e2894c2429b</a></td><td>[Sat, 24 Jun 2017 11:21:16 -0500]</td><td>[Ted Wang &lt;tpc.wang@gmail.com&gt;]</td><td><a href="#l145" class="line" id="l145">    145</a>         status = extract_regex(&amp;q-&gt;negate.tags_pat, &quot;-tags&quot;, request-&gt;not_tags());</td></tr>
+<tr>
+<td><a href="../../../../commit/52be098f2dc84d4bc806849d9625c109a6c04289">52be098f2dc84d4bc806849d9625c109a6c04289</a></td><td>[Sun,  3 Sep 2017 13:43:07 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l146" class="line" id="l146">    146</a>     q-&gt;filename_only = request-&gt;filename_only();</td></tr>
+<tr>
+<td><a href="../../../../commit/06012740162b7bf359ce678cb36ece2d44044027">06012740162b7bf359ce678cb36ece2d44044027</a></td><td>[Sat, 10 Aug 2019 16:37:51 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l147" class="line" id="l147">    147</a>     q-&gt;context_lines = request-&gt;context_lines();</td></tr>
+<tr>
+<td><a href="../../../../commit/06012740162b7bf359ce678cb36ece2d44044027">06012740162b7bf359ce678cb36ece2d44044027</a></td><td>[Sat, 10 Aug 2019 16:37:51 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l148" class="line" id="l148">    148</a>     if (q-&gt;context_lines &lt;= 0 &amp;&amp; FLAGS_context_lines) {</td></tr>
+<tr>
+<td><a href="../../../../commit/06012740162b7bf359ce678cb36ece2d44044027">06012740162b7bf359ce678cb36ece2d44044027</a></td><td>[Sat, 10 Aug 2019 16:37:51 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l149" class="line" id="l149">    149</a>         q-&gt;context_lines = FLAGS_context_lines;</td></tr>
+<tr>
+<td><a href="../../../../commit/06012740162b7bf359ce678cb36ece2d44044027">06012740162b7bf359ce678cb36ece2d44044027</a></td><td>[Sat, 10 Aug 2019 16:37:51 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l150" class="line" id="l150">    150</a>     }</td></tr>
+<tr>
+<td><a href="../../../../commit/b5f15f32da288a0a4bc345920dfd6800151c42a5">b5f15f32da288a0a4bc345920dfd6800151c42a5</a></td><td>[Sun, 27 Nov 2016 11:32:19 -0800]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l151" class="line" id="l151">    151</a>     return status;</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l152" class="line" id="l152">    152</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l153" class="line" id="l153">    153</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l154" class="line" id="l154">    154</a> class add_match {</td></tr>
+<tr>
+<td><a href="../../../../commit/87c73f4b8e7add10c22ddceb312cdb7aa7e78b75">87c73f4b8e7add10c22ddceb312cdb7aa7e78b75</a></td><td>[Mon,  3 Sep 2018 22:30:27 +0000]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l155" class="line" id="l155">    155</a>     void insert_string_back(google::protobuf::RepeatedPtrField&lt;string&gt; *field, StringPiece str) const {</td></tr>
+<tr>
+<td><a href="../../../../commit/87c73f4b8e7add10c22ddceb312cdb7aa7e78b75">87c73f4b8e7add10c22ddceb312cdb7aa7e78b75</a></td><td>[Mon,  3 Sep 2018 22:30:27 +0000]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l156" class="line" id="l156">    156</a>         if (utf8::is_valid(str.begin(), str.end())) {</td></tr>
+<tr>
+<td><a href="../../../../commit/87c73f4b8e7add10c22ddceb312cdb7aa7e78b75">87c73f4b8e7add10c22ddceb312cdb7aa7e78b75</a></td><td>[Mon,  3 Sep 2018 22:30:27 +0000]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l157" class="line" id="l157">    157</a>             field-&gt;Add(str.ToString());</td></tr>
+<tr>
+<td><a href="../../../../commit/87c73f4b8e7add10c22ddceb312cdb7aa7e78b75">87c73f4b8e7add10c22ddceb312cdb7aa7e78b75</a></td><td>[Mon,  3 Sep 2018 22:30:27 +0000]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l158" class="line" id="l158">    158</a>         } else {</td></tr>
+<tr>
+<td><a href="../../../../commit/87c73f4b8e7add10c22ddceb312cdb7aa7e78b75">87c73f4b8e7add10c22ddceb312cdb7aa7e78b75</a></td><td>[Mon,  3 Sep 2018 22:30:27 +0000]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l159" class="line" id="l159">    159</a>             field-&gt;Add(&quot;&lt;invalid utf-8&gt;&quot;);</td></tr>
+<tr>
+<td><a href="../../../../commit/87c73f4b8e7add10c22ddceb312cdb7aa7e78b75">87c73f4b8e7add10c22ddceb312cdb7aa7e78b75</a></td><td>[Mon,  3 Sep 2018 22:30:27 +0000]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l160" class="line" id="l160">    160</a>         }</td></tr>
+<tr>
+<td><a href="../../../../commit/87c73f4b8e7add10c22ddceb312cdb7aa7e78b75">87c73f4b8e7add10c22ddceb312cdb7aa7e78b75</a></td><td>[Mon,  3 Sep 2018 22:30:27 +0000]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l161" class="line" id="l161">    161</a>     }</td></tr>
+<tr>
+<td><a href="../../../../commit/87c73f4b8e7add10c22ddceb312cdb7aa7e78b75">87c73f4b8e7add10c22ddceb312cdb7aa7e78b75</a></td><td>[Mon,  3 Sep 2018 22:30:27 +0000]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l162" class="line" id="l162">    162</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l163" class="line" id="l163">    163</a> public:</td></tr>
+<tr>
+<td><a href="../../../../commit/ec9579d7aad0d4e2c28b16d63d9c9e57a0d3042e">ec9579d7aad0d4e2c28b16d63d9c9e57a0d3042e</a></td><td>[Mon,  5 Feb 2018 13:46:31 -0500]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l164" class="line" id="l164">    164</a>     typedef std::set&lt;std::pair&lt;indexed_file*, int&gt;&gt; line_set;</td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l165" class="line" id="l165">    165</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/9fca08f6af685f0d2536131de2dfc75fabce07ac">9fca08f6af685f0d2536131de2dfc75fabce07ac</a></td><td>[Wed,  7 Feb 2018 07:52:22 -0500]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l166" class="line" id="l166">    166</a>     add_match(line_set* ls, CodeSearchResult* response)</td></tr>
+<tr>
+<td><a href="../../../../commit/9fca08f6af685f0d2536131de2dfc75fabce07ac">9fca08f6af685f0d2536131de2dfc75fabce07ac</a></td><td>[Wed,  7 Feb 2018 07:52:22 -0500]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l167" class="line" id="l167">    167</a>         : unique_lines_(ls), response_(response) {}</td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l168" class="line" id="l168">    168</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l169" class="line" id="l169">    169</a>     int match_count() {</td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l170" class="line" id="l170">    170</a>         return response_-&gt;results_size();</td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l171" class="line" id="l171">    171</a>     }</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l172" class="line" id="l172">    172</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l173" class="line" id="l173">    173</a>     void operator()(const match_result *m) const {</td></tr>
+<tr>
+<td><a href="../../../../commit/0ffc28d564e81d27dcb14cc4161fc97d60f8e0a3">0ffc28d564e81d27dcb14cc4161fc97d60f8e0a3</a></td><td>[Thu,  1 Feb 2018 09:43:10 -0500]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l174" class="line" id="l174">    174</a>         // Avoid a duplicate if a line is returned once from the</td></tr>
+<tr>
+<td><a href="../../../../commit/0ffc28d564e81d27dcb14cc4161fc97d60f8e0a3">0ffc28d564e81d27dcb14cc4161fc97d60f8e0a3</a></td><td>[Thu,  1 Feb 2018 09:43:10 -0500]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l175" class="line" id="l175">    175</a>         // tags search then again during the main corpus search.</td></tr>
+<tr>
+<td><a href="../../../../commit/ec9579d7aad0d4e2c28b16d63d9c9e57a0d3042e">ec9579d7aad0d4e2c28b16d63d9c9e57a0d3042e</a></td><td>[Mon,  5 Feb 2018 13:46:31 -0500]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l176" class="line" id="l176">    176</a>         bool already_inserted = ! unique_lines_-&gt;insert(std::make_pair(m-&gt;file, m-&gt;lno)).second;</td></tr>
+<tr>
+<td><a href="../../../../commit/57315d8383f98ca21c8a37f01fa293c36a2725e0">57315d8383f98ca21c8a37f01fa293c36a2725e0</a></td><td>[Thu,  1 Feb 2018 10:20:15 -0500]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l177" class="line" id="l177">    177</a>         if (already_inserted) {</td></tr>
+<tr>
+<td><a href="../../../../commit/0ffc28d564e81d27dcb14cc4161fc97d60f8e0a3">0ffc28d564e81d27dcb14cc4161fc97d60f8e0a3</a></td><td>[Thu,  1 Feb 2018 09:43:10 -0500]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l178" class="line" id="l178">    178</a>             return;</td></tr>
+<tr>
+<td><a href="../../../../commit/57315d8383f98ca21c8a37f01fa293c36a2725e0">57315d8383f98ca21c8a37f01fa293c36a2725e0</a></td><td>[Thu,  1 Feb 2018 10:20:15 -0500]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l179" class="line" id="l179">    179</a>         }</td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l180" class="line" id="l180">    180</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l181" class="line" id="l181">    181</a>         auto result = response_-&gt;add_results();</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l182" class="line" id="l182">    182</a>         result-&gt;set_tree(m-&gt;file-&gt;tree-&gt;name);</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l183" class="line" id="l183">    183</a>         result-&gt;set_version(m-&gt;file-&gt;tree-&gt;version);</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l184" class="line" id="l184">    184</a>         result-&gt;set_path(m-&gt;file-&gt;path);</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l185" class="line" id="l185">    185</a>         result-&gt;set_line_number(m-&gt;lno);</td></tr>
+<tr>
+<td><a href="../../../../commit/87c73f4b8e7add10c22ddceb312cdb7aa7e78b75">87c73f4b8e7add10c22ddceb312cdb7aa7e78b75</a></td><td>[Mon,  3 Sep 2018 22:30:27 +0000]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l186" class="line" id="l186">    186</a>         for (auto &amp;piece : m-&gt;context_before) {</td></tr>
+<tr>
+<td><a href="../../../../commit/87c73f4b8e7add10c22ddceb312cdb7aa7e78b75">87c73f4b8e7add10c22ddceb312cdb7aa7e78b75</a></td><td>[Mon,  3 Sep 2018 22:30:27 +0000]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l187" class="line" id="l187">    187</a>             insert_string_back(result-&gt;mutable_context_before(), piece);</td></tr>
+<tr>
+<td><a href="../../../../commit/87c73f4b8e7add10c22ddceb312cdb7aa7e78b75">87c73f4b8e7add10c22ddceb312cdb7aa7e78b75</a></td><td>[Mon,  3 Sep 2018 22:30:27 +0000]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l188" class="line" id="l188">    188</a>         }</td></tr>
+<tr>
+<td><a href="../../../../commit/87c73f4b8e7add10c22ddceb312cdb7aa7e78b75">87c73f4b8e7add10c22ddceb312cdb7aa7e78b75</a></td><td>[Mon,  3 Sep 2018 22:30:27 +0000]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l189" class="line" id="l189">    189</a>         for (auto &amp;piece : m-&gt;context_after) {</td></tr>
+<tr>
+<td><a href="../../../../commit/87c73f4b8e7add10c22ddceb312cdb7aa7e78b75">87c73f4b8e7add10c22ddceb312cdb7aa7e78b75</a></td><td>[Mon,  3 Sep 2018 22:30:27 +0000]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l190" class="line" id="l190">    190</a>             insert_string_back(result-&gt;mutable_context_after(), piece);</td></tr>
+<tr>
+<td><a href="../../../../commit/87c73f4b8e7add10c22ddceb312cdb7aa7e78b75">87c73f4b8e7add10c22ddceb312cdb7aa7e78b75</a></td><td>[Mon,  3 Sep 2018 22:30:27 +0000]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l191" class="line" id="l191">    191</a>         }</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l192" class="line" id="l192">    192</a>         result-&gt;mutable_bounds()-&gt;set_left(m-&gt;matchleft);</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l193" class="line" id="l193">    193</a>         result-&gt;mutable_bounds()-&gt;set_right(m-&gt;matchright);</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l194" class="line" id="l194">    194</a>         result-&gt;set_line(m-&gt;line.ToString());</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l195" class="line" id="l195">    195</a>     }</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l196" class="line" id="l196">    196</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/8861dfa7c8656468f66d8500780920258f1308a0">8861dfa7c8656468f66d8500780920258f1308a0</a></td><td>[Fri,  9 Jun 2017 22:12:48 +0000]</td><td>[Josiah Boning &lt;josiah@dropbox.com&gt;]</td><td><a href="#l197" class="line" id="l197">    197</a>     void operator()(const file_result *f) const {</td></tr>
+<tr>
+<td><a href="../../../../commit/8861dfa7c8656468f66d8500780920258f1308a0">8861dfa7c8656468f66d8500780920258f1308a0</a></td><td>[Fri,  9 Jun 2017 22:12:48 +0000]</td><td>[Josiah Boning &lt;josiah@dropbox.com&gt;]</td><td><a href="#l198" class="line" id="l198">    198</a>         auto result = response_-&gt;add_file_results();</td></tr>
+<tr>
+<td><a href="../../../../commit/8861dfa7c8656468f66d8500780920258f1308a0">8861dfa7c8656468f66d8500780920258f1308a0</a></td><td>[Fri,  9 Jun 2017 22:12:48 +0000]</td><td>[Josiah Boning &lt;josiah@dropbox.com&gt;]</td><td><a href="#l199" class="line" id="l199">    199</a>         result-&gt;set_tree(f-&gt;file-&gt;tree-&gt;name);</td></tr>
+<tr>
+<td><a href="../../../../commit/8861dfa7c8656468f66d8500780920258f1308a0">8861dfa7c8656468f66d8500780920258f1308a0</a></td><td>[Fri,  9 Jun 2017 22:12:48 +0000]</td><td>[Josiah Boning &lt;josiah@dropbox.com&gt;]</td><td><a href="#l200" class="line" id="l200">    200</a>         result-&gt;set_version(f-&gt;file-&gt;tree-&gt;version);</td></tr>
+<tr>
+<td><a href="../../../../commit/8861dfa7c8656468f66d8500780920258f1308a0">8861dfa7c8656468f66d8500780920258f1308a0</a></td><td>[Fri,  9 Jun 2017 22:12:48 +0000]</td><td>[Josiah Boning &lt;josiah@dropbox.com&gt;]</td><td><a href="#l201" class="line" id="l201">    201</a>         result-&gt;set_path(f-&gt;file-&gt;path);</td></tr>
+<tr>
+<td><a href="../../../../commit/8861dfa7c8656468f66d8500780920258f1308a0">8861dfa7c8656468f66d8500780920258f1308a0</a></td><td>[Fri,  9 Jun 2017 22:12:48 +0000]</td><td>[Josiah Boning &lt;josiah@dropbox.com&gt;]</td><td><a href="#l202" class="line" id="l202">    202</a>         result-&gt;mutable_bounds()-&gt;set_left(f-&gt;matchleft);</td></tr>
+<tr>
+<td><a href="../../../../commit/8861dfa7c8656468f66d8500780920258f1308a0">8861dfa7c8656468f66d8500780920258f1308a0</a></td><td>[Fri,  9 Jun 2017 22:12:48 +0000]</td><td>[Josiah Boning &lt;josiah@dropbox.com&gt;]</td><td><a href="#l203" class="line" id="l203">    203</a>         result-&gt;mutable_bounds()-&gt;set_right(f-&gt;matchright);</td></tr>
+<tr>
+<td><a href="../../../../commit/8861dfa7c8656468f66d8500780920258f1308a0">8861dfa7c8656468f66d8500780920258f1308a0</a></td><td>[Fri,  9 Jun 2017 22:12:48 +0000]</td><td>[Josiah Boning &lt;josiah@dropbox.com&gt;]</td><td><a href="#l204" class="line" id="l204">    204</a>     }</td></tr>
+<tr>
+<td><a href="../../../../commit/8861dfa7c8656468f66d8500780920258f1308a0">8861dfa7c8656468f66d8500780920258f1308a0</a></td><td>[Fri,  9 Jun 2017 22:12:48 +0000]</td><td>[Josiah Boning &lt;josiah@dropbox.com&gt;]</td><td><a href="#l205" class="line" id="l205">    205</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l206" class="line" id="l206">    206</a> private:</td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l207" class="line" id="l207">    207</a>     line_set* unique_lines_;</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l208" class="line" id="l208">    208</a>     CodeSearchResult* response_;</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l209" class="line" id="l209">    209</a> };</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l210" class="line" id="l210">    210</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/e0c31e1b5418d61cffb3e09cb4cbc2c2726d0bdf">e0c31e1b5418d61cffb3e09cb4cbc2c2726d0bdf</a></td><td>[Fri,  5 Oct 2018 12:51:53 -0400]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l211" class="line" id="l211">    211</a> static void run_tags_search(const query&amp; main_query, std::string regex,</td></tr>
+<tr>
+<td><a href="../../../../commit/e0c31e1b5418d61cffb3e09cb4cbc2c2726d0bdf">e0c31e1b5418d61cffb3e09cb4cbc2c2726d0bdf</a></td><td>[Fri,  5 Oct 2018 12:51:53 -0400]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l212" class="line" id="l212">    212</a>                             code_searcher *tagdata, add_match&amp; cb,</td></tr>
+<tr>
+<td><a href="../../../../commit/e0c31e1b5418d61cffb3e09cb4cbc2c2726d0bdf">e0c31e1b5418d61cffb3e09cb4cbc2c2726d0bdf</a></td><td>[Fri,  5 Oct 2018 12:51:53 -0400]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l213" class="line" id="l213">    213</a>                             tag_searcher* searcher, match_stats&amp; stats) {</td></tr>
+<tr>
+<td><a href="../../../../commit/e0c31e1b5418d61cffb3e09cb4cbc2c2726d0bdf">e0c31e1b5418d61cffb3e09cb4cbc2c2726d0bdf</a></td><td>[Fri,  5 Oct 2018 12:51:53 -0400]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l214" class="line" id="l214">    214</a>     // copy of the main query that we will edit into a query of the tags</td></tr>
+<tr>
+<td><a href="../../../../commit/e0c31e1b5418d61cffb3e09cb4cbc2c2726d0bdf">e0c31e1b5418d61cffb3e09cb4cbc2c2726d0bdf</a></td><td>[Fri,  5 Oct 2018 12:51:53 -0400]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l215" class="line" id="l215">    215</a>     // file for the pattern `regex`</td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l216" class="line" id="l216">    216</a>     query q = main_query;</td></tr>
+<tr>
+<td><a href="../../../../commit/e0c31e1b5418d61cffb3e09cb4cbc2c2726d0bdf">e0c31e1b5418d61cffb3e09cb4cbc2c2726d0bdf</a></td><td>[Fri,  5 Oct 2018 12:51:53 -0400]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l217" class="line" id="l217">    217</a>     q.line_pat.reset(new RE2(regex, q.line_pat-&gt;options()));</td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l218" class="line" id="l218">    218</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l219" class="line" id="l219">    219</a>     // the negation constraints will be checked when we transform the match</td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l220" class="line" id="l220">    220</a>     // (unfortunately, we can&#39;t construct a line query that checks these)</td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l221" class="line" id="l221">    221</a>     query constraints;</td></tr>
+<tr>
+<td><a href="../../../../commit/e0c31e1b5418d61cffb3e09cb4cbc2c2726d0bdf">e0c31e1b5418d61cffb3e09cb4cbc2c2726d0bdf</a></td><td>[Fri,  5 Oct 2018 12:51:53 -0400]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l222" class="line" id="l222">    222</a>     constraints.line_pat = main_query.line_pat;  // tell it what to highlight</td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l223" class="line" id="l223">    223</a>     constraints.negate.file_pat.swap(q.negate.file_pat);</td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l224" class="line" id="l224">    224</a>     constraints.negate.tags_pat.swap(q.negate.tags_pat);</td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l225" class="line" id="l225">    225</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l226" class="line" id="l226">    226</a>     // modify the line pattern to match the constraints that we can handle now</td></tr>
+<tr>
+<td><a href="../../../../commit/e0c31e1b5418d61cffb3e09cb4cbc2c2726d0bdf">e0c31e1b5418d61cffb3e09cb4cbc2c2726d0bdf</a></td><td>[Fri,  5 Oct 2018 12:51:53 -0400]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l227" class="line" id="l227">    227</a>     regex = tag_searcher::create_tag_line_regex_from_query(&amp;q);</td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l228" class="line" id="l228">    228</a>     q.line_pat.reset(new RE2(regex, q.line_pat-&gt;options()));</td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l229" class="line" id="l229">    229</a>     q.file_pat.reset();</td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l230" class="line" id="l230">    230</a>     q.tags_pat.reset();</td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l231" class="line" id="l231">    231</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l232" class="line" id="l232">    232</a>     code_searcher::search_thread search(tagdata);</td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l233" class="line" id="l233">    233</a>     search.match(q,</td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l234" class="line" id="l234">    234</a>                  cb,</td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l235" class="line" id="l235">    235</a>                  cb,</td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l236" class="line" id="l236">    236</a>                  boost::bind(&amp;tag_searcher::transform, searcher, &amp;constraints, _1),</td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l237" class="line" id="l237">    237</a>                  &amp;stats);</td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l238" class="line" id="l238">    238</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l239" class="line" id="l239">    239</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l240" class="line" id="l240">    240</a> static std::string pat(const std::shared_ptr&lt;RE2&gt; &amp;p) {</td></tr>
+<tr>
+<td><a href="../../../../commit/81401b445382549991277a455916d28e8ddf6157">81401b445382549991277a455916d28e8ddf6157</a></td><td>[Thu, 25 Aug 2016 21:15:27 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l241" class="line" id="l241">    241</a>     if (p.get() == 0)</td></tr>
+<tr>
+<td><a href="../../../../commit/81401b445382549991277a455916d28e8ddf6157">81401b445382549991277a455916d28e8ddf6157</a></td><td>[Thu, 25 Aug 2016 21:15:27 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l242" class="line" id="l242">    242</a>         return &quot;&quot;;</td></tr>
+<tr>
+<td><a href="../../../../commit/81401b445382549991277a455916d28e8ddf6157">81401b445382549991277a455916d28e8ddf6157</a></td><td>[Thu, 25 Aug 2016 21:15:27 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l243" class="line" id="l243">    243</a>     return p-&gt;pattern();</td></tr>
+<tr>
+<td><a href="../../../../commit/81401b445382549991277a455916d28e8ddf6157">81401b445382549991277a455916d28e8ddf6157</a></td><td>[Thu, 25 Aug 2016 21:15:27 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l244" class="line" id="l244">    244</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/81401b445382549991277a455916d28e8ddf6157">81401b445382549991277a455916d28e8ddf6157</a></td><td>[Thu, 25 Aug 2016 21:15:27 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l245" class="line" id="l245">    245</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/6addd608f7a24f06bf450020e7f1d37389b0b68d">6addd608f7a24f06bf450020e7f1d37389b0b68d</a></td><td>[Mon,  5 Feb 2018 15:27:12 -0500]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l246" class="line" id="l246">    246</a> void CodeSearchImpl::TagsFirstSearch_(::CodeSearchResult* response, query&amp; q, match_stats&amp; stats) {</td></tr>
+<tr>
+<td><a href="../../../../commit/6addd608f7a24f06bf450020e7f1d37389b0b68d">6addd608f7a24f06bf450020e7f1d37389b0b68d</a></td><td>[Mon,  5 Feb 2018 15:27:12 -0500]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l247" class="line" id="l247">    247</a>     string line_pat = q.line_pat-&gt;pattern();</td></tr>
+<tr>
+<td><a href="../../../../commit/57315d8383f98ca21c8a37f01fa293c36a2725e0">57315d8383f98ca21c8a37f01fa293c36a2725e0</a></td><td>[Thu,  1 Feb 2018 10:20:15 -0500]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l248" class="line" id="l248">    248</a>     string regex;</td></tr>
+<tr>
+<td><a href="../../../../commit/e6868e4ed9ffea0a6c4083f3c5c6fe612c58ec08">e6868e4ed9ffea0a6c4083f3c5c6fe612c58ec08</a></td><td>[Mon,  5 Feb 2018 13:55:07 -0500]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l249" class="line" id="l249">    249</a>     int32_t original_max_matches = q.max_matches;  // remember original value</td></tr>
+<tr>
+<td><a href="../../../../commit/57315d8383f98ca21c8a37f01fa293c36a2725e0">57315d8383f98ca21c8a37f01fa293c36a2725e0</a></td><td>[Thu,  1 Feb 2018 10:20:15 -0500]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l250" class="line" id="l250">    250</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/9fca08f6af685f0d2536131de2dfc75fabce07ac">9fca08f6af685f0d2536131de2dfc75fabce07ac</a></td><td>[Wed,  7 Feb 2018 07:52:22 -0500]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l251" class="line" id="l251">    251</a>     add_match::line_set ls;</td></tr>
+<tr>
+<td><a href="../../../../commit/9fca08f6af685f0d2536131de2dfc75fabce07ac">9fca08f6af685f0d2536131de2dfc75fabce07ac</a></td><td>[Wed,  7 Feb 2018 07:52:22 -0500]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l252" class="line" id="l252">    252</a>     add_match cb(&amp;ls, response);</td></tr>
+<tr>
+<td><a href="../../../../commit/57315d8383f98ca21c8a37f01fa293c36a2725e0">57315d8383f98ca21c8a37f01fa293c36a2725e0</a></td><td>[Thu,  1 Feb 2018 10:20:15 -0500]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l253" class="line" id="l253">    253</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/57315d8383f98ca21c8a37f01fa293c36a2725e0">57315d8383f98ca21c8a37f01fa293c36a2725e0</a></td><td>[Thu,  1 Feb 2018 10:20:15 -0500]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l254" class="line" id="l254">    254</a>     /* To surface the most important matches first, start with tags.</td></tr>
+<tr>
+<td><a href="../../../../commit/57315d8383f98ca21c8a37f01fa293c36a2725e0">57315d8383f98ca21c8a37f01fa293c36a2725e0</a></td><td>[Thu,  1 Feb 2018 10:20:15 -0500]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l255" class="line" id="l255">    255</a>        First pass: is the pattern an exact match for any tags? */</td></tr>
+<tr>
+<td><a href="../../../../commit/57315d8383f98ca21c8a37f01fa293c36a2725e0">57315d8383f98ca21c8a37f01fa293c36a2725e0</a></td><td>[Thu,  1 Feb 2018 10:20:15 -0500]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l256" class="line" id="l256">    256</a>     regex = &quot;^&quot; + line_pat + &quot;$&quot;;</td></tr>
+<tr>
+<td><a href="../../../../commit/e0c31e1b5418d61cffb3e09cb4cbc2c2726d0bdf">e0c31e1b5418d61cffb3e09cb4cbc2c2726d0bdf</a></td><td>[Fri,  5 Oct 2018 12:51:53 -0400]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l257" class="line" id="l257">    257</a>     run_tags_search(q, regex, tagdata_, cb, tagmatch_, stats);</td></tr>
+<tr>
+<td><a href="../../../../commit/57315d8383f98ca21c8a37f01fa293c36a2725e0">57315d8383f98ca21c8a37f01fa293c36a2725e0</a></td><td>[Thu,  1 Feb 2018 10:20:15 -0500]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l258" class="line" id="l258">    258</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/e6868e4ed9ffea0a6c4083f3c5c6fe612c58ec08">e6868e4ed9ffea0a6c4083f3c5c6fe612c58ec08</a></td><td>[Mon,  5 Feb 2018 13:55:07 -0500]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l259" class="line" id="l259">    259</a>     q.max_matches = original_max_matches - cb.match_count();</td></tr>
+<tr>
+<td><a href="../../../../commit/57315d8383f98ca21c8a37f01fa293c36a2725e0">57315d8383f98ca21c8a37f01fa293c36a2725e0</a></td><td>[Thu,  1 Feb 2018 10:20:15 -0500]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l260" class="line" id="l260">    260</a>     if (q.max_matches &lt;= 0)</td></tr>
+<tr>
+<td><a href="../../../../commit/57315d8383f98ca21c8a37f01fa293c36a2725e0">57315d8383f98ca21c8a37f01fa293c36a2725e0</a></td><td>[Thu,  1 Feb 2018 10:20:15 -0500]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l261" class="line" id="l261">    261</a>         return;</td></tr>
+<tr>
+<td><a href="../../../../commit/57315d8383f98ca21c8a37f01fa293c36a2725e0">57315d8383f98ca21c8a37f01fa293c36a2725e0</a></td><td>[Thu,  1 Feb 2018 10:20:15 -0500]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l262" class="line" id="l262">    262</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/57315d8383f98ca21c8a37f01fa293c36a2725e0">57315d8383f98ca21c8a37f01fa293c36a2725e0</a></td><td>[Thu,  1 Feb 2018 10:20:15 -0500]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l263" class="line" id="l263">    263</a>     /* Second pass: is the pattern a prefix match for any tags? */</td></tr>
+<tr>
+<td><a href="../../../../commit/57315d8383f98ca21c8a37f01fa293c36a2725e0">57315d8383f98ca21c8a37f01fa293c36a2725e0</a></td><td>[Thu,  1 Feb 2018 10:20:15 -0500]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l264" class="line" id="l264">    264</a>     regex = &quot;^&quot; + line_pat + &quot;[^\t]&quot;;</td></tr>
+<tr>
+<td><a href="../../../../commit/e0c31e1b5418d61cffb3e09cb4cbc2c2726d0bdf">e0c31e1b5418d61cffb3e09cb4cbc2c2726d0bdf</a></td><td>[Fri,  5 Oct 2018 12:51:53 -0400]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l265" class="line" id="l265">    265</a>     run_tags_search(q, regex, tagdata_, cb, tagmatch_, stats);</td></tr>
+<tr>
+<td><a href="../../../../commit/57315d8383f98ca21c8a37f01fa293c36a2725e0">57315d8383f98ca21c8a37f01fa293c36a2725e0</a></td><td>[Thu,  1 Feb 2018 10:20:15 -0500]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l266" class="line" id="l266">    266</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/e6868e4ed9ffea0a6c4083f3c5c6fe612c58ec08">e6868e4ed9ffea0a6c4083f3c5c6fe612c58ec08</a></td><td>[Mon,  5 Feb 2018 13:55:07 -0500]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l267" class="line" id="l267">    267</a>     q.max_matches = original_max_matches - cb.match_count();</td></tr>
+<tr>
+<td><a href="../../../../commit/57315d8383f98ca21c8a37f01fa293c36a2725e0">57315d8383f98ca21c8a37f01fa293c36a2725e0</a></td><td>[Thu,  1 Feb 2018 10:20:15 -0500]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l268" class="line" id="l268">    268</a>     if (q.max_matches &lt;= 0)</td></tr>
+<tr>
+<td><a href="../../../../commit/57315d8383f98ca21c8a37f01fa293c36a2725e0">57315d8383f98ca21c8a37f01fa293c36a2725e0</a></td><td>[Thu,  1 Feb 2018 10:20:15 -0500]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l269" class="line" id="l269">    269</a>         return;</td></tr>
+<tr>
+<td><a href="../../../../commit/57315d8383f98ca21c8a37f01fa293c36a2725e0">57315d8383f98ca21c8a37f01fa293c36a2725e0</a></td><td>[Thu,  1 Feb 2018 10:20:15 -0500]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l270" class="line" id="l270">    270</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/57315d8383f98ca21c8a37f01fa293c36a2725e0">57315d8383f98ca21c8a37f01fa293c36a2725e0</a></td><td>[Thu,  1 Feb 2018 10:20:15 -0500]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l271" class="line" id="l271">    271</a>     /* Third and final pass: full corpus search. */</td></tr>
+<tr>
+<td><a href="../../../../commit/57315d8383f98ca21c8a37f01fa293c36a2725e0">57315d8383f98ca21c8a37f01fa293c36a2725e0</a></td><td>[Thu,  1 Feb 2018 10:20:15 -0500]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l272" class="line" id="l272">    272</a>     code_searcher::search_thread *search;</td></tr>
+<tr>
+<td><a href="../../../../commit/57315d8383f98ca21c8a37f01fa293c36a2725e0">57315d8383f98ca21c8a37f01fa293c36a2725e0</a></td><td>[Thu,  1 Feb 2018 10:20:15 -0500]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l273" class="line" id="l273">    273</a>     if (!pool_.try_pop(&amp;search))</td></tr>
+<tr>
+<td><a href="../../../../commit/57315d8383f98ca21c8a37f01fa293c36a2725e0">57315d8383f98ca21c8a37f01fa293c36a2725e0</a></td><td>[Thu,  1 Feb 2018 10:20:15 -0500]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l274" class="line" id="l274">    274</a>         search = new code_searcher::search_thread(cs_);</td></tr>
+<tr>
+<td><a href="../../../../commit/57315d8383f98ca21c8a37f01fa293c36a2725e0">57315d8383f98ca21c8a37f01fa293c36a2725e0</a></td><td>[Thu,  1 Feb 2018 10:20:15 -0500]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l275" class="line" id="l275">    275</a>     search-&gt;match(q, cb, cb, &amp;stats);</td></tr>
+<tr>
+<td><a href="../../../../commit/57315d8383f98ca21c8a37f01fa293c36a2725e0">57315d8383f98ca21c8a37f01fa293c36a2725e0</a></td><td>[Thu,  1 Feb 2018 10:20:15 -0500]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l276" class="line" id="l276">    276</a>     pool_.push(search);</td></tr>
+<tr>
+<td><a href="../../../../commit/57315d8383f98ca21c8a37f01fa293c36a2725e0">57315d8383f98ca21c8a37f01fa293c36a2725e0</a></td><td>[Thu,  1 Feb 2018 10:20:15 -0500]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l277" class="line" id="l277">    277</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/57315d8383f98ca21c8a37f01fa293c36a2725e0">57315d8383f98ca21c8a37f01fa293c36a2725e0</a></td><td>[Thu,  1 Feb 2018 10:20:15 -0500]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l278" class="line" id="l278">    278</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l279" class="line" id="l279">    279</a> Status CodeSearchImpl::Search(ServerContext* context, const ::Query* request, ::CodeSearchResult* response) {</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l280" class="line" id="l280">    280</a>     WidthWalker width;</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l281" class="line" id="l281">    281</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/81401b445382549991277a455916d28e8ddf6157">81401b445382549991277a455916d28e8ddf6157</a></td><td>[Thu, 25 Aug 2016 21:15:27 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l282" class="line" id="l282">    282</a>     scoped_trace_id trace(trace_id_from_request(context));</td></tr>
+<tr>
+<td><a href="../../../../commit/81401b445382549991277a455916d28e8ddf6157">81401b445382549991277a455916d28e8ddf6157</a></td><td>[Thu, 25 Aug 2016 21:15:27 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l283" class="line" id="l283">    283</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/0d2ac2cbf9a446d2e2383b8fd781abb0125ee70a">0d2ac2cbf9a446d2e2383b8fd781abb0125ee70a</a></td><td>[Mon, 18 Nov 2019 22:19:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l284" class="line" id="l284">    284</a>     response-&gt;set_index_name(cs_-&gt;name());</td></tr>
+<tr>
+<td><a href="../../../../commit/0d2ac2cbf9a446d2e2383b8fd781abb0125ee70a">0d2ac2cbf9a446d2e2383b8fd781abb0125ee70a</a></td><td>[Mon, 18 Nov 2019 22:19:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l285" class="line" id="l285">    285</a>     response-&gt;set_index_time(cs_-&gt;index_timestamp());</td></tr>
+<tr>
+<td><a href="../../../../commit/0d2ac2cbf9a446d2e2383b8fd781abb0125ee70a">0d2ac2cbf9a446d2e2383b8fd781abb0125ee70a</a></td><td>[Mon, 18 Nov 2019 22:19:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l286" class="line" id="l286">    286</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l287" class="line" id="l287">    287</a>     query q;</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l288" class="line" id="l288">    288</a>     Status st;</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l289" class="line" id="l289">    289</a>     st = parse_query(&amp;q, request, response);</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l290" class="line" id="l290">    290</a>     if (!st.ok())</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l291" class="line" id="l291">    291</a>         return st;</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l292" class="line" id="l292">    292</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/81401b445382549991277a455916d28e8ddf6157">81401b445382549991277a455916d28e8ddf6157</a></td><td>[Thu, 25 Aug 2016 21:15:27 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l293" class="line" id="l293">    293</a>     q.trace_id = current_trace_id();</td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l294" class="line" id="l294">    294</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/a0ff85248be6242148828e9762bab9af23925582">a0ff85248be6242148828e9762bab9af23925582</a></td><td>[Sat, 20 May 2017 16:11:08 -0500]</td><td>[Ted Wang &lt;tpc.wang@gmail.com&gt;]</td><td><a href="#l295" class="line" id="l295">    295</a>     q.max_matches = request-&gt;max_matches();</td></tr>
+<tr>
+<td><a href="../../../../commit/acca29947caf76f58e972b2ba5e4d899ee23bee7">acca29947caf76f58e972b2ba5e4d899ee23bee7</a></td><td>[Tue, 25 Feb 2020 08:23:02 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l296" class="line" id="l296">    296</a>     if (q.max_matches == 0 &amp;&amp; FLAGS_max_matches) {</td></tr>
+<tr>
+<td><a href="../../../../commit/acca29947caf76f58e972b2ba5e4d899ee23bee7">acca29947caf76f58e972b2ba5e4d899ee23bee7</a></td><td>[Tue, 25 Feb 2020 08:23:02 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l297" class="line" id="l297">    297</a>         // For zero-valued match limits, defer to the command line-specified default</td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l298" class="line" id="l298">    298</a>         q.max_matches = FLAGS_max_matches;</td></tr>
+<tr>
+<td><a href="../../../../commit/acca29947caf76f58e972b2ba5e4d899ee23bee7">acca29947caf76f58e972b2ba5e4d899ee23bee7</a></td><td>[Tue, 25 Feb 2020 08:23:02 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l299" class="line" id="l299">    299</a>     } else if (q.max_matches &lt; 0) {</td></tr>
+<tr>
+<td><a href="../../../../commit/acca29947caf76f58e972b2ba5e4d899ee23bee7">acca29947caf76f58e972b2ba5e4d899ee23bee7</a></td><td>[Tue, 25 Feb 2020 08:23:02 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l300" class="line" id="l300">    300</a>         // For explicitly negative match limits, disable the match limiter entirely</td></tr>
+<tr>
+<td><a href="../../../../commit/acca29947caf76f58e972b2ba5e4d899ee23bee7">acca29947caf76f58e972b2ba5e4d899ee23bee7</a></td><td>[Tue, 25 Feb 2020 08:23:02 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l301" class="line" id="l301">    301</a>         q.max_matches = 0;</td></tr>
+<tr>
+<td><a href="../../../../commit/acca29947caf76f58e972b2ba5e4d899ee23bee7">acca29947caf76f58e972b2ba5e4d899ee23bee7</a></td><td>[Tue, 25 Feb 2020 08:23:02 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l302" class="line" id="l302">    302</a>     }</td></tr>
+<tr>
+<td><a href="../../../../commit/81401b445382549991277a455916d28e8ddf6157">81401b445382549991277a455916d28e8ddf6157</a></td><td>[Thu, 25 Aug 2016 21:15:27 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l303" class="line" id="l303">    303</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/81401b445382549991277a455916d28e8ddf6157">81401b445382549991277a455916d28e8ddf6157</a></td><td>[Thu, 25 Aug 2016 21:15:27 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l304" class="line" id="l304">    304</a>     log(q.trace_id,</td></tr>
+<tr>
+<td><a href="../../../../commit/81401b445382549991277a455916d28e8ddf6157">81401b445382549991277a455916d28e8ddf6157</a></td><td>[Thu, 25 Aug 2016 21:15:27 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l305" class="line" id="l305">    305</a>         &quot;processing query line=&#39;%s&#39; file=&#39;%s&#39; tree=&#39;%s&#39; tags=&#39;%s&#39; &quot;</td></tr>
+<tr>
+<td><a href="../../../../commit/a0ff85248be6242148828e9762bab9af23925582">a0ff85248be6242148828e9762bab9af23925582</a></td><td>[Sat, 20 May 2017 16:11:08 -0500]</td><td>[Ted Wang &lt;tpc.wang@gmail.com&gt;]</td><td><a href="#l306" class="line" id="l306">    306</a>         &quot;not_file=&#39;%s&#39; not_tree=&#39;%s&#39; not_tags=&#39;%s&#39; max_matches=&#39;%d&#39;&quot;,</td></tr>
+<tr>
+<td><a href="../../../../commit/81401b445382549991277a455916d28e8ddf6157">81401b445382549991277a455916d28e8ddf6157</a></td><td>[Thu, 25 Aug 2016 21:15:27 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l307" class="line" id="l307">    307</a>         pat(q.line_pat).c_str(),</td></tr>
+<tr>
+<td><a href="../../../../commit/81401b445382549991277a455916d28e8ddf6157">81401b445382549991277a455916d28e8ddf6157</a></td><td>[Thu, 25 Aug 2016 21:15:27 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l308" class="line" id="l308">    308</a>         pat(q.file_pat).c_str(),</td></tr>
+<tr>
+<td><a href="../../../../commit/81401b445382549991277a455916d28e8ddf6157">81401b445382549991277a455916d28e8ddf6157</a></td><td>[Thu, 25 Aug 2016 21:15:27 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l309" class="line" id="l309">    309</a>         pat(q.tree_pat).c_str(),</td></tr>
+<tr>
+<td><a href="../../../../commit/81401b445382549991277a455916d28e8ddf6157">81401b445382549991277a455916d28e8ddf6157</a></td><td>[Thu, 25 Aug 2016 21:15:27 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l310" class="line" id="l310">    310</a>         pat(q.tags_pat).c_str(),</td></tr>
+<tr>
+<td><a href="../../../../commit/81401b445382549991277a455916d28e8ddf6157">81401b445382549991277a455916d28e8ddf6157</a></td><td>[Thu, 25 Aug 2016 21:15:27 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l311" class="line" id="l311">    311</a>         pat(q.negate.file_pat).c_str(),</td></tr>
+<tr>
+<td><a href="../../../../commit/81401b445382549991277a455916d28e8ddf6157">81401b445382549991277a455916d28e8ddf6157</a></td><td>[Thu, 25 Aug 2016 21:15:27 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l312" class="line" id="l312">    312</a>         pat(q.negate.tree_pat).c_str(),</td></tr>
+<tr>
+<td><a href="../../../../commit/a0ff85248be6242148828e9762bab9af23925582">a0ff85248be6242148828e9762bab9af23925582</a></td><td>[Sat, 20 May 2017 16:11:08 -0500]</td><td>[Ted Wang &lt;tpc.wang@gmail.com&gt;]</td><td><a href="#l313" class="line" id="l313">    313</a>         pat(q.negate.tags_pat).c_str(),</td></tr>
+<tr>
+<td><a href="../../../../commit/a0ff85248be6242148828e9762bab9af23925582">a0ff85248be6242148828e9762bab9af23925582</a></td><td>[Sat, 20 May 2017 16:11:08 -0500]</td><td>[Ted Wang &lt;tpc.wang@gmail.com&gt;]</td><td><a href="#l314" class="line" id="l314">    314</a>         q.max_matches);</td></tr>
+<tr>
+<td><a href="../../../../commit/81401b445382549991277a455916d28e8ddf6157">81401b445382549991277a455916d28e8ddf6157</a></td><td>[Thu, 25 Aug 2016 21:15:27 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l315" class="line" id="l315">    315</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l316" class="line" id="l316">    316</a>     if (q.line_pat-&gt;ProgramSize() &gt; kMaxProgramSize) {</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l317" class="line" id="l317">    317</a>         log(&quot;program too large size=%d&quot;, q.line_pat-&gt;ProgramSize());</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l318" class="line" id="l318">    318</a>         return Status(StatusCode::INVALID_ARGUMENT, &quot;Parse error&quot;);</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l319" class="line" id="l319">    319</a>     }</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l320" class="line" id="l320">    320</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l321" class="line" id="l321">    321</a>     int w = width.Walk(q.line_pat-&gt;Regexp(), 0);</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l322" class="line" id="l322">    322</a>     if (w &gt; kMaxWidth) {</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l323" class="line" id="l323">    323</a>         log(&quot;program too wide width=%d&quot;, w);</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l324" class="line" id="l324">    324</a>         return Status(StatusCode::INVALID_ARGUMENT, &quot;Parse error&quot;);</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l325" class="line" id="l325">    325</a>     }</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l326" class="line" id="l326">    326</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l327" class="line" id="l327">    327</a>     string line_pat = q.line_pat-&gt;pattern();</td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l328" class="line" id="l328">    328</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l329" class="line" id="l329">    329</a>     /* Patterns like &quot;User.*Info&quot; and &quot;p\d+&quot; might be genuine attempts</td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l330" class="line" id="l330">    330</a>        to match tags, so we cannot too quickly dismiss odd-looking REs</td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l331" class="line" id="l331">    331</a>        as justifying our skipping the phases of a tags search.  But we</td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l332" class="line" id="l332">    332</a>        can at least special-case a few characters that would not ever</td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l333" class="line" id="l333">    333</a>        appear in a pattern that matches tags.</td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l334" class="line" id="l334">    334</a>        TODO(brandon-rhodes): make this more sophisticated. */</td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l335" class="line" id="l335">    335</a>     bool might_match_tags =</td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l336" class="line" id="l336">    336</a>         // Characters that can&#39;t appear in an RE that matches a tag.</td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l337" class="line" id="l337">    337</a>         line_pat.find_first_of(&quot; !\&quot;#%&amp;&#39;,-/;&lt;=&gt;@`&quot;) == string::npos</td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l338" class="line" id="l338">    338</a>         // If the user anchored the RE, then we can only run it against</td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l339" class="line" id="l339">    339</a>         // whole lines from the corpus, never against tags.</td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l340" class="line" id="l340">    340</a>         &amp;&amp; line_pat.front() != &#39;^&#39;</td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l341" class="line" id="l341">    341</a>         &amp;&amp; line_pat.back() != &#39;$&#39;</td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l342" class="line" id="l342">    342</a>         ;</td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l343" class="line" id="l343">    343</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l344" class="line" id="l344">    344</a>     match_stats stats;</td></tr>
+<tr>
+<td><a href="../../../../commit/ba39a0d3ebf974d4f51549aace410399fd8c5138">ba39a0d3ebf974d4f51549aace410399fd8c5138</a></td><td>[Fri, 31 Jan 2020 20:35:57 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l345" class="line" id="l345">    345</a>     timer search_tm(true);</td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l346" class="line" id="l346">    346</a>     if (q.tags_pat == NULL &amp;&amp; tagdata_ &amp;&amp; might_match_tags) {</td></tr>
+<tr>
+<td><a href="../../../../commit/6addd608f7a24f06bf450020e7f1d37389b0b68d">6addd608f7a24f06bf450020e7f1d37389b0b68d</a></td><td>[Mon,  5 Feb 2018 15:27:12 -0500]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l347" class="line" id="l347">    347</a>         CodeSearchImpl::TagsFirstSearch_(response, q, stats);</td></tr>
+<tr>
+<td><a href="../../../../commit/dace8f1bf30a27db9e95f582e845bab0c4914aff">dace8f1bf30a27db9e95f582e845bab0c4914aff</a></td><td>[Thu,  5 Oct 2017 18:02:26 +0000]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l348" class="line" id="l348">    348</a>     } else if (q.tags_pat == NULL) {</td></tr>
+<tr>
+<td><a href="../../../../commit/fa8874131539f7fed813d5a1703617c95d198309">fa8874131539f7fed813d5a1703617c95d198309</a></td><td>[Tue, 14 Feb 2017 19:09:43 -0800]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l349" class="line" id="l349">    349</a>         code_searcher::search_thread *search;</td></tr>
+<tr>
+<td><a href="../../../../commit/fa8874131539f7fed813d5a1703617c95d198309">fa8874131539f7fed813d5a1703617c95d198309</a></td><td>[Tue, 14 Feb 2017 19:09:43 -0800]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l350" class="line" id="l350">    350</a>         if (!pool_.try_pop(&amp;search))</td></tr>
+<tr>
+<td><a href="../../../../commit/fa8874131539f7fed813d5a1703617c95d198309">fa8874131539f7fed813d5a1703617c95d198309</a></td><td>[Tue, 14 Feb 2017 19:09:43 -0800]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l351" class="line" id="l351">    351</a>             search = new code_searcher::search_thread(cs_);</td></tr>
+<tr>
+<td><a href="../../../../commit/9fca08f6af685f0d2536131de2dfc75fabce07ac">9fca08f6af685f0d2536131de2dfc75fabce07ac</a></td><td>[Wed,  7 Feb 2018 07:52:22 -0500]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l352" class="line" id="l352">    352</a>         add_match::line_set ls;</td></tr>
+<tr>
+<td><a href="../../../../commit/9fca08f6af685f0d2536131de2dfc75fabce07ac">9fca08f6af685f0d2536131de2dfc75fabce07ac</a></td><td>[Wed,  7 Feb 2018 07:52:22 -0500]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l353" class="line" id="l353">    353</a>         add_match cb(&amp;ls, response);</td></tr>
+<tr>
+<td><a href="../../../../commit/8861dfa7c8656468f66d8500780920258f1308a0">8861dfa7c8656468f66d8500780920258f1308a0</a></td><td>[Fri,  9 Jun 2017 22:12:48 +0000]</td><td>[Josiah Boning &lt;josiah@dropbox.com&gt;]</td><td><a href="#l354" class="line" id="l354">    354</a>         search-&gt;match(q, cb, cb, &amp;stats);</td></tr>
+<tr>
+<td><a href="../../../../commit/fa8874131539f7fed813d5a1703617c95d198309">fa8874131539f7fed813d5a1703617c95d198309</a></td><td>[Tue, 14 Feb 2017 19:09:43 -0800]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l355" class="line" id="l355">    355</a>         pool_.push(search);</td></tr>
+<tr>
+<td><a href="../../../../commit/dcce4bb31be47ed35a9a86c1fce291997039a214">dcce4bb31be47ed35a9a86c1fce291997039a214</a></td><td>[Sat, 22 Oct 2016 15:53:24 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l356" class="line" id="l356">    356</a>     } else {</td></tr>
+<tr>
+<td><a href="../../../../commit/614b03e4490de4c22433043b5e326e55a8c76a96">614b03e4490de4c22433043b5e326e55a8c76a96</a></td><td>[Sun, 30 Oct 2016 16:16:45 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l357" class="line" id="l357">    357</a>         if (tagdata_ == NULL)</td></tr>
+<tr>
+<td><a href="../../../../commit/dcce4bb31be47ed35a9a86c1fce291997039a214">dcce4bb31be47ed35a9a86c1fce291997039a214</a></td><td>[Sat, 22 Oct 2016 15:53:24 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l358" class="line" id="l358">    358</a>             return Status(StatusCode::FAILED_PRECONDITION, &quot;No tags file available.&quot;);</td></tr>
+<tr>
+<td><a href="../../../../commit/dcce4bb31be47ed35a9a86c1fce291997039a214">dcce4bb31be47ed35a9a86c1fce291997039a214</a></td><td>[Sat, 22 Oct 2016 15:53:24 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l359" class="line" id="l359">    359</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/9fca08f6af685f0d2536131de2dfc75fabce07ac">9fca08f6af685f0d2536131de2dfc75fabce07ac</a></td><td>[Wed,  7 Feb 2018 07:52:22 -0500]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l360" class="line" id="l360">    360</a>         add_match::line_set ls;</td></tr>
+<tr>
+<td><a href="../../../../commit/9fca08f6af685f0d2536131de2dfc75fabce07ac">9fca08f6af685f0d2536131de2dfc75fabce07ac</a></td><td>[Wed,  7 Feb 2018 07:52:22 -0500]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l361" class="line" id="l361">    361</a>         add_match cb(&amp;ls, response);</td></tr>
+<tr>
+<td><a href="../../../../commit/e0c31e1b5418d61cffb3e09cb4cbc2c2726d0bdf">e0c31e1b5418d61cffb3e09cb4cbc2c2726d0bdf</a></td><td>[Fri,  5 Oct 2018 12:51:53 -0400]</td><td>[Brandon Rhodes &lt;brhodes@dropbox.com&gt;]</td><td><a href="#l362" class="line" id="l362">    362</a>         run_tags_search(q, line_pat, tagdata_, cb, tagmatch_, stats);</td></tr>
+<tr>
+<td><a href="../../../../commit/dcce4bb31be47ed35a9a86c1fce291997039a214">dcce4bb31be47ed35a9a86c1fce291997039a214</a></td><td>[Sat, 22 Oct 2016 15:53:24 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l363" class="line" id="l363">    363</a>     }</td></tr>
+<tr>
+<td><a href="../../../../commit/ba39a0d3ebf974d4f51549aace410399fd8c5138">ba39a0d3ebf974d4f51549aace410399fd8c5138</a></td><td>[Fri, 31 Jan 2020 20:35:57 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l364" class="line" id="l364">    364</a>     search_tm.pause();</td></tr>
+<tr>
+<td><a href="../../../../commit/dcce4bb31be47ed35a9a86c1fce291997039a214">dcce4bb31be47ed35a9a86c1fce291997039a214</a></td><td>[Sat, 22 Oct 2016 15:53:24 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l365" class="line" id="l365">    365</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l366" class="line" id="l366">    366</a>     auto out_stats = response-&gt;mutable_stats();</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l367" class="line" id="l367">    367</a>     out_stats-&gt;set_re2_time(timeval_ms(stats.re2_time));</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l368" class="line" id="l368">    368</a>     out_stats-&gt;set_git_time(timeval_ms(stats.git_time));</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l369" class="line" id="l369">    369</a>     out_stats-&gt;set_sort_time(timeval_ms(stats.sort_time));</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l370" class="line" id="l370">    370</a>     out_stats-&gt;set_index_time(timeval_ms(stats.index_time));</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l371" class="line" id="l371">    371</a>     out_stats-&gt;set_analyze_time(timeval_ms(stats.analyze_time));</td></tr>
+<tr>
+<td><a href="../../../../commit/ba39a0d3ebf974d4f51549aace410399fd8c5138">ba39a0d3ebf974d4f51549aace410399fd8c5138</a></td><td>[Fri, 31 Jan 2020 20:35:57 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><a href="#l372" class="line" id="l372">    372</a>     out_stats-&gt;set_total_time(timeval_ms(search_tm.elapsed()));</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l373" class="line" id="l373">    373</a>     switch (stats.why) {</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l374" class="line" id="l374">    374</a>     case kExitNone:</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l375" class="line" id="l375">    375</a>         out_stats-&gt;set_exit_reason(SearchStats::NONE);</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l376" class="line" id="l376">    376</a>         break;</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l377" class="line" id="l377">    377</a>     case kExitMatchLimit:</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l378" class="line" id="l378">    378</a>         out_stats-&gt;set_exit_reason(SearchStats::MATCH_LIMIT);</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l379" class="line" id="l379">    379</a>         break;</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l380" class="line" id="l380">    380</a>     case kExitTimeout:</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l381" class="line" id="l381">    381</a>         out_stats-&gt;set_exit_reason(SearchStats::TIMEOUT);</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l382" class="line" id="l382">    382</a>         break;</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l383" class="line" id="l383">    383</a>     }</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l384" class="line" id="l384">    384</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l385" class="line" id="l385">    385</a>     return Status::OK;</td></tr>
+<tr>
+<td><a href="../../../../commit/21d881f6058a92fe3a811feeba822456067b8239">21d881f6058a92fe3a811feeba822456067b8239</a></td><td>[Mon, 22 Aug 2016 23:50:52 -0700]</td><td>[Nelson Elhage &lt;nelhage@nelhage.com&gt;]</td><td><a href="#l386" class="line" id="l386">    386</a> }</td></tr>
+<tr>
+<td><a href="../../../../commit/ca728c7c05a662289f0f0d50c0e64b09e3a3c54c">ca728c7c05a662289f0f0d50c0e64b09e3a3c54c</a></td><td>[Wed, 31 May 2017 08:52:30 +0000]</td><td>[Josiah Boning &lt;josiah@dropbox.com&gt;]</td><td><a href="#l387" class="line" id="l387">    387</a> </td></tr>
+<tr>
+<td><a href="../../../../commit/ca728c7c05a662289f0f0d50c0e64b09e3a3c54c">ca728c7c05a662289f0f0d50c0e64b09e3a3c54c</a></td><td>[Wed, 31 May 2017 08:52:30 +0000]</td><td>[Josiah Boning &lt;josiah@dropbox.com&gt;]</td><td><a href="#l388" class="line" id="l388">    388</a> Status CodeSearchImpl::Reload(ServerContext* context, const ::Empty* request, ::Empty* response) {</td></tr>
+<tr>
+<td><a href="../../../../commit/ca728c7c05a662289f0f0d50c0e64b09e3a3c54c">ca728c7c05a662289f0f0d50c0e64b09e3a3c54c</a></td><td>[Wed, 31 May 2017 08:52:30 +0000]</td><td>[Josiah Boning &lt;josiah@dropbox.com&gt;]</td><td><a href="#l389" class="line" id="l389">    389</a>     log(&quot;Reload()&quot;);</td></tr>
+<tr>
+<td><a href="../../../../commit/ca728c7c05a662289f0f0d50c0e64b09e3a3c54c">ca728c7c05a662289f0f0d50c0e64b09e3a3c54c</a></td><td>[Wed, 31 May 2017 08:52:30 +0000]</td><td>[Josiah Boning &lt;josiah@dropbox.com&gt;]</td><td><a href="#l390" class="line" id="l390">    390</a>     if (reload_request_ == NULL) {</td></tr>
+<tr>
+<td><a href="../../../../commit/ca728c7c05a662289f0f0d50c0e64b09e3a3c54c">ca728c7c05a662289f0f0d50c0e64b09e3a3c54c</a></td><td>[Wed, 31 May 2017 08:52:30 +0000]</td><td>[Josiah Boning &lt;josiah@dropbox.com&gt;]</td><td><a href="#l391" class="line" id="l391">    391</a>       return Status(StatusCode::UNIMPLEMENTED, &quot;reload rpc not enabled&quot;);</td></tr>
+<tr>
+<td><a href="../../../../commit/ca728c7c05a662289f0f0d50c0e64b09e3a3c54c">ca728c7c05a662289f0f0d50c0e64b09e3a3c54c</a></td><td>[Wed, 31 May 2017 08:52:30 +0000]</td><td>[Josiah Boning &lt;josiah@dropbox.com&gt;]</td><td><a href="#l392" class="line" id="l392">    392</a>     }</td></tr>
+<tr>
+<td><a href="../../../../commit/ca728c7c05a662289f0f0d50c0e64b09e3a3c54c">ca728c7c05a662289f0f0d50c0e64b09e3a3c54c</a></td><td>[Wed, 31 May 2017 08:52:30 +0000]</td><td>[Josiah Boning &lt;josiah@dropbox.com&gt;]</td><td><a href="#l393" class="line" id="l393">    393</a>     reload_request_-&gt;set_value();</td></tr>
+<tr>
+<td><a href="../../../../commit/ca728c7c05a662289f0f0d50c0e64b09e3a3c54c">ca728c7c05a662289f0f0d50c0e64b09e3a3c54c</a></td><td>[Wed, 31 May 2017 08:52:30 +0000]</td><td>[Josiah Boning &lt;josiah@dropbox.com&gt;]</td><td><a href="#l394" class="line" id="l394">    394</a>     return Status::OK;</td></tr>
+<tr>
+<td><a href="../../../../commit/ca728c7c05a662289f0f0d50c0e64b09e3a3c54c">ca728c7c05a662289f0f0d50c0e64b09e3a3c54c</a></td><td>[Wed, 31 May 2017 08:52:30 +0000]</td><td>[Josiah Boning &lt;josiah@dropbox.com&gt;]</td><td><a href="#l395" class="line" id="l395">    395</a> }</td></tr>
+</table>
+</div>
+</body>
+</html>
