@@ -76,7 +76,7 @@ func (r *Reader) ReadASCIICommand() ([]byte, error) {
 				)
 			}
 
-			size, err := strconv.Atoi(string(components[4]))
+			dataSize, err := strconv.Atoi(string(components[4]))
 			if err != nil {
 				return buf, fmt.Errorf(
 					"protocol: error parsing size in storage header: err=%v",
@@ -84,17 +84,24 @@ func (r *Reader) ReadASCIICommand() ([]byte, error) {
 				)
 			}
 
-			data := make([]byte, size)
-			n, err := r.Read(data)
-			buf = append(buf, data...)
+			headerSize := len(buf)
+			data := make([]byte, dataSize)
 
-			if n != size {
-				return buf, fmt.Errorf(
-					"protocol: cannot accommodate purported storage data "+
-						"size from buffer: expect=%d actual=%d",
-					size,
-					n,
-				)
+			for len(buf) < headerSize+dataSize {
+				dataChunkSize := headerSize + dataSize - len(buf)
+				if dataChunkSize > dataSize {
+					dataChunkSize = dataSize
+				}
+
+				n, err := r.Read(data[:dataChunkSize])
+				buf = append(buf, data[:n]...)
+
+				if err != nil {
+					return buf, fmt.Errorf(
+						"protocol: error reading storage item data: err=%v",
+						err,
+					)
+				}
 			}
 
 			tailer, err := r.readUntil(crlf)
