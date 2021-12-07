@@ -8,7 +8,7 @@ require (
 	github.com/tikv/client-go/v2 v2.0.0-alpha.0.20211118154139-b11da6307c6f
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616
 	golang.org/x/tools v0.1.7
-	lib.kevinlin.info/mcrpc v0.0.0-20211125124728-94c0dc19a61d
+	lib.kevinlin.info/mcrpc v0.0.0-20211130000503-65b9d49b068a
 )
 
 require (
