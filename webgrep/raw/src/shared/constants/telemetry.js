@@ -14,6 +14,8 @@ export const TELEMETRY_ACTIONS = {
   CLICK_CODE_RESULT_POSITION: 'CLICK_CODE_RESULT_POSITION',
   // Open the source preview for a code search result.
   SOURCE_PREVIEW: 'SOURCE_PREVIEW',
+  // Download the raw file from the source preview.
+  SOURCE_RAW_DOWNLOAD: 'SOURCE_RAW_DOWNLOAD',
   // Copy of text to the system clipboard.
   CLIPBOARD_WRITE: 'CLIPBOARD_WRITE',
   // Add an entry to client-side search history.

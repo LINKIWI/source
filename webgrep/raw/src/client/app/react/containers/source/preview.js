@@ -1,7 +1,7 @@
 import PropTypes from 'prop-types';
 import React, { createRef, Component, Fragment } from 'react';
 import { Modal, Spacing } from 'react-elemental';
-import { MdClear, MdContentCopy, MdKeyboardReturn, MdSearch } from 'react-icons/md';
+import { MdClear, MdContentCopy, MdDownload, MdKeyboardReturn, MdSearch } from 'react-icons/md';
 import { connect } from 'react-redux';
 import { withResource } from 'supercharged/client';
 import { compose } from '@linkiwi/hoc';
@@ -15,6 +15,7 @@ import FloatingButton from 'client/app/react/components/ui/floating-button';
 import Spinner from 'client/app/react/components/ui/spinner';
 import Tooltip from 'client/app/react/components/ui/tooltip';
 import { PREFERENCE_KEYS } from 'client/app/util/constants/preferences';
+import { fileSize } from 'client/app/util/format';
 import { scroll } from 'client/app/util/navigation';
 import { transition } from 'client/app/util/style/transition';
 import { CANONICAL_FILE_EXTENSION_LANGUAGES, SYNTAX_HIGHLIGHT_THEME_NAMES } from 'client/resources/data/source';
@@ -40,6 +41,7 @@ class SourcePreviewContainer extends Component {
     onHide: PropTypes.func.isRequired,
     onSearchQueryChange: PropTypes.func.isRequired,
     onPathCopy: PropTypes.func.isRequired,
+    onFileDownload: PropTypes.func.isRequired,
     onSingleFileSearchClick: PropTypes.func.isRequired,
     // HOC props
     width: PropTypes.number,
@@ -87,6 +89,7 @@ class SourcePreviewContainer extends Component {
       themePreference,
       selection,
       onPathCopy,
+      onFileDownload,
       onSingleFileSearchClick,
     } = this.props;
 
@@ -95,9 +98,11 @@ class SourcePreviewContainer extends Component {
       .reduce((acc, [extension, syntax]) => (path.endsWith(extension) ? syntax : acc), 'text');
     const annotations = [
       language,
-      `${isLoaded && ok ? (contents.match(/\n/g) || ['']).length : '-'} lines`,
+      `${(isLoaded && ok) ? (contents.match(/\n/g) || ['']).length : '-'} lines`,
+      (isLoaded && ok) ? fileSize(contents.length) : '- KB',
       version,
     ];
+    const download = new File([contents], path.split(/[\\/]/).pop(), { type: 'text/plain' });
 
     const body = (() => {
       if (err) {
@@ -227,6 +232,15 @@ class SourcePreviewContainer extends Component {
                       style={{ left: 'unset', right: 0, width: '85px' }}
                     >
                       <IconButton icon={MdContentCopy} onClick={onPathCopy} />
+                    </Tooltip>
+                  </Spacing>
+
+                  <Spacing size="tiny" right>
+                    <Tooltip
+                      description="Download raw file"
+                      style={{ left: 'unset', right: 0, width: '85px' }}
+                    >
+                      <IconButton icon={MdDownload} onClick={onFileDownload(download)} />
                     </Tooltip>
                   </Spacing>
 

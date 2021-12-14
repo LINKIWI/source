@@ -50,6 +50,8 @@ class CodeSnippetContainer extends Component {
 
   handleCodePathCopy = this._handleCodePathCopy.bind(this);
 
+  handleFileDownload = this._handleFileDownload.bind(this);
+
   handleSourcePreviewShow = this._handleSourcePreviewShow.bind(this);
 
   handleSourcePreviewHide = this._handleSourcePreviewHide.bind(this);
@@ -71,6 +73,18 @@ class CodeSnippetContainer extends Component {
     clipboard.write(snippet.path, (err) => toast(err ?
       'There was an error writing to the system clipboard.' :
       `Copied to clipboard: ${snippet.path}`));
+  }
+
+  _handleFileDownload(file) {
+    const { recordTelemetryEvent } = this.props;
+
+    return () => {
+      recordTelemetryEvent(TELEMETRY_ACTIONS.SOURCE_RAW_DOWNLOAD);
+
+      const downloadURL = URL.createObjectURL(file);
+      window.open(downloadURL, '_blank');
+      URL.revokeObjectURL(downloadURL);
+    };
   }
 
   _handleSourcePreviewShow(line) {
@@ -202,6 +216,7 @@ class CodeSnippetContainer extends Component {
             onSearchQueryChange={onSearchQueryChange}
             onSingleFileSearchClick={this.handleSingleFileSearch}
             onPathCopy={this.handleCodePathCopy}
+            onFileDownload={this.handleFileDownload}
           />
         )}
 

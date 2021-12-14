@@ -30,3 +30,11 @@ export const absoluteTimestamp = (timestamp) => humanize.date('F j, Y, g:i A', t
  * @returns {String} Human-consumable relative description of the timestamp.
  */
 export const relativeTimestamp = (timestamp) => humanize.relativeTime(timestamp);
+
+/**
+ * Format a file size.
+ *
+ * @param size File size, in bytes.
+ * @returns {String} Human-consumable file size with reasonable units.
+ */
+export const fileSize = (size) => humanize.filesize(size);

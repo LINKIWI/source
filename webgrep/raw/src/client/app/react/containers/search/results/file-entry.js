@@ -53,6 +53,8 @@ class FileEntry extends Component {
 
   handleFilePathCopy = this._handleFilePathCopy.bind(this);
 
+  handleFileDownload = this._handleFileDownload.bind(this);
+
   handleSourcePreview = this._handleSourcePreview.bind(this);
 
   handleSingleFileSearch = this._handleSingleFileSearch.bind(this);
@@ -75,6 +77,18 @@ class FileEntry extends Component {
     clipboard.write(file.path, (err) => toast(err ?
       'There was an error writing to the system clipboard.' :
       `Copied to clipboard: ${file.path}`));
+  }
+
+  _handleFileDownload(file) {
+    const { recordTelemetryEvent } = this.props;
+
+    return () => {
+      recordTelemetryEvent(TELEMETRY_ACTIONS.SOURCE_RAW_DOWNLOAD);
+
+      const downloadURL = URL.createObjectURL(file);
+      window.open(downloadURL, '_blank');
+      URL.revokeObjectURL(downloadURL);
+    };
   }
 
   _handleSourcePreview() {
@@ -208,6 +222,7 @@ class FileEntry extends Component {
             onSearchQueryChange={onSearchQueryChange}
             onSingleFileSearchClick={this.handleSingleFileSearch}
             onPathCopy={this.handleFilePathCopy}
+            onFileDownload={this.handleFileDownload}
           />
         )}
       </Fragment>
