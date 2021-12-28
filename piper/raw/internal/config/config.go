@@ -2,8 +2,8 @@ package config
 
 import (
 	"fmt"
-	"net"
 	"os"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 
@@ -38,13 +38,19 @@ func (c *Config) Validate() error {
 		} else if relay.LogFile.Pattern == "" {
 			return fmt.Errorf("config: relay log file path is not populated")
 		} else if len(relay.Delimiter) > 1 {
-			return fmt.Errorf("config: relay delimiter must be omitted or exactly one character")
+			return fmt.Errorf(
+				"config: relay delimiter must be omitted or exactly one character: delimiter=%s",
+				relay.Delimiter,
+			)
 		} else if relay.BufferLength < 0 {
 			return fmt.Errorf("config: buffer length must be a nonnegative integer")
-		} else if _, _, err := net.SplitHostPort(relay.ProxyAddress); relay.ProxyAddress != "" && err != nil {
-			return fmt.Errorf("config: failed to parse proxy server address: err=%v", err)
-		} else if _, _, err := net.SplitHostPort(relay.KafkaAddress); err != nil {
-			return fmt.Errorf("config: failed to parse Kafka address: err=%v", err)
+		} else if relay.KafkaAddress.String() == "" {
+			return fmt.Errorf("config: Kafka address is not populated")
+		} else if !strings.HasPrefix(relay.KafkaAddress.Network(), "tcp") {
+			return fmt.Errorf(
+				"config: Kafka address only supports TCP transports: network=%s",
+				relay.KafkaAddress.Network(),
+			)
 		}
 
 		switch relay.Serializer {

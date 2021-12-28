@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/config: Forbid use of Unix sockets for Kafka address due to lack of support in Sarama - piper - Realtime log file to Kafka relay daemon</title>
+<meta name="description" content="Realtime log file to Kafka relay daemon" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="piper Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="piper Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>piper</h1><span class="desc">Realtime log file to Kafka relay daemon</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/piper.git">https://source.static.kevinlin.info/piper.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/d52f4f4a74d6f8c7a4cec8eaa1285dbd20cbb4ee">d52f4f4a74d6f8c7a4cec8eaa1285dbd20cbb4ee</a>
+<b>parent</b> <a href="../commit/d7dfb58e2985a1269aed07cfe5f147f6f153488c">d7dfb58e2985a1269aed07cfe5f147f6f153488c</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sun 26 Dec 2021 09:33:04 -0800
+
+internal/config: Forbid use of Unix sockets for Kafka address due to lack of support in Sarama
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/config/config.go</a></td><td> | </td><td class="num">11</td><td><span class="i">++++++++++</span><span class="d">-</span></td></tr>
+</table></pre><pre>1 file changed, 10 insertions(+), 1 deletion(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/config/config.go">internal/config/config.go</a> b/<a href="../file/internal/config/config.go">internal/config/config.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -3,6 +3,7 @@ package config
+</a> import (
+ 	&quot;fmt&quot;
+ 	&quot;os&quot;
+<a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;strings&quot;
+</a> 
+ 	&quot;github.com/BurntSushi/toml&quot;
+ 
+<a href="#h0-1" id="h0-1" class="h">@@ -37,11 +38,19 @@ func (c *Config) Validate() error {
+</a> 		} else if relay.LogFile.Pattern == &quot;&quot; {
+ 			return fmt.Errorf(&quot;config: relay log file path is not populated&quot;)
+ 		} else if len(relay.Delimiter) &gt; 1 {
+<a href="#h0-1-3" id="h0-1-3" class="d">-			return fmt.Errorf(&quot;config: relay delimiter must be omitted or exactly one character&quot;)
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+			return fmt.Errorf(
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+				&quot;config: relay delimiter must be omitted or exactly one character: delimiter=%s&quot;,
+</a><a href="#h0-1-6" id="h0-1-6" class="i">+				relay.Delimiter,
+</a><a href="#h0-1-7" id="h0-1-7" class="i">+			)
+</a> 		} else if relay.BufferLength &lt; 0 {
+ 			return fmt.Errorf(&quot;config: buffer length must be a nonnegative integer&quot;)
+ 		} else if relay.KafkaAddress.String() == &quot;&quot; {
+ 			return fmt.Errorf(&quot;config: Kafka address is not populated&quot;)
+<a href="#h0-1-12" id="h0-1-12" class="i">+		} else if !strings.HasPrefix(relay.KafkaAddress.Network(), &quot;tcp&quot;) {
+</a><a href="#h0-1-13" id="h0-1-13" class="i">+			return fmt.Errorf(
+</a><a href="#h0-1-14" id="h0-1-14" class="i">+				&quot;config: Kafka address only supports TCP transports: network=%s&quot;,
+</a><a href="#h0-1-15" id="h0-1-15" class="i">+				relay.KafkaAddress.Network(),
+</a><a href="#h0-1-16" id="h0-1-16" class="i">+			)
+</a> 		}
+ 
+ 		switch relay.Serializer {
+</pre>
+</div>
+</body>
+</html>

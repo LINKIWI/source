@@ -2,6 +2,7 @@ package relay
 
 import (
 	"fmt"
+	"net"
 	"time"
 
 	"github.com/Shopify/sarama"
@@ -19,8 +20,8 @@ type Producer struct {
 // NewProducer creates a new Kafka producer for a particular target broker.
 func NewProducer(
 	serializer MessageSerializer,
-	socks5 string,
-	address string,
+	socks5 net.Addr,
+	address net.Addr,
 	acks int,
 	retries int,
 	timeout time.Duration,
@@ -36,8 +37,8 @@ func NewProducer(
 	if timeout != 0 {
 		kafkaCfg.Producer.Timeout = timeout
 	}
-	if socks5 != "" {
-		dialer, err := proxy.SOCKS5("tcp", socks5, nil, proxy.Direct)
+	if socks5.String() != "" {
+		dialer, err := proxy.SOCKS5(socks5.Network(), socks5.String(), nil, proxy.Direct)
 		if err != nil {
 			return nil, err
 		}
@@ -46,9 +47,14 @@ func NewProducer(
 		kafkaCfg.Net.Proxy.Dialer = dialer
 	}
 
-	client, err := sarama.NewSyncProducer([]string{address}, kafkaCfg)
+	client, err := sarama.NewSyncProducer([]string{address.String()}, kafkaCfg)
 	if err != nil {
-		return nil, fmt.Errorf("relay: failed to create client: err=%v", err)
+		return nil, fmt.Errorf(
+			"relay: failed to create client: address=%s proxy=%s err=%v",
+			address,
+			socks5,
+			err,
+		)
 	}
 
 	return &Producer{

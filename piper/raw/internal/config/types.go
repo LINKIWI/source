@@ -51,8 +51,8 @@ type Relay struct {
 	SeekPosition   SeekPosition `toml:"seek-position"`
 	TagIdentifiers []Tag        `toml:"tags"`
 	BufferLength   int          `toml:"buffer-length"`
-	ProxyAddress   string       `toml:"proxy-address"`
-	KafkaAddress   string       `toml:"kafka-address"`
+	ProxyAddress   address      `toml:"proxy-address"`
+	KafkaAddress   address      `toml:"kafka-address"`
 	KafkaTopic     string       `toml:"kafka-topic"`
 	KafkaAcks      int          `toml:"kafka-acks"`
 	KafkaRetries   int          `toml:"kafka-retries"`

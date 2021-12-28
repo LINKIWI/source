@@ -118,7 +118,7 @@ func main() {
 			"registering log stream relay",
 			zap.String("name", cfgRelay.Name),
 			zap.String("path", cfgRelay.LogFile.Pattern),
-			zap.String("address", cfgRelay.KafkaAddress),
+			zap.String("address", cfgRelay.KafkaAddress.Spec()),
 			zap.String("topic", cfgRelay.KafkaTopic),
 		)
 
@@ -128,7 +128,7 @@ func main() {
 					"initializing log stream relay",
 					zap.String("name", cfgRelay.Name),
 					zap.String("path", cfgRelay.LogFile.Pattern),
-					zap.String("address", cfgRelay.KafkaAddress),
+					zap.String("address", cfgRelay.KafkaAddress.Spec()),
 					zap.String("topic", cfgRelay.KafkaTopic),
 				)
 
@@ -231,8 +231,8 @@ func streamLog(cfgRelay config.Relay) error {
 
 	logger.Debug(
 		"established Kafka producer connection",
-		zap.String("proxy", cfgRelay.ProxyAddress),
-		zap.String("address", cfgRelay.KafkaAddress),
+		zap.String("proxy", cfgRelay.ProxyAddress.Spec()),
+		zap.String("address", cfgRelay.KafkaAddress.Spec()),
 		zap.Int("acks", cfgRelay.KafkaAcks),
 		zap.Int("retries", cfgRelay.KafkaRetries),
 		zap.Duration("timeout", cfgRelay.KafkaTimeout.Duration),

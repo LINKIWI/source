@@ -18,93 +18,99 @@ body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{fo
 <a href="../../../log">Log</a> | <a href="../../../files">Files</a> | <a href="../../../refs">Refs</a> | <a href="../../../file/README.md">README</a></td></tr></table>
 <hr/>
 <div id="content">
-<p>internal/relay/<strong>messaging.go</strong> (2184B) (<a href="../../../raw/internal/relay/messaging.go">raw</a>) (<a href="../../../blame/internal/relay/messaging.go">blame</a>)</p><hr/>
+<p>internal/relay/<strong>messaging.go</strong> (2287B) (<a href="../../../raw/internal/relay/messaging.go">raw</a>) (<a href="../../../blame/internal/relay/messaging.go">blame</a>)</p><hr/>
 <pre id="blob">
 <a href="#l1" class="line" id="l1">      1</a> package relay
 <a href="#l2" class="line" id="l2">      2</a> 
 <a href="#l3" class="line" id="l3">      3</a> import (
 <a href="#l4" class="line" id="l4">      4</a> 	&quot;fmt&quot;
-<a href="#l5" class="line" id="l5">      5</a> 	&quot;time&quot;
-<a href="#l6" class="line" id="l6">      6</a> 
-<a href="#l7" class="line" id="l7">      7</a> 	&quot;github.com/Shopify/sarama&quot;
-<a href="#l8" class="line" id="l8">      8</a> 	&quot;golang.org/x/net/proxy&quot;
-<a href="#l9" class="line" id="l9">      9</a> 
-<a href="#l10" class="line" id="l10">     10</a> 	&quot;piper/internal/tail&quot;
-<a href="#l11" class="line" id="l11">     11</a> )
-<a href="#l12" class="line" id="l12">     12</a> 
-<a href="#l13" class="line" id="l13">     13</a> // Producer is an abstraction over a sarama.SyncProducer that exposes a limited API surface.
-<a href="#l14" class="line" id="l14">     14</a> type Producer struct {
-<a href="#l15" class="line" id="l15">     15</a> 	client     sarama.SyncProducer
-<a href="#l16" class="line" id="l16">     16</a> 	serializer MessageSerializer
-<a href="#l17" class="line" id="l17">     17</a> }
-<a href="#l18" class="line" id="l18">     18</a> 
-<a href="#l19" class="line" id="l19">     19</a> // NewProducer creates a new Kafka producer for a particular target broker.
-<a href="#l20" class="line" id="l20">     20</a> func NewProducer(
-<a href="#l21" class="line" id="l21">     21</a> 	serializer MessageSerializer,
-<a href="#l22" class="line" id="l22">     22</a> 	socks5 string,
-<a href="#l23" class="line" id="l23">     23</a> 	address string,
-<a href="#l24" class="line" id="l24">     24</a> 	acks int,
-<a href="#l25" class="line" id="l25">     25</a> 	retries int,
-<a href="#l26" class="line" id="l26">     26</a> 	timeout time.Duration,
-<a href="#l27" class="line" id="l27">     27</a> ) (*Producer, error) {
-<a href="#l28" class="line" id="l28">     28</a> 	kafkaCfg := sarama.NewConfig()
-<a href="#l29" class="line" id="l29">     29</a> 	kafkaCfg.Producer.RequiredAcks = sarama.RequiredAcks(acks)
-<a href="#l30" class="line" id="l30">     30</a> 	kafkaCfg.Producer.Retry.Backoff = 5 * time.Second
-<a href="#l31" class="line" id="l31">     31</a> 	kafkaCfg.Producer.Return.Successes = true
-<a href="#l32" class="line" id="l32">     32</a> 	kafkaCfg.Producer.Return.Errors = true
-<a href="#l33" class="line" id="l33">     33</a> 	if retries != 0 {
-<a href="#l34" class="line" id="l34">     34</a> 		kafkaCfg.Producer.Retry.Max = retries
-<a href="#l35" class="line" id="l35">     35</a> 	}
-<a href="#l36" class="line" id="l36">     36</a> 	if timeout != 0 {
-<a href="#l37" class="line" id="l37">     37</a> 		kafkaCfg.Producer.Timeout = timeout
-<a href="#l38" class="line" id="l38">     38</a> 	}
-<a href="#l39" class="line" id="l39">     39</a> 	if socks5 != &quot;&quot; {
-<a href="#l40" class="line" id="l40">     40</a> 		dialer, err := proxy.SOCKS5(&quot;tcp&quot;, socks5, nil, proxy.Direct)
-<a href="#l41" class="line" id="l41">     41</a> 		if err != nil {
-<a href="#l42" class="line" id="l42">     42</a> 			return nil, err
-<a href="#l43" class="line" id="l43">     43</a> 		}
-<a href="#l44" class="line" id="l44">     44</a> 
-<a href="#l45" class="line" id="l45">     45</a> 		kafkaCfg.Net.Proxy.Enable = true
-<a href="#l46" class="line" id="l46">     46</a> 		kafkaCfg.Net.Proxy.Dialer = dialer
-<a href="#l47" class="line" id="l47">     47</a> 	}
-<a href="#l48" class="line" id="l48">     48</a> 
-<a href="#l49" class="line" id="l49">     49</a> 	client, err := sarama.NewSyncProducer([]string{address}, kafkaCfg)
-<a href="#l50" class="line" id="l50">     50</a> 	if err != nil {
-<a href="#l51" class="line" id="l51">     51</a> 		return nil, fmt.Errorf(&quot;relay: failed to create client: err=%v&quot;, err)
-<a href="#l52" class="line" id="l52">     52</a> 	}
-<a href="#l53" class="line" id="l53">     53</a> 
-<a href="#l54" class="line" id="l54">     54</a> 	return &amp;Producer{
-<a href="#l55" class="line" id="l55">     55</a> 		client:     client,
-<a href="#l56" class="line" id="l56">     56</a> 		serializer: serializer,
-<a href="#l57" class="line" id="l57">     57</a> 	}, nil
-<a href="#l58" class="line" id="l58">     58</a> }
+<a href="#l5" class="line" id="l5">      5</a> 	&quot;net&quot;
+<a href="#l6" class="line" id="l6">      6</a> 	&quot;time&quot;
+<a href="#l7" class="line" id="l7">      7</a> 
+<a href="#l8" class="line" id="l8">      8</a> 	&quot;github.com/Shopify/sarama&quot;
+<a href="#l9" class="line" id="l9">      9</a> 	&quot;golang.org/x/net/proxy&quot;
+<a href="#l10" class="line" id="l10">     10</a> 
+<a href="#l11" class="line" id="l11">     11</a> 	&quot;piper/internal/tail&quot;
+<a href="#l12" class="line" id="l12">     12</a> )
+<a href="#l13" class="line" id="l13">     13</a> 
+<a href="#l14" class="line" id="l14">     14</a> // Producer is an abstraction over a sarama.SyncProducer that exposes a limited API surface.
+<a href="#l15" class="line" id="l15">     15</a> type Producer struct {
+<a href="#l16" class="line" id="l16">     16</a> 	client     sarama.SyncProducer
+<a href="#l17" class="line" id="l17">     17</a> 	serializer MessageSerializer
+<a href="#l18" class="line" id="l18">     18</a> }
+<a href="#l19" class="line" id="l19">     19</a> 
+<a href="#l20" class="line" id="l20">     20</a> // NewProducer creates a new Kafka producer for a particular target broker.
+<a href="#l21" class="line" id="l21">     21</a> func NewProducer(
+<a href="#l22" class="line" id="l22">     22</a> 	serializer MessageSerializer,
+<a href="#l23" class="line" id="l23">     23</a> 	socks5 net.Addr,
+<a href="#l24" class="line" id="l24">     24</a> 	address net.Addr,
+<a href="#l25" class="line" id="l25">     25</a> 	acks int,
+<a href="#l26" class="line" id="l26">     26</a> 	retries int,
+<a href="#l27" class="line" id="l27">     27</a> 	timeout time.Duration,
+<a href="#l28" class="line" id="l28">     28</a> ) (*Producer, error) {
+<a href="#l29" class="line" id="l29">     29</a> 	kafkaCfg := sarama.NewConfig()
+<a href="#l30" class="line" id="l30">     30</a> 	kafkaCfg.Producer.RequiredAcks = sarama.RequiredAcks(acks)
+<a href="#l31" class="line" id="l31">     31</a> 	kafkaCfg.Producer.Retry.Backoff = 5 * time.Second
+<a href="#l32" class="line" id="l32">     32</a> 	kafkaCfg.Producer.Return.Successes = true
+<a href="#l33" class="line" id="l33">     33</a> 	kafkaCfg.Producer.Return.Errors = true
+<a href="#l34" class="line" id="l34">     34</a> 	if retries != 0 {
+<a href="#l35" class="line" id="l35">     35</a> 		kafkaCfg.Producer.Retry.Max = retries
+<a href="#l36" class="line" id="l36">     36</a> 	}
+<a href="#l37" class="line" id="l37">     37</a> 	if timeout != 0 {
+<a href="#l38" class="line" id="l38">     38</a> 		kafkaCfg.Producer.Timeout = timeout
+<a href="#l39" class="line" id="l39">     39</a> 	}
+<a href="#l40" class="line" id="l40">     40</a> 	if socks5.String() != &quot;&quot; {
+<a href="#l41" class="line" id="l41">     41</a> 		dialer, err := proxy.SOCKS5(socks5.Network(), socks5.String(), nil, proxy.Direct)
+<a href="#l42" class="line" id="l42">     42</a> 		if err != nil {
+<a href="#l43" class="line" id="l43">     43</a> 			return nil, err
+<a href="#l44" class="line" id="l44">     44</a> 		}
+<a href="#l45" class="line" id="l45">     45</a> 
+<a href="#l46" class="line" id="l46">     46</a> 		kafkaCfg.Net.Proxy.Enable = true
+<a href="#l47" class="line" id="l47">     47</a> 		kafkaCfg.Net.Proxy.Dialer = dialer
+<a href="#l48" class="line" id="l48">     48</a> 	}
+<a href="#l49" class="line" id="l49">     49</a> 
+<a href="#l50" class="line" id="l50">     50</a> 	client, err := sarama.NewSyncProducer([]string{address.String()}, kafkaCfg)
+<a href="#l51" class="line" id="l51">     51</a> 	if err != nil {
+<a href="#l52" class="line" id="l52">     52</a> 		return nil, fmt.Errorf(
+<a href="#l53" class="line" id="l53">     53</a> 			&quot;relay: failed to create client: address=%s proxy=%s err=%v&quot;,
+<a href="#l54" class="line" id="l54">     54</a> 			address,
+<a href="#l55" class="line" id="l55">     55</a> 			socks5,
+<a href="#l56" class="line" id="l56">     56</a> 			err,
+<a href="#l57" class="line" id="l57">     57</a> 		)
+<a href="#l58" class="line" id="l58">     58</a> 	}
 <a href="#l59" class="line" id="l59">     59</a> 
-<a href="#l60" class="line" id="l60">     60</a> // WriteMessage synchronously writes a tail.Message to a particular Kafka topic, blocking until the
-<a href="#l61" class="line" id="l61">     61</a> // write has been sent and has reached the Kafka acknowledgement level specified in configuration.
-<a href="#l62" class="line" id="l62">     62</a> // It returns the length of the produced content in bytes and an error as applicable.
-<a href="#l63" class="line" id="l63">     63</a> func (p *Producer) WriteMessage(topic string, message tail.Message) (int, error) {
-<a href="#l64" class="line" id="l64">     64</a> 	serialized, err := p.serializer.Serialize(message)
-<a href="#l65" class="line" id="l65">     65</a> 	if err != nil {
-<a href="#l66" class="line" id="l66">     66</a> 		return 0, err
-<a href="#l67" class="line" id="l67">     67</a> 	}
-<a href="#l68" class="line" id="l68">     68</a> 
-<a href="#l69" class="line" id="l69">     69</a> 	value := sarama.ByteEncoder(serialized)
-<a href="#l70" class="line" id="l70">     70</a> 
-<a href="#l71" class="line" id="l71">     71</a> 	if _, _, err := p.client.SendMessage(&amp;sarama.ProducerMessage{
-<a href="#l72" class="line" id="l72">     72</a> 		Topic:     topic,
-<a href="#l73" class="line" id="l73">     73</a> 		Value:     value,
-<a href="#l74" class="line" id="l74">     74</a> 		Timestamp: message.Timestamp,
-<a href="#l75" class="line" id="l75">     75</a> 	}); err != nil {
-<a href="#l76" class="line" id="l76">     76</a> 		return 0, fmt.Errorf(&quot;relay: failed to send message: err=%v&quot;, err)
-<a href="#l77" class="line" id="l77">     77</a> 	}
-<a href="#l78" class="line" id="l78">     78</a> 
-<a href="#l79" class="line" id="l79">     79</a> 	return value.Length(), nil
-<a href="#l80" class="line" id="l80">     80</a> }
-<a href="#l81" class="line" id="l81">     81</a> 
-<a href="#l82" class="line" id="l82">     82</a> // Close closes the underlying Kafka client.
-<a href="#l83" class="line" id="l83">     83</a> func (p *Producer) Close() error {
-<a href="#l84" class="line" id="l84">     84</a> 	return p.client.Close()
-<a href="#l85" class="line" id="l85">     85</a> }
+<a href="#l60" class="line" id="l60">     60</a> 	return &amp;Producer{
+<a href="#l61" class="line" id="l61">     61</a> 		client:     client,
+<a href="#l62" class="line" id="l62">     62</a> 		serializer: serializer,
+<a href="#l63" class="line" id="l63">     63</a> 	}, nil
+<a href="#l64" class="line" id="l64">     64</a> }
+<a href="#l65" class="line" id="l65">     65</a> 
+<a href="#l66" class="line" id="l66">     66</a> // WriteMessage synchronously writes a tail.Message to a particular Kafka topic, blocking until the
+<a href="#l67" class="line" id="l67">     67</a> // write has been sent and has reached the Kafka acknowledgement level specified in configuration.
+<a href="#l68" class="line" id="l68">     68</a> // It returns the length of the produced content in bytes and an error as applicable.
+<a href="#l69" class="line" id="l69">     69</a> func (p *Producer) WriteMessage(topic string, message tail.Message) (int, error) {
+<a href="#l70" class="line" id="l70">     70</a> 	serialized, err := p.serializer.Serialize(message)
+<a href="#l71" class="line" id="l71">     71</a> 	if err != nil {
+<a href="#l72" class="line" id="l72">     72</a> 		return 0, err
+<a href="#l73" class="line" id="l73">     73</a> 	}
+<a href="#l74" class="line" id="l74">     74</a> 
+<a href="#l75" class="line" id="l75">     75</a> 	value := sarama.ByteEncoder(serialized)
+<a href="#l76" class="line" id="l76">     76</a> 
+<a href="#l77" class="line" id="l77">     77</a> 	if _, _, err := p.client.SendMessage(&amp;sarama.ProducerMessage{
+<a href="#l78" class="line" id="l78">     78</a> 		Topic:     topic,
+<a href="#l79" class="line" id="l79">     79</a> 		Value:     value,
+<a href="#l80" class="line" id="l80">     80</a> 		Timestamp: message.Timestamp,
+<a href="#l81" class="line" id="l81">     81</a> 	}); err != nil {
+<a href="#l82" class="line" id="l82">     82</a> 		return 0, fmt.Errorf(&quot;relay: failed to send message: err=%v&quot;, err)
+<a href="#l83" class="line" id="l83">     83</a> 	}
+<a href="#l84" class="line" id="l84">     84</a> 
+<a href="#l85" class="line" id="l85">     85</a> 	return value.Length(), nil
+<a href="#l86" class="line" id="l86">     86</a> }
+<a href="#l87" class="line" id="l87">     87</a> 
+<a href="#l88" class="line" id="l88">     88</a> // Close closes the underlying Kafka client.
+<a href="#l89" class="line" id="l89">     89</a> func (p *Producer) Close() error {
+<a href="#l90" class="line" id="l90">     90</a> 	return p.client.Close()
+<a href="#l91" class="line" id="l91">     91</a> }
 </pre>
 </div>
 </body>
