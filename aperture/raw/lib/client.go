@@ -9,21 +9,9 @@ import (
 // NoopStatsd implements the Statsd interface but noops on all APIs.
 type NoopStatsd struct{}
 
-// AsyncStatsd wraps a Statsd implementation to write all metrics asynchronously.
-type AsyncStatsd struct {
-	aperture.Statsd
-}
-
 // NewNoopStatsd is a convenience function for creating a NoopStatsd.
 func NewNoopStatsd() *NoopStatsd {
 	return &NoopStatsd{}
-}
-
-// NewAsyncStatsd creates an AsyncStatsd wrapping an existing Statsd implementation.
-// Note that, due to the asynchronous nature of the client, write errors are not surfaced; all APIs
-// return a nil error even if an error occurs internally.
-func NewAsyncStatsd(statsd aperture.Statsd) *AsyncStatsd {
-	return &AsyncStatsd{statsd}
 }
 
 // Count is a noop.
@@ -69,6 +57,18 @@ func (n *NoopStatsd) Histogram(name string, value float64, tags map[string]inter
 // Close is a noop.
 func (n *NoopStatsd) Close() error {
 	return nil
+}
+
+// AsyncStatsd wraps a Statsd implementation to write all metrics asynchronously.
+type AsyncStatsd struct {
+	aperture.Statsd
+}
+
+// NewAsyncStatsd creates an AsyncStatsd wrapping an existing Statsd implementation.
+// Note that, due to the asynchronous nature of the client, write errors are not surfaced; all APIs
+// return a nil error even if an error occurs internally.
+func NewAsyncStatsd(statsd aperture.Statsd) *AsyncStatsd {
+	return &AsyncStatsd{statsd}
 }
 
 // Count invokes the underlying Count in a goroutine.

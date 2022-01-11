@@ -9,6 +9,11 @@ import (
 // with bidirectional transitions between them.
 type stopwatchState int
 
+const (
+	paused stopwatchState = iota
+	running
+)
+
 // timeProvider is an interface for supplying details about time.
 type timeProvider interface {
 	// Now provides the current time.
@@ -18,6 +23,11 @@ type timeProvider interface {
 // realTimeProvider uses standard library functions to report real clock time.
 type realTimeProvider struct{}
 
+// Now retrieves the current real time.
+func (p *realTimeProvider) Now() time.Time {
+	return time.Now()
+}
+
 // Stopwatch reports elapsed time.
 type Stopwatch struct {
 	start    time.Time
@@ -25,11 +35,6 @@ type Stopwatch struct {
 	state    stopwatchState
 	provider timeProvider
 }
-
-const (
-	paused stopwatchState = iota
-	running
-)
 
 // NewStopwatch creates a stopwatch instance. Note that the stopwatch is started on instantiation.
 func NewStopwatch() *Stopwatch {
@@ -81,9 +86,4 @@ func (s *Stopwatch) Elapsed() time.Duration {
 	}
 
 	return s.provider.Now().Add(s.delta).Sub(s.start)
-}
-
-// Now retrieves the current real time.
-func (p *realTimeProvider) Now() time.Time {
-	return time.Now()
 }
