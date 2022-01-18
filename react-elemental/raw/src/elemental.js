@@ -33,13 +33,14 @@ export default class Elemental extends Component {
     colorOpts: {},
   };
 
-  componentDidMount() {
-    const { fontOpts, colorOpts } = this.props;
+  constructor(props) {
+    super(props);
+
+    const { fontOpts, colorOpts } = props;
 
     // Idempotent bootstrapping by caching initialization state in a global key
     if (!window.__REACT_ELEMENTAL_BOOTSTRAPPED__) {
       bootstrap(fontOpts, colorOpts);
-
       window.__REACT_ELEMENTAL_BOOTSTRAPPED__ = true;
     }
   }
