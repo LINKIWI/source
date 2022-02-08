@@ -18,15 +18,38 @@ body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{fo
 <a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
 <hr/>
 <div id="content">
-<p><strong>.bazelrc.ci</strong> (228B) (<a href="../raw/.bazelrc.ci">raw</a>) (<a href="../blame/.bazelrc.ci">blame</a>)</p><hr/>
+<p><strong>.bazelrc.ci</strong> (1181B) (<a href="../raw/.bazelrc.ci">raw</a>) (<a href="../blame/.bazelrc.ci">blame</a>)</p><hr/>
 <pre id="blob">
-<a href="#l1" class="line" id="l1">      1</a> # This is from Bazel&#39;s former travis setup, to avoid blowing up the RAM usage.
-<a href="#l2" class="line" id="l2">      2</a> startup --host_jvm_args=-Xms512m
-<a href="#l3" class="line" id="l3">      3</a> startup --host_jvm_args=-Xmx1024m
-<a href="#l4" class="line" id="l4">      4</a> build -c opt
+<a href="#l1" class="line" id="l1">      1</a> startup --host_jvm_args=-Dbazel.DigestFunction=sha256
+<a href="#l2" class="line" id="l2">      2</a> 
+<a href="#l3" class="line" id="l3">      3</a> # Ensure sandboxing is on to increase hermeticity.
+<a href="#l4" class="line" id="l4">      4</a> build --spawn_strategy=sandboxed
 <a href="#l5" class="line" id="l5">      5</a> 
-<a href="#l6" class="line" id="l6">      6</a> # This is so we understand failures better
-<a href="#l7" class="line" id="l7">      7</a> build --verbose_failures
+<a href="#l6" class="line" id="l6">      6</a> build --compilation_mode=opt
+<a href="#l7" class="line" id="l7">      7</a> 
+<a href="#l8" class="line" id="l8">      8</a> # This is so we understand failures better
+<a href="#l9" class="line" id="l9">      9</a> build --verbose_failures
+<a href="#l10" class="line" id="l10">     10</a> build --worker_verbose
+<a href="#l11" class="line" id="l11">     11</a> test --test_output=errors
+<a href="#l12" class="line" id="l12">     12</a> test --test_verbose_timeout_warnings
+<a href="#l13" class="line" id="l13">     13</a> 
+<a href="#l14" class="line" id="l14">     14</a> # Use BuildBuddy (anonymously for now) to build
+<a href="#l15" class="line" id="l15">     15</a> # I tried a GCS cache, but I think we were hitting up against
+<a href="#l16" class="line" id="l16">     16</a> # GH Actions API Request limit (10,000 per hour), since the GCS
+<a href="#l17" class="line" id="l17">     17</a> # cache is HTTP based, and seeding the cache (building with an empty 
+<a href="#l18" class="line" id="l18">     18</a> # cache) will write ~18k objects - 
+<a href="#l19" class="line" id="l19">     19</a> # each which is theoretically an HTTP PUT call. BuildBuddy otoh uses
+<a href="#l20" class="line" id="l20">     20</a> # GRPC, so a single connection/API call can be used to stream many writes
+<a href="#l21" class="line" id="l21">     21</a> build --bes_results_url=https://app.buildbuddy.io/invocation/
+<a href="#l22" class="line" id="l22">     22</a> build --bes_backend=grpcs://cloud.buildbuddy.io
+<a href="#l23" class="line" id="l23">     23</a> build --remote_cache=grpcs://cloud.buildbuddy.io
+<a href="#l24" class="line" id="l24">     24</a> build --remote_timeout=3600
+<a href="#l25" class="line" id="l25">     25</a> 
+<a href="#l26" class="line" id="l26">     26</a> # don&#39;t fail if the cache is unavailable
+<a href="#l27" class="line" id="l27">     27</a> common --remote_local_fallback=true
+<a href="#l28" class="line" id="l28">     28</a> # remote upload defaults to true, which we don&#39;t want. We use sed to switch
+<a href="#l29" class="line" id="l29">     29</a> # false to true during the CI build if necessary
+<a href="#l30" class="line" id="l30">     30</a> common --remote_upload_local_results=false
 </pre>
 </div>
 </body>

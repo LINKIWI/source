@@ -5,6 +5,7 @@ import { Helmet } from 'react-helmet';
 import { connect } from 'react-redux';
 import { bindActionCreators } from 'redux';
 import { compose, withForm } from '@linkiwi/hoc';
+import withTelemetry from 'client/app/react/containers/hoc/with-telemetry';
 import withTransactionalTunnel from 'client/app/react/containers/hoc/with-transactional-tunnel';
 import SearchResultsContainer from 'client/app/react/containers/search/results';
 import SearchQueryContainer from 'client/app/react/containers/search/query';
@@ -16,6 +17,7 @@ import { MAX_MATCHES } from 'client/app/util/constants/search';
 import { string } from 'client/app/util/format';
 import { URLStateSerializer, URLStateDeserializer } from 'client/app/util/data';
 import { decodeURLState, encodeURLState } from 'client/app/util/navigation';
+import { TELEMETRY_ACTIONS } from 'shared/constants/telemetry';
 import { objLookup } from 'shared/util/data';
 
 // Window widths at which to consider the layout to be horizontally compact.
@@ -55,6 +57,7 @@ class SearchContainer extends Component {
       repos: PropTypes.arrayOf(PropTypes.string.isRequired).isRequired,
     }).isRequired,
     handleFormChange: PropTypes.func.isRequired,
+    recordTelemetryEvent: PropTypes.func.isRequired,
   };
 
   static defaultProps = {
@@ -62,9 +65,12 @@ class SearchContainer extends Component {
   };
 
   componentDidUpdate(prevProps) {
+    const { results, recordTelemetryEvent } = this.props;
+
     // Trigger another search request if the connection state changed from disconnected to connected
-    if (this.props.results.isConnected && !prevProps.results.isConnected) {
+    if (results.isConnected && !prevProps.results.isConnected) {
       this.invoke();
+      recordTelemetryEvent(TELEMETRY_ACTIONS.SEARCH_CONNECT);
     }
   }
 
@@ -277,6 +283,7 @@ export default compose(
       query: URLStateDeserializer.string,
     }),
   }),
+  withTelemetry,
   withTransactionalTunnel({
     key: 'results',
     endpoint: '/api/search',

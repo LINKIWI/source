@@ -59,6 +59,7 @@ export default class MetaLogic extends BaseLogic {
     switch (action) {
       // Counters
       case TELEMETRY_ACTIONS.RENDER_VIEW_ROUTE:
+      case TELEMETRY_ACTIONS.SEARCH_CONNECT:
       case TELEMETRY_ACTIONS.CLICK_FILE_RESULT_PATH:
       case TELEMETRY_ACTIONS.CLICK_CODE_RESULT_LINE:
       case TELEMETRY_ACTIONS.CLICK_CODE_RESULT_PATH:
@@ -76,6 +77,7 @@ export default class MetaLogic extends BaseLogic {
       case TELEMETRY_ACTIONS.RESET_DEFAULT_PREFERENCES:
         return this.ctx.metrics.count('event.telemetry.record', value, { ...tags, action });
       // Gauges (with bucketed aggregation)
+      case TELEMETRY_ACTIONS.RENDER_DELAY:
       case TELEMETRY_ACTIONS.CLICK_FILE_RESULT_POSITION:
       case TELEMETRY_ACTIONS.CLICK_CODE_RESULT_POSITION:
       case TELEMETRY_ACTIONS.ACTIVE_SESSION_LENGTH:

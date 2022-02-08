@@ -2,6 +2,10 @@
 export const TELEMETRY_ACTIONS = {
   // Navigation event to a new client-side defined route.
   RENDER_VIEW_ROUTE: 'RENDER_VIEW_ROUTE',
+  // Duration between server render and client render.
+  RENDER_DELAY: 'RENDER_DELAY',
+  // Live connection was established to the search API.
+  SEARCH_CONNECT: 'SEARCH_CONNECT',
   // Click on a file path in a file search result.
   CLICK_FILE_RESULT_PATH: 'CLICK_FILE_RESULT_PATH',
   // Rank position of the clicked file result.

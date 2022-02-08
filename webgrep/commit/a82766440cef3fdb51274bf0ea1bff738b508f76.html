@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Report server/client render time delay as telemetry event - webgrep - Web client for livegrep</title>
+<meta name="description" content="Web client for livegrep" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="webgrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="webgrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>webgrep</h1><span class="desc">Web client for livegrep</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/webgrep.git">https://source.static.kevinlin.info/webgrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/LICENSE">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/a82766440cef3fdb51274bf0ea1bff738b508f76">a82766440cef3fdb51274bf0ea1bff738b508f76</a>
+<b>parent</b> <a href="../commit/18da9e8f1e5d3c891418497131e2deafbeeee9ad">18da9e8f1e5d3c891418497131e2deafbeeee9ad</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sat  5 Feb 2022 11:57:42 -0800
+
+Report server/client render time delay as telemetry event
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">src/client/app/react/root.js</a></td><td> | </td><td class="num">12</td><td><span class="i">+++++++++++</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">src/server/logic/meta.js</a></td><td> | </td><td class="num">1</td><td><span class="i">+</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">src/shared/constants/telemetry.js</a></td><td> | </td><td class="num">2</td><td><span class="i">++</span><span class="d"></span></td></tr>
+</table></pre><pre>3 files changed, 14 insertions(+), 1 deletion(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/src/client/app/react/root.js">src/client/app/react/root.js</a> b/<a href="../file/src/client/app/react/root.js">src/client/app/react/root.js</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -40,6 +40,7 @@ class Root extends Component {
+</a>     width: PropTypes.number.isRequired,
+     height: PropTypes.number.isRequired,
+     recordTelemetryEvent: PropTypes.func.isRequired,
+<a href="#h0-0-3" id="h0-0-3" class="i">+    serverTimestamp: PropTypes.number.isRequired,
+</a>     actions: PropTypes.shape({
+       setWindowDimensions: PropTypes.func.isRequired,
+     }).isRequired,
+<a href="#h0-1" id="h0-1" class="h">@@ -57,7 +58,9 @@ class Root extends Component {
+</a> 
+     actions.setWindowDimensions(width, height);
+ 
+<a href="#h0-1-3" id="h0-1-3" class="i">+    this._recordRootRender();
+</a>     this._recordRouteRender(history.location.pathname);
+<a href="#h0-1-5" id="h0-1-5" class="i">+
+</a>     this.unlistenHistory = history.listen((location, action) =&gt; {
+       if ([&#39;PUSH&#39;, &#39;REPLACE&#39;].includes(action)) {
+         this._recordRouteRender(location.pathname);
+<a href="#h0-2" id="h0-2" class="h">@@ -83,6 +86,12 @@ class Root extends Component {
+</a> 
+   handlePageUnload = this._handlePageUnload.bind(this);
+ 
+<a href="#h0-2-3" id="h0-2-3" class="i">+  _recordRootRender() {
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+    const { recordTelemetryEvent, serverTimestamp } = this.props;
+</a><a href="#h0-2-5" id="h0-2-5" class="i">+
+</a><a href="#h0-2-6" id="h0-2-6" class="i">+    recordTelemetryEvent(TELEMETRY_ACTIONS.RENDER_DELAY, Date.now() - serverTimestamp);
+</a><a href="#h0-2-7" id="h0-2-7" class="i">+  }
+</a><a href="#h0-2-8" id="h0-2-8" class="i">+
+</a>   _recordRouteRender(path) {
+     this.props.recordTelemetryEvent(TELEMETRY_ACTIONS.RENDER_VIEW_ROUTE, 1, { path });
+   }
+<a href="#h0-3" id="h0-3" class="h">@@ -143,8 +152,9 @@ class Root extends Component {
+</a>   }
+ }
+ 
+<a href="#h0-3-3" id="h0-3-3" class="d">-const mapStateToProps = ({ config }) =&gt; ({
+</a><a href="#h0-3-4" id="h0-3-4" class="i">+const mapStateToProps = ({ config, context }) =&gt; ({
+</a>   metadataPollInterval: objLookup(config, [&#39;client&#39;, &#39;options&#39;, &#39;metadata_poll_interval&#39;]) || 0,
+<a href="#h0-3-6" id="h0-3-6" class="i">+  serverTimestamp: objLookup(context, [&#39;timestamp&#39;]) || Date.now(),
+</a> });
+ 
+ const mapDispatchToProps = (dispatch) =&gt; ({
+<b>diff --git a/<a id="h1" href="../file/src/server/logic/meta.js">src/server/logic/meta.js</a> b/<a href="../file/src/server/logic/meta.js">src/server/logic/meta.js</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -76,6 +76,7 @@ export default class MetaLogic extends BaseLogic {
+</a>       case TELEMETRY_ACTIONS.RESET_DEFAULT_PREFERENCES:
+         return this.ctx.metrics.count(&#39;event.telemetry.record&#39;, value, { ...tags, action });
+       // Gauges (with bucketed aggregation)
+<a href="#h1-0-3" id="h1-0-3" class="i">+      case TELEMETRY_ACTIONS.RENDER_DELAY:
+</a>       case TELEMETRY_ACTIONS.CLICK_FILE_RESULT_POSITION:
+       case TELEMETRY_ACTIONS.CLICK_CODE_RESULT_POSITION:
+       case TELEMETRY_ACTIONS.ACTIVE_SESSION_LENGTH:
+<b>diff --git a/<a id="h2" href="../file/src/shared/constants/telemetry.js">src/shared/constants/telemetry.js</a> b/<a href="../file/src/shared/constants/telemetry.js">src/shared/constants/telemetry.js</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -2,6 +2,8 @@
+</a> export const TELEMETRY_ACTIONS = {
+   // Navigation event to a new client-side defined route.
+   RENDER_VIEW_ROUTE: &#39;RENDER_VIEW_ROUTE&#39;,
+<a href="#h2-0-3" id="h2-0-3" class="i">+  // Duration between server render and client render.
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+  RENDER_DELAY: &#39;RENDER_DELAY&#39;,
+</a>   // Click on a file path in a file search result.
+   CLICK_FILE_RESULT_PATH: &#39;CLICK_FILE_RESULT_PATH&#39;,
+   // Rank position of the clicked file result.
+</pre>
+</div>
+</body>
+</html>

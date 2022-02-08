@@ -2,10 +2,7 @@ import { SET_WINDOW_DIMENSIONS } from 'client/app/redux/actions/context';
 import createReducer from 'client/app/redux/reducers/create-reducer';
 
 const initialState = {
-  window: {
-    width: null,
-    height: null,
-  },
+  // Injected by SSR store hydration
 };
 
 const setWindowDimensionsReducer = (state, action) => {

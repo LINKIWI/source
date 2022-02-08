@@ -39,6 +39,11 @@ export default class ViewLogic extends BaseLogic {
     this.ctx.metrics.increment('event.frontend.render');
 
     return this.ctx.logic.meta.info((err, { data = {} } = {}) => {
+      const context = {
+        timestamp: Date.now(),
+        window: { width: null, height: null },
+      };
+
       const meta = {
         name: data.name || '',
         timestamp: data.timestamp || 0,
@@ -52,6 +57,7 @@ export default class ViewLogic extends BaseLogic {
 
       const hydratedStore = {
         config: this.ctx.config.config,
+        context,
         meta,
       };
 

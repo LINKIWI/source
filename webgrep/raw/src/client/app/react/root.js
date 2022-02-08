@@ -40,6 +40,7 @@ class Root extends Component {
     width: PropTypes.number.isRequired,
     height: PropTypes.number.isRequired,
     recordTelemetryEvent: PropTypes.func.isRequired,
+    serverTimestamp: PropTypes.number.isRequired,
     actions: PropTypes.shape({
       setWindowDimensions: PropTypes.func.isRequired,
     }).isRequired,
@@ -57,7 +58,9 @@ class Root extends Component {
 
     actions.setWindowDimensions(width, height);
 
+    this._recordRootRender();
     this._recordRouteRender(history.location.pathname);
+
     this.unlistenHistory = history.listen((location, action) => {
       if (['PUSH', 'REPLACE'].includes(action)) {
         this._recordRouteRender(location.pathname);
@@ -82,6 +85,12 @@ class Root extends Component {
   handlePageHide = this._handlePageHide.bind(this);
 
   handlePageUnload = this._handlePageUnload.bind(this);
+
+  _recordRootRender() {
+    const { recordTelemetryEvent, serverTimestamp } = this.props;
+
+    recordTelemetryEvent(TELEMETRY_ACTIONS.RENDER_DELAY, Date.now() - serverTimestamp);
+  }
 
   _recordRouteRender(path) {
     this.props.recordTelemetryEvent(TELEMETRY_ACTIONS.RENDER_VIEW_ROUTE, 1, { path });
@@ -143,8 +152,9 @@ class Root extends Component {
   }
 }
 
-const mapStateToProps = ({ config }) => ({
+const mapStateToProps = ({ config, context }) => ({
   metadataPollInterval: objLookup(config, ['client', 'options', 'metadata_poll_interval']) || 0,
+  serverTimestamp: objLookup(context, ['timestamp']) || Date.now(),
 });
 
 const mapDispatchToProps = (dispatch) => ({

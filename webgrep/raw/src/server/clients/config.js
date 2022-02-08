@@ -12,7 +12,7 @@ export default class ConfigClient {
    * @param {String} path Path to the config file on disk.
    */
   constructor(path) {
-    this.config = yaml.safeLoad(fs.readFileSync(path));
+    this.config = yaml.load(fs.readFileSync(path));
   }
 
   /**
