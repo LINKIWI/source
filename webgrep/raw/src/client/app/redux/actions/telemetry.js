@@ -10,5 +10,16 @@ export const RECORD_TELEMETRY_EVENT = 'RECORD_TELEMETRY_EVENT';
  */
 export const recordTelemetryEvent = (action, value = 1, tags = {}) => ({
   type: RECORD_TELEMETRY_EVENT,
-  payload: { action, value, tags },
+  payload: { action, value, tags, timestamp: Date.now() },
+});
+
+/**
+ * Retry the reporting of a previously created telemetry event.
+ *
+ * @param {Object} event Previously created action of type RECORD_TELEMETRY_EVENT.
+ * @returns {Object} Modified action with a flag indicating the report retry attempt.
+ */
+export const retryTelemetryEvent = (event) => ({
+  type: RECORD_TELEMETRY_EVENT,
+  payload: { ...event.payload, attempt: (event.payload.attempt || 0) + 1 },
 });

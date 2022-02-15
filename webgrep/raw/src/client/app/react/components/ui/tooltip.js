@@ -6,7 +6,7 @@ import { text } from 'client/app/util/style/color';
 /**
  * Abstraction over an Elemental Tooltip with some predefined structure and styling.
  */
-const Tooltip = ({ description, style, children }) => (
+const Tooltip = ({ description, style, children, ...props }) => (
   <div>
     <ElementalTooltip
       contents={
@@ -23,6 +23,7 @@ const Tooltip = ({ description, style, children }) => (
         ...style,
       }}
       bottom
+      {...props}
     >
       {children}
     </ElementalTooltip>

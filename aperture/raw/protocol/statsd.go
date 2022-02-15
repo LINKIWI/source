@@ -70,7 +70,7 @@ func (s *StatsdLineSerializer) SerializeHistogram(histogram *Histogram) (string,
 	return s.serializeMetric(histogram.Name, histogram.Value, histogram.Tags, histogramType), nil
 }
 
-// serializeMetric is an common utility to format tagged metrics in accordance with statsd
+// serializeMetric is a common utility to format tagged metrics in accordance with statsd
 // protocol conventions.
 func (s *StatsdLineSerializer) serializeMetric(
 	name string,
@@ -80,51 +80,49 @@ func (s *StatsdLineSerializer) serializeMetric(
 ) string {
 	/* Serialize tags */
 
-	var tagComponents []string
+	idx := 0
+	tagComponents := make([]string, len(tags))
 
-	for tagKey := range tags {
-		tagComponents = append(
-			tagComponents,
-			strings.Join([]string{
-				url.QueryEscape(tagKey),
-				s.tagJoiner,
-				url.QueryEscape(fmt.Sprintf("%v", tags[tagKey])),
-			}, ""),
-		)
+	for tagKey, tagValue := range tags {
+		tagComponents[idx] += url.QueryEscape(tagKey)
+		tagComponents[idx] += s.tagJoiner
+		tagComponents[idx] += url.QueryEscape(tagValue)
+
+		idx++
 	}
 
 	// Sort tag components to achieve deterministic serialization outputs
-	sort.Strings(tagComponents)
+	if len(tagComponents) > 1 {
+		sort.Strings(tagComponents)
+	}
 
 	/* Assemble metric name, value, and type */
 
-	var metric []string
+	var metric strings.Builder
 
 	// Some characters, like colons, are incompatible with the statsd protocol.
 	// This standardizes on URL escaping to encode such characters that may appear in the metric
 	// name or tag keys/values.
-	metric = append(metric, url.QueryEscape(name))
+	metric.WriteString(url.QueryEscape(name))
 
 	if len(tagComponents) > 0 {
-		metric = append(
-			metric,
-			s.tagDelimiter,
-			strings.Join(tagComponents, s.tagDelimiter),
-		)
+		metric.WriteString(s.tagDelimiter)
+		metric.WriteString(strings.Join(tagComponents, s.tagDelimiter))
 	}
 
-	metric = append(metric, valueDelimiter)
+	metric.WriteString(valueDelimiter)
 
-	switch value := value.(type) {
+	switch v := value.(type) {
 	case float64:
-		metric = append(metric, strconv.FormatFloat(value, 'f', -1, 64))
+		metric.WriteString(strconv.FormatFloat(v, 'f', -1, 64))
 	case int64:
-		metric = append(metric, strconv.Itoa(int(value)))
+		metric.WriteString(strconv.Itoa(int(v)))
 	default:
-		metric = append(metric, fmt.Sprintf("%v", value))
+		metric.WriteString(fmt.Sprintf("%v", v))
 	}
 
-	metric = append(metric, typeDelimiter, string(id))
+	metric.WriteString(typeDelimiter)
+	metric.WriteString(string(id))
 
-	return strings.Join(metric, "")
+	return metric.String()
 }

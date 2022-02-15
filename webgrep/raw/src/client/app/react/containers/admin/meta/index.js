@@ -2,6 +2,7 @@ import React, { Fragment } from 'react';
 import { Spacing } from 'react-elemental';
 import AdminMetaAboutContainer from 'client/app/react/containers/admin/meta/about';
 import AdminMetaResourcesContainer from 'client/app/react/containers/admin/meta/resources';
+import AdminMetaTelemetryContainer from 'client/app/react/containers/admin/meta/telemetry';
 
 /**
  * Admin page "Meta" tab.
@@ -14,6 +15,10 @@ const AdminMetaContainer = () => (
 
     <Spacing size="large" bottom>
       <AdminMetaResourcesContainer />
+    </Spacing>
+
+    <Spacing size="large" bottom>
+      <AdminMetaTelemetryContainer />
     </Spacing>
   </Fragment>
 );

@@ -1,13 +1,16 @@
 package transport
 
 import (
+	"sync"
+
 	"lib.kevinlin.info/aperture/internal/errors"
 )
 
 // Buffered is an abstraction over a Transport that internally buffers the transmission of
 // individual payloads with a configurable batch size.
 type Buffered struct {
-	buf chan []byte
+	buf   chan []byte
+	mutex sync.Mutex
 	Transport
 }
 
@@ -52,6 +55,9 @@ func (t *Buffered) Close() error {
 
 // flush sends all queued payloads, ignoring all errors.
 func (t *Buffered) flush() {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+
 	elements := len(t.buf)
 
 	for i := 0; i < elements; i++ {

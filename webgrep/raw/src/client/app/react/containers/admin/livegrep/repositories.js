@@ -65,6 +65,7 @@ class AdminIndexRepositoriesContainer extends Component {
               version={repo.version}
               url={repo.url}
               remote={repo.remote}
+              onCopyName={this.handleClipboardCopy(repo.name)}
               onCopyVersion={this.handleClipboardCopy(repo.version)}
               onCopyRemote={this.handleClipboardCopy(repo.remote)}
             />

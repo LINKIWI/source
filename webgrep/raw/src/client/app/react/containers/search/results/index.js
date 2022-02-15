@@ -60,10 +60,10 @@ class SearchResultsContainer extends Component {
     onQueryChange({ target: { value: query } });
   }
 
-  _executeSourcePreviewSearch(query) {
+  _executeSourcePreviewSearch(repo, query) {
     const { recordTelemetryEvent, onQueryChange, onQueryRecord } = this.props;
 
-    recordTelemetryEvent(TELEMETRY_ACTIONS.EXECUTE_SEARCH_SOURCE_PREVIEW);
+    recordTelemetryEvent(TELEMETRY_ACTIONS.EXECUTE_SEARCH_SOURCE_PREVIEW, 1, { repo });
     onQueryChange({ target: { value: query } });
     // Also manually persist the query to search history, since it would not otherwise be triggered
     // as when entering the query in the query field.

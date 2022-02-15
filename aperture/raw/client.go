@@ -285,25 +285,27 @@ func (s *Client) Close() error {
 
 // formatName adds a prefix and suffix, if specified, to the metric name.
 func (s *Client) formatName(metric string) string {
-	var components []string
+	var formatted strings.Builder
 
 	if s.cfg.Prefix != "" {
-		components = append(components, s.cfg.Prefix)
+		formatted.WriteString(s.cfg.Prefix)
+		formatted.WriteString(".")
 	}
 
-	components = append(components, metric)
+	formatted.WriteString(metric)
 
 	if s.cfg.Suffix != "" {
-		components = append(components, s.cfg.Suffix)
+		formatted.WriteString(".")
+		formatted.WriteString(s.cfg.Suffix)
 	}
 
-	return strings.Join(components, ".")
+	return formatted.String()
 }
 
 // mergeTags merges configuration-supplied default tag with the per-metric tags. Metric tags take
 // precedence over client-global default tags (i.e., it can override default tags).
 func (s *Client) mergeTags(tags map[string]interface{}) map[string]string {
-	mergedTags := make(map[string]string)
+	mergedTags := make(map[string]string, len(s.cfg.DefaultTags)+len(tags))
 
 	for key, value := range s.cfg.DefaultTags {
 		mergedTags[key] = fmt.Sprintf("%v", value)

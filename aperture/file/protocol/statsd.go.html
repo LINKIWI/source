@@ -15,7 +15,7 @@ body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{fo
 </head>
 <body>
 <table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>aperture</h1><span class="desc">Go statsd client library</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/aperture.git">https://source.static.kevinlin.info/aperture.git</a></td></tr><tr><td></td><td>
-<a href="../../log">Log</a> | <a href="../../files">Files</a> | <a href="../../refs">Refs</a> | <a href="../../file/README.md">README</a> | <a href="../../file/LICENSE">LICENSE</a></td></tr></table>
+<a href="../../log">Log</a> | <a href="../../files">Files</a> | <a href="../../refs">Refs</a> | <a href="../../file/README.md">README</a></td></tr></table>
 <hr/>
 <div id="content">
 <p>protocol/<strong>statsd.go</strong> (3502B) (<a href="../../raw/protocol/statsd.go">raw</a>) (<a href="../../blame/protocol/statsd.go">blame</a>)</p><hr/>
@@ -92,7 +92,7 @@ body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{fo
 <a href="#l70" class="line" id="l70">     70</a> 	return s.serializeMetric(histogram.Name, histogram.Value, histogram.Tags, histogramType), nil
 <a href="#l71" class="line" id="l71">     71</a> }
 <a href="#l72" class="line" id="l72">     72</a> 
-<a href="#l73" class="line" id="l73">     73</a> // serializeMetric is an common utility to format tagged metrics in accordance with statsd
+<a href="#l73" class="line" id="l73">     73</a> // serializeMetric is a common utility to format tagged metrics in accordance with statsd
 <a href="#l74" class="line" id="l74">     74</a> // protocol conventions.
 <a href="#l75" class="line" id="l75">     75</a> func (s *StatsdLineSerializer) serializeMetric(
 <a href="#l76" class="line" id="l76">     76</a> 	name string,
@@ -102,54 +102,52 @@ body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{fo
 <a href="#l80" class="line" id="l80">     80</a> ) string {
 <a href="#l81" class="line" id="l81">     81</a> 	/* Serialize tags */
 <a href="#l82" class="line" id="l82">     82</a> 
-<a href="#l83" class="line" id="l83">     83</a> 	var tagComponents []string
-<a href="#l84" class="line" id="l84">     84</a> 
-<a href="#l85" class="line" id="l85">     85</a> 	for tagKey := range tags {
-<a href="#l86" class="line" id="l86">     86</a> 		tagComponents = append(
-<a href="#l87" class="line" id="l87">     87</a> 			tagComponents,
-<a href="#l88" class="line" id="l88">     88</a> 			strings.Join([]string{
-<a href="#l89" class="line" id="l89">     89</a> 				url.QueryEscape(tagKey),
-<a href="#l90" class="line" id="l90">     90</a> 				s.tagJoiner,
-<a href="#l91" class="line" id="l91">     91</a> 				url.QueryEscape(fmt.Sprintf(&quot;%v&quot;, tags[tagKey])),
-<a href="#l92" class="line" id="l92">     92</a> 			}, &quot;&quot;),
-<a href="#l93" class="line" id="l93">     93</a> 		)
-<a href="#l94" class="line" id="l94">     94</a> 	}
-<a href="#l95" class="line" id="l95">     95</a> 
-<a href="#l96" class="line" id="l96">     96</a> 	// Sort tag components to achieve deterministic serialization outputs
-<a href="#l97" class="line" id="l97">     97</a> 	sort.Strings(tagComponents)
+<a href="#l83" class="line" id="l83">     83</a> 	idx := 0
+<a href="#l84" class="line" id="l84">     84</a> 	tagComponents := make([]string, len(tags))
+<a href="#l85" class="line" id="l85">     85</a> 
+<a href="#l86" class="line" id="l86">     86</a> 	for tagKey, tagValue := range tags {
+<a href="#l87" class="line" id="l87">     87</a> 		tagComponents[idx] += url.QueryEscape(tagKey)
+<a href="#l88" class="line" id="l88">     88</a> 		tagComponents[idx] += s.tagJoiner
+<a href="#l89" class="line" id="l89">     89</a> 		tagComponents[idx] += url.QueryEscape(tagValue)
+<a href="#l90" class="line" id="l90">     90</a> 
+<a href="#l91" class="line" id="l91">     91</a> 		idx++
+<a href="#l92" class="line" id="l92">     92</a> 	}
+<a href="#l93" class="line" id="l93">     93</a> 
+<a href="#l94" class="line" id="l94">     94</a> 	// Sort tag components to achieve deterministic serialization outputs
+<a href="#l95" class="line" id="l95">     95</a> 	if len(tagComponents) &gt; 1 {
+<a href="#l96" class="line" id="l96">     96</a> 		sort.Strings(tagComponents)
+<a href="#l97" class="line" id="l97">     97</a> 	}
 <a href="#l98" class="line" id="l98">     98</a> 
 <a href="#l99" class="line" id="l99">     99</a> 	/* Assemble metric name, value, and type */
 <a href="#l100" class="line" id="l100">    100</a> 
-<a href="#l101" class="line" id="l101">    101</a> 	var metric []string
+<a href="#l101" class="line" id="l101">    101</a> 	var metric strings.Builder
 <a href="#l102" class="line" id="l102">    102</a> 
 <a href="#l103" class="line" id="l103">    103</a> 	// Some characters, like colons, are incompatible with the statsd protocol.
 <a href="#l104" class="line" id="l104">    104</a> 	// This standardizes on URL escaping to encode such characters that may appear in the metric
 <a href="#l105" class="line" id="l105">    105</a> 	// name or tag keys/values.
-<a href="#l106" class="line" id="l106">    106</a> 	metric = append(metric, url.QueryEscape(name))
+<a href="#l106" class="line" id="l106">    106</a> 	metric.WriteString(url.QueryEscape(name))
 <a href="#l107" class="line" id="l107">    107</a> 
 <a href="#l108" class="line" id="l108">    108</a> 	if len(tagComponents) &gt; 0 {
-<a href="#l109" class="line" id="l109">    109</a> 		metric = append(
-<a href="#l110" class="line" id="l110">    110</a> 			metric,
-<a href="#l111" class="line" id="l111">    111</a> 			s.tagDelimiter,
-<a href="#l112" class="line" id="l112">    112</a> 			strings.Join(tagComponents, s.tagDelimiter),
-<a href="#l113" class="line" id="l113">    113</a> 		)
-<a href="#l114" class="line" id="l114">    114</a> 	}
-<a href="#l115" class="line" id="l115">    115</a> 
-<a href="#l116" class="line" id="l116">    116</a> 	metric = append(metric, valueDelimiter)
-<a href="#l117" class="line" id="l117">    117</a> 
-<a href="#l118" class="line" id="l118">    118</a> 	switch value := value.(type) {
-<a href="#l119" class="line" id="l119">    119</a> 	case float64:
-<a href="#l120" class="line" id="l120">    120</a> 		metric = append(metric, strconv.FormatFloat(value, &#39;f&#39;, -1, 64))
-<a href="#l121" class="line" id="l121">    121</a> 	case int64:
-<a href="#l122" class="line" id="l122">    122</a> 		metric = append(metric, strconv.Itoa(int(value)))
-<a href="#l123" class="line" id="l123">    123</a> 	default:
-<a href="#l124" class="line" id="l124">    124</a> 		metric = append(metric, fmt.Sprintf(&quot;%v&quot;, value))
-<a href="#l125" class="line" id="l125">    125</a> 	}
+<a href="#l109" class="line" id="l109">    109</a> 		metric.WriteString(s.tagDelimiter)
+<a href="#l110" class="line" id="l110">    110</a> 		metric.WriteString(strings.Join(tagComponents, s.tagDelimiter))
+<a href="#l111" class="line" id="l111">    111</a> 	}
+<a href="#l112" class="line" id="l112">    112</a> 
+<a href="#l113" class="line" id="l113">    113</a> 	metric.WriteString(valueDelimiter)
+<a href="#l114" class="line" id="l114">    114</a> 
+<a href="#l115" class="line" id="l115">    115</a> 	switch v := value.(type) {
+<a href="#l116" class="line" id="l116">    116</a> 	case float64:
+<a href="#l117" class="line" id="l117">    117</a> 		metric.WriteString(strconv.FormatFloat(v, &#39;f&#39;, -1, 64))
+<a href="#l118" class="line" id="l118">    118</a> 	case int64:
+<a href="#l119" class="line" id="l119">    119</a> 		metric.WriteString(strconv.Itoa(int(v)))
+<a href="#l120" class="line" id="l120">    120</a> 	default:
+<a href="#l121" class="line" id="l121">    121</a> 		metric.WriteString(fmt.Sprintf(&quot;%v&quot;, v))
+<a href="#l122" class="line" id="l122">    122</a> 	}
+<a href="#l123" class="line" id="l123">    123</a> 
+<a href="#l124" class="line" id="l124">    124</a> 	metric.WriteString(typeDelimiter)
+<a href="#l125" class="line" id="l125">    125</a> 	metric.WriteString(string(id))
 <a href="#l126" class="line" id="l126">    126</a> 
-<a href="#l127" class="line" id="l127">    127</a> 	metric = append(metric, typeDelimiter, string(id))
-<a href="#l128" class="line" id="l128">    128</a> 
-<a href="#l129" class="line" id="l129">    129</a> 	return strings.Join(metric, &quot;&quot;)
-<a href="#l130" class="line" id="l130">    130</a> }
+<a href="#l127" class="line" id="l127">    127</a> 	return metric.String()
+<a href="#l128" class="line" id="l128">    128</a> }
 </pre>
 </div>
 </body>

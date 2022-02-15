@@ -23,6 +23,12 @@ export default class MetaTelemetryHandler extends WebSocketTransactionHandler {
         },
         additionalProperties: false,
       },
+      timestamp: {
+        type: 'number',
+      },
+      attempt: {
+        type: 'number',
+      },
     },
     required: ['action', 'value', 'tags'],
     additionalProperties: false,

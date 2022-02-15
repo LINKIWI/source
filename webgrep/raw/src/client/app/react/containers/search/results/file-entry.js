@@ -80,10 +80,10 @@ class FileEntry extends Component {
   }
 
   _handleFileDownload(file) {
-    const { recordTelemetryEvent } = this.props;
+    const { file: { repo }, recordTelemetryEvent } = this.props;
 
     return () => {
-      recordTelemetryEvent(TELEMETRY_ACTIONS.SOURCE_RAW_DOWNLOAD);
+      recordTelemetryEvent(TELEMETRY_ACTIONS.SOURCE_RAW_DOWNLOAD, 1, { repo });
 
       const downloadURL = URL.createObjectURL(file);
       window.open(downloadURL, '_blank');
@@ -92,9 +92,9 @@ class FileEntry extends Component {
   }
 
   _handleSourcePreview() {
-    const { recordTelemetryEvent, showSourcePreview } = this.props;
+    const { file, recordTelemetryEvent, showSourcePreview } = this.props;
 
-    recordTelemetryEvent(TELEMETRY_ACTIONS.SOURCE_PREVIEW);
+    recordTelemetryEvent(TELEMETRY_ACTIONS.SOURCE_PREVIEW, 1, { repo: file.repo });
     showSourcePreview();
   }
 

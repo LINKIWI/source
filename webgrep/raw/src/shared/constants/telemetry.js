@@ -54,6 +54,9 @@ export const TELEMETRY_TAGS = {
   CLICK_CODE_RESULT_LINE: ['repo'],
   CLICK_CODE_RESULT_PATH: ['repo'],
   CLICK_CODE_RESULT_POSITION: ['repo'],
+  SOURCE_PREVIEW: ['repo'],
+  SOURCE_RAW_DOWNLOAD: ['repo'],
+  EXECUTE_SEARCH_SOURCE_PREVIEW: ['repo'],
   EXECUTE_SEARCH_SINGLE_FILE: ['repo'],
   SET_PREFERENCE: ['key'],
 };

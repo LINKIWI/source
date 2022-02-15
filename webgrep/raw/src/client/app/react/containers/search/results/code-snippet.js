@@ -76,10 +76,10 @@ class CodeSnippetContainer extends Component {
   }
 
   _handleFileDownload(file) {
-    const { recordTelemetryEvent } = this.props;
+    const { snippet, recordTelemetryEvent } = this.props;
 
     return () => {
-      recordTelemetryEvent(TELEMETRY_ACTIONS.SOURCE_RAW_DOWNLOAD);
+      recordTelemetryEvent(TELEMETRY_ACTIONS.SOURCE_RAW_DOWNLOAD, 1, { repo: snippet.repo });
 
       const downloadURL = URL.createObjectURL(file);
       window.open(downloadURL, '_blank');
@@ -88,7 +88,7 @@ class CodeSnippetContainer extends Component {
   }
 
   _handleSourcePreviewShow(line) {
-    const { showSourcePreview, recordTelemetryEvent, handleFormChange } = this.props;
+    const { snippet, showSourcePreview, recordTelemetryEvent, handleFormChange } = this.props;
 
     return () => {
       // If a line context is available, request that the source preview focus on that line after
@@ -97,7 +97,7 @@ class CodeSnippetContainer extends Component {
         handleFormChange('sourcePreviewLine')(line.number);
       }
 
-      recordTelemetryEvent(TELEMETRY_ACTIONS.SOURCE_PREVIEW);
+      recordTelemetryEvent(TELEMETRY_ACTIONS.SOURCE_PREVIEW, 1, { repo: snippet.repo });
       showSourcePreview();
     };
   }

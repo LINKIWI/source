@@ -21,7 +21,7 @@ export const string = (base = '', formatters = {}) => Object.entries(formatters)
  * @param {Number} timestamp Unix timestamp, in seconds.
  * @returns {String} Human-consumable absolute description of the timestamp.
  */
-export const absoluteTimestamp = (timestamp) => humanize.date('F j, Y, g:i A', timestamp);
+export const absoluteTimestamp = (timestamp) => humanize.date('F j, Y, g:i:s A', timestamp);
 
 /**
  * Format a relative Unix timestamp.

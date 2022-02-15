@@ -16,6 +16,7 @@ const Repository = ({
   version,
   url,
   remote,
+  onCopyName,
   onCopyVersion,
   onCopyRemote,
 }) => (
@@ -50,6 +51,11 @@ const Repository = ({
 
       <OverflowMenu menuStyle={{ width: '150px' }}>
         <ButtonMenuItem
+          label="Copy name"
+          icon={<MdContentCopy style={{ display: 'inherit' }} />}
+          onClick={onCopyName}
+        />
+        <ButtonMenuItem
           label="Copy version"
           icon={<MdContentCopy style={{ display: 'inherit' }} />}
           onClick={onCopyVersion}
@@ -69,6 +75,7 @@ Repository.propTypes = {
   version: PropTypes.string.isRequired,
   url: PropTypes.string.isRequired,
   remote: PropTypes.string.isRequired,
+  onCopyName: PropTypes.func.isRequired,
   onCopyVersion: PropTypes.func.isRequired,
   onCopyRemote: PropTypes.func.isRequired,
 };

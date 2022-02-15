@@ -1,5 +1,5 @@
 import ReconnectingWebSocket from 'reconnectingwebsocket';
-import { RECORD_TELEMETRY_EVENT } from 'client/app/redux/actions/telemetry';
+import { RECORD_TELEMETRY_EVENT, retryTelemetryEvent } from 'client/app/redux/actions/telemetry';
 import createMiddleware from 'client/app/redux/middleware/create-middleware';
 
 // Constant number of milliseconds to wait before attempting to retry reporting a telemetry event.
@@ -19,7 +19,7 @@ const reportTelemetryEvent = (store, next, action) => {
   if (socket.readyState === WebSocket.OPEN) {
     socket.send(JSON.stringify(action.payload));
   } else {
-    window.setTimeout(() => store.dispatch(action), FAILED_REPORT_RETRY_DELAY);
+    window.setTimeout(() => store.dispatch(retryTelemetryEvent(action)), FAILED_REPORT_RETRY_DELAY);
   }
 
   return next(action);

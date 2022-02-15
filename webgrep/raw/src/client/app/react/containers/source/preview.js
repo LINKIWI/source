@@ -66,10 +66,10 @@ class SourcePreviewContainer extends Component {
   handleSearchPromptClick = this._handleSearchPromptClick.bind(this);
 
   _handleSearchPromptClick() {
-    const { selection, onSearchQueryChange, onHide } = this.props;
+    const { repo, selection, onSearchQueryChange, onHide } = this.props;
 
     if (selection.text) {
-      onSearchQueryChange(selection.text);
+      onSearchQueryChange(repo, selection.text);
       onHide();
       // Also scroll to the top of the document, since the search results have changed
       scroll();

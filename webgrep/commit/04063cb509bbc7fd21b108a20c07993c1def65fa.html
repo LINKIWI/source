@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Counter for telemetry event report attempt during retries, persist recent event history to store - webgrep - Web client for livegrep</title>
+<meta name="description" content="Web client for livegrep" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="webgrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="webgrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>webgrep</h1><span class="desc">Web client for livegrep</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/webgrep.git">https://source.static.kevinlin.info/webgrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/LICENSE">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/04063cb509bbc7fd21b108a20c07993c1def65fa">04063cb509bbc7fd21b108a20c07993c1def65fa</a>
+<b>parent</b> <a href="../commit/2fddb68d6e1c3f08971f49e7b51051296dde30fa">2fddb68d6e1c3f08971f49e7b51051296dde30fa</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sun 13 Feb 2022 10:02:08 -0800
+
+Counter for telemetry event report attempt during retries, persist recent event history to store
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">src/client/app/redux/actions/telemetry.js</a></td><td> | </td><td class="num">11</td><td><span class="i">+++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">src/client/app/redux/middleware/telemetry.js</a></td><td> | </td><td class="num">4</td><td><span class="i">++</span><span class="d">--</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">src/client/app/redux/reducers/index.js</a></td><td> | </td><td class="num">2</td><td><span class="i">++</span><span class="d"></span></td></tr>
+<tr><td class="A">A</td><td><a href="#h3">src/client/app/redux/reducers/telemetry.js</a></td><td> | </td><td class="num">27</td><td><span class="i">+++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h4">src/server/handlers/api/meta/telemetry.js</a></td><td> | </td><td class="num">3</td><td><span class="i">+++</span><span class="d"></span></td></tr>
+</table></pre><pre>5 files changed, 45 insertions(+), 2 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/src/client/app/redux/actions/telemetry.js">src/client/app/redux/actions/telemetry.js</a> b/<a href="../file/src/client/app/redux/actions/telemetry.js">src/client/app/redux/actions/telemetry.js</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -12,3 +12,14 @@ export const recordTelemetryEvent = (action, value = 1, tags = {}) =&gt; ({
+</a>   type: RECORD_TELEMETRY_EVENT,
+   payload: { action, value, tags, timestamp: Date.now() },
+ });
+<a href="#h0-0-3" id="h0-0-3" class="i">+
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+/**
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+ * Retry the reporting of a previously created telemetry event.
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+ *
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+ * @param {Object} event Previously created action of type RECORD_TELEMETRY_EVENT.
+</a><a href="#h0-0-8" id="h0-0-8" class="i">+ * @returns {Object} Modified action with a flag indicating the report retry attempt.
+</a><a href="#h0-0-9" id="h0-0-9" class="i">+ */
+</a><a href="#h0-0-10" id="h0-0-10" class="i">+export const retryTelemetryEvent = (event) =&gt; ({
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+  type: RECORD_TELEMETRY_EVENT,
+</a><a href="#h0-0-12" id="h0-0-12" class="i">+  payload: { ...event.payload, attempt: (event.payload.attempt || 0) + 1 },
+</a><a href="#h0-0-13" id="h0-0-13" class="i">+});
+</a><b>diff --git a/<a id="h1" href="../file/src/client/app/redux/middleware/telemetry.js">src/client/app/redux/middleware/telemetry.js</a> b/<a href="../file/src/client/app/redux/middleware/telemetry.js">src/client/app/redux/middleware/telemetry.js</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -1,5 +1,5 @@
+</a> import ReconnectingWebSocket from &#39;reconnectingwebsocket&#39;;
+<a href="#h1-0-1" id="h1-0-1" class="d">-import { RECORD_TELEMETRY_EVENT } from &#39;client/app/redux/actions/telemetry&#39;;
+</a><a href="#h1-0-2" id="h1-0-2" class="i">+import { RECORD_TELEMETRY_EVENT, retryTelemetryEvent } from &#39;client/app/redux/actions/telemetry&#39;;
+</a> import createMiddleware from &#39;client/app/redux/middleware/create-middleware&#39;;
+ 
+ // Constant number of milliseconds to wait before attempting to retry reporting a telemetry event.
+<a href="#h1-1" id="h1-1" class="h">@@ -19,7 +19,7 @@ const reportTelemetryEvent = (store, next, action) =&gt; {
+</a>   if (socket.readyState === WebSocket.OPEN) {
+     socket.send(JSON.stringify(action.payload));
+   } else {
+<a href="#h1-1-3" id="h1-1-3" class="d">-    window.setTimeout(() =&gt; store.dispatch(action), FAILED_REPORT_RETRY_DELAY);
+</a><a href="#h1-1-4" id="h1-1-4" class="i">+    window.setTimeout(() =&gt; store.dispatch(retryTelemetryEvent(action)), FAILED_REPORT_RETRY_DELAY);
+</a>   }
+ 
+   return next(action);
+<b>diff --git a/<a id="h2" href="../file/src/client/app/redux/reducers/index.js">src/client/app/redux/reducers/index.js</a> b/<a href="../file/src/client/app/redux/reducers/index.js">src/client/app/redux/reducers/index.js</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -4,6 +4,7 @@ import contextReducer from &#39;client/app/redux/reducers/context&#39;;
+</a> import metaReducer from &#39;client/app/redux/reducers/meta&#39;;
+ import preferencesReducer from &#39;client/app/redux/reducers/preferences&#39;;
+ import searchReducer from &#39;client/app/redux/reducers/search&#39;;
+<a href="#h2-0-3" id="h2-0-3" class="i">+import telemetryReducer from &#39;client/app/redux/reducers/telemetry&#39;;
+</a> import toastReducer from &#39;client/app/redux/reducers/toast&#39;;
+ 
+ const reducer = combineReducers({
+<a href="#h2-1" id="h2-1" class="h">@@ -12,6 +13,7 @@ const reducer = combineReducers({
+</a>   meta: metaReducer,
+   preferences: preferencesReducer,
+   search: searchReducer,
+<a href="#h2-1-3" id="h2-1-3" class="i">+  telemetry: telemetryReducer,
+</a>   toasts: toastReducer,
+ });
+ 
+<b>diff --git a/<a id="h3" href="../file/src/client/app/redux/reducers/telemetry.js">src/client/app/redux/reducers/telemetry.js</a> b/<a href="../file/src/client/app/redux/reducers/telemetry.js">src/client/app/redux/reducers/telemetry.js</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -0,0 +1,27 @@
+</a><a href="#h3-0-0" id="h3-0-0" class="i">+import { RECORD_TELEMETRY_EVENT } from &#39;client/app/redux/actions/telemetry&#39;;
+</a><a href="#h3-0-1" id="h3-0-1" class="i">+import createReducer from &#39;client/app/redux/reducers/create-reducer&#39;;
+</a><a href="#h3-0-2" id="h3-0-2" class="i">+
+</a><a href="#h3-0-3" id="h3-0-3" class="i">+// Retain only this many recent telemetry events in history.
+</a><a href="#h3-0-4" id="h3-0-4" class="i">+const MAX_TELEMETRY_HISTORY_EVENTS = 20;
+</a><a href="#h3-0-5" id="h3-0-5" class="i">+
+</a><a href="#h3-0-6" id="h3-0-6" class="i">+const initialState = {
+</a><a href="#h3-0-7" id="h3-0-7" class="i">+  events: [],
+</a><a href="#h3-0-8" id="h3-0-8" class="i">+};
+</a><a href="#h3-0-9" id="h3-0-9" class="i">+
+</a><a href="#h3-0-10" id="h3-0-10" class="i">+const recordTelemetryEventReducer = (state, action) =&gt; {
+</a><a href="#h3-0-11" id="h3-0-11" class="i">+  // Skip appending telemetry events that are retried due to initial failure.
+</a><a href="#h3-0-12" id="h3-0-12" class="i">+  if (action.payload.attempt) {
+</a><a href="#h3-0-13" id="h3-0-13" class="i">+    return state;
+</a><a href="#h3-0-14" id="h3-0-14" class="i">+  }
+</a><a href="#h3-0-15" id="h3-0-15" class="i">+
+</a><a href="#h3-0-16" id="h3-0-16" class="i">+  return {
+</a><a href="#h3-0-17" id="h3-0-17" class="i">+    ...state,
+</a><a href="#h3-0-18" id="h3-0-18" class="i">+    events: [action.payload, ...state.events].slice(0, MAX_TELEMETRY_HISTORY_EVENTS),
+</a><a href="#h3-0-19" id="h3-0-19" class="i">+  };
+</a><a href="#h3-0-20" id="h3-0-20" class="i">+};
+</a><a href="#h3-0-21" id="h3-0-21" class="i">+
+</a><a href="#h3-0-22" id="h3-0-22" class="i">+const reducerMapping = {
+</a><a href="#h3-0-23" id="h3-0-23" class="i">+  [RECORD_TELEMETRY_EVENT]: recordTelemetryEventReducer,
+</a><a href="#h3-0-24" id="h3-0-24" class="i">+};
+</a><a href="#h3-0-25" id="h3-0-25" class="i">+
+</a><a href="#h3-0-26" id="h3-0-26" class="i">+export default createReducer(reducerMapping, initialState);
+</a><b>diff --git a/<a id="h4" href="../file/src/server/handlers/api/meta/telemetry.js">src/server/handlers/api/meta/telemetry.js</a> b/<a href="../file/src/server/handlers/api/meta/telemetry.js">src/server/handlers/api/meta/telemetry.js</a></b>
+<a href="#h4-0" id="h4-0" class="h">@@ -26,6 +26,9 @@ export default class MetaTelemetryHandler extends WebSocketTransactionHandler {
+</a>       timestamp: {
+         type: &#39;number&#39;,
+       },
+<a href="#h4-0-3" id="h4-0-3" class="i">+      attempt: {
+</a><a href="#h4-0-4" id="h4-0-4" class="i">+        type: &#39;number&#39;,
+</a><a href="#h4-0-5" id="h4-0-5" class="i">+      },
+</a>     },
+     required: [&#39;action&#39;, &#39;value&#39;, &#39;tags&#39;],
+     additionalProperties: false,
+</pre>
+</div>
+</body>
+</html>
