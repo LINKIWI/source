@@ -5,7 +5,7 @@ module.exports = {
   testURL: 'http://localhost',
   verbose: true,
   moduleNameMapper: {
-    '\\.(png|woff|woff2)': 'identity-obj-proxy',
+    '\\.(png)': 'identity-obj-proxy',
   },
   transformIgnorePatterns: [
     'node_modules/(?!(react-syntax-highlighter)/)',

@@ -50,7 +50,7 @@ const main = () => {
   app.use(Sentry.Handlers.requestHandler());
   app.use('/assets', Express.static(path.join(__dirname, '../../dist/client')));
   supercharge(app, handlers, {
-    createHandler: (HandlerClass) => (...args) => new HandlerClass(...args, ctx),
+    createHandler: (HandlerClass) => (...args) => new HandlerClass(ctx, ...args),
     ws: { perMessageDeflate: true },
   });
   app.use(Sentry.Handlers.errorHandler());

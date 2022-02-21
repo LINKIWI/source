@@ -1,3 +1,4 @@
+import { Query, SearchStats } from 'livegrep/proto/livegrep_pb';
 import BaseLogic from 'server/logic/base';
 import { invertMap } from 'server/util/data';
 import { escapeRegex } from 'server/util/format';
@@ -58,7 +59,15 @@ export default class SearchLogic extends BaseLogic {
         return cb(null, cached);
       }
 
-      return this.ctx.service.codesearch.rpc('search', req, (rpcErr, data) => {
+      const query = new Query();
+      query.setLine(req.line);
+      query.setFile(req.file);
+      query.setRepo(req.repo);
+      query.setFoldCase(req.foldCase);
+      query.setMaxMatches(req.maxMatches);
+      query.setContextLines(req.contextLines);
+
+      return this.ctx.service.codesearch.rpc('search', query, (rpcErr, rpcResp) => {
         if (rpcErr) {
           this.ctx.log.error(
             'search: encountered RPC error: method=search code=%d details=%s request=%s',
@@ -69,9 +78,10 @@ export default class SearchLogic extends BaseLogic {
           return cb(this.formatErr(rpcErr));
         }
 
+        const data = rpcResp.toObject();
+
         // Treat early terminations due to server-side timeout as fatal errors
-        const { SearchStats: { ExitReason } } = this.ctx.service.codesearch.proto;
-        if (data.stats.exitReason === ExitReason.TIMEOUT) {
+        if (data.stats.exitReason === SearchStats.ExitReason.TIMEOUT) {
           this.ctx.log.error(
             'search: exceeded livegrep search timeout: request=%s',
             JSON.stringify(req),
@@ -84,13 +94,13 @@ export default class SearchLogic extends BaseLogic {
 
         const { code, stats, files } = this._reshapeResults(data);
 
-        this.ctx.metrics.gauge('gauge.search.code_results', data.results.length);
-        this.ctx.metrics.gauge('gauge.search.path_results', data.fileResults.length);
+        this.ctx.metrics.gauge('gauge.search.code_results', data.resultsList.length);
+        this.ctx.metrics.gauge('gauge.search.path_results', data.fileResultsList.length);
         this.ctx.metrics.gauge('gauge.search.file_results', code.length);
         this.ctx.metrics.timing(
           'latency.search.exec',
           stats.time,
-          { exit: invertMap(ExitReason)[stats.exitReason] },
+          { exit: invertMap(SearchStats.ExitReason)[stats.exitReason] },
         );
 
         const resp = {
@@ -128,7 +138,7 @@ export default class SearchLogic extends BaseLogic {
    * @private
    */
   _reshapeResults(data) {  // eslint-disable-line class-methods-use-this
-    const code = Object.values(data.results
+    const code = Object.values(data.resultsList
       // Aggregate lines by repo and path, so that each unique (repo, path) combination is
       // described by an array of all matching lines and the left/right bounds for each line.
       .reduce((aggregated, result) => {
@@ -144,11 +154,11 @@ export default class SearchLogic extends BaseLogic {
         // overlapping, it's possible that a context line does not have a bounds description,
         // but it has one from an earlier result.
         const contextLines = [
-          ...result.contextBefore.reverse(),
+          ...result.contextBeforeList.reverse(),
           result.line,
-          ...result.contextAfter,
+          ...result.contextAfterList,
         ].reduce((lines, line, idx) => {
-          const contextLno = idx + lineNumber - result.contextBefore.length;
+          const contextLno = idx + lineNumber - result.contextBeforeList.length;
           const bounds = (() => {
             // Examining the matching line, for which bounds information is available
             if (contextLno === lineNumber) {
@@ -190,7 +200,7 @@ export default class SearchLogic extends BaseLogic {
           .sort((a, b) => a.number - b.number),
       }));
 
-    const files = Object.values(data.fileResults.reduce((acc, file) => ({
+    const files = Object.values(data.fileResultsList.reduce((acc, file) => ({
       ...acc,
       // Deduplicate results keyed by its repository and file path
       [`${file.tree}-${file.path}`]: {

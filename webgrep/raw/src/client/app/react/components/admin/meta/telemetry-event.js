@@ -11,37 +11,33 @@ import { absoluteTimestamp } from 'client/app/util/format';
 const TelemetryEvent = ({ timestamp, action, value, tags }) => {
   const event = (
     <Fragment>
-      <Spacing size="micro" style={{ display: 'flex' }} bottom>
+      <Spacing size="micro" style={{ alignItems: 'center', display: 'flex' }} bottom>
         <Spacing right>
-          <Spacing size="tiny" top>
-            <div
-              style={{
-                backgroundColor: background.primary.BETA,
-                borderRadius: '50%',
-                height: '8px',
-                width: '8px',
-              }}
-            />
-          </Spacing>
+          <div
+            style={{
+              backgroundColor: background.primary.BETA,
+              borderRadius: '50%',
+              height: '8px',
+              width: '8px',
+            }}
+          />
         </Spacing>
 
-        <div style={{ flexGrow: 1 }}>
-          <div>
-            <Spacing size="small" right inline>
-              <Text size="kilo" secondary bold inline>
-                {action}
-              </Text>
-            </Spacing>
-
-            <Text color={text.dark.BETA} size="kilo" secondary inline>
-              {value}
-            </Text>
-          </div>
-
-          <Text color={text.dark.BETA} size="kilo">
-            {absoluteTimestamp(timestamp / 1000)}
+        <Spacing size="small" right>
+          <Text size="kilo" secondary bold>
+            {action}
           </Text>
-        </div>
+        </Spacing>
+
+        <Text color={text.dark.BETA} size="kilo" secondary>
+          {value}
+        </Text>
+      </Spacing>
+
+      <Spacing size="32px" left>
+        <Text color={text.dark.BETA} size="kilo">
+          {absoluteTimestamp(timestamp / 1000)}
+        </Text>
       </Spacing>
     </Fragment>
   );

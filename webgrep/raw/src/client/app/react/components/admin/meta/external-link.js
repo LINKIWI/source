@@ -24,7 +24,7 @@ const ExternalLink = ({ title, href, isHover, handleMouseEnter, handleMouseLeave
         </Text>
       </Spacing>
 
-      <Text color={colors.primary} size="kilo">
+      <Text color={colors.primary} style={{ wordBreak: 'break-word' }} size="kilo">
         {href}
       </Text>
     </div>

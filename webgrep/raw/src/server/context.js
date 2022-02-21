@@ -1,5 +1,5 @@
+import { CodeSearchClient } from 'livegrep/proto/livegrep_grpc_pb';
 import os from 'os';
-import path from 'path';
 import winston from 'winston';
 import CacheClient, { MemoryCache, NoopCache, RedisCache } from 'server/clients/cache';
 import ConfigClient from 'server/clients/config';
@@ -11,14 +11,6 @@ import MetaLogic from 'server/logic/meta';
 import SearchLogic from 'server/logic/search';
 import SourceLogic from 'server/logic/source';
 import ViewLogic from 'server/logic/view';
-
-/**
- * Format a fully qualified path to a schemas file.
- *
- * @param {String} schema Name of the schemas filename.
- * @return {String} Fully qualified path to the schemas path.
- */
-const schemasPath = (schema) => path.join(__dirname, `../shared/schemas/${schema}`);
 
 /**
  * Server-side context shared by all incoming request handlers.
@@ -91,12 +83,16 @@ export default class Context {
     this.service = {
       codesearch: (() => {
         const backends = this.config.get('server.livegrep.servers').map((server) => new GRPCClient(
+          'CodeSearch',
           server.address,
           server.authority || '',
-          'CodeSearch',
-          schemasPath('livegrep.proto'),
+          CodeSearchClient,
           this.metrics,
-          { requestTimeout: this.config.get('server.livegrep.request_timeout') || 3000 },
+          {
+            requestTimeout: this.config.get('server.livegrep.request_timeout') || 3000,
+            maxRecvMessageSize: this.config.get('server.livegrep.max_recv_message_size') || 0,
+            maxSendMessageSize: this.config.get('server.livegrep.max_send_message_size') || 0,
+          },
         ));
 
         switch (this.config.get('server.livegrep.load_balancing_policy')) {

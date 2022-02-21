@@ -10,6 +10,7 @@ const webpack = require('webpack');
 const BUILD_ENV_VARS = [
   'NODE_ENV',
   'VERSION',
+  'SUPERCHARGED_CLIENT',
 ];
 
 const isProduction = process.env.NODE_ENV === 'production';
@@ -41,10 +42,6 @@ module.exports = {
           },
         ],
       },
-      {
-        test: /src\/client\/.+\.(woff|woff2)$/,
-        loader: 'base64-inline-loader',
-      },
     ],
   },
   optimization: {
@@ -67,12 +64,14 @@ module.exports = {
   plugins: [
     new webpack.ProgressPlugin(),
     new webpack.DefinePlugin({
-      'process.env': BUILD_ENV_VARS
-        .filter((key) => key in process.env)
-        .reduce((acc, key) => ({
-          ...acc,
-          [key]: JSON.stringify(process.env[key]),
-        }), {}),
+      process: {
+        env: BUILD_ENV_VARS
+          .filter((key) => key in process.env)
+          .reduce((acc, key) => ({
+            ...acc,
+            [key]: JSON.stringify(process.env[key]),
+          }), {}),
+      },
     }),
     new CopyPlugin({
       patterns: [

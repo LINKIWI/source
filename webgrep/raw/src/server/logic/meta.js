@@ -1,3 +1,4 @@
+import { InfoRequest } from 'livegrep/proto/livegrep_pb';
 import BaseLogic from 'server/logic/base';
 import { TELEMETRY_ACTIONS } from 'shared/constants/telemetry';
 
@@ -11,7 +12,7 @@ export default class MetaLogic extends BaseLogic {
    * @param {Function} cb Callback invoked with (err, data) on completion.
    */
   info(cb) {
-    return this.ctx.service.codesearch.rpc('info', {}, (err, data = {}) => {
+    return this.ctx.service.codesearch.rpc('info', new InfoRequest(), (err, resp) => {
       if (err) {
         this.ctx.log.error(
           'meta: encountered RPC error: method=info code=%d details=%s',
@@ -21,8 +22,9 @@ export default class MetaLogic extends BaseLogic {
         return cb(this.formatErr(err));
       }
 
+      const data = resp.toObject();
       const tags = { name: data.name };
-      this.ctx.metrics.gauge('gauge.index.repositories', data.trees.length, tags);
+      this.ctx.metrics.gauge('gauge.index.repositories', data.treesList.length, tags);
       this.ctx.metrics.gauge('gauge.index.timestamp', data.indexTime, tags);
 
       return cb(null, {
@@ -30,7 +32,7 @@ export default class MetaLogic extends BaseLogic {
           name: data.name,
           timestamp: parseInt(data.indexTime, 10),
           version: process.env.VERSION,
-          repositories: data.trees.map((tree) => ({
+          repositories: data.treesList.map((tree) => ({
             name: tree.name,
             version: tree.version,
             url: tree.metadata.urlPattern,

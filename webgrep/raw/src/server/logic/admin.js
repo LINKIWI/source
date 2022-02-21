@@ -1,3 +1,4 @@
+import { Empty } from 'livegrep/proto/livegrep_pb';
 import BaseLogic from 'server/logic/base';
 
 /**
@@ -13,7 +14,7 @@ export default class AdminLogic extends BaseLogic {
     // Invalidate all search query cache entries, since they may be stale after reloading the index
     this.ctx.cache.flush('search');
 
-    return this.ctx.service.codesearch.broadcastRPC('reload', {}, (err) =>
+    return this.ctx.service.codesearch.broadcastRPC('reload', new Empty(), (err) =>
       (err ? cb(this.formatErr(err)) : cb()));
   }
 

@@ -1,10 +1,11 @@
+import { SearchStats } from 'livegrep/proto/livegrep_pb';
 import PropTypes from 'prop-types';
 import React, { Component, Fragment } from 'react';
 import { Button, Spacing, Text } from 'react-elemental';
 import { connect } from 'react-redux';
 import { onlyUpdateForKeys } from 'recompose';
-import { compose } from '@linkiwi/hoc';
 import { CODE_INVALID_PARAMETERS } from 'supercharged/shared/constants/error';
+import { compose } from '@linkiwi/hoc';
 import withTelemetry from 'client/app/react/containers/hoc/with-telemetry';
 import CodeResultsContainer from 'client/app/react/containers/search/results/code-results';
 import FileResultsContainer from 'client/app/react/containers/search/results/file-results';
@@ -15,7 +16,6 @@ import { PREFERENCE_KEYS } from 'client/app/util/constants/preferences';
 import { MAX_MATCHES } from 'client/app/util/constants/search';
 import { background, text } from 'client/app/util/style/color';
 import { TELEMETRY_ACTIONS } from 'shared/constants/telemetry';
-import { SearchStats } from 'shared/schemas';
 import { objLookup } from 'shared/util/data';
 
 /**

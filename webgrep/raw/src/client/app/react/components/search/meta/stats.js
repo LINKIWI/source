@@ -1,8 +1,8 @@
+import { SearchStats } from 'livegrep/proto/livegrep_pb';
 import PropTypes from 'prop-types';
 import React from 'react';
 import { pure } from 'recompose';
 import { Spacing, Text } from 'react-elemental';
-import { SearchStats } from 'shared/schemas';
 
 /**
  * Visualization of server-side statistics for a search request.

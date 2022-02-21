@@ -1,8 +1,9 @@
-import { route, withSchema } from 'supercharged/server';
+import { route, withRequestSchema } from 'supercharged/server';
 import { HTTPHandler, WebSocketTransactionHandler } from 'server/handlers/base';
 import { withEndpointInstrumentation } from 'server/util/instrumentation';
 
 const schema = {
+  type: 'object',
   properties: {
     // Search parameters
     query: {
@@ -47,6 +48,7 @@ const schema = {
     // Optional unique index identity descriptor used for slightly more robust consistency between
     // server and client index state
     indexIdentity: {
+      type: 'object',
       properties: {
         name: {
           type: 'string',
@@ -66,7 +68,7 @@ const schema = {
 @route('/api/search')
 export class SearchHandler extends HTTPHandler {
   @withEndpointInstrumentation
-  @withSchema(schema)
+  @withRequestSchema(schema)
   get(params) {
     return this.ctx.logic.search.executeSearch(params, (err, resp) =>
       (err ? this.error(err) : this.success(resp)));
@@ -76,7 +78,7 @@ export class SearchHandler extends HTTPHandler {
 @route('/api/search')
 export class SearchLiveHandler extends WebSocketTransactionHandler {
   @withEndpointInstrumentation
-  @withSchema(schema)
+  @withRequestSchema(schema)
   invoke({ id, ...params }) {
     return this.ctx.logic.search.executeSearch(params, (err, resp) =>
       (err ? this.error({ id, ...err }) : this.success({ id, ...resp })));

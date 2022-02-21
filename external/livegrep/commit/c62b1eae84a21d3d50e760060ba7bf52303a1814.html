@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>.ci: Publish schemas after release - livegrep - Fast, regular expression code search service</title>
+<meta name="description" content="Fast, regular expression code search service" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/c62b1eae84a21d3d50e760060ba7bf52303a1814">c62b1eae84a21d3d50e760060ba7bf52303a1814</a>
+<b>parent</b> <a href="../commit/afce8d46fa336d1d058f548f1c2f81db3feb806a">afce8d46fa336d1d058f548f1c2f81db3feb806a</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Fri 18 Feb 2022 21:11:39 -0800
+
+.ci: Publish schemas after release
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">.ci/Jenkinsfile</a></td><td> | </td><td class="num">20</td><td><span class="i">++++++++++++++++++++</span><span class="d"></span></td></tr>
+</table></pre><pre>1 file changed, 20 insertions(+), 0 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/.ci/Jenkinsfile">.ci/Jenkinsfile</a> b/<a href="../file/.ci/Jenkinsfile">.ci/Jenkinsfile</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -27,6 +27,7 @@ pipeline {
+</a>         stage(&#39;Release&#39;) {
+             steps {
+                 sh &#39;mkdir -p release/bin/&#39;
+<a href="#h0-0-3" id="h0-0-3" class="i">+                sh &#39;cp -r src/ release/&#39;
+</a>                 sh &#39;cp bazel-bin/src/tools/codesearch release/bin/&#39;
+                 sh &#39;cp bazel-bin/src/tools/codesearchtool release/bin/&#39;
+                 sh &#39;cp bazel-bin/cmd/lg/lg_/lg release/bin/&#39;
+<a href="#h0-1" id="h0-1" class="h">@@ -37,6 +38,9 @@ pipeline {
+</a>                 sh &#39;cp bazel-bin/cmd/livegrep-index-builder/livegrep-index-builder_/livegrep-index-builder release/bin/&#39;
+                 sh &#39;cp bazel-bin/cmd/livegrep-metrics-exporter/livegrep-metrics-exporter_/livegrep-metrics-exporter release/bin/&#39;
+                 sh &#39;cp bazel-bin/cmd/livegrep-reload/livegrep-reload_/livegrep-reload release/bin/&#39;
+<a href="#h0-1-3" id="h0-1-3" class="i">+                // Pre-process Protobuf files for compatibility with schemas release pipeline.
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+                sh &#39;sed -i \&#39;s/import &quot;src\\//import &quot;/g\&#39; release/src/proto/*.proto&#39;
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+                sh &#39;sed -i \&#39;1a option go_package = &quot;lib.kevinlin.info/schemas/external/livegrep&quot;;\&#39; release/src/proto/*.proto&#39;
+</a>                 sh &#39;tar -C release -hcvzf release.tar.gz ./&#39;
+                 s3Upload(
+                     bucket: &#39;internal&#39;,
+<a href="#h0-2" id="h0-2" class="h">@@ -45,5 +49,21 @@ pipeline {
+</a>                 )
+             }
+         }
+<a href="#h0-2-3" id="h0-2-3" class="i">+        stage(&#39;Publish&#39;) {
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+            steps {
+</a><a href="#h0-2-5" id="h0-2-5" class="i">+                build(
+</a><a href="#h0-2-6" id="h0-2-6" class="i">+                    job: &#39;task--schema&#39;,
+</a><a href="#h0-2-7" id="h0-2-7" class="i">+                    parameters: [
+</a><a href="#h0-2-8" id="h0-2-8" class="i">+                        string(name: &#39;RELEASE_ARTIFACT&#39;, value: &#39;external/livegrep&#39;),
+</a><a href="#h0-2-9" id="h0-2-9" class="i">+                        string(name: &#39;RELEASE_VERSION&#39;, value: env.GIT_COMMIT),
+</a><a href="#h0-2-10" id="h0-2-10" class="i">+                        string(name: &#39;SCHEMA_PATH&#39;, value: &#39;src/proto&#39;),
+</a><a href="#h0-2-11" id="h0-2-11" class="i">+                        string(name: &#39;GO_MODULE&#39;, value: &#39;lib.kevinlin.info/schemas/external/livegrep&#39;),
+</a><a href="#h0-2-12" id="h0-2-12" class="i">+                        string(name: &#39;NODE_PACKAGE&#39;, value: &#39;external/livegrep&#39;),
+</a><a href="#h0-2-13" id="h0-2-13" class="i">+                        string(name: &#39;PYTHON_PACKAGE&#39;, value: &#39;external/livegrep&#39;),
+</a><a href="#h0-2-14" id="h0-2-14" class="i">+                    ],
+</a><a href="#h0-2-15" id="h0-2-15" class="i">+                    wait: true,
+</a><a href="#h0-2-16" id="h0-2-16" class="i">+                )
+</a><a href="#h0-2-17" id="h0-2-17" class="i">+            }
+</a><a href="#h0-2-18" id="h0-2-18" class="i">+        }
+</a>     }
+ }
+</pre>
+</div>
+</body>
+</html>

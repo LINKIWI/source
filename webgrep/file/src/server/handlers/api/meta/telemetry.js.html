@@ -18,9 +18,9 @@ body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{fo
 <a href="../../../../../../log">Log</a> | <a href="../../../../../../files">Files</a> | <a href="../../../../../../refs">Refs</a> | <a href="../../../../../../file/README.md">README</a> | <a href="../../../../../../file/LICENSE">LICENSE</a></td></tr></table>
 <hr/>
 <div id="content">
-<p>src/server/handlers/api/meta/<strong>telemetry.js</strong> (1376B) (<a href="../../../../../../raw/src/server/handlers/api/meta/telemetry.js">raw</a>) (<a href="../../../../../../blame/src/server/handlers/api/meta/telemetry.js">blame</a>)</p><hr/>
+<p>src/server/handlers/api/meta/<strong>telemetry.js</strong> (1410B) (<a href="../../../../../../raw/src/server/handlers/api/meta/telemetry.js">raw</a>) (<a href="../../../../../../blame/src/server/handlers/api/meta/telemetry.js">blame</a>)</p><hr/>
 <pre id="blob">
-<a href="#l1" class="line" id="l1">      1</a> import { route, withSchema } from &#39;supercharged/server&#39;;
+<a href="#l1" class="line" id="l1">      1</a> import { route, withRequestSchema } from &#39;supercharged/server&#39;;
 <a href="#l2" class="line" id="l2">      2</a> import { WebSocketTransactionHandler } from &#39;server/handlers/base&#39;;
 <a href="#l3" class="line" id="l3">      3</a> import { withEndpointInstrumentation } from &#39;server/util/instrumentation&#39;;
 <a href="#l4" class="line" id="l4">      4</a> import { TELEMETRY_ACTIONS, TELEMETRY_TAGS } from &#39;shared/constants/telemetry&#39;;
@@ -28,45 +28,46 @@ body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{fo
 <a href="#l6" class="line" id="l6">      6</a> @route(&#39;/api/meta/telemetry&#39;)
 <a href="#l7" class="line" id="l7">      7</a> export default class MetaTelemetryHandler extends WebSocketTransactionHandler {
 <a href="#l8" class="line" id="l8">      8</a>   @withEndpointInstrumentation
-<a href="#l9" class="line" id="l9">      9</a>   @withSchema({
-<a href="#l10" class="line" id="l10">     10</a>     properties: {
-<a href="#l11" class="line" id="l11">     11</a>       action: {
-<a href="#l12" class="line" id="l12">     12</a>         enum: Object.values(TELEMETRY_ACTIONS),
-<a href="#l13" class="line" id="l13">     13</a>       },
-<a href="#l14" class="line" id="l14">     14</a>       value: {
-<a href="#l15" class="line" id="l15">     15</a>         type: &#39;number&#39;,
-<a href="#l16" class="line" id="l16">     16</a>       },
-<a href="#l17" class="line" id="l17">     17</a>       tags: {
-<a href="#l18" class="line" id="l18">     18</a>         type: &#39;object&#39;,
-<a href="#l19" class="line" id="l19">     19</a>         patternProperties: {
-<a href="#l20" class="line" id="l20">     20</a>           &#39;.+&#39;: {
-<a href="#l21" class="line" id="l21">     21</a>             type: [&#39;string&#39;, &#39;number&#39;],
-<a href="#l22" class="line" id="l22">     22</a>           },
-<a href="#l23" class="line" id="l23">     23</a>         },
-<a href="#l24" class="line" id="l24">     24</a>         additionalProperties: false,
-<a href="#l25" class="line" id="l25">     25</a>       },
-<a href="#l26" class="line" id="l26">     26</a>       timestamp: {
-<a href="#l27" class="line" id="l27">     27</a>         type: &#39;number&#39;,
-<a href="#l28" class="line" id="l28">     28</a>       },
-<a href="#l29" class="line" id="l29">     29</a>       attempt: {
-<a href="#l30" class="line" id="l30">     30</a>         type: &#39;number&#39;,
-<a href="#l31" class="line" id="l31">     31</a>       },
-<a href="#l32" class="line" id="l32">     32</a>     },
-<a href="#l33" class="line" id="l33">     33</a>     required: [&#39;action&#39;, &#39;value&#39;, &#39;tags&#39;],
-<a href="#l34" class="line" id="l34">     34</a>     additionalProperties: false,
-<a href="#l35" class="line" id="l35">     35</a>   })
-<a href="#l36" class="line" id="l36">     36</a>   invoke({ action, value, tags }) {
-<a href="#l37" class="line" id="l37">     37</a>     // Only include whitelisted tag keys for the particular action type
-<a href="#l38" class="line" id="l38">     38</a>     const sanitizedTags = (TELEMETRY_TAGS[action] || [])
-<a href="#l39" class="line" id="l39">     39</a>       .filter((knownTagKey) =&gt; knownTagKey in tags)
-<a href="#l40" class="line" id="l40">     40</a>       .reduce((acc, knownTagKey) =&gt; ({
-<a href="#l41" class="line" id="l41">     41</a>         ...acc,
-<a href="#l42" class="line" id="l42">     42</a>         [knownTagKey]: tags[knownTagKey],
-<a href="#l43" class="line" id="l43">     43</a>       }), {});
-<a href="#l44" class="line" id="l44">     44</a> 
-<a href="#l45" class="line" id="l45">     45</a>     this.ctx.logic.meta.reportTelemetryMetrics(action, value, sanitizedTags);
-<a href="#l46" class="line" id="l46">     46</a>   }
-<a href="#l47" class="line" id="l47">     47</a> }
+<a href="#l9" class="line" id="l9">      9</a>   @withRequestSchema({
+<a href="#l10" class="line" id="l10">     10</a>     type: &#39;object&#39;,
+<a href="#l11" class="line" id="l11">     11</a>     properties: {
+<a href="#l12" class="line" id="l12">     12</a>       action: {
+<a href="#l13" class="line" id="l13">     13</a>         enum: Object.values(TELEMETRY_ACTIONS),
+<a href="#l14" class="line" id="l14">     14</a>       },
+<a href="#l15" class="line" id="l15">     15</a>       value: {
+<a href="#l16" class="line" id="l16">     16</a>         type: &#39;number&#39;,
+<a href="#l17" class="line" id="l17">     17</a>       },
+<a href="#l18" class="line" id="l18">     18</a>       tags: {
+<a href="#l19" class="line" id="l19">     19</a>         type: &#39;object&#39;,
+<a href="#l20" class="line" id="l20">     20</a>         patternProperties: {
+<a href="#l21" class="line" id="l21">     21</a>           &#39;.+&#39;: {
+<a href="#l22" class="line" id="l22">     22</a>             type: [&#39;string&#39;, &#39;number&#39;],
+<a href="#l23" class="line" id="l23">     23</a>           },
+<a href="#l24" class="line" id="l24">     24</a>         },
+<a href="#l25" class="line" id="l25">     25</a>         additionalProperties: false,
+<a href="#l26" class="line" id="l26">     26</a>       },
+<a href="#l27" class="line" id="l27">     27</a>       timestamp: {
+<a href="#l28" class="line" id="l28">     28</a>         type: &#39;number&#39;,
+<a href="#l29" class="line" id="l29">     29</a>       },
+<a href="#l30" class="line" id="l30">     30</a>       attempt: {
+<a href="#l31" class="line" id="l31">     31</a>         type: &#39;number&#39;,
+<a href="#l32" class="line" id="l32">     32</a>       },
+<a href="#l33" class="line" id="l33">     33</a>     },
+<a href="#l34" class="line" id="l34">     34</a>     required: [&#39;action&#39;, &#39;value&#39;, &#39;tags&#39;],
+<a href="#l35" class="line" id="l35">     35</a>     additionalProperties: false,
+<a href="#l36" class="line" id="l36">     36</a>   })
+<a href="#l37" class="line" id="l37">     37</a>   invoke({ action, value, tags }) {
+<a href="#l38" class="line" id="l38">     38</a>     // Only include whitelisted tag keys for the particular action type
+<a href="#l39" class="line" id="l39">     39</a>     const sanitizedTags = (TELEMETRY_TAGS[action] || [])
+<a href="#l40" class="line" id="l40">     40</a>       .filter((knownTagKey) =&gt; knownTagKey in tags)
+<a href="#l41" class="line" id="l41">     41</a>       .reduce((acc, knownTagKey) =&gt; ({
+<a href="#l42" class="line" id="l42">     42</a>         ...acc,
+<a href="#l43" class="line" id="l43">     43</a>         [knownTagKey]: tags[knownTagKey],
+<a href="#l44" class="line" id="l44">     44</a>       }), {});
+<a href="#l45" class="line" id="l45">     45</a> 
+<a href="#l46" class="line" id="l46">     46</a>     this.ctx.logic.meta.reportTelemetryMetrics(action, value, sanitizedTags);
+<a href="#l47" class="line" id="l47">     47</a>   }
+<a href="#l48" class="line" id="l48">     48</a> }
 </pre>
 </div>
 </body>

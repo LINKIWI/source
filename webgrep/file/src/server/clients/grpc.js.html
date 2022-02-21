@@ -18,181 +18,163 @@ body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{fo
 <a href="../../../../log">Log</a> | <a href="../../../../files">Files</a> | <a href="../../../../refs">Refs</a> | <a href="../../../../file/README.md">README</a> | <a href="../../../../file/LICENSE">LICENSE</a></td></tr></table>
 <hr/>
 <div id="content">
-<p>src/server/clients/<strong>grpc.js</strong> (5430B) (<a href="../../../../raw/src/server/clients/grpc.js">raw</a>) (<a href="../../../../blame/src/server/clients/grpc.js">blame</a>)</p><hr/>
+<p>src/server/clients/<strong>grpc.js</strong> (4806B) (<a href="../../../../raw/src/server/clients/grpc.js">raw</a>) (<a href="../../../../blame/src/server/clients/grpc.js">blame</a>)</p><hr/>
 <pre id="blob">
 <a href="#l1" class="line" id="l1">      1</a> import async from &#39;async&#39;;
-<a href="#l2" class="line" id="l2">      2</a> import protobufjs from &#39;protobufjs&#39;;
-<a href="#l3" class="line" id="l3">      3</a> import * as grpc from &#39;@grpc/grpc-js&#39;;
-<a href="#l4" class="line" id="l4">      4</a> import * as protoLoader from &#39;@grpc/proto-loader&#39;;
-<a href="#l5" class="line" id="l5">      5</a> import { stopwatch } from &#39;shared/util/instrumentation&#39;;
-<a href="#l6" class="line" id="l6">      6</a> 
-<a href="#l7" class="line" id="l7">      7</a> /**
-<a href="#l8" class="line" id="l8">      8</a>  * Abstract superclass describing a client implementing a per-request load balancing policy among
-<a href="#l9" class="line" id="l9">      9</a>  * multiple, identical replicas of a gRPC client.
-<a href="#l10" class="line" id="l10">     10</a>  */
-<a href="#l11" class="line" id="l11">     11</a> class GRPCLoadBalancer {
-<a href="#l12" class="line" id="l12">     12</a>   /**
-<a href="#l13" class="line" id="l13">     13</a>    * Create a GRPCLoadBalancer with an array of backends (gRPC clients).
-<a href="#l14" class="line" id="l14">     14</a>    *
-<a href="#l15" class="line" id="l15">     15</a>    * @param {Array} backends Array of GRPCClient instances.
-<a href="#l16" class="line" id="l16">     16</a>    */
-<a href="#l17" class="line" id="l17">     17</a>   constructor(backends) {
-<a href="#l18" class="line" id="l18">     18</a>     this.backends = backends;
-<a href="#l19" class="line" id="l19">     19</a>   }
-<a href="#l20" class="line" id="l20">     20</a> 
-<a href="#l21" class="line" id="l21">     21</a>   /**
-<a href="#l22" class="line" id="l22">     22</a>    * Invoke an RPC method. It is expected that subclasses implement this method.
-<a href="#l23" class="line" id="l23">     23</a>    *
-<a href="#l24" class="line" id="l24">     24</a>    * @param {String} method Service method name.
-<a href="#l25" class="line" id="l25">     25</a>    * @param {Object} req Request object.
-<a href="#l26" class="line" id="l26">     26</a>    * @param {Function} cb RPC stub callback function.
-<a href="#l27" class="line" id="l27">     27</a>    */
-<a href="#l28" class="line" id="l28">     28</a>   rpc(method, req, cb) {}  // eslint-disable-line
-<a href="#l29" class="line" id="l29">     29</a> 
-<a href="#l30" class="line" id="l30">     30</a>   /**
-<a href="#l31" class="line" id="l31">     31</a>    * Execute a single unary RPC on all backend clients, in parallel. Arguments are proxied
-<a href="#l32" class="line" id="l32">     32</a>    * transparently directly to the backends, skipping all load balancing.
-<a href="#l33" class="line" id="l33">     33</a>    *
-<a href="#l34" class="line" id="l34">     34</a>    * @param {String} method Service method name.
-<a href="#l35" class="line" id="l35">     35</a>    * @param {Object} req Request object.
-<a href="#l36" class="line" id="l36">     36</a>    * @param {Function} cb RPC stub callback function.
-<a href="#l37" class="line" id="l37">     37</a>    */
-<a href="#l38" class="line" id="l38">     38</a>   broadcastRPC(method, req, cb) {
-<a href="#l39" class="line" id="l39">     39</a>     async.parallel(this.backends.map((backend) =&gt; (done) =&gt; backend.rpc(method, req, done)), cb);
-<a href="#l40" class="line" id="l40">     40</a>   }
-<a href="#l41" class="line" id="l41">     41</a> 
-<a href="#l42" class="line" id="l42">     42</a>   /**
-<a href="#l43" class="line" id="l43">     43</a>    * Retrieve the Protobuf definition associated with the backends. This assumes that all backends
-<a href="#l44" class="line" id="l44">     44</a>    * are homogeneous, and thus provides only the first backend&#39;s Protobuf definition.
-<a href="#l45" class="line" id="l45">     45</a>    *
-<a href="#l46" class="line" id="l46">     46</a>    * @return {Object} Service Protobuf definition of the first backend.
-<a href="#l47" class="line" id="l47">     47</a>    */
-<a href="#l48" class="line" id="l48">     48</a>   get proto() {
-<a href="#l49" class="line" id="l49">     49</a>     return this.backends[0].proto;
-<a href="#l50" class="line" id="l50">     50</a>   }
-<a href="#l51" class="line" id="l51">     51</a> }
-<a href="#l52" class="line" id="l52">     52</a> 
-<a href="#l53" class="line" id="l53">     53</a> /**
-<a href="#l54" class="line" id="l54">     54</a>  * API-compliant gRPC load balancer implementation that statically uses the first backend
-<a href="#l55" class="line" id="l55">     55</a>  * exclusively for all requests.
-<a href="#l56" class="line" id="l56">     56</a>  */
-<a href="#l57" class="line" id="l57">     57</a> export class StaticGRPCLoadBalancer extends GRPCLoadBalancer {
+<a href="#l2" class="line" id="l2">      2</a> import * as grpc from &#39;@grpc/grpc-js&#39;;
+<a href="#l3" class="line" id="l3">      3</a> import { stopwatch } from &#39;shared/util/instrumentation&#39;;
+<a href="#l4" class="line" id="l4">      4</a> 
+<a href="#l5" class="line" id="l5">      5</a> /**
+<a href="#l6" class="line" id="l6">      6</a>  * Abstract superclass describing a client implementing a per-request load balancing policy among
+<a href="#l7" class="line" id="l7">      7</a>  * multiple, identical replicas of a gRPC client.
+<a href="#l8" class="line" id="l8">      8</a>  */
+<a href="#l9" class="line" id="l9">      9</a> class GRPCLoadBalancer {
+<a href="#l10" class="line" id="l10">     10</a>   /**
+<a href="#l11" class="line" id="l11">     11</a>    * Create a GRPCLoadBalancer with an array of backends (gRPC clients).
+<a href="#l12" class="line" id="l12">     12</a>    *
+<a href="#l13" class="line" id="l13">     13</a>    * @param {Array} backends Array of GRPCClient instances.
+<a href="#l14" class="line" id="l14">     14</a>    */
+<a href="#l15" class="line" id="l15">     15</a>   constructor(backends) {
+<a href="#l16" class="line" id="l16">     16</a>     this.backends = backends;
+<a href="#l17" class="line" id="l17">     17</a>   }
+<a href="#l18" class="line" id="l18">     18</a> 
+<a href="#l19" class="line" id="l19">     19</a>   /**
+<a href="#l20" class="line" id="l20">     20</a>    * Invoke an RPC method. It is expected that subclasses implement this method.
+<a href="#l21" class="line" id="l21">     21</a>    *
+<a href="#l22" class="line" id="l22">     22</a>    * @param {String} method Service method name.
+<a href="#l23" class="line" id="l23">     23</a>    * @param {Object} req Request object.
+<a href="#l24" class="line" id="l24">     24</a>    * @param {Function} cb RPC stub callback function.
+<a href="#l25" class="line" id="l25">     25</a>    */
+<a href="#l26" class="line" id="l26">     26</a>   rpc(method, req, cb) {}  // eslint-disable-line
+<a href="#l27" class="line" id="l27">     27</a> 
+<a href="#l28" class="line" id="l28">     28</a>   /**
+<a href="#l29" class="line" id="l29">     29</a>    * Execute a single unary RPC on all backend clients, in parallel. Arguments are proxied
+<a href="#l30" class="line" id="l30">     30</a>    * transparently directly to the backends, skipping all load balancing.
+<a href="#l31" class="line" id="l31">     31</a>    *
+<a href="#l32" class="line" id="l32">     32</a>    * @param {String} method Service method name.
+<a href="#l33" class="line" id="l33">     33</a>    * @param {Object} req Request object.
+<a href="#l34" class="line" id="l34">     34</a>    * @param {Function} cb RPC stub callback function.
+<a href="#l35" class="line" id="l35">     35</a>    */
+<a href="#l36" class="line" id="l36">     36</a>   broadcastRPC(method, req, cb) {
+<a href="#l37" class="line" id="l37">     37</a>     async.parallel(this.backends.map((backend) =&gt; (done) =&gt; backend.rpc(method, req, done)), cb);
+<a href="#l38" class="line" id="l38">     38</a>   }
+<a href="#l39" class="line" id="l39">     39</a> }
+<a href="#l40" class="line" id="l40">     40</a> 
+<a href="#l41" class="line" id="l41">     41</a> /**
+<a href="#l42" class="line" id="l42">     42</a>  * API-compliant gRPC load balancer implementation that statically uses the first backend
+<a href="#l43" class="line" id="l43">     43</a>  * exclusively for all requests.
+<a href="#l44" class="line" id="l44">     44</a>  */
+<a href="#l45" class="line" id="l45">     45</a> export class StaticGRPCLoadBalancer extends GRPCLoadBalancer {
+<a href="#l46" class="line" id="l46">     46</a>   rpc(method, req, cb) {
+<a href="#l47" class="line" id="l47">     47</a>     return this.backends[0].rpc(method, req, cb);
+<a href="#l48" class="line" id="l48">     48</a>   }
+<a href="#l49" class="line" id="l49">     49</a> }
+<a href="#l50" class="line" id="l50">     50</a> 
+<a href="#l51" class="line" id="l51">     51</a> /**
+<a href="#l52" class="line" id="l52">     52</a>  * Abstraction over multiple gRPC clients that rotates among all clients in round-robin order for
+<a href="#l53" class="line" id="l53">     53</a>  * each request.
+<a href="#l54" class="line" id="l54">     54</a>  */
+<a href="#l55" class="line" id="l55">     55</a> export class RoundRobinGRPCLoadBalancer extends GRPCLoadBalancer {
+<a href="#l56" class="line" id="l56">     56</a>   rotation = 0;  // Current round robin index
+<a href="#l57" class="line" id="l57">     57</a> 
 <a href="#l58" class="line" id="l58">     58</a>   rpc(method, req, cb) {
-<a href="#l59" class="line" id="l59">     59</a>     return this.backends[0].rpc(method, req, cb);
-<a href="#l60" class="line" id="l60">     60</a>   }
-<a href="#l61" class="line" id="l61">     61</a> }
-<a href="#l62" class="line" id="l62">     62</a> 
-<a href="#l63" class="line" id="l63">     63</a> /**
-<a href="#l64" class="line" id="l64">     64</a>  * Abstraction over multiple gRPC clients that rotates among all clients in round-robin order for
-<a href="#l65" class="line" id="l65">     65</a>  * each request.
-<a href="#l66" class="line" id="l66">     66</a>  */
-<a href="#l67" class="line" id="l67">     67</a> export class RoundRobinGRPCLoadBalancer extends GRPCLoadBalancer {
-<a href="#l68" class="line" id="l68">     68</a>   rotation = 0;  // Current round robin index
-<a href="#l69" class="line" id="l69">     69</a> 
-<a href="#l70" class="line" id="l70">     70</a>   rpc(method, req, cb) {
-<a href="#l71" class="line" id="l71">     71</a>     try {
-<a href="#l72" class="line" id="l72">     72</a>       return this.backends[this.rotation].rpc(method, req, cb);
-<a href="#l73" class="line" id="l73">     73</a>     } finally {
-<a href="#l74" class="line" id="l74">     74</a>       this.rotation = (this.rotation + 1) % this.backends.length;
-<a href="#l75" class="line" id="l75">     75</a>     }
-<a href="#l76" class="line" id="l76">     76</a>   }
-<a href="#l77" class="line" id="l77">     77</a> }
-<a href="#l78" class="line" id="l78">     78</a> 
-<a href="#l79" class="line" id="l79">     79</a> /**
-<a href="#l80" class="line" id="l80">     80</a>  * Abstraction over multiple gRPC clients that prefers earlier clients, failing over to later
-<a href="#l81" class="line" id="l81">     81</a>  * clients when the preceding client encounters any error during the stub invocation.
-<a href="#l82" class="line" id="l82">     82</a>  */
-<a href="#l83" class="line" id="l83">     83</a> export class FailoverGRPCLoadBalancer extends GRPCLoadBalancer {
-<a href="#l84" class="line" id="l84">     84</a>   rpc(method, req, cb) {
-<a href="#l85" class="line" id="l85">     85</a>     const failoverRPC = (idx) =&gt; this.backends[idx].rpc(method, req, (err, ...args) =&gt; {
-<a href="#l86" class="line" id="l86">     86</a>       if (err) {
-<a href="#l87" class="line" id="l87">     87</a>         // All backends exhausted; propagate the error back to the client
-<a href="#l88" class="line" id="l88">     88</a>         if (idx === this.backends.length) {
-<a href="#l89" class="line" id="l89">     89</a>           return cb(err, ...args);
-<a href="#l90" class="line" id="l90">     90</a>         }
-<a href="#l91" class="line" id="l91">     91</a> 
-<a href="#l92" class="line" id="l92">     92</a>         return failoverRPC(idx + 1);
-<a href="#l93" class="line" id="l93">     93</a>       }
-<a href="#l94" class="line" id="l94">     94</a> 
-<a href="#l95" class="line" id="l95">     95</a>       return cb(err, ...args);
-<a href="#l96" class="line" id="l96">     96</a>     });
-<a href="#l97" class="line" id="l97">     97</a> 
-<a href="#l98" class="line" id="l98">     98</a>     return failoverRPC(0);
-<a href="#l99" class="line" id="l99">     99</a>   }
-<a href="#l100" class="line" id="l100">    100</a> }
-<a href="#l101" class="line" id="l101">    101</a> 
-<a href="#l102" class="line" id="l102">    102</a> /**
-<a href="#l103" class="line" id="l103">    103</a>  * Client for interacting with gRPC services.
-<a href="#l104" class="line" id="l104">    104</a>  */
-<a href="#l105" class="line" id="l105">    105</a> export default class GRPCClient {
-<a href="#l106" class="line" id="l106">    106</a>   /**
-<a href="#l107" class="line" id="l107">    107</a>    * Create a gRPC service client, with access to an RPC stub as well as the protobuf data
-<a href="#l108" class="line" id="l108">    108</a>    * structures defined alongside the service.
-<a href="#l109" class="line" id="l109">    109</a>    *
-<a href="#l110" class="line" id="l110">    110</a>    * @param {String} addr Address of the gRPC server.
-<a href="#l111" class="line" id="l111">    111</a>    * @param {String} authority HTTP/2 authority pseudo-header for requests to the gRPC server.
-<a href="#l112" class="line" id="l112">    112</a>    * @param {String} service Name of the gRPC service as defined in the proto file.
-<a href="#l113" class="line" id="l113">    113</a>    * @param {String} protoPath Path to the protobuf service definition on disk.
-<a href="#l114" class="line" id="l114">    114</a>    * @param {MetricsClient} metrics Metrics client instance for automatic instrumentation of RPC
-<a href="#l115" class="line" id="l115">    115</a>    *                                stub invocations.
-<a href="#l116" class="line" id="l116">    116</a>    * @param {Object} options Optional object of customized options to apply.
-<a href="#l117" class="line" id="l117">    117</a>    */
-<a href="#l118" class="line" id="l118">    118</a>   constructor(addr, authority, service, protoPath, metrics, options = {}) {
-<a href="#l119" class="line" id="l119">    119</a>     const packageDefinition = protoLoader.loadSync(protoPath, {
-<a href="#l120" class="line" id="l120">    120</a>       longs: String,
-<a href="#l121" class="line" id="l121">    121</a>       defaults: true,
-<a href="#l122" class="line" id="l122">    122</a>       oneofs: true,
-<a href="#l123" class="line" id="l123">    123</a>     });
-<a href="#l124" class="line" id="l124">    124</a>     const protoDescriptor = grpc.loadPackageDefinition(packageDefinition);
-<a href="#l125" class="line" id="l125">    125</a>     const opts = { &#39;grpc.default_authority&#39;: authority };
-<a href="#l126" class="line" id="l126">    126</a>     const Service = service &amp;&amp; protoDescriptor[service];
-<a href="#l127" class="line" id="l127">    127</a> 
-<a href="#l128" class="line" id="l128">    128</a>     this._proto = protobufjs.loadSync(protoPath);
-<a href="#l129" class="line" id="l129">    129</a>     this._stub = addr &amp;&amp; service &amp;&amp; new Service(addr, grpc.credentials.createInsecure(), opts);
-<a href="#l130" class="line" id="l130">    130</a>     this._service = service;
-<a href="#l131" class="line" id="l131">    131</a>     this._metrics = metrics;
-<a href="#l132" class="line" id="l132">    132</a>     this._options = options;
-<a href="#l133" class="line" id="l133">    133</a>   }
-<a href="#l134" class="line" id="l134">    134</a> 
-<a href="#l135" class="line" id="l135">    135</a>   /**
-<a href="#l136" class="line" id="l136">    136</a>    * Invoke an RPC method.
-<a href="#l137" class="line" id="l137">    137</a>    *
-<a href="#l138" class="line" id="l138">    138</a>    * @param {String} method Service method name.
-<a href="#l139" class="line" id="l139">    139</a>    * @param {Object} req Request object.
-<a href="#l140" class="line" id="l140">    140</a>    * @param {Function} cb RPC stub callback function.
-<a href="#l141" class="line" id="l141">    141</a>    */
-<a href="#l142" class="line" id="l142">    142</a>   rpc(method, req, cb) {
-<a href="#l143" class="line" id="l143">    143</a>     const duration = stopwatch();
-<a href="#l144" class="line" id="l144">    144</a>     const tags = {
-<a href="#l145" class="line" id="l145">    145</a>       service: this._service.toLowerCase(),
-<a href="#l146" class="line" id="l146">    146</a>       method,
-<a href="#l147" class="line" id="l147">    147</a>     };
-<a href="#l148" class="line" id="l148">    148</a>     const opts = {
-<a href="#l149" class="line" id="l149">    149</a>       deadline: new Date(Date.now() + this._options.requestTimeout || 3000),
-<a href="#l150" class="line" id="l150">    150</a>     };
+<a href="#l59" class="line" id="l59">     59</a>     try {
+<a href="#l60" class="line" id="l60">     60</a>       return this.backends[this.rotation].rpc(method, req, cb);
+<a href="#l61" class="line" id="l61">     61</a>     } finally {
+<a href="#l62" class="line" id="l62">     62</a>       this.rotation = (this.rotation + 1) % this.backends.length;
+<a href="#l63" class="line" id="l63">     63</a>     }
+<a href="#l64" class="line" id="l64">     64</a>   }
+<a href="#l65" class="line" id="l65">     65</a> }
+<a href="#l66" class="line" id="l66">     66</a> 
+<a href="#l67" class="line" id="l67">     67</a> /**
+<a href="#l68" class="line" id="l68">     68</a>  * Abstraction over multiple gRPC clients that prefers earlier clients, failing over to later
+<a href="#l69" class="line" id="l69">     69</a>  * clients when the preceding client encounters any error during the stub invocation.
+<a href="#l70" class="line" id="l70">     70</a>  */
+<a href="#l71" class="line" id="l71">     71</a> export class FailoverGRPCLoadBalancer extends GRPCLoadBalancer {
+<a href="#l72" class="line" id="l72">     72</a>   rpc(method, req, cb) {
+<a href="#l73" class="line" id="l73">     73</a>     const failoverRPC = (idx) =&gt; this.backends[idx].rpc(method, req, (err, ...args) =&gt; {
+<a href="#l74" class="line" id="l74">     74</a>       if (err) {
+<a href="#l75" class="line" id="l75">     75</a>         // All backends exhausted; propagate the error back to the client
+<a href="#l76" class="line" id="l76">     76</a>         if (idx === this.backends.length) {
+<a href="#l77" class="line" id="l77">     77</a>           return cb(err, ...args);
+<a href="#l78" class="line" id="l78">     78</a>         }
+<a href="#l79" class="line" id="l79">     79</a> 
+<a href="#l80" class="line" id="l80">     80</a>         return failoverRPC(idx + 1);
+<a href="#l81" class="line" id="l81">     81</a>       }
+<a href="#l82" class="line" id="l82">     82</a> 
+<a href="#l83" class="line" id="l83">     83</a>       return cb(err, ...args);
+<a href="#l84" class="line" id="l84">     84</a>     });
+<a href="#l85" class="line" id="l85">     85</a> 
+<a href="#l86" class="line" id="l86">     86</a>     return failoverRPC(0);
+<a href="#l87" class="line" id="l87">     87</a>   }
+<a href="#l88" class="line" id="l88">     88</a> }
+<a href="#l89" class="line" id="l89">     89</a> 
+<a href="#l90" class="line" id="l90">     90</a> /**
+<a href="#l91" class="line" id="l91">     91</a>  * Client for interacting with gRPC services.
+<a href="#l92" class="line" id="l92">     92</a>  */
+<a href="#l93" class="line" id="l93">     93</a> export default class GRPCClient {
+<a href="#l94" class="line" id="l94">     94</a>   /**
+<a href="#l95" class="line" id="l95">     95</a>    * Create a gRPC service client, with access to an RPC stub as well as the protobuf data
+<a href="#l96" class="line" id="l96">     96</a>    * structures defined alongside the service.
+<a href="#l97" class="line" id="l97">     97</a>    *
+<a href="#l98" class="line" id="l98">     98</a>    * @param {String} name Unique identifier for this gRPC service client instance.
+<a href="#l99" class="line" id="l99">     99</a>    * @param {String} address Address of the gRPC server.
+<a href="#l100" class="line" id="l100">    100</a>    * @param {String} authority HTTP/2 authority pseudo-header for requests to the gRPC server.
+<a href="#l101" class="line" id="l101">    101</a>    * @param {String} service Name of the gRPC service as defined in the proto file.
+<a href="#l102" class="line" id="l102">    102</a>    * @param {MetricsClient} metrics Metrics client instance for automatic instrumentation of RPC
+<a href="#l103" class="line" id="l103">    103</a>    *                                stub invocations.
+<a href="#l104" class="line" id="l104">    104</a>    * @param {Object} options Optional object of customized options to apply.
+<a href="#l105" class="line" id="l105">    105</a>    */
+<a href="#l106" class="line" id="l106">    106</a>   constructor(name, address, authority, service, metrics, options = {}) {
+<a href="#l107" class="line" id="l107">    107</a>     const Service = service;
+<a href="#l108" class="line" id="l108">    108</a>     const opts = {
+<a href="#l109" class="line" id="l109">    109</a>       &#39;grpc.default_authority&#39;: authority,
+<a href="#l110" class="line" id="l110">    110</a>       ...options.maxRecvMessageSize &amp;&amp; {
+<a href="#l111" class="line" id="l111">    111</a>         &#39;grpc.max_receive_message_length&#39;: options.maxRecvMessageSize,
+<a href="#l112" class="line" id="l112">    112</a>       },
+<a href="#l113" class="line" id="l113">    113</a>       ...options.maxSendMessageSize &amp;&amp; {
+<a href="#l114" class="line" id="l114">    114</a>         &#39;grpc.max_send_message_length&#39;: options.maxSendMessageSize,
+<a href="#l115" class="line" id="l115">    115</a>       },
+<a href="#l116" class="line" id="l116">    116</a>     };
+<a href="#l117" class="line" id="l117">    117</a> 
+<a href="#l118" class="line" id="l118">    118</a>     this._stub = address &amp;&amp;
+<a href="#l119" class="line" id="l119">    119</a>       service &amp;&amp;
+<a href="#l120" class="line" id="l120">    120</a>       new Service(address, grpc.credentials.createInsecure(), opts);
+<a href="#l121" class="line" id="l121">    121</a>     this._name = name;
+<a href="#l122" class="line" id="l122">    122</a>     this._metrics = metrics;
+<a href="#l123" class="line" id="l123">    123</a>     this._options = options;
+<a href="#l124" class="line" id="l124">    124</a>   }
+<a href="#l125" class="line" id="l125">    125</a> 
+<a href="#l126" class="line" id="l126">    126</a>   /**
+<a href="#l127" class="line" id="l127">    127</a>    * Invoke an RPC method.
+<a href="#l128" class="line" id="l128">    128</a>    *
+<a href="#l129" class="line" id="l129">    129</a>    * @param {String} method Service method name.
+<a href="#l130" class="line" id="l130">    130</a>    * @param {Object} req Request object.
+<a href="#l131" class="line" id="l131">    131</a>    * @param {Function} cb RPC stub callback function.
+<a href="#l132" class="line" id="l132">    132</a>    */
+<a href="#l133" class="line" id="l133">    133</a>   rpc(method, req, cb) {
+<a href="#l134" class="line" id="l134">    134</a>     const duration = stopwatch();
+<a href="#l135" class="line" id="l135">    135</a>     const tags = {
+<a href="#l136" class="line" id="l136">    136</a>       service: this._name.toLowerCase(),
+<a href="#l137" class="line" id="l137">    137</a>       method,
+<a href="#l138" class="line" id="l138">    138</a>     };
+<a href="#l139" class="line" id="l139">    139</a>     const opts = {
+<a href="#l140" class="line" id="l140">    140</a>       deadline: new Date(Date.now() + this._options.requestTimeout || 3000),
+<a href="#l141" class="line" id="l141">    141</a>     };
+<a href="#l142" class="line" id="l142">    142</a> 
+<a href="#l143" class="line" id="l143">    143</a>     this._metrics.increment(&#39;event.rpc.invoke&#39;, tags);
+<a href="#l144" class="line" id="l144">    144</a> 
+<a href="#l145" class="line" id="l145">    145</a>     return this._stub[method](req, opts, (err, ...args) =&gt; {
+<a href="#l146" class="line" id="l146">    146</a>       if (err) {
+<a href="#l147" class="line" id="l147">    147</a>         this._metrics.increment(&#39;event.rpc.error&#39;, tags);
+<a href="#l148" class="line" id="l148">    148</a>       }
+<a href="#l149" class="line" id="l149">    149</a> 
+<a href="#l150" class="line" id="l150">    150</a>       this._metrics.timing(&#39;latency.rpc.invoke&#39;, duration.elapsed(), tags);
 <a href="#l151" class="line" id="l151">    151</a> 
-<a href="#l152" class="line" id="l152">    152</a>     this._metrics.increment(&#39;event.rpc.invoke&#39;, tags);
-<a href="#l153" class="line" id="l153">    153</a> 
-<a href="#l154" class="line" id="l154">    154</a>     return this._stub[method](req, opts, (err, ...args) =&gt; {
-<a href="#l155" class="line" id="l155">    155</a>       if (err) {
-<a href="#l156" class="line" id="l156">    156</a>         this._metrics.increment(&#39;event.rpc.error&#39;, tags);
-<a href="#l157" class="line" id="l157">    157</a>       }
-<a href="#l158" class="line" id="l158">    158</a> 
-<a href="#l159" class="line" id="l159">    159</a>       this._metrics.timing(&#39;latency.rpc.invoke&#39;, duration.elapsed(), tags);
-<a href="#l160" class="line" id="l160">    160</a> 
-<a href="#l161" class="line" id="l161">    161</a>       return cb(err, ...args);
-<a href="#l162" class="line" id="l162">    162</a>     });
-<a href="#l163" class="line" id="l163">    163</a>   }
-<a href="#l164" class="line" id="l164">    164</a> 
-<a href="#l165" class="line" id="l165">    165</a>   /**
-<a href="#l166" class="line" id="l166">    166</a>    * Object representation of the protobuf&#39;s defined data structures.
-<a href="#l167" class="line" id="l167">    167</a>    *
-<a href="#l168" class="line" id="l168">    168</a>    * @returns {Object} Protobuf data structures.
-<a href="#l169" class="line" id="l169">    169</a>    */
-<a href="#l170" class="line" id="l170">    170</a>   get proto() {
-<a href="#l171" class="line" id="l171">    171</a>     return this._proto;
-<a href="#l172" class="line" id="l172">    172</a>   }
-<a href="#l173" class="line" id="l173">    173</a> }
+<a href="#l152" class="line" id="l152">    152</a>       return cb(err, ...args);
+<a href="#l153" class="line" id="l153">    153</a>     });
+<a href="#l154" class="line" id="l154">    154</a>   }
+<a href="#l155" class="line" id="l155">    155</a> }
 </pre>
 </div>
 </body>

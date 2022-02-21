@@ -14,6 +14,7 @@ import { objLookup } from 'shared/util/data';
 
 class AdminPreferencesInterfaceContainer extends Component {
   static propTypes = {
+    isCompact: PropTypes.bool.isRequired,
     // HOC props
     preferences: PropTypes.shape({
       [PREFERENCE_KEYS.CODE_SEARCH_RESULT_NAVIGATION]: PropTypes.string.isRequired,
@@ -36,7 +37,7 @@ class AdminPreferencesInterfaceContainer extends Component {
   }
 
   render() {
-    const { preferences, sourcePreviewOpts } = this.props;
+    const { preferences, sourcePreviewOpts, isCompact } = this.props;
 
     return (
       <AdminPanel
@@ -47,6 +48,7 @@ class AdminPreferencesInterfaceContainer extends Component {
         <AdminControl
           title="Code search result navigation"
           description="Customize the behavior when clicking on a code line search result"
+          isCompact={isCompact}
         >
           <SelectList
             value={preferences[PREFERENCE_KEYS.CODE_SEARCH_RESULT_NAVIGATION]}
@@ -82,6 +84,7 @@ class AdminPreferencesInterfaceContainer extends Component {
               description="Color scheme to use in interactive source previews"
               linkTitle="Browse Prism themes"
               linkHref="https://prismjs.com"
+              isCompact={isCompact}
             >
               <SelectList
                 value={preferences[PREFERENCE_KEYS.SYNTAX_HIGHLIGHT_THEME]}

@@ -23,6 +23,7 @@ const MAX_FILE_RESULTS_LIMIT = 50;
 
 class AdminPreferencesSearchContainer extends Component {
   static propTypes = {
+    isCompact: PropTypes.bool.isRequired,
     // HOC props
     form: PropTypes.shape({
       contextSlider: PropTypes.number.isRequired,
@@ -71,6 +72,7 @@ class AdminPreferencesSearchContainer extends Component {
   render() {
     const {
       form: { contextSlider, matchLimitSlider, fileResultsLimitSlider },
+      isCompact,
       handleFormChange,
     } = this.props;
     const {
@@ -92,6 +94,7 @@ class AdminPreferencesSearchContainer extends Component {
         <AdminControl
           title="Code context lines"
           description="Number of lines of surrounding context for each matching search result"
+          isCompact={isCompact}
         >
           <Slider
             value={contextSlider}
@@ -109,6 +112,7 @@ class AdminPreferencesSearchContainer extends Component {
         <AdminControl
           title="Default match limit"
           description="Initial maximum number of matched lines per search query"
+          isCompact={isCompact}
         >
           <Slider
             value={matchLimitSlider}
@@ -126,6 +130,7 @@ class AdminPreferencesSearchContainer extends Component {
         <AdminControl
           title="Collapsed file results limit"
           description="Number of file result matches to display per search query before expansion"
+          isCompact={isCompact}
         >
           <Slider
             value={fileResultsLimitSlider}

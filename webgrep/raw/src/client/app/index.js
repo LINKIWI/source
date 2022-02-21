@@ -1,14 +1,14 @@
 import React, { Component } from 'react';
 import { Elemental } from 'react-elemental';
-import karlaBold from 'react-elemental-fonts/karla-bold';
-import karlaRegular from 'react-elemental-fonts/karla-regular';
 import { BrowserRouter } from 'react-router-dom';
 import { Provider } from 'react-redux';
+import karlaBold from '@linkiwi/fonts/karla/bold';
+import karlaRegular from '@linkiwi/fonts/karla/regular';
+import sourceCodeProBold from '@linkiwi/fonts/source-code-pro/bold';
+import sourceCodeProRegular from '@linkiwi/fonts/source-code-pro/regular';
 import * as Sentry from '@sentry/browser';
 import Root from 'client/app/react/root';
 import store from 'client/app/redux/store';
-import sourceCodeProBold from 'client/resources/font/source-code-pro-bold.woff2';
-import sourceCodeProRegular from 'client/resources/font/source-code-pro-regular.woff2';
 import { objLookup } from 'shared/util/data';
 
 const {
@@ -44,8 +44,8 @@ export default class App extends Component {
                 regular: karlaRegular,
               },
               secondary: {
-                bold: `url(${sourceCodeProBold})`,
-                regular: `url(${sourceCodeProRegular})`,
+                bold: sourceCodeProBold,
+                regular: sourceCodeProRegular,
               },
             }}
           >

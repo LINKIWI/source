@@ -27,6 +27,7 @@ pipeline {
         stage('Release') {
             steps {
                 sh 'mkdir -p release/bin/'
+                sh 'cp -r src/ release/'
                 sh 'cp bazel-bin/src/tools/codesearch release/bin/'
                 sh 'cp bazel-bin/src/tools/codesearchtool release/bin/'
                 sh 'cp bazel-bin/cmd/lg/lg_/lg release/bin/'
@@ -37,11 +38,30 @@ pipeline {
                 sh 'cp bazel-bin/cmd/livegrep-index-builder/livegrep-index-builder_/livegrep-index-builder release/bin/'
                 sh 'cp bazel-bin/cmd/livegrep-metrics-exporter/livegrep-metrics-exporter_/livegrep-metrics-exporter release/bin/'
                 sh 'cp bazel-bin/cmd/livegrep-reload/livegrep-reload_/livegrep-reload release/bin/'
+                // Pre-process Protobuf files for compatibility with schemas release pipeline.
+                sh 'sed -i \'s/import "src\\//import "/g\' release/src/proto/*.proto'
+                sh 'sed -i \'1a option go_package = "lib.kevinlin.info/schemas/external/livegrep";\' release/src/proto/*.proto'
                 sh 'tar -C release -hcvzf release.tar.gz ./'
                 s3Upload(
                     bucket: 'internal',
                     path: "deploy/external/livegrep/${env.GIT_COMMIT}/",
                     file: 'release.tar.gz',
+                )
+            }
+        }
+        stage('Publish') {
+            steps {
+                build(
+                    job: 'task--schema',
+                    parameters: [
+                        string(name: 'RELEASE_ARTIFACT', value: 'external/livegrep'),
+                        string(name: 'RELEASE_VERSION', value: env.GIT_COMMIT),
+                        string(name: 'SCHEMA_PATH', value: 'src/proto'),
+                        string(name: 'GO_MODULE', value: 'lib.kevinlin.info/schemas/external/livegrep'),
+                        string(name: 'NODE_PACKAGE', value: 'external/livegrep'),
+                        string(name: 'PYTHON_PACKAGE', value: 'external/livegrep'),
+                    ],
+                    wait: true,
                 )
             }
         }

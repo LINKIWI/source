@@ -145,6 +145,7 @@ class QueryOptionControls extends Component {
     const flyoutToggleStyle = {
       position: 'relative',
       ...isCompact && {
+        marginBottom: '10px',
         position: 'unset',
       },
     };

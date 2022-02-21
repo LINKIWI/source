@@ -1,7 +1,5 @@
 import async from 'async';
-import protobufjs from 'protobufjs';
 import * as grpc from '@grpc/grpc-js';
-import * as protoLoader from '@grpc/proto-loader';
 import { stopwatch } from 'shared/util/instrumentation';
 
 /**
@@ -37,16 +35,6 @@ class GRPCLoadBalancer {
    */
   broadcastRPC(method, req, cb) {
     async.parallel(this.backends.map((backend) => (done) => backend.rpc(method, req, done)), cb);
-  }
-
-  /**
-   * Retrieve the Protobuf definition associated with the backends. This assumes that all backends
-   * are homogeneous, and thus provides only the first backend's Protobuf definition.
-   *
-   * @return {Object} Service Protobuf definition of the first backend.
-   */
-  get proto() {
-    return this.backends[0].proto;
   }
 }
 
@@ -107,27 +95,30 @@ export default class GRPCClient {
    * Create a gRPC service client, with access to an RPC stub as well as the protobuf data
    * structures defined alongside the service.
    *
-   * @param {String} addr Address of the gRPC server.
+   * @param {String} name Unique identifier for this gRPC service client instance.
+   * @param {String} address Address of the gRPC server.
    * @param {String} authority HTTP/2 authority pseudo-header for requests to the gRPC server.
    * @param {String} service Name of the gRPC service as defined in the proto file.
-   * @param {String} protoPath Path to the protobuf service definition on disk.
    * @param {MetricsClient} metrics Metrics client instance for automatic instrumentation of RPC
    *                                stub invocations.
    * @param {Object} options Optional object of customized options to apply.
    */
-  constructor(addr, authority, service, protoPath, metrics, options = {}) {
-    const packageDefinition = protoLoader.loadSync(protoPath, {
-      longs: String,
-      defaults: true,
-      oneofs: true,
-    });
-    const protoDescriptor = grpc.loadPackageDefinition(packageDefinition);
-    const opts = { 'grpc.default_authority': authority };
-    const Service = service && protoDescriptor[service];
+  constructor(name, address, authority, service, metrics, options = {}) {
+    const Service = service;
+    const opts = {
+      'grpc.default_authority': authority,
+      ...options.maxRecvMessageSize && {
+        'grpc.max_receive_message_length': options.maxRecvMessageSize,
+      },
+      ...options.maxSendMessageSize && {
+        'grpc.max_send_message_length': options.maxSendMessageSize,
+      },
+    };
 
-    this._proto = protobufjs.loadSync(protoPath);
-    this._stub = addr && service && new Service(addr, grpc.credentials.createInsecure(), opts);
-    this._service = service;
+    this._stub = address &&
+      service &&
+      new Service(address, grpc.credentials.createInsecure(), opts);
+    this._name = name;
     this._metrics = metrics;
     this._options = options;
   }
@@ -142,7 +133,7 @@ export default class GRPCClient {
   rpc(method, req, cb) {
     const duration = stopwatch();
     const tags = {
-      service: this._service.toLowerCase(),
+      service: this._name.toLowerCase(),
       method,
     };
     const opts = {
@@ -160,14 +151,5 @@ export default class GRPCClient {
 
       return cb(err, ...args);
     });
-  }
-
-  /**
-   * Object representation of the protobuf's defined data structures.
-   *
-   * @returns {Object} Protobuf data structures.
-   */
-  get proto() {
-    return this._proto;
   }
 }

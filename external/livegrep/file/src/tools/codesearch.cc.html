@@ -18,7 +18,7 @@ body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{fo
 <a href="../../../log">Log</a> | <a href="../../../files">Files</a> | <a href="../../../refs">Refs</a> | <a href="../../../file/README.md">README</a> | <a href="../../../file/COPYING">LICENSE</a></td></tr></table>
 <hr/>
 <div id="content">
-<p>src/tools/<strong>codesearch.cc</strong> (7375B) (<a href="../../../raw/src/tools/codesearch.cc">raw</a>) (<a href="../../../blame/src/tools/codesearch.cc">blame</a>)</p><hr/>
+<p>src/tools/<strong>codesearch.cc</strong> (7864B) (<a href="../../../raw/src/tools/codesearch.cc">raw</a>) (<a href="../../../blame/src/tools/codesearch.cc">blame</a>)</p><hr/>
 <pre id="blob">
 <a href="#l1" class="line" id="l1">      1</a> /********************************************************************
 <a href="#l2" class="line" id="l2">      2</a>  * livegrep -- tools/codesearch.cc
@@ -76,168 +76,176 @@ body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{fo
 <a href="#l54" class="line" id="l54">     54</a> DEFINE_bool(reload_rpc, false, &quot;Enable the Reload RPC&quot;);
 <a href="#l55" class="line" id="l55">     55</a> DEFINE_bool(hot_index_reload, false, &quot;Enable automatic reloads when the index file changes&quot;);
 <a href="#l56" class="line" id="l56">     56</a> DEFINE_bool(reuseport, true, &quot;Set SO_REUSEPORT to enable multiple concurrent server instances.&quot;);
-<a href="#l57" class="line" id="l57">     57</a> 
-<a href="#l58" class="line" id="l58">     58</a> using namespace std;
-<a href="#l59" class="line" id="l59">     59</a> using namespace re2;
-<a href="#l60" class="line" id="l60">     60</a> namespace fs = boost::filesystem;
-<a href="#l61" class="line" id="l61">     61</a> 
-<a href="#l62" class="line" id="l62">     62</a> using grpc::Server;
-<a href="#l63" class="line" id="l63">     63</a> using grpc::ServerBuilder;
-<a href="#l64" class="line" id="l64">     64</a> 
-<a href="#l65" class="line" id="l65">     65</a> void die_errno(const char *str) {
-<a href="#l66" class="line" id="l66">     66</a>     perror(str);
-<a href="#l67" class="line" id="l67">     67</a>     exit(1);
-<a href="#l68" class="line" id="l68">     68</a> }
-<a href="#l69" class="line" id="l69">     69</a> 
-<a href="#l70" class="line" id="l70">     70</a> void build_index(code_searcher *cs, const vector&lt;std::string&gt; &amp;argv) {
-<a href="#l71" class="line" id="l71">     71</a>     if (argv.size() != 2) {
-<a href="#l72" class="line" id="l72">     72</a>         fprintf(stderr, &quot;Usage: %s [OPTIONS] config.json\n&quot;, argv[0].c_str());
-<a href="#l73" class="line" id="l73">     73</a>         exit(1);
-<a href="#l74" class="line" id="l74">     74</a>     }
-<a href="#l75" class="line" id="l75">     75</a> 
-<a href="#l76" class="line" id="l76">     76</a>     fs::path config_file_path(argv[1]);
-<a href="#l77" class="line" id="l77">     77</a>     std::string json_text;
-<a href="#l78" class="line" id="l78">     78</a>     fs::load_string_file(config_file_path, json_text);
-<a href="#l79" class="line" id="l79">     79</a> 
-<a href="#l80" class="line" id="l80">     80</a>     IndexSpec spec;
-<a href="#l81" class="line" id="l81">     81</a>     auto status = google::protobuf::util::JsonStringToMessage(json_text, &amp;spec, google::protobuf::util::JsonParseOptions());
-<a href="#l82" class="line" id="l82">     82</a>     if (!status.ok()) {
-<a href="#l83" class="line" id="l83">     83</a>         fprintf(stderr, &quot;Parsing %s: %s\n&quot;, argv[1].c_str(), status.message().data());
-<a href="#l84" class="line" id="l84">     84</a>         exit(1);
-<a href="#l85" class="line" id="l85">     85</a>     }
-<a href="#l86" class="line" id="l86">     86</a>     if (!spec.paths_size() &amp;&amp; !spec.repositories_size()) {
-<a href="#l87" class="line" id="l87">     87</a>         fprintf(stderr, &quot;%s: You must specify at least one path to index.\n&quot;, argv[1].c_str());
-<a href="#l88" class="line" id="l88">     88</a>         exit(1);
-<a href="#l89" class="line" id="l89">     89</a>     }
-<a href="#l90" class="line" id="l90">     90</a> 
-<a href="#l91" class="line" id="l91">     91</a>     if (spec.name().size())
-<a href="#l92" class="line" id="l92">     92</a>         cs-&gt;set_name(spec.name());
-<a href="#l93" class="line" id="l93">     93</a>     for (auto &amp;path : spec.paths()) {
-<a href="#l94" class="line" id="l94">     94</a>         fprintf(stderr, &quot;Walking path_spec name=%s, path=%s\n&quot;,
-<a href="#l95" class="line" id="l95">     95</a>                 path.name().c_str(), path.path().c_str());
-<a href="#l96" class="line" id="l96">     96</a>         fs_indexer indexer(cs, path.path(), path.name(), path.metadata());
-<a href="#l97" class="line" id="l97">     97</a>         if (path.ordered_contents().empty()) {
-<a href="#l98" class="line" id="l98">     98</a>             fprintf(stderr, &quot;  walking full tree\n&quot;);
-<a href="#l99" class="line" id="l99">     99</a>             indexer.walk(path.path());
-<a href="#l100" class="line" id="l100">    100</a>         } else {
-<a href="#l101" class="line" id="l101">    101</a>             fprintf(stderr, &quot;  walking paths from ordered contents list\n&quot;);
-<a href="#l102" class="line" id="l102">    102</a>             fs::path contents_file_path = fs::canonical(path.ordered_contents(), config_file_path.remove_filename());
-<a href="#l103" class="line" id="l103">    103</a>             indexer.walk_contents_file(contents_file_path);
-<a href="#l104" class="line" id="l104">    104</a>         }
-<a href="#l105" class="line" id="l105">    105</a>         fprintf(stderr, &quot;done\n&quot;);
-<a href="#l106" class="line" id="l106">    106</a>     }
-<a href="#l107" class="line" id="l107">    107</a> 
-<a href="#l108" class="line" id="l108">    108</a>     for (auto &amp;repo  : spec.repositories()) {
-<a href="#l109" class="line" id="l109">    109</a>         fprintf(stderr, &quot;Walking repo_spec name=%s, path=%s (including  submodules: %s)\n&quot;,
-<a href="#l110" class="line" id="l110">    110</a>                 repo.name().c_str(), repo.path().c_str(), repo.walk_submodules() ? &quot;true&quot; : &quot;false&quot;);
-<a href="#l111" class="line" id="l111">    111</a>         git_indexer indexer(cs, repo.path(), repo.name(), repo.metadata(), repo.walk_submodules());
-<a href="#l112" class="line" id="l112">    112</a>         for (auto &amp;rev : repo.revisions()) {
-<a href="#l113" class="line" id="l113">    113</a>             fprintf(stderr, &quot;  walking %s\n&quot;, rev.c_str());
-<a href="#l114" class="line" id="l114">    114</a>             indexer.walk(rev);
-<a href="#l115" class="line" id="l115">    115</a>             fprintf(stderr, &quot;  done\n&quot;);
-<a href="#l116" class="line" id="l116">    116</a>         }
-<a href="#l117" class="line" id="l117">    117</a>     }
-<a href="#l118" class="line" id="l118">    118</a> }
-<a href="#l119" class="line" id="l119">    119</a> 
-<a href="#l120" class="line" id="l120">    120</a> void initialize_search(code_searcher *search,
-<a href="#l121" class="line" id="l121">    121</a>                        int argc, char **argv) {
-<a href="#l122" class="line" id="l122">    122</a>     if (FLAGS_load_index.size() == 0) {
-<a href="#l123" class="line" id="l123">    123</a>         if (FLAGS_dump_index.size())
-<a href="#l124" class="line" id="l124">    124</a>             search-&gt;set_alloc(make_dump_allocator(search, FLAGS_dump_index));
-<a href="#l125" class="line" id="l125">    125</a>         else
-<a href="#l126" class="line" id="l126">    126</a>             search-&gt;set_alloc(make_mem_allocator());
-<a href="#l127" class="line" id="l127">    127</a> 
-<a href="#l128" class="line" id="l128">    128</a>         vector&lt;std::string&gt; args;
-<a href="#l129" class="line" id="l129">    129</a>         for (int i = 0; i &lt; argc; ++i)
-<a href="#l130" class="line" id="l130">    130</a>             args.push_back(argv[i]);
-<a href="#l131" class="line" id="l131">    131</a> 
-<a href="#l132" class="line" id="l132">    132</a>         timer tm;
-<a href="#l133" class="line" id="l133">    133</a>         struct timeval elapsed;
-<a href="#l134" class="line" id="l134">    134</a>         build_index(search, args);
-<a href="#l135" class="line" id="l135">    135</a>         fprintf(stderr, &quot;Finalizing...\n&quot;);
-<a href="#l136" class="line" id="l136">    136</a>         search-&gt;finalize();
-<a href="#l137" class="line" id="l137">    137</a>         elapsed = tm.elapsed();
-<a href="#l138" class="line" id="l138">    138</a>         fprintf(stderr, &quot;repository indexed in %d.%06ds\n&quot;,
-<a href="#l139" class="line" id="l139">    139</a>                 (int)elapsed.tv_sec, (int)elapsed.tv_usec);
-<a href="#l140" class="line" id="l140">    140</a>         metric::dump_all();
-<a href="#l141" class="line" id="l141">    141</a>     } else {
-<a href="#l142" class="line" id="l142">    142</a>         search-&gt;load_index(FLAGS_load_index);
-<a href="#l143" class="line" id="l143">    143</a>     }
-<a href="#l144" class="line" id="l144">    144</a>     if (FLAGS_dump_index.size() &amp;&amp; FLAGS_load_index.size())
-<a href="#l145" class="line" id="l145">    145</a>         search-&gt;dump_index(FLAGS_dump_index);
-<a href="#l146" class="line" id="l146">    146</a> }
-<a href="#l147" class="line" id="l147">    147</a> 
-<a href="#l148" class="line" id="l148">    148</a> void listen_grpc(code_searcher *search, code_searcher *tags, const string&amp; addr) {
-<a href="#l149" class="line" id="l149">    149</a>     promise&lt;void&gt; reload_request;
-<a href="#l150" class="line" id="l150">    150</a>     auto reload_request_ptr = FLAGS_reload_rpc ? &amp;reload_request : NULL;
-<a href="#l151" class="line" id="l151">    151</a> 
-<a href="#l152" class="line" id="l152">    152</a>     unique_ptr&lt;CodeSearch::Service&gt; service(build_grpc_server(search, tags, reload_request_ptr));
+<a href="#l57" class="line" id="l57">     57</a> DEFINE_int32(max_recv_message_size, 0, &quot;Maximum gRPC receive (inbound) message size in bytes&quot;);
+<a href="#l58" class="line" id="l58">     58</a> DEFINE_int32(max_send_message_size, 0, &quot;Maximum gRPC send (outbound) message size in bytes&quot;);
+<a href="#l59" class="line" id="l59">     59</a> 
+<a href="#l60" class="line" id="l60">     60</a> using namespace std;
+<a href="#l61" class="line" id="l61">     61</a> using namespace re2;
+<a href="#l62" class="line" id="l62">     62</a> namespace fs = boost::filesystem;
+<a href="#l63" class="line" id="l63">     63</a> 
+<a href="#l64" class="line" id="l64">     64</a> using grpc::Server;
+<a href="#l65" class="line" id="l65">     65</a> using grpc::ServerBuilder;
+<a href="#l66" class="line" id="l66">     66</a> 
+<a href="#l67" class="line" id="l67">     67</a> void die_errno(const char *str) {
+<a href="#l68" class="line" id="l68">     68</a>     perror(str);
+<a href="#l69" class="line" id="l69">     69</a>     exit(1);
+<a href="#l70" class="line" id="l70">     70</a> }
+<a href="#l71" class="line" id="l71">     71</a> 
+<a href="#l72" class="line" id="l72">     72</a> void build_index(code_searcher *cs, const vector&lt;std::string&gt; &amp;argv) {
+<a href="#l73" class="line" id="l73">     73</a>     if (argv.size() != 2) {
+<a href="#l74" class="line" id="l74">     74</a>         fprintf(stderr, &quot;Usage: %s [OPTIONS] config.json\n&quot;, argv[0].c_str());
+<a href="#l75" class="line" id="l75">     75</a>         exit(1);
+<a href="#l76" class="line" id="l76">     76</a>     }
+<a href="#l77" class="line" id="l77">     77</a> 
+<a href="#l78" class="line" id="l78">     78</a>     fs::path config_file_path(argv[1]);
+<a href="#l79" class="line" id="l79">     79</a>     std::string json_text;
+<a href="#l80" class="line" id="l80">     80</a>     fs::load_string_file(config_file_path, json_text);
+<a href="#l81" class="line" id="l81">     81</a> 
+<a href="#l82" class="line" id="l82">     82</a>     IndexSpec spec;
+<a href="#l83" class="line" id="l83">     83</a>     auto status = google::protobuf::util::JsonStringToMessage(json_text, &amp;spec, google::protobuf::util::JsonParseOptions());
+<a href="#l84" class="line" id="l84">     84</a>     if (!status.ok()) {
+<a href="#l85" class="line" id="l85">     85</a>         fprintf(stderr, &quot;Parsing %s: %s\n&quot;, argv[1].c_str(), status.message().data());
+<a href="#l86" class="line" id="l86">     86</a>         exit(1);
+<a href="#l87" class="line" id="l87">     87</a>     }
+<a href="#l88" class="line" id="l88">     88</a>     if (!spec.paths_size() &amp;&amp; !spec.repositories_size()) {
+<a href="#l89" class="line" id="l89">     89</a>         fprintf(stderr, &quot;%s: You must specify at least one path to index.\n&quot;, argv[1].c_str());
+<a href="#l90" class="line" id="l90">     90</a>         exit(1);
+<a href="#l91" class="line" id="l91">     91</a>     }
+<a href="#l92" class="line" id="l92">     92</a> 
+<a href="#l93" class="line" id="l93">     93</a>     if (spec.name().size())
+<a href="#l94" class="line" id="l94">     94</a>         cs-&gt;set_name(spec.name());
+<a href="#l95" class="line" id="l95">     95</a>     for (auto &amp;path : spec.paths()) {
+<a href="#l96" class="line" id="l96">     96</a>         fprintf(stderr, &quot;Walking path_spec name=%s, path=%s\n&quot;,
+<a href="#l97" class="line" id="l97">     97</a>                 path.name().c_str(), path.path().c_str());
+<a href="#l98" class="line" id="l98">     98</a>         fs_indexer indexer(cs, path.path(), path.name(), path.metadata());
+<a href="#l99" class="line" id="l99">     99</a>         if (path.ordered_contents().empty()) {
+<a href="#l100" class="line" id="l100">    100</a>             fprintf(stderr, &quot;  walking full tree\n&quot;);
+<a href="#l101" class="line" id="l101">    101</a>             indexer.walk(path.path());
+<a href="#l102" class="line" id="l102">    102</a>         } else {
+<a href="#l103" class="line" id="l103">    103</a>             fprintf(stderr, &quot;  walking paths from ordered contents list\n&quot;);
+<a href="#l104" class="line" id="l104">    104</a>             fs::path contents_file_path = fs::canonical(path.ordered_contents(), config_file_path.remove_filename());
+<a href="#l105" class="line" id="l105">    105</a>             indexer.walk_contents_file(contents_file_path);
+<a href="#l106" class="line" id="l106">    106</a>         }
+<a href="#l107" class="line" id="l107">    107</a>         fprintf(stderr, &quot;done\n&quot;);
+<a href="#l108" class="line" id="l108">    108</a>     }
+<a href="#l109" class="line" id="l109">    109</a> 
+<a href="#l110" class="line" id="l110">    110</a>     for (auto &amp;repo  : spec.repositories()) {
+<a href="#l111" class="line" id="l111">    111</a>         fprintf(stderr, &quot;Walking repo_spec name=%s, path=%s (including  submodules: %s)\n&quot;,
+<a href="#l112" class="line" id="l112">    112</a>                 repo.name().c_str(), repo.path().c_str(), repo.walk_submodules() ? &quot;true&quot; : &quot;false&quot;);
+<a href="#l113" class="line" id="l113">    113</a>         git_indexer indexer(cs, repo.path(), repo.name(), repo.metadata(), repo.walk_submodules());
+<a href="#l114" class="line" id="l114">    114</a>         for (auto &amp;rev : repo.revisions()) {
+<a href="#l115" class="line" id="l115">    115</a>             fprintf(stderr, &quot;  walking %s\n&quot;, rev.c_str());
+<a href="#l116" class="line" id="l116">    116</a>             indexer.walk(rev);
+<a href="#l117" class="line" id="l117">    117</a>             fprintf(stderr, &quot;  done\n&quot;);
+<a href="#l118" class="line" id="l118">    118</a>         }
+<a href="#l119" class="line" id="l119">    119</a>     }
+<a href="#l120" class="line" id="l120">    120</a> }
+<a href="#l121" class="line" id="l121">    121</a> 
+<a href="#l122" class="line" id="l122">    122</a> void initialize_search(code_searcher *search,
+<a href="#l123" class="line" id="l123">    123</a>                        int argc, char **argv) {
+<a href="#l124" class="line" id="l124">    124</a>     if (FLAGS_load_index.size() == 0) {
+<a href="#l125" class="line" id="l125">    125</a>         if (FLAGS_dump_index.size())
+<a href="#l126" class="line" id="l126">    126</a>             search-&gt;set_alloc(make_dump_allocator(search, FLAGS_dump_index));
+<a href="#l127" class="line" id="l127">    127</a>         else
+<a href="#l128" class="line" id="l128">    128</a>             search-&gt;set_alloc(make_mem_allocator());
+<a href="#l129" class="line" id="l129">    129</a> 
+<a href="#l130" class="line" id="l130">    130</a>         vector&lt;std::string&gt; args;
+<a href="#l131" class="line" id="l131">    131</a>         for (int i = 0; i &lt; argc; ++i)
+<a href="#l132" class="line" id="l132">    132</a>             args.push_back(argv[i]);
+<a href="#l133" class="line" id="l133">    133</a> 
+<a href="#l134" class="line" id="l134">    134</a>         timer tm;
+<a href="#l135" class="line" id="l135">    135</a>         struct timeval elapsed;
+<a href="#l136" class="line" id="l136">    136</a>         build_index(search, args);
+<a href="#l137" class="line" id="l137">    137</a>         fprintf(stderr, &quot;Finalizing...\n&quot;);
+<a href="#l138" class="line" id="l138">    138</a>         search-&gt;finalize();
+<a href="#l139" class="line" id="l139">    139</a>         elapsed = tm.elapsed();
+<a href="#l140" class="line" id="l140">    140</a>         fprintf(stderr, &quot;repository indexed in %d.%06ds\n&quot;,
+<a href="#l141" class="line" id="l141">    141</a>                 (int)elapsed.tv_sec, (int)elapsed.tv_usec);
+<a href="#l142" class="line" id="l142">    142</a>         metric::dump_all();
+<a href="#l143" class="line" id="l143">    143</a>     } else {
+<a href="#l144" class="line" id="l144">    144</a>         search-&gt;load_index(FLAGS_load_index);
+<a href="#l145" class="line" id="l145">    145</a>     }
+<a href="#l146" class="line" id="l146">    146</a>     if (FLAGS_dump_index.size() &amp;&amp; FLAGS_load_index.size())
+<a href="#l147" class="line" id="l147">    147</a>         search-&gt;dump_index(FLAGS_dump_index);
+<a href="#l148" class="line" id="l148">    148</a> }
+<a href="#l149" class="line" id="l149">    149</a> 
+<a href="#l150" class="line" id="l150">    150</a> void listen_grpc(code_searcher *search, code_searcher *tags, const string&amp; addr) {
+<a href="#l151" class="line" id="l151">    151</a>     promise&lt;void&gt; reload_request;
+<a href="#l152" class="line" id="l152">    152</a>     auto reload_request_ptr = FLAGS_reload_rpc ? &amp;reload_request : NULL;
 <a href="#l153" class="line" id="l153">    153</a> 
-<a href="#l154" class="line" id="l154">    154</a>     ServerBuilder builder;
-<a href="#l155" class="line" id="l155">    155</a>     builder.AddListeningPort(addr, grpc::InsecureServerCredentials());
-<a href="#l156" class="line" id="l156">    156</a>     builder.RegisterService(service.get());
-<a href="#l157" class="line" id="l157">    157</a>     if (!FLAGS_reuseport) {
-<a href="#l158" class="line" id="l158">    158</a>         builder.AddChannelArgument(GRPC_ARG_ALLOW_REUSEPORT, 0);
-<a href="#l159" class="line" id="l159">    159</a>     }
-<a href="#l160" class="line" id="l160">    160</a>     std::unique_ptr&lt;Server&gt; server(builder.BuildAndStart());
-<a href="#l161" class="line" id="l161">    161</a>     if (!server) {
-<a href="#l162" class="line" id="l162">    162</a>         die(&quot;Error starting GRPC server.&quot;);
-<a href="#l163" class="line" id="l163">    163</a>     }
-<a href="#l164" class="line" id="l164">    164</a> 
-<a href="#l165" class="line" id="l165">    165</a>     if (FLAGS_reload_rpc &amp;&amp; FLAGS_hot_index_reload) {
-<a href="#l166" class="line" id="l166">    166</a>         die(&quot;reload_rpc and hot_index_reload options are mutually exclusive&quot;);
+<a href="#l154" class="line" id="l154">    154</a>     unique_ptr&lt;CodeSearch::Service&gt; service(build_grpc_server(search, tags, reload_request_ptr));
+<a href="#l155" class="line" id="l155">    155</a> 
+<a href="#l156" class="line" id="l156">    156</a>     ServerBuilder builder;
+<a href="#l157" class="line" id="l157">    157</a>     builder.AddListeningPort(addr, grpc::InsecureServerCredentials());
+<a href="#l158" class="line" id="l158">    158</a>     builder.RegisterService(service.get());
+<a href="#l159" class="line" id="l159">    159</a>     if (!FLAGS_reuseport) {
+<a href="#l160" class="line" id="l160">    160</a>         builder.AddChannelArgument(GRPC_ARG_ALLOW_REUSEPORT, 0);
+<a href="#l161" class="line" id="l161">    161</a>     }
+<a href="#l162" class="line" id="l162">    162</a>     if (FLAGS_max_recv_message_size &gt; 0) {
+<a href="#l163" class="line" id="l163">    163</a>         builder.AddChannelArgument(GRPC_ARG_MAX_RECEIVE_MESSAGE_LENGTH, FLAGS_max_recv_message_size);
+<a href="#l164" class="line" id="l164">    164</a>     }
+<a href="#l165" class="line" id="l165">    165</a>     if (FLAGS_max_send_message_size &gt; 0) {
+<a href="#l166" class="line" id="l166">    166</a>         builder.AddChannelArgument(GRPC_ARG_MAX_SEND_MESSAGE_LENGTH, FLAGS_max_send_message_size);
 <a href="#l167" class="line" id="l167">    167</a>     }
-<a href="#l168" class="line" id="l168">    168</a> 
-<a href="#l169" class="line" id="l169">    169</a>     log(&quot;Serving...&quot;);
-<a href="#l170" class="line" id="l170">    170</a> 
-<a href="#l171" class="line" id="l171">    171</a>     if (FLAGS_reload_rpc) {
-<a href="#l172" class="line" id="l172">    172</a>         thread shutdown_thread([&amp;]() {
-<a href="#l173" class="line" id="l173">    173</a>             reload_request.get_future().wait();
-<a href="#l174" class="line" id="l174">    174</a>             server-&gt;Shutdown();
-<a href="#l175" class="line" id="l175">    175</a>         });
-<a href="#l176" class="line" id="l176">    176</a>         server-&gt;Wait();
-<a href="#l177" class="line" id="l177">    177</a>         shutdown_thread.join();
-<a href="#l178" class="line" id="l178">    178</a>     } else if (FLAGS_hot_index_reload &amp;&amp; FLAGS_load_index.size()) {
-<a href="#l179" class="line" id="l179">    179</a>         thread shutdown_thread([&amp;]() {
-<a href="#l180" class="line" id="l180">    180</a>             fswatcher watcher(FLAGS_load_index);
-<a href="#l181" class="line" id="l181">    181</a>             if (!watcher.wait_for_event()) {
-<a href="#l182" class="line" id="l182">    182</a>                 log(&quot;Error initializing filesystem watch. Hot index reloads will be disabled.&quot;);
-<a href="#l183" class="line" id="l183">    183</a>                 std::promise&lt;void&gt;().get_future().wait();  // Block forever.
-<a href="#l184" class="line" id="l184">    184</a>             }
-<a href="#l185" class="line" id="l185">    185</a>             log(&quot;Detected change to index file; reloading...&quot;);
-<a href="#l186" class="line" id="l186">    186</a>             server-&gt;Shutdown();
-<a href="#l187" class="line" id="l187">    187</a>         });
-<a href="#l188" class="line" id="l188">    188</a>         server-&gt;Wait();
-<a href="#l189" class="line" id="l189">    189</a>         shutdown_thread.join();
-<a href="#l190" class="line" id="l190">    190</a>     } else {
-<a href="#l191" class="line" id="l191">    191</a>         server-&gt;Wait();
-<a href="#l192" class="line" id="l192">    192</a>     }
-<a href="#l193" class="line" id="l193">    193</a> }
-<a href="#l194" class="line" id="l194">    194</a> 
-<a href="#l195" class="line" id="l195">    195</a> int main(int argc, char **argv) {
-<a href="#l196" class="line" id="l196">    196</a>     gflags::SetUsageMessage(&quot;Usage: &quot; + string(argv[0]) + &quot; &lt;options&gt; REFS&quot;);
-<a href="#l197" class="line" id="l197">    197</a>     gflags::ParseCommandLineFlags(&amp;argc, &amp;argv, true);
-<a href="#l198" class="line" id="l198">    198</a> 
-<a href="#l199" class="line" id="l199">    199</a>     signal(SIGPIPE, SIG_IGN);
-<a href="#l200" class="line" id="l200">    200</a> 
-<a href="#l201" class="line" id="l201">    201</a>     while (true) {
-<a href="#l202" class="line" id="l202">    202</a>         code_searcher search;
-<a href="#l203" class="line" id="l203">    203</a>         unique_ptr&lt;code_searcher&gt; tags;
-<a href="#l204" class="line" id="l204">    204</a> 
-<a href="#l205" class="line" id="l205">    205</a>         initialize_search(&amp;search, argc, argv);
-<a href="#l206" class="line" id="l206">    206</a>         if (FLAGS_load_tags.size() != 0) {
-<a href="#l207" class="line" id="l207">    207</a>             tags.reset(new code_searcher());
-<a href="#l208" class="line" id="l208">    208</a>             tags-&gt;load_index(FLAGS_load_tags);
-<a href="#l209" class="line" id="l209">    209</a>         }
-<a href="#l210" class="line" id="l210">    210</a> 
-<a href="#l211" class="line" id="l211">    211</a>         if (FLAGS_index_only)
-<a href="#l212" class="line" id="l212">    212</a>             return 0;
-<a href="#l213" class="line" id="l213">    213</a> 
-<a href="#l214" class="line" id="l214">    214</a>         if (FLAGS_grpc.size()) {
-<a href="#l215" class="line" id="l215">    215</a>             listen_grpc(&amp;search, tags.get(), FLAGS_grpc);
-<a href="#l216" class="line" id="l216">    216</a>         }
-<a href="#l217" class="line" id="l217">    217</a>     }
-<a href="#l218" class="line" id="l218">    218</a> }
+<a href="#l168" class="line" id="l168">    168</a>     std::unique_ptr&lt;Server&gt; server(builder.BuildAndStart());
+<a href="#l169" class="line" id="l169">    169</a>     if (!server) {
+<a href="#l170" class="line" id="l170">    170</a>         die(&quot;Error starting GRPC server.&quot;);
+<a href="#l171" class="line" id="l171">    171</a>     }
+<a href="#l172" class="line" id="l172">    172</a> 
+<a href="#l173" class="line" id="l173">    173</a>     if (FLAGS_reload_rpc &amp;&amp; FLAGS_hot_index_reload) {
+<a href="#l174" class="line" id="l174">    174</a>         die(&quot;reload_rpc and hot_index_reload options are mutually exclusive&quot;);
+<a href="#l175" class="line" id="l175">    175</a>     }
+<a href="#l176" class="line" id="l176">    176</a> 
+<a href="#l177" class="line" id="l177">    177</a>     log(&quot;Serving...&quot;);
+<a href="#l178" class="line" id="l178">    178</a> 
+<a href="#l179" class="line" id="l179">    179</a>     if (FLAGS_reload_rpc) {
+<a href="#l180" class="line" id="l180">    180</a>         thread shutdown_thread([&amp;]() {
+<a href="#l181" class="line" id="l181">    181</a>             reload_request.get_future().wait();
+<a href="#l182" class="line" id="l182">    182</a>             server-&gt;Shutdown();
+<a href="#l183" class="line" id="l183">    183</a>         });
+<a href="#l184" class="line" id="l184">    184</a>         server-&gt;Wait();
+<a href="#l185" class="line" id="l185">    185</a>         shutdown_thread.join();
+<a href="#l186" class="line" id="l186">    186</a>     } else if (FLAGS_hot_index_reload &amp;&amp; FLAGS_load_index.size()) {
+<a href="#l187" class="line" id="l187">    187</a>         thread shutdown_thread([&amp;]() {
+<a href="#l188" class="line" id="l188">    188</a>             fswatcher watcher(FLAGS_load_index);
+<a href="#l189" class="line" id="l189">    189</a>             if (!watcher.wait_for_event()) {
+<a href="#l190" class="line" id="l190">    190</a>                 log(&quot;Error initializing filesystem watch. Hot index reloads will be disabled.&quot;);
+<a href="#l191" class="line" id="l191">    191</a>                 std::promise&lt;void&gt;().get_future().wait();  // Block forever.
+<a href="#l192" class="line" id="l192">    192</a>             }
+<a href="#l193" class="line" id="l193">    193</a>             log(&quot;Detected change to index file; reloading...&quot;);
+<a href="#l194" class="line" id="l194">    194</a>             server-&gt;Shutdown();
+<a href="#l195" class="line" id="l195">    195</a>         });
+<a href="#l196" class="line" id="l196">    196</a>         server-&gt;Wait();
+<a href="#l197" class="line" id="l197">    197</a>         shutdown_thread.join();
+<a href="#l198" class="line" id="l198">    198</a>     } else {
+<a href="#l199" class="line" id="l199">    199</a>         server-&gt;Wait();
+<a href="#l200" class="line" id="l200">    200</a>     }
+<a href="#l201" class="line" id="l201">    201</a> }
+<a href="#l202" class="line" id="l202">    202</a> 
+<a href="#l203" class="line" id="l203">    203</a> int main(int argc, char **argv) {
+<a href="#l204" class="line" id="l204">    204</a>     gflags::SetUsageMessage(&quot;Usage: &quot; + string(argv[0]) + &quot; &lt;options&gt; REFS&quot;);
+<a href="#l205" class="line" id="l205">    205</a>     gflags::ParseCommandLineFlags(&amp;argc, &amp;argv, true);
+<a href="#l206" class="line" id="l206">    206</a> 
+<a href="#l207" class="line" id="l207">    207</a>     signal(SIGPIPE, SIG_IGN);
+<a href="#l208" class="line" id="l208">    208</a> 
+<a href="#l209" class="line" id="l209">    209</a>     while (true) {
+<a href="#l210" class="line" id="l210">    210</a>         code_searcher search;
+<a href="#l211" class="line" id="l211">    211</a>         unique_ptr&lt;code_searcher&gt; tags;
+<a href="#l212" class="line" id="l212">    212</a> 
+<a href="#l213" class="line" id="l213">    213</a>         initialize_search(&amp;search, argc, argv);
+<a href="#l214" class="line" id="l214">    214</a>         if (FLAGS_load_tags.size() != 0) {
+<a href="#l215" class="line" id="l215">    215</a>             tags.reset(new code_searcher());
+<a href="#l216" class="line" id="l216">    216</a>             tags-&gt;load_index(FLAGS_load_tags);
+<a href="#l217" class="line" id="l217">    217</a>         }
+<a href="#l218" class="line" id="l218">    218</a> 
+<a href="#l219" class="line" id="l219">    219</a>         if (FLAGS_index_only)
+<a href="#l220" class="line" id="l220">    220</a>             return 0;
+<a href="#l221" class="line" id="l221">    221</a> 
+<a href="#l222" class="line" id="l222">    222</a>         if (FLAGS_grpc.size()) {
+<a href="#l223" class="line" id="l223">    223</a>             listen_grpc(&amp;search, tags.get(), FLAGS_grpc);
+<a href="#l224" class="line" id="l224">    224</a>         }
+<a href="#l225" class="line" id="l225">    225</a>     }
+<a href="#l226" class="line" id="l226">    226</a> }
 </pre>
 </div>
 </body>

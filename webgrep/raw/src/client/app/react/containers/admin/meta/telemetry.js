@@ -18,7 +18,7 @@ const AdminMetaTelemetryContainer = ({ events }) => (
     {events.map((event, idx) => (
       <Spacing
         key={`${event.timestamp}-${event.action}-${event.value}`}
-        size="small"
+        size="16px"
         bottom={idx < events.length - 1}
       >
         <TelemetryEvent

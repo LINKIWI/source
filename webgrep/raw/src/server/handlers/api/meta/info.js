@@ -1,4 +1,4 @@
-import { route, withSchema } from 'supercharged/server';
+import { route, withRequestSchema } from 'supercharged/server';
 import { HTTPHandler, WebSocketTransactionHandler } from 'server/handlers/base';
 import { withEndpointInstrumentation } from 'server/util/instrumentation';
 
@@ -13,7 +13,8 @@ export class MetaInfoHandler extends HTTPHandler {
 @route('/api/meta/info')
 export class MetaInfoLiveHandler extends WebSocketTransactionHandler {
   @withEndpointInstrumentation
-  @withSchema({
+  @withRequestSchema({
+    type: 'object',
     properties: {
       // Optional message transaction ID used by the websocket duplex stream for strict
       // request/response ordering

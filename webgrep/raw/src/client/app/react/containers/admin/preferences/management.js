@@ -8,7 +8,7 @@ import AdminControl from 'client/app/react/components/admin/control';
 import AdminPanel from 'client/app/react/components/admin/panel';
 import { clearAllPreferences } from 'client/app/redux/actions/preferences';
 
-const AdminPreferencesManagementContainer = ({ actions }) => (
+const AdminPreferencesManagementContainer = ({ actions, isCompact }) => (
   <AdminPanel
     title="Management"
     subtitle="Manage persisted preferences"
@@ -17,18 +17,24 @@ const AdminPreferencesManagementContainer = ({ actions }) => (
     <AdminControl
       title="Reset preferences"
       description="Reset all preferences to defaults"
+      isCompact={isCompact}
     >
       <Button
         size="gamma"
         text="Reset"
         onClick={actions.clearAllPreferences}
-        style={{ borderRadius: '3px', height: '35px', width: '70px' }}
+        style={{
+          borderRadius: '3px',
+          height: '35px',
+          width: isCompact ? '100%' : '70px',
+        }}
       />
     </AdminControl>
   </AdminPanel>
 );
 
 AdminPreferencesManagementContainer.propTypes = {
+  isCompact: PropTypes.bool.isRequired,
   // HOC props
   actions: PropTypes.shape({
     clearAllPreferences: PropTypes.func.isRequired,

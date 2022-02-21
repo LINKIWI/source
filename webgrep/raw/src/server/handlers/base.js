@@ -6,16 +6,16 @@ import { CODE_SERVER_UNDEFINED } from 'supercharged/shared/constants/error';
 import { parseJSON } from 'shared/util/data';
 
 export class HTTPHandler extends SuperchargedHTTPHandler {
-  constructor(req, res, ctx) {
-    super(req, res);
+  constructor(ctx, ...args) {
+    super(...args);
 
     this.ctx = ctx;
   }
 }
 
 export class WebSocketHandler extends SuperchargedWebSocketHandler {
-  constructor(req, ws, ctx) {
-    super(req, ws);
+  constructor(ctx, ...args) {
+    super(...args);
 
     this.ctx = ctx;
   }

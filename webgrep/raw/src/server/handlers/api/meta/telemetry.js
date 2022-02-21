@@ -1,4 +1,4 @@
-import { route, withSchema } from 'supercharged/server';
+import { route, withRequestSchema } from 'supercharged/server';
 import { WebSocketTransactionHandler } from 'server/handlers/base';
 import { withEndpointInstrumentation } from 'server/util/instrumentation';
 import { TELEMETRY_ACTIONS, TELEMETRY_TAGS } from 'shared/constants/telemetry';
@@ -6,7 +6,8 @@ import { TELEMETRY_ACTIONS, TELEMETRY_TAGS } from 'shared/constants/telemetry';
 @route('/api/meta/telemetry')
 export default class MetaTelemetryHandler extends WebSocketTransactionHandler {
   @withEndpointInstrumentation
-  @withSchema({
+  @withRequestSchema({
+    type: 'object',
     properties: {
       action: {
         enum: Object.values(TELEMETRY_ACTIONS),
