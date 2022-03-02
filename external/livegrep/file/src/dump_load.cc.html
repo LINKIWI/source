@@ -18,7 +18,7 @@ body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{fo
 <a href="../../log">Log</a> | <a href="../../files">Files</a> | <a href="../../refs">Refs</a> | <a href="../../file/README.md">README</a> | <a href="../../file/COPYING">LICENSE</a></td></tr></table>
 <hr/>
 <div id="content">
-<p>src/<strong>dump_load.cc</strong> (15970B) (<a href="../../raw/src/dump_load.cc">raw</a>) (<a href="../../blame/src/dump_load.cc">blame</a>)</p><hr/>
+<p>src/<strong>dump_load.cc</strong> (16359B) (<a href="../../raw/src/dump_load.cc">raw</a>) (<a href="../../blame/src/dump_load.cc">blame</a>)</p><hr/>
 <pre id="blob">
 <a href="#l1" class="line" id="l1">      1</a> /********************************************************************
 <a href="#l2" class="line" id="l2">      2</a>  * livegrep -- dump_load.cc
@@ -47,536 +47,549 @@ body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{fo
 <a href="#l25" class="line" id="l25">     25</a> 
 <a href="#l26" class="line" id="l26">     26</a> #include &quot;google/protobuf/util/json_util.h&quot;
 <a href="#l27" class="line" id="l27">     27</a> 
-<a href="#l28" class="line" id="l28">     28</a> class codesearch_index {
-<a href="#l29" class="line" id="l29">     29</a> public:
-<a href="#l30" class="line" id="l30">     30</a>     codesearch_index(code_searcher *cs, string path) :
-<a href="#l31" class="line" id="l31">     31</a>         cs_(cs),
-<a href="#l32" class="line" id="l32">     32</a>         stream_(path.c_str(), ios::out | ios::trunc),
-<a href="#l33" class="line" id="l33">     33</a>         hdr_() {
-<a href="#l34" class="line" id="l34">     34</a>         assert(!stream_.fail());
-<a href="#l35" class="line" id="l35">     35</a>         fd_ = open(path.c_str(), O_RDWR|O_APPEND);
-<a href="#l36" class="line" id="l36">     36</a>         if (fd_ == -1) {
-<a href="#l37" class="line" id="l37">     37</a>             string message = &quot;Cannot open &quot; + path;
-<a href="#l38" class="line" id="l38">     38</a>             perror(message.c_str());
-<a href="#l39" class="line" id="l39">     39</a>             exit(1);
-<a href="#l40" class="line" id="l40">     40</a>         }
-<a href="#l41" class="line" id="l41">     41</a> 
-<a href="#l42" class="line" id="l42">     42</a>         hdr_.magic      = kIndexMagic;
-<a href="#l43" class="line" id="l43">     43</a>         hdr_.version    = kIndexVersion;
-<a href="#l44" class="line" id="l44">     44</a>         hdr_.chunk_size = cs-&gt;alloc_-&gt;chunk_size();
-<a href="#l45" class="line" id="l45">     45</a>     }
-<a href="#l46" class="line" id="l46">     46</a> 
-<a href="#l47" class="line" id="l47">     47</a>     ~codesearch_index() {
-<a href="#l48" class="line" id="l48">     48</a>         close(fd_);
+<a href="#l28" class="line" id="l28">     28</a> #include &quot;gflags/gflags.h&quot;
+<a href="#l29" class="line" id="l29">     29</a> 
+<a href="#l30" class="line" id="l30">     30</a> DEFINE_bool(eager_memory_load, false, &quot;Eagerly load memory-mapped index file pages into virtual memory (Linux only)&quot;);
+<a href="#l31" class="line" id="l31">     31</a> 
+<a href="#l32" class="line" id="l32">     32</a> class codesearch_index {
+<a href="#l33" class="line" id="l33">     33</a> public:
+<a href="#l34" class="line" id="l34">     34</a>     codesearch_index(code_searcher *cs, string path) :
+<a href="#l35" class="line" id="l35">     35</a>         cs_(cs),
+<a href="#l36" class="line" id="l36">     36</a>         stream_(path.c_str(), ios::out | ios::trunc),
+<a href="#l37" class="line" id="l37">     37</a>         hdr_() {
+<a href="#l38" class="line" id="l38">     38</a>         assert(!stream_.fail());
+<a href="#l39" class="line" id="l39">     39</a>         fd_ = open(path.c_str(), O_RDWR|O_APPEND);
+<a href="#l40" class="line" id="l40">     40</a>         if (fd_ == -1) {
+<a href="#l41" class="line" id="l41">     41</a>             string message = &quot;Cannot open &quot; + path;
+<a href="#l42" class="line" id="l42">     42</a>             perror(message.c_str());
+<a href="#l43" class="line" id="l43">     43</a>             exit(1);
+<a href="#l44" class="line" id="l44">     44</a>         }
+<a href="#l45" class="line" id="l45">     45</a> 
+<a href="#l46" class="line" id="l46">     46</a>         hdr_.magic      = kIndexMagic;
+<a href="#l47" class="line" id="l47">     47</a>         hdr_.version    = kIndexVersion;
+<a href="#l48" class="line" id="l48">     48</a>         hdr_.chunk_size = cs-&gt;alloc_-&gt;chunk_size();
 <a href="#l49" class="line" id="l49">     49</a>     }
 <a href="#l50" class="line" id="l50">     50</a> 
-<a href="#l51" class="line" id="l51">     51</a>     void dump();
-<a href="#l52" class="line" id="l52">     52</a> protected:
-<a href="#l53" class="line" id="l53">     53</a>     void dump_chunk_data();
-<a href="#l54" class="line" id="l54">     54</a>     void dump_metadata();
-<a href="#l55" class="line" id="l55">     55</a>     void dump_file(map&lt;const indexed_tree*, int&gt;&amp; ids, indexed_file *sf);
-<a href="#l56" class="line" id="l56">     56</a>     void dump_chunk_file(chunk_file *cf);
-<a href="#l57" class="line" id="l57">     57</a>     void dump_chunk_files(chunk *, chunk_header *);
-<a href="#l58" class="line" id="l58">     58</a>     void dump_chunk_data(chunk *);
-<a href="#l59" class="line" id="l59">     59</a>     void dump_content_data();
-<a href="#l60" class="line" id="l60">     60</a>     void dump_filename_index();
-<a href="#l61" class="line" id="l61">     61</a> 
-<a href="#l62" class="line" id="l62">     62</a>     void alignp(uint32_t align) {
-<a href="#l63" class="line" id="l63">     63</a>         streampos pos = stream_.tellp();
-<a href="#l64" class="line" id="l64">     64</a>         stream_.seekp((size_t(pos) + align - 1) &amp; ~(align - 1));
-<a href="#l65" class="line" id="l65">     65</a>     }
-<a href="#l66" class="line" id="l66">     66</a> 
-<a href="#l67" class="line" id="l67">     67</a>     template&lt;class T&gt;
-<a href="#l68" class="line" id="l68">     68</a>     void dump(T *t) {
-<a href="#l69" class="line" id="l69">     69</a>         stream_.write(reinterpret_cast&lt;char*&gt;(t), sizeof *t);
-<a href="#l70" class="line" id="l70">     70</a>     }
-<a href="#l71" class="line" id="l71">     71</a> 
-<a href="#l72" class="line" id="l72">     72</a>     void dump_int32(uint32_t i) {
-<a href="#l73" class="line" id="l73">     73</a>         dump(&amp;i);
+<a href="#l51" class="line" id="l51">     51</a>     ~codesearch_index() {
+<a href="#l52" class="line" id="l52">     52</a>         close(fd_);
+<a href="#l53" class="line" id="l53">     53</a>     }
+<a href="#l54" class="line" id="l54">     54</a> 
+<a href="#l55" class="line" id="l55">     55</a>     void dump();
+<a href="#l56" class="line" id="l56">     56</a> protected:
+<a href="#l57" class="line" id="l57">     57</a>     void dump_chunk_data();
+<a href="#l58" class="line" id="l58">     58</a>     void dump_metadata();
+<a href="#l59" class="line" id="l59">     59</a>     void dump_file(map&lt;const indexed_tree*, int&gt;&amp; ids, indexed_file *sf);
+<a href="#l60" class="line" id="l60">     60</a>     void dump_chunk_file(chunk_file *cf);
+<a href="#l61" class="line" id="l61">     61</a>     void dump_chunk_files(chunk *, chunk_header *);
+<a href="#l62" class="line" id="l62">     62</a>     void dump_chunk_data(chunk *);
+<a href="#l63" class="line" id="l63">     63</a>     void dump_content_data();
+<a href="#l64" class="line" id="l64">     64</a>     void dump_filename_index();
+<a href="#l65" class="line" id="l65">     65</a> 
+<a href="#l66" class="line" id="l66">     66</a>     void alignp(uint32_t align) {
+<a href="#l67" class="line" id="l67">     67</a>         streampos pos = stream_.tellp();
+<a href="#l68" class="line" id="l68">     68</a>         stream_.seekp((size_t(pos) + align - 1) &amp; ~(align - 1));
+<a href="#l69" class="line" id="l69">     69</a>     }
+<a href="#l70" class="line" id="l70">     70</a> 
+<a href="#l71" class="line" id="l71">     71</a>     template&lt;class T&gt;
+<a href="#l72" class="line" id="l72">     72</a>     void dump(T *t) {
+<a href="#l73" class="line" id="l73">     73</a>         stream_.write(reinterpret_cast&lt;char*&gt;(t), sizeof *t);
 <a href="#l74" class="line" id="l74">     74</a>     }
 <a href="#l75" class="line" id="l75">     75</a> 
-<a href="#l76" class="line" id="l76">     76</a>     void dump_string(const string &amp;str) {
-<a href="#l77" class="line" id="l77">     77</a>         dump_int32(str.size());
-<a href="#l78" class="line" id="l78">     78</a>         stream_.write(str.c_str(), str.size());
-<a href="#l79" class="line" id="l79">     79</a>     }
-<a href="#l80" class="line" id="l80">     80</a> 
-<a href="#l81" class="line" id="l81">     81</a>     code_searcher *cs_;
-<a href="#l82" class="line" id="l82">     82</a>     std::fstream stream_;
-<a href="#l83" class="line" id="l83">     83</a>     int fd_;
+<a href="#l76" class="line" id="l76">     76</a>     void dump_int32(uint32_t i) {
+<a href="#l77" class="line" id="l77">     77</a>         dump(&amp;i);
+<a href="#l78" class="line" id="l78">     78</a>     }
+<a href="#l79" class="line" id="l79">     79</a> 
+<a href="#l80" class="line" id="l80">     80</a>     void dump_string(const string &amp;str) {
+<a href="#l81" class="line" id="l81">     81</a>         dump_int32(str.size());
+<a href="#l82" class="line" id="l82">     82</a>         stream_.write(str.c_str(), str.size());
+<a href="#l83" class="line" id="l83">     83</a>     }
 <a href="#l84" class="line" id="l84">     84</a> 
-<a href="#l85" class="line" id="l85">     85</a>     uint8_t *map_;
-<a href="#l86" class="line" id="l86">     86</a>     uint8_t *p_;
-<a href="#l87" class="line" id="l87">     87</a> 
-<a href="#l88" class="line" id="l88">     88</a>     index_header hdr_;
-<a href="#l89" class="line" id="l89">     89</a>     vector&lt;chunk_header&gt; chunks_;
-<a href="#l90" class="line" id="l90">     90</a>     vector&lt;content_chunk_header&gt; content_;
+<a href="#l85" class="line" id="l85">     85</a>     code_searcher *cs_;
+<a href="#l86" class="line" id="l86">     86</a>     std::fstream stream_;
+<a href="#l87" class="line" id="l87">     87</a>     int fd_;
+<a href="#l88" class="line" id="l88">     88</a> 
+<a href="#l89" class="line" id="l89">     89</a>     uint8_t *map_;
+<a href="#l90" class="line" id="l90">     90</a>     uint8_t *p_;
 <a href="#l91" class="line" id="l91">     91</a> 
-<a href="#l92" class="line" id="l92">     92</a>     friend class dump_allocator;
-<a href="#l93" class="line" id="l93">     93</a> };
-<a href="#l94" class="line" id="l94">     94</a> 
-<a href="#l95" class="line" id="l95">     95</a> class dump_allocator : public chunk_allocator {
-<a href="#l96" class="line" id="l96">     96</a> private:
-<a href="#l97" class="line" id="l97">     97</a>     pair&lt;off_t, uint8_t *&gt; alloc_mmap(size_t len) {
-<a href="#l98" class="line" id="l98">     98</a>         void *buf;
-<a href="#l99" class="line" id="l99">     99</a> 
-<a href="#l100" class="line" id="l100">    100</a>         if (!index_.get()) {
-<a href="#l101" class="line" id="l101">    101</a>             index_.reset(new codesearch_index(cs_, path_.c_str()));
-<a href="#l102" class="line" id="l102">    102</a>             index_-&gt;dump(&amp;index_-&gt;hdr_);
-<a href="#l103" class="line" id="l103">    103</a>             index_-&gt;alignp(kPageSize);
-<a href="#l104" class="line" id="l104">    104</a>         }
-<a href="#l105" class="line" id="l105">    105</a> 
-<a href="#l106" class="line" id="l106">    106</a>         off_t off = index_-&gt;stream_.tellp();
-<a href="#l107" class="line" id="l107">    107</a>         int err = ftruncate(index_-&gt;fd_, off + len);
-<a href="#l108" class="line" id="l108">    108</a>         if (err != 0) {
-<a href="#l109" class="line" id="l109">    109</a>             die(&quot;ftruncate&quot;);
-<a href="#l110" class="line" id="l110">    110</a>         }
-<a href="#l111" class="line" id="l111">    111</a>         buf = mmap(NULL, len, PROT_READ|PROT_WRITE, MAP_SHARED,
-<a href="#l112" class="line" id="l112">    112</a>                    index_-&gt;fd_, off);
-<a href="#l113" class="line" id="l113">    113</a>         assert(buf != MAP_FAILED);
-<a href="#l114" class="line" id="l114">    114</a>         index_-&gt;stream_.seekp(len, ios::cur);
-<a href="#l115" class="line" id="l115">    115</a>         return make_pair(off, static_cast&lt;uint8_t*&gt;(buf));
-<a href="#l116" class="line" id="l116">    116</a>     }
-<a href="#l117" class="line" id="l117">    117</a> 
-<a href="#l118" class="line" id="l118">    118</a> public:
-<a href="#l119" class="line" id="l119">    119</a>     dump_allocator(code_searcher *cs, const char *path)
-<a href="#l120" class="line" id="l120">    120</a>         : cs_(cs), path_(path), index_() {
-<a href="#l121" class="line" id="l121">    121</a>     }
-<a href="#l122" class="line" id="l122">    122</a> 
-<a href="#l123" class="line" id="l123">    123</a>     virtual chunk *alloc_chunk() {
-<a href="#l124" class="line" id="l124">    124</a>         auto alloc = alloc_mmap((1 + sizeof(uint32_t)) * chunk_size_);
-<a href="#l125" class="line" id="l125">    125</a> 
-<a href="#l126" class="line" id="l126">    126</a>         chunk_header chdr = {
-<a href="#l127" class="line" id="l127">    127</a>             uint64_t(alloc.first)
-<a href="#l128" class="line" id="l128">    128</a>         };
-<a href="#l129" class="line" id="l129">    129</a>         index_-&gt;chunks_.push_back(chdr);
-<a href="#l130" class="line" id="l130">    130</a> 
-<a href="#l131" class="line" id="l131">    131</a>         return new chunk(static_cast&lt;unsigned char*&gt;(alloc.second),
-<a href="#l132" class="line" id="l132">    132</a>                          reinterpret_cast&lt;uint32_t*&gt;
-<a href="#l133" class="line" id="l133">    133</a>                          (static_cast&lt;unsigned char*&gt;(alloc.second) + chunk_size_));
-<a href="#l134" class="line" id="l134">    134</a>     }
-<a href="#l135" class="line" id="l135">    135</a> 
-<a href="#l136" class="line" id="l136">    136</a>     virtual buffer alloc_content_chunk() {
-<a href="#l137" class="line" id="l137">    137</a>         auto alloc = alloc_mmap(kContentChunkSize);
-<a href="#l138" class="line" id="l138">    138</a>         buffer b = {
-<a href="#l139" class="line" id="l139">    139</a>             alloc.second, alloc.second + kContentChunkSize
-<a href="#l140" class="line" id="l140">    140</a>         };
-<a href="#l141" class="line" id="l141">    141</a>         content_chunk_header hdr = {
-<a href="#l142" class="line" id="l142">    142</a>             uint64_t(alloc.first)
-<a href="#l143" class="line" id="l143">    143</a>             /* .size will be calculated in finalize */
+<a href="#l92" class="line" id="l92">     92</a>     index_header hdr_;
+<a href="#l93" class="line" id="l93">     93</a>     vector&lt;chunk_header&gt; chunks_;
+<a href="#l94" class="line" id="l94">     94</a>     vector&lt;content_chunk_header&gt; content_;
+<a href="#l95" class="line" id="l95">     95</a> 
+<a href="#l96" class="line" id="l96">     96</a>     friend class dump_allocator;
+<a href="#l97" class="line" id="l97">     97</a> };
+<a href="#l98" class="line" id="l98">     98</a> 
+<a href="#l99" class="line" id="l99">     99</a> class dump_allocator : public chunk_allocator {
+<a href="#l100" class="line" id="l100">    100</a> private:
+<a href="#l101" class="line" id="l101">    101</a>     pair&lt;off_t, uint8_t *&gt; alloc_mmap(size_t len) {
+<a href="#l102" class="line" id="l102">    102</a>         void *buf;
+<a href="#l103" class="line" id="l103">    103</a> 
+<a href="#l104" class="line" id="l104">    104</a>         if (!index_.get()) {
+<a href="#l105" class="line" id="l105">    105</a>             index_.reset(new codesearch_index(cs_, path_.c_str()));
+<a href="#l106" class="line" id="l106">    106</a>             index_-&gt;dump(&amp;index_-&gt;hdr_);
+<a href="#l107" class="line" id="l107">    107</a>             index_-&gt;alignp(kPageSize);
+<a href="#l108" class="line" id="l108">    108</a>         }
+<a href="#l109" class="line" id="l109">    109</a> 
+<a href="#l110" class="line" id="l110">    110</a>         off_t off = index_-&gt;stream_.tellp();
+<a href="#l111" class="line" id="l111">    111</a>         int err = ftruncate(index_-&gt;fd_, off + len);
+<a href="#l112" class="line" id="l112">    112</a>         if (err != 0) {
+<a href="#l113" class="line" id="l113">    113</a>             die(&quot;ftruncate&quot;);
+<a href="#l114" class="line" id="l114">    114</a>         }
+<a href="#l115" class="line" id="l115">    115</a>         buf = mmap(NULL, len, PROT_READ|PROT_WRITE, MAP_SHARED,
+<a href="#l116" class="line" id="l116">    116</a>                    index_-&gt;fd_, off);
+<a href="#l117" class="line" id="l117">    117</a>         assert(buf != MAP_FAILED);
+<a href="#l118" class="line" id="l118">    118</a>         index_-&gt;stream_.seekp(len, ios::cur);
+<a href="#l119" class="line" id="l119">    119</a>         return make_pair(off, static_cast&lt;uint8_t*&gt;(buf));
+<a href="#l120" class="line" id="l120">    120</a>     }
+<a href="#l121" class="line" id="l121">    121</a> 
+<a href="#l122" class="line" id="l122">    122</a> public:
+<a href="#l123" class="line" id="l123">    123</a>     dump_allocator(code_searcher *cs, const char *path)
+<a href="#l124" class="line" id="l124">    124</a>         : cs_(cs), path_(path), index_() {
+<a href="#l125" class="line" id="l125">    125</a>     }
+<a href="#l126" class="line" id="l126">    126</a> 
+<a href="#l127" class="line" id="l127">    127</a>     virtual chunk *alloc_chunk() {
+<a href="#l128" class="line" id="l128">    128</a>         auto alloc = alloc_mmap((1 + sizeof(uint32_t)) * chunk_size_);
+<a href="#l129" class="line" id="l129">    129</a> 
+<a href="#l130" class="line" id="l130">    130</a>         chunk_header chdr = {
+<a href="#l131" class="line" id="l131">    131</a>             uint64_t(alloc.first)
+<a href="#l132" class="line" id="l132">    132</a>         };
+<a href="#l133" class="line" id="l133">    133</a>         index_-&gt;chunks_.push_back(chdr);
+<a href="#l134" class="line" id="l134">    134</a> 
+<a href="#l135" class="line" id="l135">    135</a>         return new chunk(static_cast&lt;unsigned char*&gt;(alloc.second),
+<a href="#l136" class="line" id="l136">    136</a>                          reinterpret_cast&lt;uint32_t*&gt;
+<a href="#l137" class="line" id="l137">    137</a>                          (static_cast&lt;unsigned char*&gt;(alloc.second) + chunk_size_));
+<a href="#l138" class="line" id="l138">    138</a>     }
+<a href="#l139" class="line" id="l139">    139</a> 
+<a href="#l140" class="line" id="l140">    140</a>     virtual buffer alloc_content_chunk() {
+<a href="#l141" class="line" id="l141">    141</a>         auto alloc = alloc_mmap(kContentChunkSize);
+<a href="#l142" class="line" id="l142">    142</a>         buffer b = {
+<a href="#l143" class="line" id="l143">    143</a>             alloc.second, alloc.second + kContentChunkSize
 <a href="#l144" class="line" id="l144">    144</a>         };
-<a href="#l145" class="line" id="l145">    145</a>         index_-&gt;content_.push_back(hdr);
-<a href="#l146" class="line" id="l146">    146</a>         return b;
-<a href="#l147" class="line" id="l147">    147</a>     }
-<a href="#l148" class="line" id="l148">    148</a> 
-<a href="#l149" class="line" id="l149">    149</a>     virtual void finalize() {
-<a href="#l150" class="line" id="l150">    150</a>         chunk_allocator::finalize();
-<a href="#l151" class="line" id="l151">    151</a>         auto cit = index_-&gt;content_.begin();
-<a href="#l152" class="line" id="l152">    152</a>         for (auto ait = begin_content();
-<a href="#l153" class="line" id="l153">    153</a>              ait != end_content(); ++ait, ++cit) {
-<a href="#l154" class="line" id="l154">    154</a>             cit-&gt;size = ait-&gt;end - ait-&gt;data;
-<a href="#l155" class="line" id="l155">    155</a>         }
-<a href="#l156" class="line" id="l156">    156</a>         index_-&gt;dump_metadata();
-<a href="#l157" class="line" id="l157">    157</a>         index_-&gt;dump_filename_index();
-<a href="#l158" class="line" id="l158">    158</a>         index_-&gt;stream_.seekp(0);
-<a href="#l159" class="line" id="l159">    159</a>         index_-&gt;dump(&amp;index_-&gt;hdr_);
-<a href="#l160" class="line" id="l160">    160</a>         index_-&gt;stream_.close();
-<a href="#l161" class="line" id="l161">    161</a>     }
-<a href="#l162" class="line" id="l162">    162</a> 
-<a href="#l163" class="line" id="l163">    163</a>     virtual void free_chunk(chunk *chunk) {
-<a href="#l164" class="line" id="l164">    164</a>         munmap(chunk-&gt;data, 5*chunk_size_);
-<a href="#l165" class="line" id="l165">    165</a>         delete chunk;
-<a href="#l166" class="line" id="l166">    166</a>     }
-<a href="#l167" class="line" id="l167">    167</a> protected:
-<a href="#l168" class="line" id="l168">    168</a>     code_searcher *cs_;
-<a href="#l169" class="line" id="l169">    169</a>     std::string path_;
-<a href="#l170" class="line" id="l170">    170</a>     unique_ptr&lt;codesearch_index&gt; index_;
-<a href="#l171" class="line" id="l171">    171</a>     map&lt;void *, off_t&gt; alloc_map_;
-<a href="#l172" class="line" id="l172">    172</a>     vector&lt;off_t&gt; content_;
-<a href="#l173" class="line" id="l173">    173</a> 
-<a href="#l174" class="line" id="l174">    174</a> };
-<a href="#l175" class="line" id="l175">    175</a> 
-<a href="#l176" class="line" id="l176">    176</a> class load_allocator : public chunk_allocator {
-<a href="#l177" class="line" id="l177">    177</a> public:
-<a href="#l178" class="line" id="l178">    178</a>     load_allocator(code_searcher *cs, const string&amp; path);
+<a href="#l145" class="line" id="l145">    145</a>         content_chunk_header hdr = {
+<a href="#l146" class="line" id="l146">    146</a>             uint64_t(alloc.first)
+<a href="#l147" class="line" id="l147">    147</a>             /* .size will be calculated in finalize */
+<a href="#l148" class="line" id="l148">    148</a>         };
+<a href="#l149" class="line" id="l149">    149</a>         index_-&gt;content_.push_back(hdr);
+<a href="#l150" class="line" id="l150">    150</a>         return b;
+<a href="#l151" class="line" id="l151">    151</a>     }
+<a href="#l152" class="line" id="l152">    152</a> 
+<a href="#l153" class="line" id="l153">    153</a>     virtual void finalize() {
+<a href="#l154" class="line" id="l154">    154</a>         chunk_allocator::finalize();
+<a href="#l155" class="line" id="l155">    155</a>         auto cit = index_-&gt;content_.begin();
+<a href="#l156" class="line" id="l156">    156</a>         for (auto ait = begin_content();
+<a href="#l157" class="line" id="l157">    157</a>              ait != end_content(); ++ait, ++cit) {
+<a href="#l158" class="line" id="l158">    158</a>             cit-&gt;size = ait-&gt;end - ait-&gt;data;
+<a href="#l159" class="line" id="l159">    159</a>         }
+<a href="#l160" class="line" id="l160">    160</a>         index_-&gt;dump_metadata();
+<a href="#l161" class="line" id="l161">    161</a>         index_-&gt;dump_filename_index();
+<a href="#l162" class="line" id="l162">    162</a>         index_-&gt;stream_.seekp(0);
+<a href="#l163" class="line" id="l163">    163</a>         index_-&gt;dump(&amp;index_-&gt;hdr_);
+<a href="#l164" class="line" id="l164">    164</a>         index_-&gt;stream_.close();
+<a href="#l165" class="line" id="l165">    165</a>     }
+<a href="#l166" class="line" id="l166">    166</a> 
+<a href="#l167" class="line" id="l167">    167</a>     virtual void free_chunk(chunk *chunk) {
+<a href="#l168" class="line" id="l168">    168</a>         munmap(chunk-&gt;data, 5*chunk_size_);
+<a href="#l169" class="line" id="l169">    169</a>         delete chunk;
+<a href="#l170" class="line" id="l170">    170</a>     }
+<a href="#l171" class="line" id="l171">    171</a> protected:
+<a href="#l172" class="line" id="l172">    172</a>     code_searcher *cs_;
+<a href="#l173" class="line" id="l173">    173</a>     std::string path_;
+<a href="#l174" class="line" id="l174">    174</a>     unique_ptr&lt;codesearch_index&gt; index_;
+<a href="#l175" class="line" id="l175">    175</a>     map&lt;void *, off_t&gt; alloc_map_;
+<a href="#l176" class="line" id="l176">    176</a>     vector&lt;off_t&gt; content_;
+<a href="#l177" class="line" id="l177">    177</a> 
+<a href="#l178" class="line" id="l178">    178</a> };
 <a href="#l179" class="line" id="l179">    179</a> 
-<a href="#l180" class="line" id="l180">    180</a>     ~load_allocator() {
-<a href="#l181" class="line" id="l181">    181</a>         close(fd_);
-<a href="#l182" class="line" id="l182">    182</a>         munmap(map_, map_size_);
-<a href="#l183" class="line" id="l183">    183</a>     }
-<a href="#l184" class="line" id="l184">    184</a> 
-<a href="#l185" class="line" id="l185">    185</a>     virtual chunk *alloc_chunk();
-<a href="#l186" class="line" id="l186">    186</a>     virtual buffer alloc_content_chunk() {
-<a href="#l187" class="line" id="l187">    187</a>         die(&quot;load_allocator::alloc_content_chunk&quot;);
-<a href="#l188" class="line" id="l188">    188</a>     }
-<a href="#l189" class="line" id="l189">    189</a> 
-<a href="#l190" class="line" id="l190">    190</a>     virtual void free_chunk(chunk *chunk) {
-<a href="#l191" class="line" id="l191">    191</a>         delete chunk;
+<a href="#l180" class="line" id="l180">    180</a> class load_allocator : public chunk_allocator {
+<a href="#l181" class="line" id="l181">    181</a> public:
+<a href="#l182" class="line" id="l182">    182</a>     load_allocator(code_searcher *cs, const string&amp; path);
+<a href="#l183" class="line" id="l183">    183</a> 
+<a href="#l184" class="line" id="l184">    184</a>     ~load_allocator() {
+<a href="#l185" class="line" id="l185">    185</a>         close(fd_);
+<a href="#l186" class="line" id="l186">    186</a>         munmap(map_, map_size_);
+<a href="#l187" class="line" id="l187">    187</a>     }
+<a href="#l188" class="line" id="l188">    188</a> 
+<a href="#l189" class="line" id="l189">    189</a>     virtual chunk *alloc_chunk();
+<a href="#l190" class="line" id="l190">    190</a>     virtual buffer alloc_content_chunk() {
+<a href="#l191" class="line" id="l191">    191</a>         die(&quot;load_allocator::alloc_content_chunk&quot;);
 <a href="#l192" class="line" id="l192">    192</a>     }
 <a href="#l193" class="line" id="l193">    193</a> 
-<a href="#l194" class="line" id="l194">    194</a>     virtual void drop_caches() {
-<a href="#l195" class="line" id="l195">    195</a>         for (auto it = begin(); it != end(); ++it) {
-<a href="#l196" class="line" id="l196">    196</a>             madvise((*it)-&gt;data, (*it)-&gt;size, MADV_DONTNEED);
-<a href="#l197" class="line" id="l197">    197</a>             madvise((*it)-&gt;suffixes, (*it)-&gt;size * sizeof(*(*it)-&gt;suffixes), MADV_DONTNEED);
-<a href="#l198" class="line" id="l198">    198</a>         }
-<a href="#l199" class="line" id="l199">    199</a> #ifdef POSIX_FADV_DONTNEED
-<a href="#l200" class="line" id="l200">    200</a>         posix_fadvise(fd_, hdr_-&gt;chunks_off,
-<a href="#l201" class="line" id="l201">    201</a>                       chunks_.size() * chunk_size_ * (1 + sizeof(uint32_t)),
-<a href="#l202" class="line" id="l202">    202</a>                       POSIX_FADV_DONTNEED);
-<a href="#l203" class="line" id="l203">    203</a> #endif
-<a href="#l204" class="line" id="l204">    204</a>     }
-<a href="#l205" class="line" id="l205">    205</a> 
-<a href="#l206" class="line" id="l206">    206</a>     void load(code_searcher *cs);
-<a href="#l207" class="line" id="l207">    207</a> protected:
-<a href="#l208" class="line" id="l208">    208</a>     template &lt;class T&gt;
-<a href="#l209" class="line" id="l209">    209</a>     T *consume() {
-<a href="#l210" class="line" id="l210">    210</a>         T *out = reinterpret_cast&lt;T*&gt;(p_);
-<a href="#l211" class="line" id="l211">    211</a>         p_ += sizeof(T);
-<a href="#l212" class="line" id="l212">    212</a>         return out;
-<a href="#l213" class="line" id="l213">    213</a>     }
-<a href="#l214" class="line" id="l214">    214</a> 
-<a href="#l215" class="line" id="l215">    215</a>     template &lt;class T&gt;
-<a href="#l216" class="line" id="l216">    216</a>     T *ptr(uint64_t off) {
-<a href="#l217" class="line" id="l217">    217</a>         assert(off &lt; map_size_);
-<a href="#l218" class="line" id="l218">    218</a>         return reinterpret_cast&lt;T*&gt;(static_cast&lt;uint8_t*&gt;(map_) + off);
-<a href="#l219" class="line" id="l219">    219</a>     }
-<a href="#l220" class="line" id="l220">    220</a> 
-<a href="#l221" class="line" id="l221">    221</a>     void seekg(off_t off) {
-<a href="#l222" class="line" id="l222">    222</a>         p_ = static_cast&lt;uint8_t*&gt;(map_) + off;
+<a href="#l194" class="line" id="l194">    194</a>     virtual void free_chunk(chunk *chunk) {
+<a href="#l195" class="line" id="l195">    195</a>         delete chunk;
+<a href="#l196" class="line" id="l196">    196</a>     }
+<a href="#l197" class="line" id="l197">    197</a> 
+<a href="#l198" class="line" id="l198">    198</a>     virtual void drop_caches() {
+<a href="#l199" class="line" id="l199">    199</a>         for (auto it = begin(); it != end(); ++it) {
+<a href="#l200" class="line" id="l200">    200</a>             madvise((*it)-&gt;data, (*it)-&gt;size, MADV_DONTNEED);
+<a href="#l201" class="line" id="l201">    201</a>             madvise((*it)-&gt;suffixes, (*it)-&gt;size * sizeof(*(*it)-&gt;suffixes), MADV_DONTNEED);
+<a href="#l202" class="line" id="l202">    202</a>         }
+<a href="#l203" class="line" id="l203">    203</a> #ifdef POSIX_FADV_DONTNEED
+<a href="#l204" class="line" id="l204">    204</a>         posix_fadvise(fd_, hdr_-&gt;chunks_off,
+<a href="#l205" class="line" id="l205">    205</a>                       chunks_.size() * chunk_size_ * (1 + sizeof(uint32_t)),
+<a href="#l206" class="line" id="l206">    206</a>                       POSIX_FADV_DONTNEED);
+<a href="#l207" class="line" id="l207">    207</a> #endif
+<a href="#l208" class="line" id="l208">    208</a>     }
+<a href="#l209" class="line" id="l209">    209</a> 
+<a href="#l210" class="line" id="l210">    210</a>     void load(code_searcher *cs);
+<a href="#l211" class="line" id="l211">    211</a> protected:
+<a href="#l212" class="line" id="l212">    212</a>     template &lt;class T&gt;
+<a href="#l213" class="line" id="l213">    213</a>     T *consume() {
+<a href="#l214" class="line" id="l214">    214</a>         T *out = reinterpret_cast&lt;T*&gt;(p_);
+<a href="#l215" class="line" id="l215">    215</a>         p_ += sizeof(T);
+<a href="#l216" class="line" id="l216">    216</a>         return out;
+<a href="#l217" class="line" id="l217">    217</a>     }
+<a href="#l218" class="line" id="l218">    218</a> 
+<a href="#l219" class="line" id="l219">    219</a>     template &lt;class T&gt;
+<a href="#l220" class="line" id="l220">    220</a>     T *ptr(uint64_t off) {
+<a href="#l221" class="line" id="l221">    221</a>         assert(off &lt; map_size_);
+<a href="#l222" class="line" id="l222">    222</a>         return reinterpret_cast&lt;T*&gt;(static_cast&lt;uint8_t*&gt;(map_) + off);
 <a href="#l223" class="line" id="l223">    223</a>     }
 <a href="#l224" class="line" id="l224">    224</a> 
-<a href="#l225" class="line" id="l225">    225</a>     std::unique_ptr&lt;indexed_file&gt; load_file(code_searcher *cs);
-<a href="#l226" class="line" id="l226">    226</a>     void load_chunk(code_searcher *);
-<a href="#l227" class="line" id="l227">    227</a> 
-<a href="#l228" class="line" id="l228">    228</a>     uint32_t load_int32() {
-<a href="#l229" class="line" id="l229">    229</a>         return *(consume&lt;uint32_t&gt;());
-<a href="#l230" class="line" id="l230">    230</a>     }
+<a href="#l225" class="line" id="l225">    225</a>     void seekg(off_t off) {
+<a href="#l226" class="line" id="l226">    226</a>         p_ = static_cast&lt;uint8_t*&gt;(map_) + off;
+<a href="#l227" class="line" id="l227">    227</a>     }
+<a href="#l228" class="line" id="l228">    228</a> 
+<a href="#l229" class="line" id="l229">    229</a>     std::unique_ptr&lt;indexed_file&gt; load_file(code_searcher *cs);
+<a href="#l230" class="line" id="l230">    230</a>     void load_chunk(code_searcher *);
 <a href="#l231" class="line" id="l231">    231</a> 
-<a href="#l232" class="line" id="l232">    232</a>     string load_string() {
-<a href="#l233" class="line" id="l233">    233</a>         uint32_t len = load_int32();
-<a href="#l234" class="line" id="l234">    234</a>         uint8_t *buf = p_;
-<a href="#l235" class="line" id="l235">    235</a>         p_ += len;
-<a href="#l236" class="line" id="l236">    236</a>         return string(reinterpret_cast&lt;char*&gt;(buf), len);
-<a href="#l237" class="line" id="l237">    237</a>     }
-<a href="#l238" class="line" id="l238">    238</a> 
-<a href="#l239" class="line" id="l239">    239</a>     int fd_;
-<a href="#l240" class="line" id="l240">    240</a>     void *map_;
-<a href="#l241" class="line" id="l241">    241</a>     size_t map_size_;
-<a href="#l242" class="line" id="l242">    242</a>     uint8_t *p_;
-<a href="#l243" class="line" id="l243">    243</a> 
-<a href="#l244" class="line" id="l244">    244</a>     index_header *hdr_;
-<a href="#l245" class="line" id="l245">    245</a>     chunk_header *chunks_hdr_;
-<a href="#l246" class="line" id="l246">    246</a>     chunk_header *next_chunk_;
-<a href="#l247" class="line" id="l247">    247</a> };
-<a href="#l248" class="line" id="l248">    248</a> 
-<a href="#l249" class="line" id="l249">    249</a> std::unique_ptr&lt;chunk_allocator&gt; make_dump_allocator(code_searcher *search, const string&amp; path) {
-<a href="#l250" class="line" id="l250">    250</a>     return std::make_unique&lt;dump_allocator&gt;(search, path.c_str());
-<a href="#l251" class="line" id="l251">    251</a> }
+<a href="#l232" class="line" id="l232">    232</a>     uint32_t load_int32() {
+<a href="#l233" class="line" id="l233">    233</a>         return *(consume&lt;uint32_t&gt;());
+<a href="#l234" class="line" id="l234">    234</a>     }
+<a href="#l235" class="line" id="l235">    235</a> 
+<a href="#l236" class="line" id="l236">    236</a>     string load_string() {
+<a href="#l237" class="line" id="l237">    237</a>         uint32_t len = load_int32();
+<a href="#l238" class="line" id="l238">    238</a>         uint8_t *buf = p_;
+<a href="#l239" class="line" id="l239">    239</a>         p_ += len;
+<a href="#l240" class="line" id="l240">    240</a>         return string(reinterpret_cast&lt;char*&gt;(buf), len);
+<a href="#l241" class="line" id="l241">    241</a>     }
+<a href="#l242" class="line" id="l242">    242</a> 
+<a href="#l243" class="line" id="l243">    243</a>     int fd_;
+<a href="#l244" class="line" id="l244">    244</a>     void *map_;
+<a href="#l245" class="line" id="l245">    245</a>     size_t map_size_;
+<a href="#l246" class="line" id="l246">    246</a>     uint8_t *p_;
+<a href="#l247" class="line" id="l247">    247</a> 
+<a href="#l248" class="line" id="l248">    248</a>     index_header *hdr_;
+<a href="#l249" class="line" id="l249">    249</a>     chunk_header *chunks_hdr_;
+<a href="#l250" class="line" id="l250">    250</a>     chunk_header *next_chunk_;
+<a href="#l251" class="line" id="l251">    251</a> };
 <a href="#l252" class="line" id="l252">    252</a> 
-<a href="#l253" class="line" id="l253">    253</a> void codesearch_index::dump_file(map&lt;const indexed_tree*, int&gt;&amp; ids, indexed_file *sf) {
-<a href="#l254" class="line" id="l254">    254</a>     dump_int32(ids[sf-&gt;tree]);
-<a href="#l255" class="line" id="l255">    255</a>     dump_string(sf-&gt;path);
-<a href="#l256" class="line" id="l256">    256</a> }
-<a href="#l257" class="line" id="l257">    257</a> 
-<a href="#l258" class="line" id="l258">    258</a> void codesearch_index::dump_chunk_file(chunk_file *cf) {
-<a href="#l259" class="line" id="l259">    259</a>     dump_int32(cf-&gt;files.size());
-<a href="#l260" class="line" id="l260">    260</a>     for (list&lt;indexed_file*&gt;::iterator it = cf-&gt;files.begin();
-<a href="#l261" class="line" id="l261">    261</a>          it != cf-&gt;files.end(); ++it)
-<a href="#l262" class="line" id="l262">    262</a>         dump_int32((*it)-&gt;no);
-<a href="#l263" class="line" id="l263">    263</a> 
-<a href="#l264" class="line" id="l264">    264</a>     dump_int32(cf-&gt;left);
-<a href="#l265" class="line" id="l265">    265</a>     dump_int32(cf-&gt;right);
-<a href="#l266" class="line" id="l266">    266</a> }
+<a href="#l253" class="line" id="l253">    253</a> std::unique_ptr&lt;chunk_allocator&gt; make_dump_allocator(code_searcher *search, const string&amp; path) {
+<a href="#l254" class="line" id="l254">    254</a>     return std::make_unique&lt;dump_allocator&gt;(search, path.c_str());
+<a href="#l255" class="line" id="l255">    255</a> }
+<a href="#l256" class="line" id="l256">    256</a> 
+<a href="#l257" class="line" id="l257">    257</a> void codesearch_index::dump_file(map&lt;const indexed_tree*, int&gt;&amp; ids, indexed_file *sf) {
+<a href="#l258" class="line" id="l258">    258</a>     dump_int32(ids[sf-&gt;tree]);
+<a href="#l259" class="line" id="l259">    259</a>     dump_string(sf-&gt;path);
+<a href="#l260" class="line" id="l260">    260</a> }
+<a href="#l261" class="line" id="l261">    261</a> 
+<a href="#l262" class="line" id="l262">    262</a> void codesearch_index::dump_chunk_file(chunk_file *cf) {
+<a href="#l263" class="line" id="l263">    263</a>     dump_int32(cf-&gt;files.size());
+<a href="#l264" class="line" id="l264">    264</a>     for (list&lt;indexed_file*&gt;::iterator it = cf-&gt;files.begin();
+<a href="#l265" class="line" id="l265">    265</a>          it != cf-&gt;files.end(); ++it)
+<a href="#l266" class="line" id="l266">    266</a>         dump_int32((*it)-&gt;no);
 <a href="#l267" class="line" id="l267">    267</a> 
-<a href="#l268" class="line" id="l268">    268</a> void codesearch_index::dump_chunk_files(chunk *chunk, chunk_header *hdr) {
-<a href="#l269" class="line" id="l269">    269</a>     hdr-&gt;files_off = stream_.tellp();
-<a href="#l270" class="line" id="l270">    270</a>     hdr-&gt;nfiles = chunk-&gt;files.size();
-<a href="#l271" class="line" id="l271">    271</a>     hdr-&gt;size = chunk-&gt;size;
-<a href="#l272" class="line" id="l272">    272</a> 
-<a href="#l273" class="line" id="l273">    273</a>     for (vector&lt;chunk_file&gt;::iterator it = chunk-&gt;files.begin();
-<a href="#l274" class="line" id="l274">    274</a>          it != chunk-&gt;files.end(); it ++)
-<a href="#l275" class="line" id="l275">    275</a>         dump_chunk_file(&amp;(*it));
-<a href="#l276" class="line" id="l276">    276</a> }
-<a href="#l277" class="line" id="l277">    277</a> 
-<a href="#l278" class="line" id="l278">    278</a> void codesearch_index::dump_chunk_data(chunk *chunk) {
-<a href="#l279" class="line" id="l279">    279</a>     alignp(kPageSize);
-<a href="#l280" class="line" id="l280">    280</a>     size_t off = stream_.tellp();
+<a href="#l268" class="line" id="l268">    268</a>     dump_int32(cf-&gt;left);
+<a href="#l269" class="line" id="l269">    269</a>     dump_int32(cf-&gt;right);
+<a href="#l270" class="line" id="l270">    270</a> }
+<a href="#l271" class="line" id="l271">    271</a> 
+<a href="#l272" class="line" id="l272">    272</a> void codesearch_index::dump_chunk_files(chunk *chunk, chunk_header *hdr) {
+<a href="#l273" class="line" id="l273">    273</a>     hdr-&gt;files_off = stream_.tellp();
+<a href="#l274" class="line" id="l274">    274</a>     hdr-&gt;nfiles = chunk-&gt;files.size();
+<a href="#l275" class="line" id="l275">    275</a>     hdr-&gt;size = chunk-&gt;size;
+<a href="#l276" class="line" id="l276">    276</a> 
+<a href="#l277" class="line" id="l277">    277</a>     for (vector&lt;chunk_file&gt;::iterator it = chunk-&gt;files.begin();
+<a href="#l278" class="line" id="l278">    278</a>          it != chunk-&gt;files.end(); it ++)
+<a href="#l279" class="line" id="l279">    279</a>         dump_chunk_file(&amp;(*it));
+<a href="#l280" class="line" id="l280">    280</a> }
 <a href="#l281" class="line" id="l281">    281</a> 
-<a href="#l282" class="line" id="l282">    282</a>     chunk_header chdr;
-<a href="#l283" class="line" id="l283">    283</a>     chdr.data_off = off;
-<a href="#l284" class="line" id="l284">    284</a>     chdr.size = chunk-&gt;size;
-<a href="#l285" class="line" id="l285">    285</a>     chunks_.push_back(chdr);
-<a href="#l286" class="line" id="l286">    286</a> 
-<a href="#l287" class="line" id="l287">    287</a>     int err = ftruncate(fd_, off + 5 * hdr_.chunk_size);
-<a href="#l288" class="line" id="l288">    288</a>     if (err != 0) {
-<a href="#l289" class="line" id="l289">    289</a>         die(&quot;ftruncate&quot;);
-<a href="#l290" class="line" id="l290">    290</a>     }
-<a href="#l291" class="line" id="l291">    291</a>     stream_.write(reinterpret_cast&lt;char*&gt;(chunk-&gt;data), hdr_.chunk_size);
-<a href="#l292" class="line" id="l292">    292</a>     stream_.write(reinterpret_cast&lt;char*&gt;(chunk-&gt;suffixes),
-<a href="#l293" class="line" id="l293">    293</a>                   sizeof(uint32_t) * chunk-&gt;size);
-<a href="#l294" class="line" id="l294">    294</a>     stream_.seekp(off + 5 * hdr_.chunk_size);
-<a href="#l295" class="line" id="l295">    295</a> }
-<a href="#l296" class="line" id="l296">    296</a> 
-<a href="#l297" class="line" id="l297">    297</a> void codesearch_index::dump_metadata() {
-<a href="#l298" class="line" id="l298">    298</a>     hdr_.ntrees   = cs_-&gt;trees_.size();
-<a href="#l299" class="line" id="l299">    299</a>     hdr_.nfiles   = cs_-&gt;files_.size();
-<a href="#l300" class="line" id="l300">    300</a>     hdr_.nchunks  = cs_-&gt;alloc_-&gt;size();
-<a href="#l301" class="line" id="l301">    301</a>     hdr_.ncontent = content_.size();
-<a href="#l302" class="line" id="l302">    302</a> 
-<a href="#l303" class="line" id="l303">    303</a>     hdr_.name_off = stream_.tellp();
-<a href="#l304" class="line" id="l304">    304</a>     dump_string(cs_-&gt;name());
-<a href="#l305" class="line" id="l305">    305</a> 
-<a href="#l306" class="line" id="l306">    306</a>     map&lt;const indexed_tree*, int&gt; tree_ids;
-<a href="#l307" class="line" id="l307">    307</a> 
-<a href="#l308" class="line" id="l308">    308</a>     hdr_.refs_off = stream_.tellp();
-<a href="#l309" class="line" id="l309">    309</a>     for (auto it = cs_-&gt;trees_.begin();
-<a href="#l310" class="line" id="l310">    310</a>          it != cs_-&gt;trees_.end(); ++it) {
-<a href="#l311" class="line" id="l311">    311</a>         dump_string((*it)-&gt;name);
-<a href="#l312" class="line" id="l312">    312</a>         dump_string((*it)-&gt;version);
-<a href="#l313" class="line" id="l313">    313</a>         string metadata;
-<a href="#l314" class="line" id="l314">    314</a>         auto st = google::protobuf::util::MessageToJsonString((*it)-&gt;metadata, &amp;metadata);
-<a href="#l315" class="line" id="l315">    315</a>         if (!st.ok()) {
-<a href="#l316" class="line" id="l316">    316</a>             die(&quot;protobuf: %s&quot;, st.ToString().c_str());
-<a href="#l317" class="line" id="l317">    317</a>         }
-<a href="#l318" class="line" id="l318">    318</a>         dump_string(metadata);
-<a href="#l319" class="line" id="l319">    319</a>         tree_ids[it-&gt;get()] = it - cs_-&gt;trees_.begin();
-<a href="#l320" class="line" id="l320">    320</a>     }
-<a href="#l321" class="line" id="l321">    321</a>     hdr_.files_off = stream_.tellp();
-<a href="#l322" class="line" id="l322">    322</a>     for (auto it = cs_-&gt;files_.begin();
-<a href="#l323" class="line" id="l323">    323</a>          it != cs_-&gt;files_.end(); ++it)
-<a href="#l324" class="line" id="l324">    324</a>         dump_file(tree_ids, it-&gt;get());
-<a href="#l325" class="line" id="l325">    325</a> 
-<a href="#l326" class="line" id="l326">    326</a>     auto hdr = chunks_.begin();
-<a href="#l327" class="line" id="l327">    327</a>     for (auto it = cs_-&gt;alloc_-&gt;begin();
-<a href="#l328" class="line" id="l328">    328</a>          it != cs_-&gt;alloc_-&gt;end(); ++it, ++hdr) {
-<a href="#l329" class="line" id="l329">    329</a>         assert(hdr != chunks_.end());
-<a href="#l330" class="line" id="l330">    330</a>         dump_chunk_files(*it, &amp;(*hdr));
-<a href="#l331" class="line" id="l331">    331</a>     }
-<a href="#l332" class="line" id="l332">    332</a> 
-<a href="#l333" class="line" id="l333">    333</a>     hdr_.chunks_off = stream_.tellp();
-<a href="#l334" class="line" id="l334">    334</a>     for (auto it = chunks_.begin(); it != chunks_.end(); ++it)
-<a href="#l335" class="line" id="l335">    335</a>         dump(&amp;*it);
+<a href="#l282" class="line" id="l282">    282</a> void codesearch_index::dump_chunk_data(chunk *chunk) {
+<a href="#l283" class="line" id="l283">    283</a>     alignp(kPageSize);
+<a href="#l284" class="line" id="l284">    284</a>     size_t off = stream_.tellp();
+<a href="#l285" class="line" id="l285">    285</a> 
+<a href="#l286" class="line" id="l286">    286</a>     chunk_header chdr;
+<a href="#l287" class="line" id="l287">    287</a>     chdr.data_off = off;
+<a href="#l288" class="line" id="l288">    288</a>     chdr.size = chunk-&gt;size;
+<a href="#l289" class="line" id="l289">    289</a>     chunks_.push_back(chdr);
+<a href="#l290" class="line" id="l290">    290</a> 
+<a href="#l291" class="line" id="l291">    291</a>     int err = ftruncate(fd_, off + 5 * hdr_.chunk_size);
+<a href="#l292" class="line" id="l292">    292</a>     if (err != 0) {
+<a href="#l293" class="line" id="l293">    293</a>         die(&quot;ftruncate&quot;);
+<a href="#l294" class="line" id="l294">    294</a>     }
+<a href="#l295" class="line" id="l295">    295</a>     stream_.write(reinterpret_cast&lt;char*&gt;(chunk-&gt;data), hdr_.chunk_size);
+<a href="#l296" class="line" id="l296">    296</a>     stream_.write(reinterpret_cast&lt;char*&gt;(chunk-&gt;suffixes),
+<a href="#l297" class="line" id="l297">    297</a>                   sizeof(uint32_t) * chunk-&gt;size);
+<a href="#l298" class="line" id="l298">    298</a>     stream_.seekp(off + 5 * hdr_.chunk_size);
+<a href="#l299" class="line" id="l299">    299</a> }
+<a href="#l300" class="line" id="l300">    300</a> 
+<a href="#l301" class="line" id="l301">    301</a> void codesearch_index::dump_metadata() {
+<a href="#l302" class="line" id="l302">    302</a>     hdr_.ntrees   = cs_-&gt;trees_.size();
+<a href="#l303" class="line" id="l303">    303</a>     hdr_.nfiles   = cs_-&gt;files_.size();
+<a href="#l304" class="line" id="l304">    304</a>     hdr_.nchunks  = cs_-&gt;alloc_-&gt;size();
+<a href="#l305" class="line" id="l305">    305</a>     hdr_.ncontent = content_.size();
+<a href="#l306" class="line" id="l306">    306</a> 
+<a href="#l307" class="line" id="l307">    307</a>     hdr_.name_off = stream_.tellp();
+<a href="#l308" class="line" id="l308">    308</a>     dump_string(cs_-&gt;name());
+<a href="#l309" class="line" id="l309">    309</a> 
+<a href="#l310" class="line" id="l310">    310</a>     map&lt;const indexed_tree*, int&gt; tree_ids;
+<a href="#l311" class="line" id="l311">    311</a> 
+<a href="#l312" class="line" id="l312">    312</a>     hdr_.refs_off = stream_.tellp();
+<a href="#l313" class="line" id="l313">    313</a>     for (auto it = cs_-&gt;trees_.begin();
+<a href="#l314" class="line" id="l314">    314</a>          it != cs_-&gt;trees_.end(); ++it) {
+<a href="#l315" class="line" id="l315">    315</a>         dump_string((*it)-&gt;name);
+<a href="#l316" class="line" id="l316">    316</a>         dump_string((*it)-&gt;version);
+<a href="#l317" class="line" id="l317">    317</a>         string metadata;
+<a href="#l318" class="line" id="l318">    318</a>         auto st = google::protobuf::util::MessageToJsonString((*it)-&gt;metadata, &amp;metadata);
+<a href="#l319" class="line" id="l319">    319</a>         if (!st.ok()) {
+<a href="#l320" class="line" id="l320">    320</a>             die(&quot;protobuf: %s&quot;, st.ToString().c_str());
+<a href="#l321" class="line" id="l321">    321</a>         }
+<a href="#l322" class="line" id="l322">    322</a>         dump_string(metadata);
+<a href="#l323" class="line" id="l323">    323</a>         tree_ids[it-&gt;get()] = it - cs_-&gt;trees_.begin();
+<a href="#l324" class="line" id="l324">    324</a>     }
+<a href="#l325" class="line" id="l325">    325</a>     hdr_.files_off = stream_.tellp();
+<a href="#l326" class="line" id="l326">    326</a>     for (auto it = cs_-&gt;files_.begin();
+<a href="#l327" class="line" id="l327">    327</a>          it != cs_-&gt;files_.end(); ++it)
+<a href="#l328" class="line" id="l328">    328</a>         dump_file(tree_ids, it-&gt;get());
+<a href="#l329" class="line" id="l329">    329</a> 
+<a href="#l330" class="line" id="l330">    330</a>     auto hdr = chunks_.begin();
+<a href="#l331" class="line" id="l331">    331</a>     for (auto it = cs_-&gt;alloc_-&gt;begin();
+<a href="#l332" class="line" id="l332">    332</a>          it != cs_-&gt;alloc_-&gt;end(); ++it, ++hdr) {
+<a href="#l333" class="line" id="l333">    333</a>         assert(hdr != chunks_.end());
+<a href="#l334" class="line" id="l334">    334</a>         dump_chunk_files(*it, &amp;(*hdr));
+<a href="#l335" class="line" id="l335">    335</a>     }
 <a href="#l336" class="line" id="l336">    336</a> 
-<a href="#l337" class="line" id="l337">    337</a>     hdr_.content_off = stream_.tellp();
-<a href="#l338" class="line" id="l338">    338</a>     for (auto it = content_.begin(); it != content_.end(); ++it)
+<a href="#l337" class="line" id="l337">    337</a>     hdr_.chunks_off = stream_.tellp();
+<a href="#l338" class="line" id="l338">    338</a>     for (auto it = chunks_.begin(); it != chunks_.end(); ++it)
 <a href="#l339" class="line" id="l339">    339</a>         dump(&amp;*it);
-<a href="#l340" class="line" id="l340">    340</a> }
-<a href="#l341" class="line" id="l341">    341</a> 
-<a href="#l342" class="line" id="l342">    342</a> void codesearch_index::dump_chunk_data() {
-<a href="#l343" class="line" id="l343">    343</a>     alignp(kPageSize);
-<a href="#l344" class="line" id="l344">    344</a>     for (auto it = cs_-&gt;alloc_-&gt;begin();
-<a href="#l345" class="line" id="l345">    345</a>          it != cs_-&gt;alloc_-&gt;end(); ++it) {
-<a href="#l346" class="line" id="l346">    346</a>         dump_chunk_data(*it);
-<a href="#l347" class="line" id="l347">    347</a>     }
-<a href="#l348" class="line" id="l348">    348</a> }
-<a href="#l349" class="line" id="l349">    349</a> 
-<a href="#l350" class="line" id="l350">    350</a> void codesearch_index::dump_content_data() {
-<a href="#l351" class="line" id="l351">    351</a>     alignp(kPageSize);
-<a href="#l352" class="line" id="l352">    352</a>     for (auto it = cs_-&gt;alloc_-&gt;begin_content();
-<a href="#l353" class="line" id="l353">    353</a>          it != cs_-&gt;alloc_-&gt;end_content(); ++it) {
-<a href="#l354" class="line" id="l354">    354</a>         off_t off = stream_.tellp();
-<a href="#l355" class="line" id="l355">    355</a>         stream_.write(reinterpret_cast&lt;char*&gt;(it-&gt;data), it-&gt;end - it-&gt;data);
-<a href="#l356" class="line" id="l356">    356</a>         content_.push_back((content_chunk_header) {
-<a href="#l357" class="line" id="l357">    357</a>                 uint64_t(off),
-<a href="#l358" class="line" id="l358">    358</a>                 uint32_t(it-&gt;end - it-&gt;data)
-<a href="#l359" class="line" id="l359">    359</a>             });
-<a href="#l360" class="line" id="l360">    360</a>     }
-<a href="#l361" class="line" id="l361">    361</a> }
-<a href="#l362" class="line" id="l362">    362</a> 
-<a href="#l363" class="line" id="l363">    363</a> void codesearch_index::dump_filename_index() {
-<a href="#l364" class="line" id="l364">    364</a>     hdr_.nfiledata = cs_-&gt;filename_data_.size();
-<a href="#l365" class="line" id="l365">    365</a> 
-<a href="#l366" class="line" id="l366">    366</a>     hdr_.filedata_off = stream_.tellp();
-<a href="#l367" class="line" id="l367">    367</a>     for (auto it = cs_-&gt;filename_data_.begin();
-<a href="#l368" class="line" id="l368">    368</a>          it != cs_-&gt;filename_data_.end(); ++it) {
-<a href="#l369" class="line" id="l369">    369</a>         dump(&amp;*it);
-<a href="#l370" class="line" id="l370">    370</a>     }
-<a href="#l371" class="line" id="l371">    371</a> 
-<a href="#l372" class="line" id="l372">    372</a>     hdr_.filesuffixes_off = stream_.tellp();
-<a href="#l373" class="line" id="l373">    373</a>     for (auto it = cs_-&gt;filename_suffixes_.begin();
-<a href="#l374" class="line" id="l374">    374</a>          it != cs_-&gt;filename_suffixes_.end(); ++it) {
-<a href="#l375" class="line" id="l375">    375</a>         dump_int32(*it);
-<a href="#l376" class="line" id="l376">    376</a>     }
-<a href="#l377" class="line" id="l377">    377</a> 
-<a href="#l378" class="line" id="l378">    378</a>     hdr_.filepos_off = stream_.tellp();
-<a href="#l379" class="line" id="l379">    379</a>     for (auto it = cs_-&gt;filename_positions_.begin();
-<a href="#l380" class="line" id="l380">    380</a>          it != cs_-&gt;filename_positions_.end(); ++it) {
-<a href="#l381" class="line" id="l381">    381</a>         dump(&amp;it-&gt;first);
-<a href="#l382" class="line" id="l382">    382</a>         // The indexed_file associated with this filename position is already
-<a href="#l383" class="line" id="l383">    383</a>         // populated into the dump file via dump_metadata at this point; it need
-<a href="#l384" class="line" id="l384">    384</a>         // not be re-written.
-<a href="#l385" class="line" id="l385">    385</a>     }
-<a href="#l386" class="line" id="l386">    386</a> }
-<a href="#l387" class="line" id="l387">    387</a> 
-<a href="#l388" class="line" id="l388">    388</a> void codesearch_index::dump() {
-<a href="#l389" class="line" id="l389">    389</a>     assert(cs_-&gt;finalized_);
-<a href="#l390" class="line" id="l390">    390</a> 
-<a href="#l391" class="line" id="l391">    391</a>     dump(&amp;hdr_);
-<a href="#l392" class="line" id="l392">    392</a> 
-<a href="#l393" class="line" id="l393">    393</a>     dump_chunk_data();
-<a href="#l394" class="line" id="l394">    394</a>     dump_content_data();
-<a href="#l395" class="line" id="l395">    395</a>     dump_metadata();
-<a href="#l396" class="line" id="l396">    396</a>     dump_filename_index();
-<a href="#l397" class="line" id="l397">    397</a> 
-<a href="#l398" class="line" id="l398">    398</a>     stream_.seekp(0);
-<a href="#l399" class="line" id="l399">    399</a>     dump(&amp;hdr_);
-<a href="#l400" class="line" id="l400">    400</a> }
+<a href="#l340" class="line" id="l340">    340</a> 
+<a href="#l341" class="line" id="l341">    341</a>     hdr_.content_off = stream_.tellp();
+<a href="#l342" class="line" id="l342">    342</a>     for (auto it = content_.begin(); it != content_.end(); ++it)
+<a href="#l343" class="line" id="l343">    343</a>         dump(&amp;*it);
+<a href="#l344" class="line" id="l344">    344</a> }
+<a href="#l345" class="line" id="l345">    345</a> 
+<a href="#l346" class="line" id="l346">    346</a> void codesearch_index::dump_chunk_data() {
+<a href="#l347" class="line" id="l347">    347</a>     alignp(kPageSize);
+<a href="#l348" class="line" id="l348">    348</a>     for (auto it = cs_-&gt;alloc_-&gt;begin();
+<a href="#l349" class="line" id="l349">    349</a>          it != cs_-&gt;alloc_-&gt;end(); ++it) {
+<a href="#l350" class="line" id="l350">    350</a>         dump_chunk_data(*it);
+<a href="#l351" class="line" id="l351">    351</a>     }
+<a href="#l352" class="line" id="l352">    352</a> }
+<a href="#l353" class="line" id="l353">    353</a> 
+<a href="#l354" class="line" id="l354">    354</a> void codesearch_index::dump_content_data() {
+<a href="#l355" class="line" id="l355">    355</a>     alignp(kPageSize);
+<a href="#l356" class="line" id="l356">    356</a>     for (auto it = cs_-&gt;alloc_-&gt;begin_content();
+<a href="#l357" class="line" id="l357">    357</a>          it != cs_-&gt;alloc_-&gt;end_content(); ++it) {
+<a href="#l358" class="line" id="l358">    358</a>         off_t off = stream_.tellp();
+<a href="#l359" class="line" id="l359">    359</a>         stream_.write(reinterpret_cast&lt;char*&gt;(it-&gt;data), it-&gt;end - it-&gt;data);
+<a href="#l360" class="line" id="l360">    360</a>         content_.push_back((content_chunk_header) {
+<a href="#l361" class="line" id="l361">    361</a>                 uint64_t(off),
+<a href="#l362" class="line" id="l362">    362</a>                 uint32_t(it-&gt;end - it-&gt;data)
+<a href="#l363" class="line" id="l363">    363</a>             });
+<a href="#l364" class="line" id="l364">    364</a>     }
+<a href="#l365" class="line" id="l365">    365</a> }
+<a href="#l366" class="line" id="l366">    366</a> 
+<a href="#l367" class="line" id="l367">    367</a> void codesearch_index::dump_filename_index() {
+<a href="#l368" class="line" id="l368">    368</a>     hdr_.nfiledata = cs_-&gt;filename_data_.size();
+<a href="#l369" class="line" id="l369">    369</a> 
+<a href="#l370" class="line" id="l370">    370</a>     hdr_.filedata_off = stream_.tellp();
+<a href="#l371" class="line" id="l371">    371</a>     for (auto it = cs_-&gt;filename_data_.begin();
+<a href="#l372" class="line" id="l372">    372</a>          it != cs_-&gt;filename_data_.end(); ++it) {
+<a href="#l373" class="line" id="l373">    373</a>         dump(&amp;*it);
+<a href="#l374" class="line" id="l374">    374</a>     }
+<a href="#l375" class="line" id="l375">    375</a> 
+<a href="#l376" class="line" id="l376">    376</a>     hdr_.filesuffixes_off = stream_.tellp();
+<a href="#l377" class="line" id="l377">    377</a>     for (auto it = cs_-&gt;filename_suffixes_.begin();
+<a href="#l378" class="line" id="l378">    378</a>          it != cs_-&gt;filename_suffixes_.end(); ++it) {
+<a href="#l379" class="line" id="l379">    379</a>         dump_int32(*it);
+<a href="#l380" class="line" id="l380">    380</a>     }
+<a href="#l381" class="line" id="l381">    381</a> 
+<a href="#l382" class="line" id="l382">    382</a>     hdr_.filepos_off = stream_.tellp();
+<a href="#l383" class="line" id="l383">    383</a>     for (auto it = cs_-&gt;filename_positions_.begin();
+<a href="#l384" class="line" id="l384">    384</a>          it != cs_-&gt;filename_positions_.end(); ++it) {
+<a href="#l385" class="line" id="l385">    385</a>         dump(&amp;it-&gt;first);
+<a href="#l386" class="line" id="l386">    386</a>         // The indexed_file associated with this filename position is already
+<a href="#l387" class="line" id="l387">    387</a>         // populated into the dump file via dump_metadata at this point; it need
+<a href="#l388" class="line" id="l388">    388</a>         // not be re-written.
+<a href="#l389" class="line" id="l389">    389</a>     }
+<a href="#l390" class="line" id="l390">    390</a> }
+<a href="#l391" class="line" id="l391">    391</a> 
+<a href="#l392" class="line" id="l392">    392</a> void codesearch_index::dump() {
+<a href="#l393" class="line" id="l393">    393</a>     assert(cs_-&gt;finalized_);
+<a href="#l394" class="line" id="l394">    394</a> 
+<a href="#l395" class="line" id="l395">    395</a>     dump(&amp;hdr_);
+<a href="#l396" class="line" id="l396">    396</a> 
+<a href="#l397" class="line" id="l397">    397</a>     dump_chunk_data();
+<a href="#l398" class="line" id="l398">    398</a>     dump_content_data();
+<a href="#l399" class="line" id="l399">    399</a>     dump_metadata();
+<a href="#l400" class="line" id="l400">    400</a>     dump_filename_index();
 <a href="#l401" class="line" id="l401">    401</a> 
-<a href="#l402" class="line" id="l402">    402</a> load_allocator::load_allocator(code_searcher *cs, const string&amp; path) {
-<a href="#l403" class="line" id="l403">    403</a>     fd_ = open(path.c_str(), O_RDONLY);
-<a href="#l404" class="line" id="l404">    404</a>     if (fd_ == -1) {
-<a href="#l405" class="line" id="l405">    405</a>         string message = &quot;Cannot open &quot; + path;
-<a href="#l406" class="line" id="l406">    406</a>         perror(message.c_str());
-<a href="#l407" class="line" id="l407">    407</a>         exit(1);
-<a href="#l408" class="line" id="l408">    408</a>     }
-<a href="#l409" class="line" id="l409">    409</a>     struct stat st;
-<a href="#l410" class="line" id="l410">    410</a>     int err = fstat(fd_, &amp;st);
-<a href="#l411" class="line" id="l411">    411</a>     if (err != 0) {
-<a href="#l412" class="line" id="l412">    412</a>         die(&quot;Cannot stat: &#39;%s&#39;: %s\n&quot;, path.c_str(), strerror(errno));
-<a href="#l413" class="line" id="l413">    413</a>     }
-<a href="#l414" class="line" id="l414">    414</a>     map_size_ = st.st_size;
-<a href="#l415" class="line" id="l415">    415</a>     map_ = mmap(NULL, map_size_, PROT_READ, MAP_SHARED,
-<a href="#l416" class="line" id="l416">    416</a>                 fd_, 0);
-<a href="#l417" class="line" id="l417">    417</a>     assert(map_ != MAP_FAILED);
-<a href="#l418" class="line" id="l418">    418</a>     p_ = static_cast&lt;unsigned char*&gt;(map_);
-<a href="#l419" class="line" id="l419">    419</a> 
-<a href="#l420" class="line" id="l420">    420</a>     hdr_ = consume&lt;index_header&gt;();
-<a href="#l421" class="line" id="l421">    421</a>     set_chunk_size(hdr_-&gt;chunk_size);
-<a href="#l422" class="line" id="l422">    422</a>     chunks_hdr_ = next_chunk_ = ptr&lt;chunk_header&gt;(hdr_-&gt;chunks_off);
-<a href="#l423" class="line" id="l423">    423</a> 
-<a href="#l424" class="line" id="l424">    424</a>     p_ = ptr&lt;unsigned char&gt;(hdr_-&gt;name_off);
-<a href="#l425" class="line" id="l425">    425</a>     cs-&gt;set_name(load_string());
-<a href="#l426" class="line" id="l426">    426</a> }
-<a href="#l427" class="line" id="l427">    427</a> 
-<a href="#l428" class="line" id="l428">    428</a> 
-<a href="#l429" class="line" id="l429">    429</a> chunk *load_allocator::alloc_chunk() {
-<a href="#l430" class="line" id="l430">    430</a>     unsigned char *data = ptr&lt;unsigned char&gt;(next_chunk_-&gt;data_off);
-<a href="#l431" class="line" id="l431">    431</a>     uint32_t *indexes = reinterpret_cast&lt;uint32_t*&gt;(data + chunk_size_);
+<a href="#l402" class="line" id="l402">    402</a>     stream_.seekp(0);
+<a href="#l403" class="line" id="l403">    403</a>     dump(&amp;hdr_);
+<a href="#l404" class="line" id="l404">    404</a> }
+<a href="#l405" class="line" id="l405">    405</a> 
+<a href="#l406" class="line" id="l406">    406</a> load_allocator::load_allocator(code_searcher *cs, const string&amp; path) {
+<a href="#l407" class="line" id="l407">    407</a>     fd_ = open(path.c_str(), O_RDONLY);
+<a href="#l408" class="line" id="l408">    408</a>     if (fd_ == -1) {
+<a href="#l409" class="line" id="l409">    409</a>         string message = &quot;Cannot open &quot; + path;
+<a href="#l410" class="line" id="l410">    410</a>         perror(message.c_str());
+<a href="#l411" class="line" id="l411">    411</a>         exit(1);
+<a href="#l412" class="line" id="l412">    412</a>     }
+<a href="#l413" class="line" id="l413">    413</a>     struct stat st;
+<a href="#l414" class="line" id="l414">    414</a>     int err = fstat(fd_, &amp;st);
+<a href="#l415" class="line" id="l415">    415</a>     if (err != 0) {
+<a href="#l416" class="line" id="l416">    416</a>         die(&quot;Cannot stat: &#39;%s&#39;: %s\n&quot;, path.c_str(), strerror(errno));
+<a href="#l417" class="line" id="l417">    417</a>     }
+<a href="#l418" class="line" id="l418">    418</a>     map_size_ = st.st_size;
+<a href="#l419" class="line" id="l419">    419</a>     int flags = MAP_PRIVATE;
+<a href="#l420" class="line" id="l420">    420</a>     if (FLAGS_eager_memory_load) {
+<a href="#l421" class="line" id="l421">    421</a> #if defined(MAP_POPULATE)
+<a href="#l422" class="line" id="l422">    422</a>         flags |= MAP_POPULATE;
+<a href="#l423" class="line" id="l423">    423</a> #else
+<a href="#l424" class="line" id="l424">    424</a>         fprintf(stderr, &quot;Error: eager memory load is not supported on this platform\n&quot;);
+<a href="#l425" class="line" id="l425">    425</a>         exit(1);
+<a href="#l426" class="line" id="l426">    426</a> #endif
+<a href="#l427" class="line" id="l427">    427</a>     }
+<a href="#l428" class="line" id="l428">    428</a>     map_ = mmap(NULL, map_size_, PROT_READ, flags,
+<a href="#l429" class="line" id="l429">    429</a>                 fd_, 0);
+<a href="#l430" class="line" id="l430">    430</a>     assert(map_ != MAP_FAILED);
+<a href="#l431" class="line" id="l431">    431</a>     p_ = static_cast&lt;unsigned char*&gt;(map_);
 <a href="#l432" class="line" id="l432">    432</a> 
-<a href="#l433" class="line" id="l433">    433</a>     return new chunk(data, indexes);
-<a href="#l434" class="line" id="l434">    434</a> }
-<a href="#l435" class="line" id="l435">    435</a> 
-<a href="#l436" class="line" id="l436">    436</a> unique_ptr&lt;indexed_file&gt; load_allocator::load_file(code_searcher *cs) {
-<a href="#l437" class="line" id="l437">    437</a>     auto sf = std::make_unique&lt;indexed_file&gt;();
-<a href="#l438" class="line" id="l438">    438</a>     sf-&gt;tree = cs-&gt;trees_[load_int32()].get();
-<a href="#l439" class="line" id="l439">    439</a>     sf-&gt;path = load_string();
-<a href="#l440" class="line" id="l440">    440</a>     sf-&gt;no = cs-&gt;files_.size();
-<a href="#l441" class="line" id="l441">    441</a>     return sf;
-<a href="#l442" class="line" id="l442">    442</a> }
-<a href="#l443" class="line" id="l443">    443</a> 
-<a href="#l444" class="line" id="l444">    444</a> void load_allocator::load_chunk(code_searcher *cs) {
-<a href="#l445" class="line" id="l445">    445</a>     skip_chunk();
-<a href="#l446" class="line" id="l446">    446</a>     chunk* chunk = current_chunk();
-<a href="#l447" class="line" id="l447">    447</a> 
-<a href="#l448" class="line" id="l448">    448</a>     assert(next_chunk_-&gt;size &lt;= hdr_-&gt;chunk_size);
-<a href="#l449" class="line" id="l449">    449</a>     chunk-&gt;size = next_chunk_-&gt;size;
-<a href="#l450" class="line" id="l450">    450</a> 
-<a href="#l451" class="line" id="l451">    451</a>     p_ = ptr&lt;unsigned char&gt;(next_chunk_-&gt;files_off);
-<a href="#l452" class="line" id="l452">    452</a> 
-<a href="#l453" class="line" id="l453">    453</a>     for (int i = 0; i &lt; next_chunk_-&gt;nfiles; i++) {
-<a href="#l454" class="line" id="l454">    454</a>         chunk-&gt;files.push_back(chunk_file());
-<a href="#l455" class="line" id="l455">    455</a>         chunk_file &amp;cf = chunk-&gt;files.back();
-<a href="#l456" class="line" id="l456">    456</a>         uint32_t nfiles = load_int32();
-<a href="#l457" class="line" id="l457">    457</a>         for (int j = 0; j &lt; nfiles; j++)
-<a href="#l458" class="line" id="l458">    458</a>             cf.files.push_back(cs-&gt;files_[load_int32()].get());
-<a href="#l459" class="line" id="l459">    459</a>         cf.left  = load_int32();
-<a href="#l460" class="line" id="l460">    460</a>         cf.right = load_int32();
-<a href="#l461" class="line" id="l461">    461</a>     }
-<a href="#l462" class="line" id="l462">    462</a>     chunk-&gt;build_tree_names();
-<a href="#l463" class="line" id="l463">    463</a>     chunk-&gt;build_tree();
-<a href="#l464" class="line" id="l464">    464</a>     ++next_chunk_;
-<a href="#l465" class="line" id="l465">    465</a> }
-<a href="#l466" class="line" id="l466">    466</a> 
-<a href="#l467" class="line" id="l467">    467</a> void load_allocator::load(code_searcher *cs) {
-<a href="#l468" class="line" id="l468">    468</a>     assert(!cs-&gt;finalized_);
-<a href="#l469" class="line" id="l469">    469</a>     assert(!cs-&gt;trees_.size());
-<a href="#l470" class="line" id="l470">    470</a> 
-<a href="#l471" class="line" id="l471">    471</a>     assert(hdr_-&gt;magic == kIndexMagic);
-<a href="#l472" class="line" id="l472">    472</a>     assert(hdr_-&gt;version == kIndexVersion);
-<a href="#l473" class="line" id="l473">    473</a>     assert(hdr_-&gt;chunks_off);
-<a href="#l474" class="line" id="l474">    474</a> 
-<a href="#l475" class="line" id="l475">    475</a>     set_chunk_size(hdr_-&gt;chunk_size);
-<a href="#l476" class="line" id="l476">    476</a> 
-<a href="#l477" class="line" id="l477">    477</a>     p_ = ptr&lt;uint8_t&gt;(hdr_-&gt;refs_off);
-<a href="#l478" class="line" id="l478">    478</a>     for (int i = 0; i &lt; hdr_-&gt;ntrees; i++) {
-<a href="#l479" class="line" id="l479">    479</a>         auto tree = std::make_unique&lt;indexed_tree&gt;();
-<a href="#l480" class="line" id="l480">    480</a>         tree-&gt;name = load_string();
-<a href="#l481" class="line" id="l481">    481</a>         tree-&gt;version = load_string();
-<a href="#l482" class="line" id="l482">    482</a>         string metadata = load_string();
-<a href="#l483" class="line" id="l483">    483</a>         if (metadata.size() != 0) {
-<a href="#l484" class="line" id="l484">    484</a>             auto status = google::protobuf::util::JsonStringToMessage(metadata, &amp;tree-&gt;metadata, google::protobuf::util::JsonParseOptions());
-<a href="#l485" class="line" id="l485">    485</a>             if (!status.ok()) {
-<a href="#l486" class="line" id="l486">    486</a>                 die(&quot;parse metadata: %s&quot;, status.ToString().c_str());
-<a href="#l487" class="line" id="l487">    487</a>             }
-<a href="#l488" class="line" id="l488">    488</a>         }
+<a href="#l433" class="line" id="l433">    433</a>     hdr_ = consume&lt;index_header&gt;();
+<a href="#l434" class="line" id="l434">    434</a>     set_chunk_size(hdr_-&gt;chunk_size);
+<a href="#l435" class="line" id="l435">    435</a>     chunks_hdr_ = next_chunk_ = ptr&lt;chunk_header&gt;(hdr_-&gt;chunks_off);
+<a href="#l436" class="line" id="l436">    436</a> 
+<a href="#l437" class="line" id="l437">    437</a>     p_ = ptr&lt;unsigned char&gt;(hdr_-&gt;name_off);
+<a href="#l438" class="line" id="l438">    438</a>     cs-&gt;set_name(load_string());
+<a href="#l439" class="line" id="l439">    439</a> }
+<a href="#l440" class="line" id="l440">    440</a> 
+<a href="#l441" class="line" id="l441">    441</a> 
+<a href="#l442" class="line" id="l442">    442</a> chunk *load_allocator::alloc_chunk() {
+<a href="#l443" class="line" id="l443">    443</a>     unsigned char *data = ptr&lt;unsigned char&gt;(next_chunk_-&gt;data_off);
+<a href="#l444" class="line" id="l444">    444</a>     uint32_t *indexes = reinterpret_cast&lt;uint32_t*&gt;(data + chunk_size_);
+<a href="#l445" class="line" id="l445">    445</a> 
+<a href="#l446" class="line" id="l446">    446</a>     return new chunk(data, indexes);
+<a href="#l447" class="line" id="l447">    447</a> }
+<a href="#l448" class="line" id="l448">    448</a> 
+<a href="#l449" class="line" id="l449">    449</a> unique_ptr&lt;indexed_file&gt; load_allocator::load_file(code_searcher *cs) {
+<a href="#l450" class="line" id="l450">    450</a>     auto sf = std::make_unique&lt;indexed_file&gt;();
+<a href="#l451" class="line" id="l451">    451</a>     sf-&gt;tree = cs-&gt;trees_[load_int32()].get();
+<a href="#l452" class="line" id="l452">    452</a>     sf-&gt;path = load_string();
+<a href="#l453" class="line" id="l453">    453</a>     sf-&gt;no = cs-&gt;files_.size();
+<a href="#l454" class="line" id="l454">    454</a>     return sf;
+<a href="#l455" class="line" id="l455">    455</a> }
+<a href="#l456" class="line" id="l456">    456</a> 
+<a href="#l457" class="line" id="l457">    457</a> void load_allocator::load_chunk(code_searcher *cs) {
+<a href="#l458" class="line" id="l458">    458</a>     skip_chunk();
+<a href="#l459" class="line" id="l459">    459</a>     chunk* chunk = current_chunk();
+<a href="#l460" class="line" id="l460">    460</a> 
+<a href="#l461" class="line" id="l461">    461</a>     assert(next_chunk_-&gt;size &lt;= hdr_-&gt;chunk_size);
+<a href="#l462" class="line" id="l462">    462</a>     chunk-&gt;size = next_chunk_-&gt;size;
+<a href="#l463" class="line" id="l463">    463</a> 
+<a href="#l464" class="line" id="l464">    464</a>     p_ = ptr&lt;unsigned char&gt;(next_chunk_-&gt;files_off);
+<a href="#l465" class="line" id="l465">    465</a> 
+<a href="#l466" class="line" id="l466">    466</a>     for (int i = 0; i &lt; next_chunk_-&gt;nfiles; i++) {
+<a href="#l467" class="line" id="l467">    467</a>         chunk-&gt;files.push_back(chunk_file());
+<a href="#l468" class="line" id="l468">    468</a>         chunk_file &amp;cf = chunk-&gt;files.back();
+<a href="#l469" class="line" id="l469">    469</a>         uint32_t nfiles = load_int32();
+<a href="#l470" class="line" id="l470">    470</a>         for (int j = 0; j &lt; nfiles; j++)
+<a href="#l471" class="line" id="l471">    471</a>             cf.files.push_back(cs-&gt;files_[load_int32()].get());
+<a href="#l472" class="line" id="l472">    472</a>         cf.left  = load_int32();
+<a href="#l473" class="line" id="l473">    473</a>         cf.right = load_int32();
+<a href="#l474" class="line" id="l474">    474</a>     }
+<a href="#l475" class="line" id="l475">    475</a>     chunk-&gt;build_tree_names();
+<a href="#l476" class="line" id="l476">    476</a>     chunk-&gt;build_tree();
+<a href="#l477" class="line" id="l477">    477</a>     ++next_chunk_;
+<a href="#l478" class="line" id="l478">    478</a> }
+<a href="#l479" class="line" id="l479">    479</a> 
+<a href="#l480" class="line" id="l480">    480</a> void load_allocator::load(code_searcher *cs) {
+<a href="#l481" class="line" id="l481">    481</a>     assert(!cs-&gt;finalized_);
+<a href="#l482" class="line" id="l482">    482</a>     assert(!cs-&gt;trees_.size());
+<a href="#l483" class="line" id="l483">    483</a> 
+<a href="#l484" class="line" id="l484">    484</a>     assert(hdr_-&gt;magic == kIndexMagic);
+<a href="#l485" class="line" id="l485">    485</a>     assert(hdr_-&gt;version == kIndexVersion);
+<a href="#l486" class="line" id="l486">    486</a>     assert(hdr_-&gt;chunks_off);
+<a href="#l487" class="line" id="l487">    487</a> 
+<a href="#l488" class="line" id="l488">    488</a>     set_chunk_size(hdr_-&gt;chunk_size);
 <a href="#l489" class="line" id="l489">    489</a> 
-<a href="#l490" class="line" id="l490">    490</a>         cs-&gt;trees_.push_back(move(tree));
-<a href="#l491" class="line" id="l491">    491</a>     }
-<a href="#l492" class="line" id="l492">    492</a> 
-<a href="#l493" class="line" id="l493">    493</a>     p_ = ptr&lt;uint8_t&gt;(hdr_-&gt;files_off);
-<a href="#l494" class="line" id="l494">    494</a>     for (int i = 0; i &lt; hdr_-&gt;nfiles; i++) {
-<a href="#l495" class="line" id="l495">    495</a>         cs-&gt;files_.push_back(load_file(cs));
-<a href="#l496" class="line" id="l496">    496</a>     }
-<a href="#l497" class="line" id="l497">    497</a> 
-<a href="#l498" class="line" id="l498">    498</a>     assert(!current_);
-<a href="#l499" class="line" id="l499">    499</a>     for (int i = 0; i &lt; hdr_-&gt;nchunks; i++) {
-<a href="#l500" class="line" id="l500">    500</a>         load_chunk(cs);
-<a href="#l501" class="line" id="l501">    501</a>     }
+<a href="#l490" class="line" id="l490">    490</a>     p_ = ptr&lt;uint8_t&gt;(hdr_-&gt;refs_off);
+<a href="#l491" class="line" id="l491">    491</a>     for (int i = 0; i &lt; hdr_-&gt;ntrees; i++) {
+<a href="#l492" class="line" id="l492">    492</a>         auto tree = std::make_unique&lt;indexed_tree&gt;();
+<a href="#l493" class="line" id="l493">    493</a>         tree-&gt;name = load_string();
+<a href="#l494" class="line" id="l494">    494</a>         tree-&gt;version = load_string();
+<a href="#l495" class="line" id="l495">    495</a>         string metadata = load_string();
+<a href="#l496" class="line" id="l496">    496</a>         if (metadata.size() != 0) {
+<a href="#l497" class="line" id="l497">    497</a>             auto status = google::protobuf::util::JsonStringToMessage(metadata, &amp;tree-&gt;metadata, google::protobuf::util::JsonParseOptions());
+<a href="#l498" class="line" id="l498">    498</a>             if (!status.ok()) {
+<a href="#l499" class="line" id="l499">    499</a>                 die(&quot;parse metadata: %s&quot;, status.ToString().c_str());
+<a href="#l500" class="line" id="l500">    500</a>             }
+<a href="#l501" class="line" id="l501">    501</a>         }
 <a href="#l502" class="line" id="l502">    502</a> 
-<a href="#l503" class="line" id="l503">    503</a>     content_chunk_header *chdr = ptr&lt;content_chunk_header&gt;(hdr_-&gt;content_off);
-<a href="#l504" class="line" id="l504">    504</a>     auto it = cs-&gt;files_.begin();
-<a href="#l505" class="line" id="l505">    505</a>     for (int i = 0; i &lt; hdr_-&gt;ncontent; i++) {
-<a href="#l506" class="line" id="l506">    506</a>         buffer b;
-<a href="#l507" class="line" id="l507">    507</a>         p_ = ptr&lt;uint8_t&gt;(chdr-&gt;file_off);
-<a href="#l508" class="line" id="l508">    508</a>         b.data = p_;
-<a href="#l509" class="line" id="l509">    509</a>         while (p_ &lt; ptr&lt;uint8_t&gt;(chdr-&gt;file_off + chdr-&gt;size)) {
-<a href="#l510" class="line" id="l510">    510</a>             (*it)-&gt;content = new(p_) file_contents;
-<a href="#l511" class="line" id="l511">    511</a>             p_ = reinterpret_cast&lt;uint8_t*&gt;((*it)-&gt;content-&gt;end());
-<a href="#l512" class="line" id="l512">    512</a>             ++it;
-<a href="#l513" class="line" id="l513">    513</a>         }
-<a href="#l514" class="line" id="l514">    514</a>         b.end = p_;
-<a href="#l515" class="line" id="l515">    515</a>         content_chunks_.push_back(b);
-<a href="#l516" class="line" id="l516">    516</a>         ++chdr;
-<a href="#l517" class="line" id="l517">    517</a>     }
-<a href="#l518" class="line" id="l518">    518</a>     assert(it == cs-&gt;files_.end());
-<a href="#l519" class="line" id="l519">    519</a> 
-<a href="#l520" class="line" id="l520">    520</a>     p_ = ptr&lt;uint8_t&gt;(hdr_-&gt;filedata_off);
-<a href="#l521" class="line" id="l521">    521</a>     cs-&gt;filename_data_.reserve(hdr_-&gt;nfiledata);
-<a href="#l522" class="line" id="l522">    522</a>     for (int i = 0; i &lt; hdr_-&gt;nfiledata; i++) {
-<a href="#l523" class="line" id="l523">    523</a>         cs-&gt;filename_data_.push_back(*consume&lt;unsigned char&gt;());
-<a href="#l524" class="line" id="l524">    524</a>     }
-<a href="#l525" class="line" id="l525">    525</a> 
-<a href="#l526" class="line" id="l526">    526</a>     p_ = ptr&lt;uint8_t&gt;(hdr_-&gt;filesuffixes_off);
-<a href="#l527" class="line" id="l527">    527</a>     cs-&gt;filename_suffixes_.reserve(hdr_-&gt;nfiledata);
-<a href="#l528" class="line" id="l528">    528</a>     for (int i = 0; i &lt; hdr_-&gt;nfiledata; i++) {
-<a href="#l529" class="line" id="l529">    529</a>         cs-&gt;filename_suffixes_.push_back(load_int32());
+<a href="#l503" class="line" id="l503">    503</a>         cs-&gt;trees_.push_back(move(tree));
+<a href="#l504" class="line" id="l504">    504</a>     }
+<a href="#l505" class="line" id="l505">    505</a> 
+<a href="#l506" class="line" id="l506">    506</a>     p_ = ptr&lt;uint8_t&gt;(hdr_-&gt;files_off);
+<a href="#l507" class="line" id="l507">    507</a>     for (int i = 0; i &lt; hdr_-&gt;nfiles; i++) {
+<a href="#l508" class="line" id="l508">    508</a>         cs-&gt;files_.push_back(load_file(cs));
+<a href="#l509" class="line" id="l509">    509</a>     }
+<a href="#l510" class="line" id="l510">    510</a> 
+<a href="#l511" class="line" id="l511">    511</a>     assert(!current_);
+<a href="#l512" class="line" id="l512">    512</a>     for (int i = 0; i &lt; hdr_-&gt;nchunks; i++) {
+<a href="#l513" class="line" id="l513">    513</a>         load_chunk(cs);
+<a href="#l514" class="line" id="l514">    514</a>     }
+<a href="#l515" class="line" id="l515">    515</a> 
+<a href="#l516" class="line" id="l516">    516</a>     content_chunk_header *chdr = ptr&lt;content_chunk_header&gt;(hdr_-&gt;content_off);
+<a href="#l517" class="line" id="l517">    517</a>     auto it = cs-&gt;files_.begin();
+<a href="#l518" class="line" id="l518">    518</a>     for (int i = 0; i &lt; hdr_-&gt;ncontent; i++) {
+<a href="#l519" class="line" id="l519">    519</a>         buffer b;
+<a href="#l520" class="line" id="l520">    520</a>         p_ = ptr&lt;uint8_t&gt;(chdr-&gt;file_off);
+<a href="#l521" class="line" id="l521">    521</a>         b.data = p_;
+<a href="#l522" class="line" id="l522">    522</a>         while (p_ &lt; ptr&lt;uint8_t&gt;(chdr-&gt;file_off + chdr-&gt;size)) {
+<a href="#l523" class="line" id="l523">    523</a>             (*it)-&gt;content = new(p_) file_contents;
+<a href="#l524" class="line" id="l524">    524</a>             p_ = reinterpret_cast&lt;uint8_t*&gt;((*it)-&gt;content-&gt;end());
+<a href="#l525" class="line" id="l525">    525</a>             ++it;
+<a href="#l526" class="line" id="l526">    526</a>         }
+<a href="#l527" class="line" id="l527">    527</a>         b.end = p_;
+<a href="#l528" class="line" id="l528">    528</a>         content_chunks_.push_back(b);
+<a href="#l529" class="line" id="l529">    529</a>         ++chdr;
 <a href="#l530" class="line" id="l530">    530</a>     }
-<a href="#l531" class="line" id="l531">    531</a> 
-<a href="#l532" class="line" id="l532">    532</a>     p_ = ptr&lt;uint8_t&gt;(hdr_-&gt;filepos_off);
-<a href="#l533" class="line" id="l533">    533</a>     cs-&gt;filename_positions_.reserve(hdr_-&gt;nfiles);
-<a href="#l534" class="line" id="l534">    534</a>     for (auto it = cs-&gt;files_.begin();
-<a href="#l535" class="line" id="l535">    535</a>          it != cs-&gt;files_.end(); ++it) {
-<a href="#l536" class="line" id="l536">    536</a>         int pos = *consume&lt;int&gt;();
-<a href="#l537" class="line" id="l537">    537</a>         indexed_file *sf = it-&gt;get();
-<a href="#l538" class="line" id="l538">    538</a>         cs-&gt;filename_positions_.push_back(make_pair(pos, sf));
-<a href="#l539" class="line" id="l539">    539</a>     }
-<a href="#l540" class="line" id="l540">    540</a> 
-<a href="#l541" class="line" id="l541">    541</a>     struct stat st;
-<a href="#l542" class="line" id="l542">    542</a>     assert(fstat(fd_, &amp;st) == 0);
-<a href="#l543" class="line" id="l543">    543</a>     cs-&gt;index_timestamp_ = st.st_mtime;
+<a href="#l531" class="line" id="l531">    531</a>     assert(it == cs-&gt;files_.end());
+<a href="#l532" class="line" id="l532">    532</a> 
+<a href="#l533" class="line" id="l533">    533</a>     p_ = ptr&lt;uint8_t&gt;(hdr_-&gt;filedata_off);
+<a href="#l534" class="line" id="l534">    534</a>     cs-&gt;filename_data_.reserve(hdr_-&gt;nfiledata);
+<a href="#l535" class="line" id="l535">    535</a>     for (int i = 0; i &lt; hdr_-&gt;nfiledata; i++) {
+<a href="#l536" class="line" id="l536">    536</a>         cs-&gt;filename_data_.push_back(*consume&lt;unsigned char&gt;());
+<a href="#l537" class="line" id="l537">    537</a>     }
+<a href="#l538" class="line" id="l538">    538</a> 
+<a href="#l539" class="line" id="l539">    539</a>     p_ = ptr&lt;uint8_t&gt;(hdr_-&gt;filesuffixes_off);
+<a href="#l540" class="line" id="l540">    540</a>     cs-&gt;filename_suffixes_.reserve(hdr_-&gt;nfiledata);
+<a href="#l541" class="line" id="l541">    541</a>     for (int i = 0; i &lt; hdr_-&gt;nfiledata; i++) {
+<a href="#l542" class="line" id="l542">    542</a>         cs-&gt;filename_suffixes_.push_back(load_int32());
+<a href="#l543" class="line" id="l543">    543</a>     }
 <a href="#l544" class="line" id="l544">    544</a> 
-<a href="#l545" class="line" id="l545">    545</a>     cs-&gt;finalized_ = true;
-<a href="#l546" class="line" id="l546">    546</a> }
-<a href="#l547" class="line" id="l547">    547</a> 
-<a href="#l548" class="line" id="l548">    548</a> void code_searcher::dump_index(const string &amp;path) {
-<a href="#l549" class="line" id="l549">    549</a>     codesearch_index idx(this, path);
-<a href="#l550" class="line" id="l550">    550</a>     idx.dump();
-<a href="#l551" class="line" id="l551">    551</a> }
-<a href="#l552" class="line" id="l552">    552</a> 
-<a href="#l553" class="line" id="l553">    553</a> void code_searcher::load_index(const string &amp;path) {
-<a href="#l554" class="line" id="l554">    554</a>     std::unique_ptr&lt;load_allocator&gt; alloc = std::make_unique&lt;load_allocator&gt;(this, path);
-<a href="#l555" class="line" id="l555">    555</a>     set_alloc(move(alloc));
-<a href="#l556" class="line" id="l556">    556</a>     dynamic_cast&lt;load_allocator*&gt;(alloc_.get())-&gt;load(this);
-<a href="#l557" class="line" id="l557">    557</a> }
+<a href="#l545" class="line" id="l545">    545</a>     p_ = ptr&lt;uint8_t&gt;(hdr_-&gt;filepos_off);
+<a href="#l546" class="line" id="l546">    546</a>     cs-&gt;filename_positions_.reserve(hdr_-&gt;nfiles);
+<a href="#l547" class="line" id="l547">    547</a>     for (auto it = cs-&gt;files_.begin();
+<a href="#l548" class="line" id="l548">    548</a>          it != cs-&gt;files_.end(); ++it) {
+<a href="#l549" class="line" id="l549">    549</a>         int pos = *consume&lt;int&gt;();
+<a href="#l550" class="line" id="l550">    550</a>         indexed_file *sf = it-&gt;get();
+<a href="#l551" class="line" id="l551">    551</a>         cs-&gt;filename_positions_.push_back(make_pair(pos, sf));
+<a href="#l552" class="line" id="l552">    552</a>     }
+<a href="#l553" class="line" id="l553">    553</a> 
+<a href="#l554" class="line" id="l554">    554</a>     struct stat st;
+<a href="#l555" class="line" id="l555">    555</a>     assert(fstat(fd_, &amp;st) == 0);
+<a href="#l556" class="line" id="l556">    556</a>     cs-&gt;index_timestamp_ = st.st_mtime;
+<a href="#l557" class="line" id="l557">    557</a> 
+<a href="#l558" class="line" id="l558">    558</a>     cs-&gt;finalized_ = true;
+<a href="#l559" class="line" id="l559">    559</a> }
+<a href="#l560" class="line" id="l560">    560</a> 
+<a href="#l561" class="line" id="l561">    561</a> void code_searcher::dump_index(const string &amp;path) {
+<a href="#l562" class="line" id="l562">    562</a>     codesearch_index idx(this, path);
+<a href="#l563" class="line" id="l563">    563</a>     idx.dump();
+<a href="#l564" class="line" id="l564">    564</a> }
+<a href="#l565" class="line" id="l565">    565</a> 
+<a href="#l566" class="line" id="l566">    566</a> void code_searcher::load_index(const string &amp;path) {
+<a href="#l567" class="line" id="l567">    567</a>     std::unique_ptr&lt;load_allocator&gt; alloc = std::make_unique&lt;load_allocator&gt;(this, path);
+<a href="#l568" class="line" id="l568">    568</a>     set_alloc(move(alloc));
+<a href="#l569" class="line" id="l569">    569</a>     dynamic_cast&lt;load_allocator*&gt;(alloc_.get())-&gt;load(this);
+<a href="#l570" class="line" id="l570">    570</a> }
 </pre>
 </div>
 </body>
