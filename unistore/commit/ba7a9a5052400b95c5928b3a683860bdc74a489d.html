@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/backend, schemas: Backend descriptor as structured tree - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/ba7a9a5052400b95c5928b3a683860bdc74a489d">ba7a9a5052400b95c5928b3a683860bdc74a489d</a>
+<b>parent</b> <a href="../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sat  8 Jan 2022 13:30:42 -0800
+
+internal/backend, schemas: Backend descriptor as structured tree
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/backend/alias.go</a></td><td> | </td><td class="num">14</td><td><span class="i">++++++++++++</span><span class="d">--</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">internal/backend/b2.go</a></td><td> | </td><td class="num">12</td><td><span class="i">+++++++++++</span><span class="d">-</span></td></tr>
+<tr><td class="A">A</td><td><a href="#h2">internal/backend/backend.go</a></td><td> | </td><td class="num">45</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">internal/backend/buffer.go</a></td><td> | </td><td class="num">33</td><td><span class="i">+++++++++++++++++++++++++++</span><span class="d">------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h4">internal/backend/checksum.go</a></td><td> | </td><td class="num">21</td><td><span class="i">++++++++++++++++++++</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h5">internal/backend/compression.go</a></td><td> | </td><td class="num">31</td><td><span class="i">+++++++++++++++++++++++++</span><span class="d">------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h6">internal/backend/disk.go</a></td><td> | </td><td class="num">18</td><td><span class="i">+++++++++++++++</span><span class="d">---</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h7">internal/backend/encrypt.go</a></td><td> | </td><td class="num">22</td><td><span class="i">++++++++++++++++++++</span><span class="d">--</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h8">internal/backend/instrumentation.go</a></td><td> | </td><td class="num">15</td><td><span class="i">+++++++++++++</span><span class="d">--</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h9">internal/backend/mux.go</a></td><td> | </td><td class="num">24</td><td><span class="i">+++++++++++++++++</span><span class="d">-------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h10">internal/backend/permission.go</a></td><td> | </td><td class="num">14</td><td><span class="i">++++++++++++</span><span class="d">--</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h11">internal/backend/threshold.go</a></td><td> | </td><td class="num">22</td><td><span class="i">+++++++++++++++++++++</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h12">internal/backend/types.go</a></td><td> | </td><td class="num">4</td><td><span class="i">++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h13">internal/backend/unistore.go</a></td><td> | </td><td class="num">16</td><td><span class="i">+++++++++++++++</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h14">internal/server/meta.go</a></td><td> | </td><td class="num">2</td><td><span class="i">+</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h15">schemas/common/backend.proto</a></td><td> | </td><td class="num">21</td><td><span class="i">+++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h16">schemas/service/meta.proto</a></td><td> | </td><td class="num">23</td><td><span class="i">+++++++</span><span class="d">----------------</span></td></tr>
+</table></pre><pre>17 files changed, 286 insertions(+), 51 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/backend/alias.go">internal/backend/alias.go</a> b/<a href="../file/internal/backend/alias.go">internal/backend/alias.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -2,9 +2,9 @@ package backend
+</a> 
+ import (
+ 	&quot;context&quot;
+<a href="#h0-0-3" id="h0-0-3" class="d">-	&quot;fmt&quot;
+</a> 
+ 	&quot;unistore/internal/config&quot;
+<a href="#h0-0-6" id="h0-0-6" class="i">+	&quot;unistore/schemas/common&quot;
+</a> 	&quot;unistore/schemas/service&quot;
+ )
+ 
+<a href="#h0-1" id="h0-1" class="h">@@ -117,7 +117,17 @@ func (a *Alias) ListObjects(ctx context.Context, request *service.ListObjectsReq
+</a> 	return a.Backend.ListObjects(ctx, request)
+ }
+ 
+<a href="#h0-1-3" id="h0-1-3" class="i">+// Descriptor returns a structured Protobuf-defined descriptor of this backend.
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+func (a *Alias) Descriptor() *common.Node {
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+	return &amp;common.Node{
+</a><a href="#h0-1-6" id="h0-1-6" class="i">+		Name: &quot;alias&quot;,
+</a><a href="#h0-1-7" id="h0-1-7" class="i">+		Children: map[string]*common.Node_Value{
+</a><a href="#h0-1-8" id="h0-1-8" class="i">+			&quot;backend&quot;: {Child: &amp;common.Node_Value_Node{Node: a.Backend.Descriptor()}},
+</a><a href="#h0-1-9" id="h0-1-9" class="i">+		},
+</a><a href="#h0-1-10" id="h0-1-10" class="i">+	}
+</a><a href="#h0-1-11" id="h0-1-11" class="i">+}
+</a><a href="#h0-1-12" id="h0-1-12" class="i">+
+</a> // String returns a human-consumable representation of this backend.
+ func (a *Alias) String() string {
+<a href="#h0-1-15" id="h0-1-15" class="d">-	return fmt.Sprintf(&quot;Alias(backend: %s)&quot;, a.Backend)
+</a><a href="#h0-1-16" id="h0-1-16" class="i">+	return marshalDescriptor(a.Descriptor())
+</a> }
+<b>diff --git a/<a id="h1" href="../file/internal/backend/b2.go">internal/backend/b2.go</a> b/<a href="../file/internal/backend/b2.go">internal/backend/b2.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -670,9 +670,19 @@ func (b *B2) ListObjects(ctx context.Context, request *service.ListObjectsReques
+</a> 	return &amp;service.ListObjectsResponse{Objects: objects}, nil
+ }
+ 
+<a href="#h1-0-3" id="h1-0-3" class="i">+// Descriptor returns a structured Protobuf-defined descriptor of this backend.
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+func (b *B2) Descriptor() *common.Node {
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+	return &amp;common.Node{
+</a><a href="#h1-0-6" id="h1-0-6" class="i">+		Name: &quot;b2&quot;,
+</a><a href="#h1-0-7" id="h1-0-7" class="i">+		Children: map[string]*common.Node_Value{
+</a><a href="#h1-0-8" id="h1-0-8" class="i">+			&quot;url&quot;: {Child: &amp;common.Node_Value_Value{Value: b2.APIV2BaseURL}},
+</a><a href="#h1-0-9" id="h1-0-9" class="i">+		},
+</a><a href="#h1-0-10" id="h1-0-10" class="i">+	}
+</a><a href="#h1-0-11" id="h1-0-11" class="i">+}
+</a><a href="#h1-0-12" id="h1-0-12" class="i">+
+</a> // String returns a human-consumable representation of this backend.
+ func (b *B2) String() string {
+<a href="#h1-0-15" id="h1-0-15" class="d">-	return fmt.Sprintf(&quot;B2(url: %s)&quot;, b2.APIV2BaseURL)
+</a><a href="#h1-0-16" id="h1-0-16" class="i">+	return marshalDescriptor(b.Descriptor())
+</a> }
+ 
+ // authorizeAccount invokes the B2 account authorization API to obtain a short-lived authorization
+<b>diff --git a/<a id="h2" href="../file/internal/backend/backend.go">internal/backend/backend.go</a> b/<a href="../file/internal/backend/backend.go">internal/backend/backend.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -0,0 +1,45 @@
+</a><a href="#h2-0-0" id="h2-0-0" class="i">+package backend
+</a><a href="#h2-0-1" id="h2-0-1" class="i">+
+</a><a href="#h2-0-2" id="h2-0-2" class="i">+import (
+</a><a href="#h2-0-3" id="h2-0-3" class="i">+	&quot;fmt&quot;
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+	&quot;strings&quot;
+</a><a href="#h2-0-5" id="h2-0-5" class="i">+
+</a><a href="#h2-0-6" id="h2-0-6" class="i">+	&quot;unistore/schemas/common&quot;
+</a><a href="#h2-0-7" id="h2-0-7" class="i">+)
+</a><a href="#h2-0-8" id="h2-0-8" class="i">+
+</a><a href="#h2-0-9" id="h2-0-9" class="i">+// marshalDescriptor is a convenience formatter
+</a><a href="#h2-0-10" id="h2-0-10" class="i">+func marshalDescriptor(node *common.Node) string {
+</a><a href="#h2-0-11" id="h2-0-11" class="i">+	var children []string
+</a><a href="#h2-0-12" id="h2-0-12" class="i">+	var parameters []string
+</a><a href="#h2-0-13" id="h2-0-13" class="i">+
+</a><a href="#h2-0-14" id="h2-0-14" class="i">+	for param := range node.Children {
+</a><a href="#h2-0-15" id="h2-0-15" class="i">+		if param == &quot;backend&quot; {
+</a><a href="#h2-0-16" id="h2-0-16" class="i">+			// The backend parameter is special and, if present, is always represented
+</a><a href="#h2-0-17" id="h2-0-17" class="i">+			// at the end of the parameters list.
+</a><a href="#h2-0-18" id="h2-0-18" class="i">+			continue
+</a><a href="#h2-0-19" id="h2-0-19" class="i">+		}
+</a><a href="#h2-0-20" id="h2-0-20" class="i">+
+</a><a href="#h2-0-21" id="h2-0-21" class="i">+		children = append(children, param)
+</a><a href="#h2-0-22" id="h2-0-22" class="i">+	}
+</a><a href="#h2-0-23" id="h2-0-23" class="i">+
+</a><a href="#h2-0-24" id="h2-0-24" class="i">+	if _, ok := node.Children[&quot;backend&quot;]; ok {
+</a><a href="#h2-0-25" id="h2-0-25" class="i">+		children = append(children, &quot;backend&quot;)
+</a><a href="#h2-0-26" id="h2-0-26" class="i">+	}
+</a><a href="#h2-0-27" id="h2-0-27" class="i">+
+</a><a href="#h2-0-28" id="h2-0-28" class="i">+	for _, param := range children {
+</a><a href="#h2-0-29" id="h2-0-29" class="i">+		var value string
+</a><a href="#h2-0-30" id="h2-0-30" class="i">+
+</a><a href="#h2-0-31" id="h2-0-31" class="i">+		switch child := node.Children[param].Child.(type) {
+</a><a href="#h2-0-32" id="h2-0-32" class="i">+		case *common.Node_Value_Value:
+</a><a href="#h2-0-33" id="h2-0-33" class="i">+			value = child.Value
+</a><a href="#h2-0-34" id="h2-0-34" class="i">+		case *common.Node_Value_Node:
+</a><a href="#h2-0-35" id="h2-0-35" class="i">+			value = marshalDescriptor(child.Node)
+</a><a href="#h2-0-36" id="h2-0-36" class="i">+		default:
+</a><a href="#h2-0-37" id="h2-0-37" class="i">+			value = &quot;?&quot;
+</a><a href="#h2-0-38" id="h2-0-38" class="i">+		}
+</a><a href="#h2-0-39" id="h2-0-39" class="i">+
+</a><a href="#h2-0-40" id="h2-0-40" class="i">+		parameters = append(parameters, fmt.Sprintf(&quot;%s: %s&quot;, param, value))
+</a><a href="#h2-0-41" id="h2-0-41" class="i">+	}
+</a><a href="#h2-0-42" id="h2-0-42" class="i">+
+</a><a href="#h2-0-43" id="h2-0-43" class="i">+	return fmt.Sprintf(&quot;%s(%s)&quot;, node.Name, strings.Join(parameters, &quot;, &quot;))
+</a><a href="#h2-0-44" id="h2-0-44" class="i">+}
+</a><b>diff --git a/<a id="h3" href="../file/internal/backend/buffer.go">internal/backend/buffer.go</a> b/<a href="../file/internal/backend/buffer.go">internal/backend/buffer.go</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -2,6 +2,8 @@ package backend
+</a> 
+ import (
+ 	&quot;fmt&quot;
+<a href="#h3-0-3" id="h3-0-3" class="i">+
+</a><a href="#h3-0-4" id="h3-0-4" class="i">+	&quot;unistore/schemas/common&quot;
+</a> )
+ 
+ // Buffer is a Backend that internally buffers streaming object gets and puts to a desired chunk
+<a href="#h3-1" id="h3-1" class="h">@@ -25,12 +27,31 @@ func NewBuffer(getChunkSize uint64, putChunkSize uint64, backend Backend) Backen
+</a> 	}
+ }
+ 
+<a href="#h3-1-3" id="h3-1-3" class="i">+// Descriptor returns a structured Protobuf-defined descriptor of this backend.
+</a><a href="#h3-1-4" id="h3-1-4" class="i">+func (b *Buffer) Descriptor() *common.Node {
+</a><a href="#h3-1-5" id="h3-1-5" class="i">+	return &amp;common.Node{
+</a><a href="#h3-1-6" id="h3-1-6" class="i">+		Name: &quot;buffer&quot;,
+</a><a href="#h3-1-7" id="h3-1-7" class="i">+		Children: map[string]*common.Node_Value{
+</a><a href="#h3-1-8" id="h3-1-8" class="i">+			&quot;get_chunk_size&quot;: {
+</a><a href="#h3-1-9" id="h3-1-9" class="i">+				Child: &amp;common.Node_Value_Value{
+</a><a href="#h3-1-10" id="h3-1-10" class="i">+					Value: fmt.Sprintf(&quot;%d&quot;, b.getChunkSize),
+</a><a href="#h3-1-11" id="h3-1-11" class="i">+				},
+</a><a href="#h3-1-12" id="h3-1-12" class="i">+			},
+</a><a href="#h3-1-13" id="h3-1-13" class="i">+			&quot;put_chunk_size&quot;: {
+</a><a href="#h3-1-14" id="h3-1-14" class="i">+				Child: &amp;common.Node_Value_Value{
+</a><a href="#h3-1-15" id="h3-1-15" class="i">+					Value: fmt.Sprintf(&quot;%d&quot;, b.putChunkSize),
+</a><a href="#h3-1-16" id="h3-1-16" class="i">+				},
+</a><a href="#h3-1-17" id="h3-1-17" class="i">+			},
+</a><a href="#h3-1-18" id="h3-1-18" class="i">+			&quot;backend&quot;: {
+</a><a href="#h3-1-19" id="h3-1-19" class="i">+				Child: &amp;common.Node_Value_Node{
+</a><a href="#h3-1-20" id="h3-1-20" class="i">+					Node: b.Backend.Descriptor(),
+</a><a href="#h3-1-21" id="h3-1-21" class="i">+				},
+</a><a href="#h3-1-22" id="h3-1-22" class="i">+			},
+</a><a href="#h3-1-23" id="h3-1-23" class="i">+		},
+</a><a href="#h3-1-24" id="h3-1-24" class="i">+	}
+</a><a href="#h3-1-25" id="h3-1-25" class="i">+}
+</a><a href="#h3-1-26" id="h3-1-26" class="i">+
+</a> // String returns a human-consumable representation of this backend.
+ func (b *Buffer) String() string {
+<a href="#h3-1-29" id="h3-1-29" class="d">-	return fmt.Sprintf(
+</a><a href="#h3-1-30" id="h3-1-30" class="d">-		&quot;Buffer(get_chunk_size: %d, put_chunk_size: %d, backend: %s)&quot;,
+</a><a href="#h3-1-31" id="h3-1-31" class="d">-		b.getChunkSize,
+</a><a href="#h3-1-32" id="h3-1-32" class="d">-		b.putChunkSize,
+</a><a href="#h3-1-33" id="h3-1-33" class="d">-		b.Backend,
+</a><a href="#h3-1-34" id="h3-1-34" class="d">-	)
+</a><a href="#h3-1-35" id="h3-1-35" class="i">+	return marshalDescriptor(b.Descriptor())
+</a> }
+<b>diff --git a/<a id="h4" href="../file/internal/backend/checksum.go">internal/backend/checksum.go</a> b/<a href="../file/internal/backend/checksum.go">internal/backend/checksum.go</a></b>
+<a href="#h4-0" id="h4-0" class="h">@@ -138,9 +138,28 @@ func (c *Checksum) StreamPutObject(ctx context.Context, stream chan *service.Put
+</a> 	}
+ }
+ 
+<a href="#h4-0-3" id="h4-0-3" class="i">+// Descriptor returns a structured Protobuf-defined descriptor of this backend.
+</a><a href="#h4-0-4" id="h4-0-4" class="i">+func (c *Checksum) Descriptor() *common.Node {
+</a><a href="#h4-0-5" id="h4-0-5" class="i">+	return &amp;common.Node{
+</a><a href="#h4-0-6" id="h4-0-6" class="i">+		Name: &quot;checksum&quot;,
+</a><a href="#h4-0-7" id="h4-0-7" class="i">+		Children: map[string]*common.Node_Value{
+</a><a href="#h4-0-8" id="h4-0-8" class="i">+			&quot;algorithm&quot;: {
+</a><a href="#h4-0-9" id="h4-0-9" class="i">+				Child: &amp;common.Node_Value_Value{
+</a><a href="#h4-0-10" id="h4-0-10" class="i">+					Value: c.algorithm.String(),
+</a><a href="#h4-0-11" id="h4-0-11" class="i">+				},
+</a><a href="#h4-0-12" id="h4-0-12" class="i">+			},
+</a><a href="#h4-0-13" id="h4-0-13" class="i">+			&quot;backend&quot;: {
+</a><a href="#h4-0-14" id="h4-0-14" class="i">+				Child: &amp;common.Node_Value_Node{
+</a><a href="#h4-0-15" id="h4-0-15" class="i">+					Node: c.Backend.Descriptor(),
+</a><a href="#h4-0-16" id="h4-0-16" class="i">+				},
+</a><a href="#h4-0-17" id="h4-0-17" class="i">+			},
+</a><a href="#h4-0-18" id="h4-0-18" class="i">+		},
+</a><a href="#h4-0-19" id="h4-0-19" class="i">+	}
+</a><a href="#h4-0-20" id="h4-0-20" class="i">+}
+</a><a href="#h4-0-21" id="h4-0-21" class="i">+
+</a> // String returns a human-consumable representation of this backend.
+ func (c *Checksum) String() string {
+<a href="#h4-0-24" id="h4-0-24" class="d">-	return fmt.Sprintf(&quot;Checksum(algorithm: %s, backend: %s)&quot;, c.algorithm, c.Backend)
+</a><a href="#h4-0-25" id="h4-0-25" class="i">+	return marshalDescriptor(c.Descriptor())
+</a> }
+ 
+ // checksum computes a checksum for the provided data slice.
+<b>diff --git a/<a id="h5" href="../file/internal/backend/compression.go">internal/backend/compression.go</a> b/<a href="../file/internal/backend/compression.go">internal/backend/compression.go</a></b>
+<a href="#h5-0" id="h5-0" class="h">@@ -101,12 +101,31 @@ func NewCompression(algorithm string, level int, backend Backend) Backend {
+</a> 	return newInstrumentation(&quot;compression&quot;, c)
+ }
+ 
+<a href="#h5-0-3" id="h5-0-3" class="i">+// Descriptor returns a structured Protobuf-defined descriptor of this backend.
+</a><a href="#h5-0-4" id="h5-0-4" class="i">+func (c *Compression) Descriptor() *common.Node {
+</a><a href="#h5-0-5" id="h5-0-5" class="i">+	return &amp;common.Node{
+</a><a href="#h5-0-6" id="h5-0-6" class="i">+		Name: &quot;compression&quot;,
+</a><a href="#h5-0-7" id="h5-0-7" class="i">+		Children: map[string]*common.Node_Value{
+</a><a href="#h5-0-8" id="h5-0-8" class="i">+			&quot;algorithm&quot;: {
+</a><a href="#h5-0-9" id="h5-0-9" class="i">+				Child: &amp;common.Node_Value_Value{
+</a><a href="#h5-0-10" id="h5-0-10" class="i">+					Value: c.algorithm.String(),
+</a><a href="#h5-0-11" id="h5-0-11" class="i">+				},
+</a><a href="#h5-0-12" id="h5-0-12" class="i">+			},
+</a><a href="#h5-0-13" id="h5-0-13" class="i">+			&quot;level&quot;: {
+</a><a href="#h5-0-14" id="h5-0-14" class="i">+				Child: &amp;common.Node_Value_Value{
+</a><a href="#h5-0-15" id="h5-0-15" class="i">+					Value: fmt.Sprintf(&quot;%d&quot;, c.level),
+</a><a href="#h5-0-16" id="h5-0-16" class="i">+				},
+</a><a href="#h5-0-17" id="h5-0-17" class="i">+			},
+</a><a href="#h5-0-18" id="h5-0-18" class="i">+			&quot;backend&quot;: {
+</a><a href="#h5-0-19" id="h5-0-19" class="i">+				Child: &amp;common.Node_Value_Node{
+</a><a href="#h5-0-20" id="h5-0-20" class="i">+					Node: c.Backend.Descriptor(),
+</a><a href="#h5-0-21" id="h5-0-21" class="i">+				},
+</a><a href="#h5-0-22" id="h5-0-22" class="i">+			},
+</a><a href="#h5-0-23" id="h5-0-23" class="i">+		},
+</a><a href="#h5-0-24" id="h5-0-24" class="i">+	}
+</a><a href="#h5-0-25" id="h5-0-25" class="i">+}
+</a><a href="#h5-0-26" id="h5-0-26" class="i">+
+</a> // String returns a human-consumable representation of this backend.
+ func (c *Compression) String() string {
+<a href="#h5-0-29" id="h5-0-29" class="d">-	return fmt.Sprintf(
+</a><a href="#h5-0-30" id="h5-0-30" class="d">-		&quot;Compression(algorithm: %s, level: %d, backend: %s)&quot;,
+</a><a href="#h5-0-31" id="h5-0-31" class="d">-		c.algorithm,
+</a><a href="#h5-0-32" id="h5-0-32" class="d">-		c.level,
+</a><a href="#h5-0-33" id="h5-0-33" class="d">-		c.Backend,
+</a><a href="#h5-0-34" id="h5-0-34" class="d">-	)
+</a><a href="#h5-0-35" id="h5-0-35" class="i">+	return marshalDescriptor(c.Descriptor())
+</a> }
+<b>diff --git a/<a id="h6" href="../file/internal/backend/disk.go">internal/backend/disk.go</a> b/<a href="../file/internal/backend/disk.go">internal/backend/disk.go</a></b>
+<a href="#h6-0" id="h6-0" class="h">@@ -33,10 +33,12 @@ func NewDisk(cfg *config.Disk) (Backend, error) {
+</a> 		return nil, err
+ 	}
+ 
+<a href="#h6-0-3" id="h6-0-3" class="d">-	return &amp;Disk{
+</a><a href="#h6-0-4" id="h6-0-4" class="i">+	d := &amp;Disk{
+</a> 		cfg:    cfg,
+ 		client: client,
+<a href="#h6-0-7" id="h6-0-7" class="d">-	}, nil
+</a><a href="#h6-0-8" id="h6-0-8" class="i">+	}
+</a><a href="#h6-0-9" id="h6-0-9" class="i">+
+</a><a href="#h6-0-10" id="h6-0-10" class="i">+	return newInstrumentation(&quot;disk&quot;, d), nil
+</a> }
+ 
+ // HeadObject stats the requested file.
+<a href="#h6-1" id="h6-1" class="h">@@ -338,9 +340,19 @@ func (d *Disk) ListObjects(ctx context.Context, request *service.ListObjectsRequ
+</a> 	return &amp;service.ListObjectsResponse{Objects: objects}, nil
+ }
+ 
+<a href="#h6-1-3" id="h6-1-3" class="i">+// Descriptor returns a structured Protobuf-defined descriptor of this backend.
+</a><a href="#h6-1-4" id="h6-1-4" class="i">+func (d *Disk) Descriptor() *common.Node {
+</a><a href="#h6-1-5" id="h6-1-5" class="i">+	return &amp;common.Node{
+</a><a href="#h6-1-6" id="h6-1-6" class="i">+		Name: &quot;disk&quot;,
+</a><a href="#h6-1-7" id="h6-1-7" class="i">+		Children: map[string]*common.Node_Value{
+</a><a href="#h6-1-8" id="h6-1-8" class="i">+			&quot;root&quot;: {Child: &amp;common.Node_Value_Value{Value: d.cfg.Root}},
+</a><a href="#h6-1-9" id="h6-1-9" class="i">+		},
+</a><a href="#h6-1-10" id="h6-1-10" class="i">+	}
+</a><a href="#h6-1-11" id="h6-1-11" class="i">+}
+</a><a href="#h6-1-12" id="h6-1-12" class="i">+
+</a> // String returns a human-consumable representation of this backend.
+ func (d *Disk) String() string {
+<a href="#h6-1-15" id="h6-1-15" class="d">-	return fmt.Sprintf(&quot;Disk(root: %s)&quot;, d.cfg.Root)
+</a><a href="#h6-1-16" id="h6-1-16" class="i">+	return marshalDescriptor(d.Descriptor())
+</a> }
+ 
+ // createError creates a semantically accurate gRPC status for errored filesystem operations.
+<b>diff --git a/<a id="h7" href="../file/internal/backend/encrypt.go">internal/backend/encrypt.go</a> b/<a href="../file/internal/backend/encrypt.go">internal/backend/encrypt.go</a></b>
+<a href="#h7-0" id="h7-0" class="h">@@ -1,7 +1,6 @@
+</a> package backend
+ 
+ import (
+<a href="#h7-0-3" id="h7-0-3" class="d">-	&quot;fmt&quot;
+</a> 	&quot;io&quot;
+ 	&quot;strings&quot;
+ 
+<a href="#h7-1" id="h7-1" class="h">@@ -66,7 +65,26 @@ func NewEncrypt(mechanism string, privateKey string, publicKey string, backend B
+</a> 	return newInstrumentation(&quot;encrypt&quot;, e)
+ }
+ 
+<a href="#h7-1-3" id="h7-1-3" class="i">+// Descriptor returns a structured Protobuf-defined descriptor of this backend.
+</a><a href="#h7-1-4" id="h7-1-4" class="i">+func (e *Encrypt) Descriptor() *common.Node {
+</a><a href="#h7-1-5" id="h7-1-5" class="i">+	return &amp;common.Node{
+</a><a href="#h7-1-6" id="h7-1-6" class="i">+		Name: &quot;encrypt&quot;,
+</a><a href="#h7-1-7" id="h7-1-7" class="i">+		Children: map[string]*common.Node_Value{
+</a><a href="#h7-1-8" id="h7-1-8" class="i">+			&quot;mechanism&quot;: {
+</a><a href="#h7-1-9" id="h7-1-9" class="i">+				Child: &amp;common.Node_Value_Value{
+</a><a href="#h7-1-10" id="h7-1-10" class="i">+					Value: e.mechanism.String(),
+</a><a href="#h7-1-11" id="h7-1-11" class="i">+				},
+</a><a href="#h7-1-12" id="h7-1-12" class="i">+			},
+</a><a href="#h7-1-13" id="h7-1-13" class="i">+			&quot;backend&quot;: {
+</a><a href="#h7-1-14" id="h7-1-14" class="i">+				Child: &amp;common.Node_Value_Node{
+</a><a href="#h7-1-15" id="h7-1-15" class="i">+					Node: e.Backend.Descriptor(),
+</a><a href="#h7-1-16" id="h7-1-16" class="i">+				},
+</a><a href="#h7-1-17" id="h7-1-17" class="i">+			},
+</a><a href="#h7-1-18" id="h7-1-18" class="i">+		},
+</a><a href="#h7-1-19" id="h7-1-19" class="i">+	}
+</a><a href="#h7-1-20" id="h7-1-20" class="i">+}
+</a><a href="#h7-1-21" id="h7-1-21" class="i">+
+</a> // String returns a human-consumable representation of this backend.
+ func (e *Encrypt) String() string {
+<a href="#h7-1-24" id="h7-1-24" class="d">-	return fmt.Sprintf(&quot;Encrypt(mechanism: %s, backend: %s)&quot;, e.mechanism, e.Backend)
+</a><a href="#h7-1-25" id="h7-1-25" class="i">+	return marshalDescriptor(e.Descriptor())
+</a> }
+<b>diff --git a/<a id="h8" href="../file/internal/backend/instrumentation.go">internal/backend/instrumentation.go</a> b/<a href="../file/internal/backend/instrumentation.go">internal/backend/instrumentation.go</a></b>
+<a href="#h8-0" id="h8-0" class="h">@@ -2,7 +2,6 @@ package backend
+</a> 
+ import (
+ 	&quot;context&quot;
+<a href="#h8-0-3" id="h8-0-3" class="d">-	&quot;fmt&quot;
+</a> 
+ 	&quot;google.golang.org/grpc/codes&quot;
+ 	&quot;google.golang.org/grpc/status&quot;
+<a href="#h8-1" id="h8-1" class="h">@@ -10,6 +9,7 @@ import (
+</a> 	&quot;lib.kevinlin.info/aperture/lib&quot;
+ 
+ 	&quot;unistore/internal/metrics&quot;
+<a href="#h8-1-3" id="h8-1-3" class="i">+	&quot;unistore/schemas/common&quot;
+</a> 	&quot;unistore/schemas/service&quot;
+ )
+ 
+<a href="#h8-2" id="h8-2" class="h">@@ -327,7 +327,18 @@ func (i *instrumentation) ListObjects(ctx context.Context, request *service.List
+</a> 	return response, err
+ }
+ 
+<a href="#h8-2-3" id="h8-2-3" class="i">+// Descriptor returns a structured Protobuf-defined descriptor of this backend.
+</a><a href="#h8-2-4" id="h8-2-4" class="i">+func (i *instrumentation) Descriptor() *common.Node {
+</a><a href="#h8-2-5" id="h8-2-5" class="i">+	return &amp;common.Node{
+</a><a href="#h8-2-6" id="h8-2-6" class="i">+		Name: &quot;instrumentation&quot;,
+</a><a href="#h8-2-7" id="h8-2-7" class="i">+		Children: map[string]*common.Node_Value{
+</a><a href="#h8-2-8" id="h8-2-8" class="i">+			&quot;name&quot;:    {Child: &amp;common.Node_Value_Value{Value: i.name}},
+</a><a href="#h8-2-9" id="h8-2-9" class="i">+			&quot;backend&quot;: {Child: &amp;common.Node_Value_Node{Node: i.Backend.Descriptor()}},
+</a><a href="#h8-2-10" id="h8-2-10" class="i">+		},
+</a><a href="#h8-2-11" id="h8-2-11" class="i">+	}
+</a><a href="#h8-2-12" id="h8-2-12" class="i">+}
+</a><a href="#h8-2-13" id="h8-2-13" class="i">+
+</a> // String returns a human-consumable representation of this backend.
+ func (i *instrumentation) String() string {
+<a href="#h8-2-16" id="h8-2-16" class="d">-	return fmt.Sprintf(&quot;Instrumentation(name: %s, backend: %s)&quot;, i.name, i.Backend)
+</a><a href="#h8-2-17" id="h8-2-17" class="i">+	return marshalDescriptor(i.Descriptor())
+</a> }
+<b>diff --git a/<a id="h9" href="../file/internal/backend/mux.go">internal/backend/mux.go</a> b/<a href="../file/internal/backend/mux.go">internal/backend/mux.go</a></b>
+<a href="#h9-0" id="h9-0" class="h">@@ -2,8 +2,6 @@ package backend
+</a> 
+ import (
+ 	&quot;context&quot;
+<a href="#h9-0-3" id="h9-0-3" class="d">-	&quot;fmt&quot;
+</a><a href="#h9-0-4" id="h9-0-4" class="d">-	&quot;strings&quot;
+</a> 
+ 	&quot;google.golang.org/grpc/codes&quot;
+ 	&quot;google.golang.org/grpc/status&quot;
+<a href="#h9-1" id="h9-1" class="h">@@ -145,13 +143,25 @@ func (m *Mux) ListObjects(ctx context.Context, request *service.ListObjectsReque
+</a> 	return backend.ListObjects(ctx, request)
+ }
+ 
+<a href="#h9-1-3" id="h9-1-3" class="d">-// String returns a human-consumable representation of this backend.
+</a><a href="#h9-1-4" id="h9-1-4" class="d">-func (m *Mux) String() string {
+</a><a href="#h9-1-5" id="h9-1-5" class="d">-	var args []string
+</a><a href="#h9-1-6" id="h9-1-6" class="i">+// Descriptor returns a structured Protobuf-defined descriptor of this backend.
+</a><a href="#h9-1-7" id="h9-1-7" class="i">+func (m *Mux) Descriptor() *common.Node {
+</a><a href="#h9-1-8" id="h9-1-8" class="i">+	children := make(map[string]*common.Node_Value)
+</a> 
+ 	for id, backend := range m.backends {
+<a href="#h9-1-11" id="h9-1-11" class="d">-		args = append(args, fmt.Sprintf(&quot;%s: %s&quot;, id, backend))
+</a><a href="#h9-1-12" id="h9-1-12" class="i">+		children[id.String()] = &amp;common.Node_Value{
+</a><a href="#h9-1-13" id="h9-1-13" class="i">+			Child: &amp;common.Node_Value_Node{
+</a><a href="#h9-1-14" id="h9-1-14" class="i">+				Node: backend.Descriptor(),
+</a><a href="#h9-1-15" id="h9-1-15" class="i">+			},
+</a><a href="#h9-1-16" id="h9-1-16" class="i">+		}
+</a><a href="#h9-1-17" id="h9-1-17" class="i">+	}
+</a><a href="#h9-1-18" id="h9-1-18" class="i">+
+</a><a href="#h9-1-19" id="h9-1-19" class="i">+	return &amp;common.Node{
+</a><a href="#h9-1-20" id="h9-1-20" class="i">+		Name:     &quot;mux&quot;,
+</a><a href="#h9-1-21" id="h9-1-21" class="i">+		Children: children,
+</a> 	}
+<a href="#h9-1-23" id="h9-1-23" class="i">+}
+</a> 
+<a href="#h9-1-25" id="h9-1-25" class="d">-	return fmt.Sprintf(&quot;Mux(%s)&quot;, strings.Join(args, &quot;, &quot;))
+</a><a href="#h9-1-26" id="h9-1-26" class="i">+// String returns a human-consumable representation of this backend.
+</a><a href="#h9-1-27" id="h9-1-27" class="i">+func (m *Mux) String() string {
+</a><a href="#h9-1-28" id="h9-1-28" class="i">+	return marshalDescriptor(m.Descriptor())
+</a> }
+<b>diff --git a/<a id="h10" href="../file/internal/backend/permission.go">internal/backend/permission.go</a> b/<a href="../file/internal/backend/permission.go">internal/backend/permission.go</a></b>
+<a href="#h10-0" id="h10-0" class="h">@@ -2,12 +2,12 @@ package backend
+</a> 
+ import (
+ 	&quot;context&quot;
+<a href="#h10-0-3" id="h10-0-3" class="d">-	&quot;fmt&quot;
+</a> 
+ 	&quot;google.golang.org/grpc/codes&quot;
+ 	&quot;google.golang.org/grpc/status&quot;
+ 
+ 	&quot;unistore/internal/config&quot;
+<a href="#h10-0-9" id="h10-0-9" class="i">+	&quot;unistore/schemas/common&quot;
+</a> 	&quot;unistore/schemas/service&quot;
+ )
+ 
+<a href="#h10-1" id="h10-1" class="h">@@ -190,7 +190,17 @@ func (p *Permission) ListObjects(ctx context.Context, request *service.ListObjec
+</a> 	return p.Backend.ListObjects(ctx, request)
+ }
+ 
+<a href="#h10-1-3" id="h10-1-3" class="i">+// Descriptor returns a structured Protobuf-defined descriptor of this backend.
+</a><a href="#h10-1-4" id="h10-1-4" class="i">+func (p *Permission) Descriptor() *common.Node {
+</a><a href="#h10-1-5" id="h10-1-5" class="i">+	return &amp;common.Node{
+</a><a href="#h10-1-6" id="h10-1-6" class="i">+		Name: &quot;permission&quot;,
+</a><a href="#h10-1-7" id="h10-1-7" class="i">+		Children: map[string]*common.Node_Value{
+</a><a href="#h10-1-8" id="h10-1-8" class="i">+			&quot;backend&quot;: {Child: &amp;common.Node_Value_Node{Node: p.Backend.Descriptor()}},
+</a><a href="#h10-1-9" id="h10-1-9" class="i">+		},
+</a><a href="#h10-1-10" id="h10-1-10" class="i">+	}
+</a><a href="#h10-1-11" id="h10-1-11" class="i">+}
+</a><a href="#h10-1-12" id="h10-1-12" class="i">+
+</a> // String returns a human-consumable representation of this backend.
+ func (p *Permission) String() string {
+<a href="#h10-1-15" id="h10-1-15" class="d">-	return fmt.Sprintf(&quot;Permission(backend: %s)&quot;, p.Backend)
+</a><a href="#h10-1-16" id="h10-1-16" class="i">+	return marshalDescriptor(p.Descriptor())
+</a> }
+<b>diff --git a/<a id="h11" href="../file/internal/backend/threshold.go">internal/backend/threshold.go</a> b/<a href="../file/internal/backend/threshold.go">internal/backend/threshold.go</a></b>
+<a href="#h11-0" id="h11-0" class="h">@@ -4,6 +4,7 @@ import (
+</a> 	&quot;context&quot;
+ 	&quot;fmt&quot;
+ 
+<a href="#h11-0-3" id="h11-0-3" class="i">+	&quot;unistore/schemas/common&quot;
+</a> 	&quot;unistore/schemas/service&quot;
+ )
+ 
+<a href="#h11-1" id="h11-1" class="h">@@ -90,7 +91,26 @@ func (t *Threshold) StreamPutObject(ctx context.Context, stream chan *service.Pu
+</a> 	return t.Backend.StreamPutObject(ctx, proxy)
+ }
+ 
+<a href="#h11-1-3" id="h11-1-3" class="i">+// Descriptor returns a structured Protobuf-defined descriptor of this backend.
+</a><a href="#h11-1-4" id="h11-1-4" class="i">+func (t *Threshold) Descriptor() *common.Node {
+</a><a href="#h11-1-5" id="h11-1-5" class="i">+	return &amp;common.Node{
+</a><a href="#h11-1-6" id="h11-1-6" class="i">+		Name: &quot;threshold&quot;,
+</a><a href="#h11-1-7" id="h11-1-7" class="i">+		Children: map[string]*common.Node_Value{
+</a><a href="#h11-1-8" id="h11-1-8" class="i">+			&quot;min_stream_put_size&quot;: {
+</a><a href="#h11-1-9" id="h11-1-9" class="i">+				Child: &amp;common.Node_Value_Value{
+</a><a href="#h11-1-10" id="h11-1-10" class="i">+					Value: fmt.Sprintf(&quot;%d&quot;, t.minStreamPutSize),
+</a><a href="#h11-1-11" id="h11-1-11" class="i">+				},
+</a><a href="#h11-1-12" id="h11-1-12" class="i">+			},
+</a><a href="#h11-1-13" id="h11-1-13" class="i">+			&quot;backend&quot;: {
+</a><a href="#h11-1-14" id="h11-1-14" class="i">+				Child: &amp;common.Node_Value_Node{
+</a><a href="#h11-1-15" id="h11-1-15" class="i">+					Node: t.Backend.Descriptor(),
+</a><a href="#h11-1-16" id="h11-1-16" class="i">+				},
+</a><a href="#h11-1-17" id="h11-1-17" class="i">+			},
+</a><a href="#h11-1-18" id="h11-1-18" class="i">+		},
+</a><a href="#h11-1-19" id="h11-1-19" class="i">+	}
+</a><a href="#h11-1-20" id="h11-1-20" class="i">+}
+</a><a href="#h11-1-21" id="h11-1-21" class="i">+
+</a> // String returns a human-consumable representation of this backend.
+ func (t *Threshold) String() string {
+<a href="#h11-1-24" id="h11-1-24" class="d">-	return fmt.Sprintf(&quot;Threshold(threshold: %d, backend: %s)&quot;, t.threshold, t.Backend)
+</a><a href="#h11-1-25" id="h11-1-25" class="i">+	return marshalDescriptor(t.Descriptor())
+</a> }
+<b>diff --git a/<a id="h12" href="../file/internal/backend/types.go">internal/backend/types.go</a> b/<a href="../file/internal/backend/types.go">internal/backend/types.go</a></b>
+<a href="#h12-0" id="h12-0" class="h">@@ -4,6 +4,7 @@ import (
+</a> 	&quot;context&quot;
+ 	&quot;fmt&quot;
+ 
+<a href="#h12-0-3" id="h12-0-3" class="i">+	&quot;unistore/schemas/common&quot;
+</a> 	&quot;unistore/schemas/service&quot;
+ )
+ 
+<a href="#h12-1" id="h12-1" class="h">@@ -31,4 +32,7 @@ type Backend interface {
+</a> 
+ 	// ListObjects lists objects under a particular prefix.
+ 	ListObjects(ctx context.Context, request *service.ListObjectsRequest) (*service.ListObjectsResponse, error)
+<a href="#h12-1-3" id="h12-1-3" class="i">+
+</a><a href="#h12-1-4" id="h12-1-4" class="i">+	// Descriptor provides a structured descriptor of the backend&#39;s internal composition tree.
+</a><a href="#h12-1-5" id="h12-1-5" class="i">+	Descriptor() *common.Node
+</a> }
+<b>diff --git a/<a id="h13" href="../file/internal/backend/unistore.go">internal/backend/unistore.go</a> b/<a href="../file/internal/backend/unistore.go">internal/backend/unistore.go</a></b>
+<a href="#h13-0" id="h13-0" class="h">@@ -19,6 +19,7 @@ import (
+</a> // Unistore is a Backend that proxies to another Unistore server. Delightfully meta!
+ type Unistore struct {
+ 	address    string
+<a href="#h13-0-3" id="h13-0-3" class="i">+	authority  string
+</a> 	backend    common.Backend
+ 	connection config.Connection
+ 	client     *unistore.Client
+<a href="#h13-1" id="h13-1" class="h">@@ -74,6 +75,7 @@ func NewUnistore(cfg *config.Unistore, rpc config.RPC) (Backend, error) {
+</a> 
+ 	u := &amp;Unistore{
+ 		address:    cfg.Address,
+<a href="#h13-1-3" id="h13-1-3" class="i">+		authority:  cfg.Authority,
+</a> 		backend:    common.Backend(bid),
+ 		connection: cfg.Connection,
+ 		client:     client,
+<a href="#h13-2" id="h13-2" class="h">@@ -202,7 +204,19 @@ func (u *Unistore) ListObjects(ctx context.Context, request *service.ListObjects
+</a> 	return u.client.ListObjects(ctx, request)
+ }
+ 
+<a href="#h13-2-3" id="h13-2-3" class="i">+// Descriptor returns a structured Protobuf-defined descriptor of this backend.
+</a><a href="#h13-2-4" id="h13-2-4" class="i">+func (u *Unistore) Descriptor() *common.Node {
+</a><a href="#h13-2-5" id="h13-2-5" class="i">+	return &amp;common.Node{
+</a><a href="#h13-2-6" id="h13-2-6" class="i">+		Name: &quot;unistore&quot;,
+</a><a href="#h13-2-7" id="h13-2-7" class="i">+		Children: map[string]*common.Node_Value{
+</a><a href="#h13-2-8" id="h13-2-8" class="i">+			&quot;address&quot;:   {Child: &amp;common.Node_Value_Value{Value: u.address}},
+</a><a href="#h13-2-9" id="h13-2-9" class="i">+			&quot;authority&quot;: {Child: &amp;common.Node_Value_Value{Value: u.authority}},
+</a><a href="#h13-2-10" id="h13-2-10" class="i">+			&quot;backend&quot;:   {Child: &amp;common.Node_Value_Value{Value: u.backend.String()}},
+</a><a href="#h13-2-11" id="h13-2-11" class="i">+		},
+</a><a href="#h13-2-12" id="h13-2-12" class="i">+	}
+</a><a href="#h13-2-13" id="h13-2-13" class="i">+}
+</a><a href="#h13-2-14" id="h13-2-14" class="i">+
+</a> // String returns a human-consumable representation of this backend.
+ func (u *Unistore) String() string {
+<a href="#h13-2-17" id="h13-2-17" class="d">-	return fmt.Sprintf(&quot;Unistore(address: %s, backend: %s)&quot;, u.address, u.backend)
+</a><a href="#h13-2-18" id="h13-2-18" class="i">+	return marshalDescriptor(u.Descriptor())
+</a> }
+<b>diff --git a/<a id="h14" href="../file/internal/server/meta.go">internal/server/meta.go</a> b/<a href="../file/internal/server/meta.go">internal/server/meta.go</a></b>
+<a href="#h14-0" id="h14-0" class="h">@@ -34,6 +34,6 @@ func (m *metaService) Info(ctx context.Context, request *service.InfoRequest) (*
+</a> 	return &amp;service.InfoResponse{
+ 		Version: meta.Version,
+ 		Address: m.cfg.Listener.Address.Spec(),
+<a href="#h14-0-3" id="h14-0-3" class="d">-		Backend: m.backend.String(),
+</a><a href="#h14-0-4" id="h14-0-4" class="i">+		Backend: m.backend.Descriptor(),
+</a> 	}, nil
+ }
+<b>diff --git a/<a id="h15" href="../file/schemas/common/backend.proto">schemas/common/backend.proto</a> b/<a href="../file/schemas/common/backend.proto">schemas/common/backend.proto</a></b>
+<a href="#h15-0" id="h15-0" class="h">@@ -75,3 +75,24 @@ message Resource {
+</a>   // Note that usage or non-usage of tags is implementation-defined.
+   map&lt;string, string&gt; tags = 3;
+ }
+<a href="#h15-0-3" id="h15-0-3" class="i">+
+</a><a href="#h15-0-4" id="h15-0-4" class="i">+// Node is a recursively defined container for expressing the structure of a backend composition
+</a><a href="#h15-0-5" id="h15-0-5" class="i">+// tree. It is used in metadata APIs for introspecting the initialized state of the server.
+</a><a href="#h15-0-6" id="h15-0-6" class="i">+message Node {
+</a><a href="#h15-0-7" id="h15-0-7" class="i">+  // Value is a wrapper for the parameter value, which may either be a string constant or a Node.
+</a><a href="#h15-0-8" id="h15-0-8" class="i">+  message Value {
+</a><a href="#h15-0-9" id="h15-0-9" class="i">+    oneof child {
+</a><a href="#h15-0-10" id="h15-0-10" class="i">+      // Value is used for constant parameter values.
+</a><a href="#h15-0-11" id="h15-0-11" class="i">+      string value = 1;
+</a><a href="#h15-0-12" id="h15-0-12" class="i">+      // Node is used for recursively defined backends.
+</a><a href="#h15-0-13" id="h15-0-13" class="i">+      Node node = 2;
+</a><a href="#h15-0-14" id="h15-0-14" class="i">+    }
+</a><a href="#h15-0-15" id="h15-0-15" class="i">+  }
+</a><a href="#h15-0-16" id="h15-0-16" class="i">+  // Name is the name of the backend implementation.
+</a><a href="#h15-0-17" id="h15-0-17" class="i">+  string name = 1;
+</a><a href="#h15-0-18" id="h15-0-18" class="i">+  // Children defines zero or more parameters of the backend. Each parameter requires a string key
+</a><a href="#h15-0-19" id="h15-0-19" class="i">+  // and an associated value, which may either be a string constant or a recursively defined Node.
+</a><a href="#h15-0-20" id="h15-0-20" class="i">+  // Children are recursively defined in the case of middleware backends that themselves wrap other
+</a><a href="#h15-0-21" id="h15-0-21" class="i">+  // backends.
+</a><a href="#h15-0-22" id="h15-0-22" class="i">+  map&lt;string, Value&gt; children = 2;
+</a><a href="#h15-0-23" id="h15-0-23" class="i">+}
+</a><b>diff --git a/<a id="h16" href="../file/schemas/service/meta.proto">schemas/service/meta.proto</a> b/<a href="../file/schemas/service/meta.proto">schemas/service/meta.proto</a></b>
+<a href="#h16-0" id="h16-0" class="h">@@ -4,6 +4,8 @@ package schemas.service;
+</a> 
+ option go_package = &quot;unistore/schemas/service&quot;;
+ 
+<a href="#h16-0-3" id="h16-0-3" class="i">+import &quot;common/backend.proto&quot;;
+</a><a href="#h16-0-4" id="h16-0-4" class="i">+
+</a> // HealthCheckRequest is the request definition for HealthCheck.
+ message HealthCheckRequest {}
+ 
+<a href="#h16-1" id="h16-1" class="h">@@ -19,24 +21,13 @@ message InfoResponse {
+</a>   string version = 1;
+   // Address is the address specification of the server gRPC listener.
+   string address = 2;
+<a href="#h16-1-3" id="h16-1-3" class="d">-  // Backend is a semi-structured description of the composite backend routing tree in use by the
+</a><a href="#h16-1-4" id="h16-1-4" class="d">-  // server, based on the server configuration. It includes, at minimum, the backend
+</a><a href="#h16-1-5" id="h16-1-5" class="i">+  // Backend is a structured descriptor of the composite backend routing tree in use by the server,
+</a><a href="#h16-1-6" id="h16-1-6" class="i">+  // based on the server configuration. It is structured as a Node with a backend name and zero or
+</a><a href="#h16-1-7" id="h16-1-7" class="i">+  // more children, each of which contains an identifier and an associated constant value or a
+</a><a href="#h16-1-8" id="h16-1-8" class="i">+  // recursively defined Node for another backend. The tree includes, at minimum, the backend
+</a>   // implementation(s) in use by the server for storage, but may also include middleware wrappers
+   // when enabled in configuration.
+<a href="#h16-1-11" id="h16-1-11" class="d">-  //
+</a><a href="#h16-1-12" id="h16-1-12" class="d">-  // Each backend is expressed as &quot;function invocations,&quot; e.g. &quot;Disk()&quot;.
+</a><a href="#h16-1-13" id="h16-1-13" class="d">-  // Backend parameters are expressed as &quot;arguments&quot; prefixed by the parameter name and a colon,
+</a><a href="#h16-1-14" id="h16-1-14" class="d">-  // e.g. &quot;algorithm: SHA256&quot;. Note that all available parameters are not necessarily exposed.
+</a><a href="#h16-1-15" id="h16-1-15" class="d">-  // For example, the base implementation for a disk backend may be expressed as follows:
+</a><a href="#h16-1-16" id="h16-1-16" class="d">-  //
+</a><a href="#h16-1-17" id="h16-1-17" class="d">-  //   Disk(root: /var/unistore)
+</a><a href="#h16-1-18" id="h16-1-18" class="d">-  //
+</a><a href="#h16-1-19" id="h16-1-19" class="d">-  // Middleware backends wrap other backends, and are thus expressed recursively.
+</a><a href="#h16-1-20" id="h16-1-20" class="d">-  // For example, when checksums and compression are enabled for a disk backend, the description
+</a><a href="#h16-1-21" id="h16-1-21" class="d">-  // may be instead expressed as follows:
+</a><a href="#h16-1-22" id="h16-1-22" class="d">-  //
+</a><a href="#h16-1-23" id="h16-1-23" class="d">-  //   Checksum(algorithm: SHA256, backend: Compression(algorithm: ZSTD, level: 10, backend: Disk(root: /var/unistore)))
+</a><a href="#h16-1-24" id="h16-1-24" class="d">-  string backend = 3;
+</a><a href="#h16-1-25" id="h16-1-25" class="i">+  common.Node backend = 3;
+</a> }
+ 
+ // Meta provides metadata information about the server.
+</pre>
+</div>
+</body>
+</html>

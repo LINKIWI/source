@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/server/middleware: Unary RPC logging middleware - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/2e8a85c68b79f36bd10f138495c1e1ff0d9e3cb8">2e8a85c68b79f36bd10f138495c1e1ff0d9e3cb8</a>
+<b>parent</b> <a href="../commit/64fd93f32721ab8b930070e67f8425090244e60e">64fd93f32721ab8b930070e67f8425090244e60e</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sun  2 Jan 2022 14:52:35 -0800
+
+internal/server/middleware: Unary RPC logging middleware
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">go.mod</a></td><td> | </td><td class="num">1</td><td><span class="i">+</span><span class="d"></span></td></tr>
+<tr><td class="A">A</td><td><a href="#h1">internal/server/middleware/log.go</a></td><td> | </td><td class="num">48</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">internal/server/server.go</a></td><td> | </td><td class="num">3</td><td><span class="i">+++</span><span class="d"></span></td></tr>
+</table></pre><pre>3 files changed, 52 insertions(+), 0 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/go.mod">go.mod</a> b/<a href="../file/go.mod">go.mod</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -15,6 +15,7 @@ require (
+</a> 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.2.0
+ 	google.golang.org/protobuf v1.27.1
+ 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
+<a href="#h0-0-3" id="h0-0-3" class="i">+	lib.kevinlin.info/aperture v0.0.0-20211106083114-44399083c90a
+</a> )
+ 
+ require (
+<b>diff --git a/<a id="h1" href="../file/internal/server/middleware/log.go">internal/server/middleware/log.go</a> b/<a href="../file/internal/server/middleware/log.go">internal/server/middleware/log.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -0,0 +1,48 @@
+</a><a href="#h1-0-0" id="h1-0-0" class="i">+package middleware
+</a><a href="#h1-0-1" id="h1-0-1" class="i">+
+</a><a href="#h1-0-2" id="h1-0-2" class="i">+import (
+</a><a href="#h1-0-3" id="h1-0-3" class="i">+	&quot;context&quot;
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+	&quot;fmt&quot;
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+
+</a><a href="#h1-0-6" id="h1-0-6" class="i">+	&quot;go.uber.org/zap&quot;
+</a><a href="#h1-0-7" id="h1-0-7" class="i">+	&quot;google.golang.org/grpc&quot;
+</a><a href="#h1-0-8" id="h1-0-8" class="i">+	&quot;google.golang.org/grpc/status&quot;
+</a><a href="#h1-0-9" id="h1-0-9" class="i">+	&quot;lib.kevinlin.info/aperture/lib&quot;
+</a><a href="#h1-0-10" id="h1-0-10" class="i">+)
+</a><a href="#h1-0-11" id="h1-0-11" class="i">+
+</a><a href="#h1-0-12" id="h1-0-12" class="i">+// NewLogUnaryInterceptor creates a new grpc.UnaryServerInterceptor for logging metadata about unary
+</a><a href="#h1-0-13" id="h1-0-13" class="i">+// requests.
+</a><a href="#h1-0-14" id="h1-0-14" class="i">+func NewLogUnaryInterceptor() grpc.UnaryServerInterceptor {
+</a><a href="#h1-0-15" id="h1-0-15" class="i">+	return func(
+</a><a href="#h1-0-16" id="h1-0-16" class="i">+		ctx context.Context,
+</a><a href="#h1-0-17" id="h1-0-17" class="i">+		request interface{},
+</a><a href="#h1-0-18" id="h1-0-18" class="i">+		info *grpc.UnaryServerInfo,
+</a><a href="#h1-0-19" id="h1-0-19" class="i">+		handler grpc.UnaryHandler,
+</a><a href="#h1-0-20" id="h1-0-20" class="i">+	) (interface{}, error) {
+</a><a href="#h1-0-21" id="h1-0-21" class="i">+		stopwatch := lib.NewStopwatch()
+</a><a href="#h1-0-22" id="h1-0-22" class="i">+		response, err := handler(ctx, request)
+</a><a href="#h1-0-23" id="h1-0-23" class="i">+
+</a><a href="#h1-0-24" id="h1-0-24" class="i">+		if err != nil {
+</a><a href="#h1-0-25" id="h1-0-25" class="i">+			st := status.Convert(err)
+</a><a href="#h1-0-26" id="h1-0-26" class="i">+			zap.L().Warn(
+</a><a href="#h1-0-27" id="h1-0-27" class="i">+				&quot;error serving gRPC unary request&quot;,
+</a><a href="#h1-0-28" id="h1-0-28" class="i">+				zap.String(&quot;method&quot;, info.FullMethod),
+</a><a href="#h1-0-29" id="h1-0-29" class="i">+				zap.Duration(&quot;duration&quot;, stopwatch.Elapsed()),
+</a><a href="#h1-0-30" id="h1-0-30" class="i">+				zap.String(&quot;request&quot;, fmt.Sprintf(&quot;%T&quot;, request)),
+</a><a href="#h1-0-31" id="h1-0-31" class="i">+				zap.String(&quot;response&quot;, fmt.Sprintf(&quot;%T&quot;, response)),
+</a><a href="#h1-0-32" id="h1-0-32" class="i">+				zap.Stringer(&quot;code&quot;, st.Code()),
+</a><a href="#h1-0-33" id="h1-0-33" class="i">+				zap.String(&quot;error&quot;, st.Message()),
+</a><a href="#h1-0-34" id="h1-0-34" class="i">+			)
+</a><a href="#h1-0-35" id="h1-0-35" class="i">+		} else {
+</a><a href="#h1-0-36" id="h1-0-36" class="i">+			zap.L().Debug(
+</a><a href="#h1-0-37" id="h1-0-37" class="i">+				&quot;served gRPC unary request&quot;,
+</a><a href="#h1-0-38" id="h1-0-38" class="i">+				zap.String(&quot;method&quot;, info.FullMethod),
+</a><a href="#h1-0-39" id="h1-0-39" class="i">+				zap.Duration(&quot;duration&quot;, stopwatch.Elapsed()),
+</a><a href="#h1-0-40" id="h1-0-40" class="i">+				zap.String(&quot;request&quot;, fmt.Sprintf(&quot;%T&quot;, request)),
+</a><a href="#h1-0-41" id="h1-0-41" class="i">+				zap.String(&quot;response&quot;, fmt.Sprintf(&quot;%T&quot;, response)),
+</a><a href="#h1-0-42" id="h1-0-42" class="i">+			)
+</a><a href="#h1-0-43" id="h1-0-43" class="i">+		}
+</a><a href="#h1-0-44" id="h1-0-44" class="i">+
+</a><a href="#h1-0-45" id="h1-0-45" class="i">+		return response, err
+</a><a href="#h1-0-46" id="h1-0-46" class="i">+	}
+</a><a href="#h1-0-47" id="h1-0-47" class="i">+}
+</a><b>diff --git a/<a id="h2" href="../file/internal/server/server.go">internal/server/server.go</a> b/<a href="../file/internal/server/server.go">internal/server/server.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -8,6 +8,7 @@ import (
+</a> 	&quot;google.golang.org/grpc/reflection&quot;
+ 
+ 	&quot;unistore/internal/config&quot;
+<a href="#h2-0-3" id="h2-0-3" class="i">+	&quot;unistore/internal/server/middleware&quot;
+</a> 	&quot;unistore/schemas/service&quot;
+ )
+ 
+<a href="#h2-1" id="h2-1" class="h">@@ -28,6 +29,8 @@ func New(cfg *config.Server) (*Unistore, error) {
+</a> 		opts = append(opts, grpc.MaxSendMsgSize(cfg.RPC.MaxSendMessageSize))
+ 	}
+ 
+<a href="#h2-1-3" id="h2-1-3" class="i">+	opts = append(opts, grpc.ChainUnaryInterceptor(middleware.NewLogUnaryInterceptor()))
+</a><a href="#h2-1-4" id="h2-1-4" class="i">+
+</a> 	srv := grpc.NewServer(opts...)
+ 
+ 	unistoreSrv, err := newUnistoreService(cfg.Storage)
+</pre>
+</div>
+</body>
+</html>

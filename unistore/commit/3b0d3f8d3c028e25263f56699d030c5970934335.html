@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/backend: B2 backend StreamGetObject implementation - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/3b0d3f8d3c028e25263f56699d030c5970934335">3b0d3f8d3c028e25263f56699d030c5970934335</a>
+<b>parent</b> <a href="../commit/968acbcda0ff065a771f0b4df6eb1947c45940bb">968acbcda0ff065a771f0b4df6eb1947c45940bb</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Mon 27 Dec 2021 15:26:59 -0800
+
+internal/backend: B2 backend StreamGetObject implementation
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/backend/b2.go</a></td><td> | </td><td class="num">75</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">-</span></td></tr>
+</table></pre><pre>1 file changed, 74 insertions(+), 1 deletion(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/backend/b2.go">internal/backend/b2.go</a> b/<a href="../file/internal/backend/b2.go">internal/backend/b2.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -5,6 +5,7 @@ import (
+</a> 	&quot;crypto/sha1&quot;
+ 	&quot;fmt&quot;
+ 	&quot;io&quot;
+<a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;log&quot;
+</a> 	&quot;net/url&quot;
+ 	&quot;time&quot;
+ 
+<a href="#h0-1" id="h0-1" class="h">@@ -160,8 +161,80 @@ func (b *B2) GetObject(request *service.GetObjectRequest) (*service.GetObjectRes
+</a> 	}, nil
+ }
+ 
+<a href="#h0-1-3" id="h0-1-3" class="i">+// StreamGetObject is a streaming implementation of GetObject. It segments the requests to B2 in
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+// chunks of the requested size using the Range request directive, and pipes chunked responses into
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+// a stream channel.
+</a> func (b *B2) StreamGetObject(request *service.GetObjectStreamRequest) (&lt;-chan *service.GetObjectStreamResponse, error) {
+<a href="#h0-1-7" id="h0-1-7" class="d">-	return nil, nil
+</a><a href="#h0-1-8" id="h0-1-8" class="i">+	stream := make(chan *service.GetObjectStreamResponse)
+</a><a href="#h0-1-9" id="h0-1-9" class="i">+
+</a><a href="#h0-1-10" id="h0-1-10" class="i">+	auth, err := b.authorizeAccount()
+</a><a href="#h0-1-11" id="h0-1-11" class="i">+	if err != nil {
+</a><a href="#h0-1-12" id="h0-1-12" class="i">+		return nil, status.Error(codes.PermissionDenied, err.Error())
+</a><a href="#h0-1-13" id="h0-1-13" class="i">+	}
+</a><a href="#h0-1-14" id="h0-1-14" class="i">+
+</a><a href="#h0-1-15" id="h0-1-15" class="i">+	go func() {
+</a><a href="#h0-1-16" id="h0-1-16" class="i">+		var offset int
+</a><a href="#h0-1-17" id="h0-1-17" class="i">+		var total int
+</a><a href="#h0-1-18" id="h0-1-18" class="i">+
+</a><a href="#h0-1-19" id="h0-1-19" class="i">+		for {
+</a><a href="#h0-1-20" id="h0-1-20" class="i">+			if offset &gt;= total &amp;&amp; offset &gt; 0 {
+</a><a href="#h0-1-21" id="h0-1-21" class="i">+				break
+</a><a href="#h0-1-22" id="h0-1-22" class="i">+			}
+</a><a href="#h0-1-23" id="h0-1-23" class="i">+
+</a><a href="#h0-1-24" id="h0-1-24" class="i">+			dfReq := &amp;b2.DownloadFileByNameRequest{
+</a><a href="#h0-1-25" id="h0-1-25" class="i">+				Authorization: auth.authorizationToken,
+</a><a href="#h0-1-26" id="h0-1-26" class="i">+				DownloadURL:   auth.downloadURL,
+</a><a href="#h0-1-27" id="h0-1-27" class="i">+				Bucket:        request.Request.Resource.Bucket,
+</a><a href="#h0-1-28" id="h0-1-28" class="i">+				File:          request.Request.Key,
+</a><a href="#h0-1-29" id="h0-1-29" class="i">+				Range: b2.Range{
+</a><a href="#h0-1-30" id="h0-1-30" class="i">+					Unit:  &quot;bytes&quot;,
+</a><a href="#h0-1-31" id="h0-1-31" class="i">+					Start: offset,
+</a><a href="#h0-1-32" id="h0-1-32" class="i">+					End:   offset + int(request.ChunkSize) - 1,
+</a><a href="#h0-1-33" id="h0-1-33" class="i">+				},
+</a><a href="#h0-1-34" id="h0-1-34" class="i">+			}
+</a><a href="#h0-1-35" id="h0-1-35" class="i">+
+</a><a href="#h0-1-36" id="h0-1-36" class="i">+			dfResp, err := b.client.DownloadFileByName(dfReq)
+</a><a href="#h0-1-37" id="h0-1-37" class="i">+			if err != nil {
+</a><a href="#h0-1-38" id="h0-1-38" class="i">+				log.Printf(&quot;backend: error during file download: err=%v&quot;, err)
+</a><a href="#h0-1-39" id="h0-1-39" class="i">+				break
+</a><a href="#h0-1-40" id="h0-1-40" class="i">+			}
+</a><a href="#h0-1-41" id="h0-1-41" class="i">+
+</a><a href="#h0-1-42" id="h0-1-42" class="i">+			chunk, err := io.ReadAll(dfResp.Data)
+</a><a href="#h0-1-43" id="h0-1-43" class="i">+			if err != nil {
+</a><a href="#h0-1-44" id="h0-1-44" class="i">+				log.Printf(&quot;backend: error in downloaded file read: err=%v&quot;, err)
+</a><a href="#h0-1-45" id="h0-1-45" class="i">+				break
+</a><a href="#h0-1-46" id="h0-1-46" class="i">+			}
+</a><a href="#h0-1-47" id="h0-1-47" class="i">+
+</a><a href="#h0-1-48" id="h0-1-48" class="i">+			dfResp.Data.Close()
+</a><a href="#h0-1-49" id="h0-1-49" class="i">+
+</a><a href="#h0-1-50" id="h0-1-50" class="i">+			stream &lt;- &amp;service.GetObjectStreamResponse{
+</a><a href="#h0-1-51" id="h0-1-51" class="i">+				Response: &amp;service.GetObjectResponse{
+</a><a href="#h0-1-52" id="h0-1-52" class="i">+					Metadata: &amp;common.Metadata{
+</a><a href="#h0-1-53" id="h0-1-53" class="i">+						Id:           dfResp.FileID,
+</a><a href="#h0-1-54" id="h0-1-54" class="i">+						Key:          dfResp.FileName,
+</a><a href="#h0-1-55" id="h0-1-55" class="i">+						Size:         uint64(dfResp.Size),
+</a><a href="#h0-1-56" id="h0-1-56" class="i">+						MimeType:     dfResp.ContentType,
+</a><a href="#h0-1-57" id="h0-1-57" class="i">+						ModifiedTime: timestamppb.New(dfResp.UploadTimestamp.Time),
+</a><a href="#h0-1-58" id="h0-1-58" class="i">+						Checksum:     dfResp.ContentSHA1,
+</a><a href="#h0-1-59" id="h0-1-59" class="i">+					},
+</a><a href="#h0-1-60" id="h0-1-60" class="i">+					Data: chunk,
+</a><a href="#h0-1-61" id="h0-1-61" class="i">+				},
+</a><a href="#h0-1-62" id="h0-1-62" class="i">+				Range: &amp;common.Range{
+</a><a href="#h0-1-63" id="h0-1-63" class="i">+					Unit:  &quot;bytes&quot;,
+</a><a href="#h0-1-64" id="h0-1-64" class="i">+					Start: uint64(dfResp.Range.Start),
+</a><a href="#h0-1-65" id="h0-1-65" class="i">+					End:   uint64(dfResp.Range.End) + 1,
+</a><a href="#h0-1-66" id="h0-1-66" class="i">+					Total: uint64(dfResp.Range.Total),
+</a><a href="#h0-1-67" id="h0-1-67" class="i">+				},
+</a><a href="#h0-1-68" id="h0-1-68" class="i">+			}
+</a><a href="#h0-1-69" id="h0-1-69" class="i">+
+</a><a href="#h0-1-70" id="h0-1-70" class="i">+			total = dfResp.Range.Total
+</a><a href="#h0-1-71" id="h0-1-71" class="i">+			offset += dfResp.Range.End - dfResp.Range.Start + 1
+</a><a href="#h0-1-72" id="h0-1-72" class="i">+		}
+</a><a href="#h0-1-73" id="h0-1-73" class="i">+
+</a><a href="#h0-1-74" id="h0-1-74" class="i">+		close(stream)
+</a><a href="#h0-1-75" id="h0-1-75" class="i">+	}()
+</a><a href="#h0-1-76" id="h0-1-76" class="i">+
+</a><a href="#h0-1-77" id="h0-1-77" class="i">+	return stream, nil
+</a> }
+ 
+ // PutObject uploads the request file in full.
+</pre>
+</div>
+</body>
+</html>

@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/backend, pkg/client/b2: Pass context through all B2 API methods - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/aaa37998a2bb46d20970a77c0c6127bb8bd3e66c">aaa37998a2bb46d20970a77c0c6127bb8bd3e66c</a>
+<b>parent</b> <a href="../commit/666dc0880054efcf98d7823a782c878949b3ac15">666dc0880054efcf98d7823a782c878949b3ac15</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Mon  3 Jan 2022 16:39:45 -0800
+
+internal/backend, pkg/client/b2: Pass context through all B2 API methods
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/backend/b2.go</a></td><td> | </td><td class="num">66</td><td><span class="i">+++++++++++++++++++++++++++++++++</span><span class="d">---------------------------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">pkg/client/b2/client.go</a></td><td> | </td><td class="num">61</td><td><span class="i">++++++++++++++++++++++++++++++++</span><span class="d">-----------------------------</span></td></tr>
+</table></pre><pre>2 files changed, 65 insertions(+), 62 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/backend/b2.go">internal/backend/b2.go</a> b/<a href="../file/internal/backend/b2.go">internal/backend/b2.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -91,7 +91,7 @@ func NewB2(cfg *config.B2) (Backend, error) {
+</a> 
+ // HeadObject locates the requested file ID followed by listing its metadata.
+ func (b *B2) HeadObject(ctx context.Context, request *service.HeadObjectRequest) (*service.HeadObjectResponse, error) {
+<a href="#h0-0-3" id="h0-0-3" class="d">-	auth, err := b.authorizeAccount()
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+	auth, err := b.authorizeAccount(ctx)
+</a> 	if err != nil {
+ 		return nil, b.createError(err)
+ 	}
+<a href="#h0-1" id="h0-1" class="h">@@ -103,7 +103,7 @@ func (b *B2) HeadObject(ctx context.Context, request *service.HeadObjectRequest)
+</a> 		BucketName:    request.Resource.Bucket,
+ 	}
+ 
+<a href="#h0-1-3" id="h0-1-3" class="d">-	lbResp, err := b.client.ListBuckets(lbReq)
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+	lbResp, err := b.client.ListBuckets(ctx, lbReq)
+</a> 	if err != nil {
+ 		return nil, b.createError(err)
+ 	}
+<a href="#h0-2" id="h0-2" class="h">@@ -126,7 +126,7 @@ func (b *B2) HeadObject(ctx context.Context, request *service.HeadObjectRequest)
+</a> 		Prefix:        request.Key,
+ 	}
+ 
+<a href="#h0-2-3" id="h0-2-3" class="d">-	lfResp, err := b.client.ListFileNames(lfReq)
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+	lfResp, err := b.client.ListFileNames(ctx, lfReq)
+</a> 	if err != nil {
+ 		return nil, b.createError(err)
+ 	}
+<a href="#h0-3" id="h0-3" class="h">@@ -155,7 +155,7 @@ func (b *B2) HeadObject(ctx context.Context, request *service.HeadObjectRequest)
+</a> 
+ // GetObject downloads the requested file and buffers its full contents in memory for response.
+ func (b *B2) GetObject(ctx context.Context, request *service.GetObjectRequest) (*service.GetObjectResponse, error) {
+<a href="#h0-3-3" id="h0-3-3" class="d">-	auth, err := b.authorizeAccount()
+</a><a href="#h0-3-4" id="h0-3-4" class="i">+	auth, err := b.authorizeAccount(ctx)
+</a> 	if err != nil {
+ 		return nil, b.createError(err)
+ 	}
+<a href="#h0-4" id="h0-4" class="h">@@ -167,7 +167,7 @@ func (b *B2) GetObject(ctx context.Context, request *service.GetObjectRequest) (
+</a> 		File:          request.Key,
+ 	}
+ 
+<a href="#h0-4-3" id="h0-4-3" class="d">-	dfResp, err := b.client.DownloadFileByName(dfReq)
+</a><a href="#h0-4-4" id="h0-4-4" class="i">+	dfResp, err := b.client.DownloadFileByName(ctx, dfReq)
+</a> 	if err != nil {
+ 		return nil, b.createError(err)
+ 	}
+<a href="#h0-5" id="h0-5" class="h">@@ -199,7 +199,7 @@ func (b *B2) GetObject(ctx context.Context, request *service.GetObjectRequest) (
+</a> func (b *B2) StreamGetObject(ctx context.Context, request *service.GetObjectStreamRequest) (&lt;-chan *service.GetObjectStreamResponse, error) {
+ 	stream := make(chan *service.GetObjectStreamResponse)
+ 
+<a href="#h0-5-3" id="h0-5-3" class="d">-	auth, err := b.authorizeAccount()
+</a><a href="#h0-5-4" id="h0-5-4" class="i">+	auth, err := b.authorizeAccount(ctx)
+</a> 	if err != nil {
+ 		return nil, b.createError(err)
+ 	}
+<a href="#h0-6" id="h0-6" class="h">@@ -224,7 +224,7 @@ func (b *B2) StreamGetObject(ctx context.Context, request *service.GetObjectStre
+</a> 				},
+ 			}
+ 
+<a href="#h0-6-3" id="h0-6-3" class="d">-			dfResp, err := b.client.DownloadFileByName(dfReq)
+</a><a href="#h0-6-4" id="h0-6-4" class="i">+			dfResp, err := b.client.DownloadFileByName(ctx, dfReq)
+</a> 			if err != nil {
+ 				zap.L().Error(
+ 					&quot;error during file download&quot;,
+<a href="#h0-7" id="h0-7" class="h">@@ -285,7 +285,7 @@ func (b *B2) StreamGetObject(ctx context.Context, request *service.GetObjectStre
+</a> 
+ // PutObject uploads the request file in full.
+ func (b *B2) PutObject(ctx context.Context, request *service.PutObjectRequest) (*service.PutObjectResponse, error) {
+<a href="#h0-7-3" id="h0-7-3" class="d">-	auth, err := b.authorizeAccount()
+</a><a href="#h0-7-4" id="h0-7-4" class="i">+	auth, err := b.authorizeAccount(ctx)
+</a> 	if err != nil {
+ 		return nil, b.createError(err)
+ 	}
+<a href="#h0-8" id="h0-8" class="h">@@ -297,7 +297,7 @@ func (b *B2) PutObject(ctx context.Context, request *service.PutObjectRequest) (
+</a> 		BucketName:    request.Resource.Bucket,
+ 	}
+ 
+<a href="#h0-8-3" id="h0-8-3" class="d">-	lbResp, err := b.client.ListBuckets(lbReq)
+</a><a href="#h0-8-4" id="h0-8-4" class="i">+	lbResp, err := b.client.ListBuckets(ctx, lbReq)
+</a> 	if err != nil {
+ 		return nil, b.createError(err)
+ 	}
+<a href="#h0-9" id="h0-9" class="h">@@ -317,7 +317,7 @@ func (b *B2) PutObject(ctx context.Context, request *service.PutObjectRequest) (
+</a> 		BucketID:      lbResp.Buckets[0].BucketID,
+ 	}
+ 
+<a href="#h0-9-3" id="h0-9-3" class="d">-	uuResp, err := b.client.GetUploadURL(uuReq)
+</a><a href="#h0-9-4" id="h0-9-4" class="i">+	uuResp, err := b.client.GetUploadURL(ctx, uuReq)
+</a> 	if err != nil {
+ 		return nil, b.createError(err)
+ 	}
+<a href="#h0-10" id="h0-10" class="h">@@ -326,7 +326,7 @@ func (b *B2) PutObject(ctx context.Context, request *service.PutObjectRequest) (
+</a> 	hash.Write(request.Data)
+ 	checksum := fmt.Sprintf(&quot;%x&quot;, hash.Sum(nil))
+ 
+<a href="#h0-10-3" id="h0-10-3" class="d">-	upReq := &amp;b2.UploadFileRequest{
+</a><a href="#h0-10-4" id="h0-10-4" class="i">+	ufReq := &amp;b2.UploadFileRequest{
+</a> 		Authorization: uuResp.AuthorizationToken,
+ 		UploadURL:     uuResp.UploadURL.URL,
+ 		FileName:      request.Key,
+<a href="#h0-11" id="h0-11" class="h">@@ -336,20 +336,20 @@ func (b *B2) PutObject(ctx context.Context, request *service.PutObjectRequest) (
+</a> 		Data:          io.NopCloser(bytes.NewReader(request.Data)),
+ 	}
+ 
+<a href="#h0-11-3" id="h0-11-3" class="d">-	upResp, err := b.client.UploadFile(upReq)
+</a><a href="#h0-11-4" id="h0-11-4" class="i">+	ufResp, err := b.client.UploadFile(ctx, ufReq)
+</a> 	if err != nil {
+ 		return nil, b.createError(err)
+ 	}
+ 
+ 	return &amp;service.PutObjectResponse{
+ 		Metadata: &amp;common.Metadata{
+<a href="#h0-11-11" id="h0-11-11" class="d">-			Id:           upResp.FileID,
+</a><a href="#h0-11-12" id="h0-11-12" class="d">-			Key:          upResp.FileName,
+</a><a href="#h0-11-13" id="h0-11-13" class="d">-			Size:         uint64(upResp.ContentLength),
+</a><a href="#h0-11-14" id="h0-11-14" class="i">+			Id:           ufResp.FileID,
+</a><a href="#h0-11-15" id="h0-11-15" class="i">+			Key:          ufResp.FileName,
+</a><a href="#h0-11-16" id="h0-11-16" class="i">+			Size:         uint64(ufResp.ContentLength),
+</a> 			ObjectType:   common.Object_REGULAR,
+<a href="#h0-11-18" id="h0-11-18" class="d">-			MimeType:     upResp.ContentType,
+</a><a href="#h0-11-19" id="h0-11-19" class="d">-			ModifiedTime: timestamppb.New(upResp.UploadTimestamp.Time),
+</a><a href="#h0-11-20" id="h0-11-20" class="d">-			Checksum:     upResp.ContentSHA1,
+</a><a href="#h0-11-21" id="h0-11-21" class="i">+			MimeType:     ufResp.ContentType,
+</a><a href="#h0-11-22" id="h0-11-22" class="i">+			ModifiedTime: timestamppb.New(ufResp.UploadTimestamp.Time),
+</a><a href="#h0-11-23" id="h0-11-23" class="i">+			Checksum:     ufResp.ContentSHA1,
+</a> 		},
+ 	}, nil
+ }
+<a href="#h0-12" id="h0-12" class="h">@@ -364,7 +364,7 @@ func (b *B2) StreamPutObject(ctx context.Context, stream chan *service.PutObject
+</a> 	var part int
+ 	var checksums []string
+ 
+<a href="#h0-12-3" id="h0-12-3" class="d">-	auth, err := b.authorizeAccount()
+</a><a href="#h0-12-4" id="h0-12-4" class="i">+	auth, err := b.authorizeAccount(ctx)
+</a> 	if err != nil {
+ 		return nil, b.createError(err)
+ 	}
+<a href="#h0-13" id="h0-13" class="h">@@ -386,7 +386,7 @@ func (b *B2) StreamPutObject(ctx context.Context, stream chan *service.PutObject
+</a> 				BucketName:    request.Request.Resource.Bucket,
+ 			}
+ 
+<a href="#h0-13-3" id="h0-13-3" class="d">-			lbResp, err := b.client.ListBuckets(lbReq)
+</a><a href="#h0-13-4" id="h0-13-4" class="i">+			lbResp, err := b.client.ListBuckets(ctx, lbReq)
+</a> 			if err != nil {
+ 				return nil, b.createError(err)
+ 			}
+<a href="#h0-14" id="h0-14" class="h">@@ -408,7 +408,7 @@ func (b *B2) StreamPutObject(ctx context.Context, stream chan *service.PutObject
+</a> 				ContentType:   &quot;b2/x-auto&quot;,
+ 			}
+ 
+<a href="#h0-14-3" id="h0-14-3" class="d">-			sfResp, err := b.client.StartLargeFile(sfReq)
+</a><a href="#h0-14-4" id="h0-14-4" class="i">+			sfResp, err := b.client.StartLargeFile(ctx, sfReq)
+</a> 			if err != nil {
+ 				return nil, b.createError(err)
+ 			}
+<a href="#h0-15" id="h0-15" class="h">@@ -419,7 +419,7 @@ func (b *B2) StreamPutObject(ctx context.Context, stream chan *service.PutObject
+</a> 				FileID:        sfResp.FileID,
+ 			}
+ 
+<a href="#h0-15-3" id="h0-15-3" class="d">-			uuResp, err := b.client.GetUploadPartURL(uuReq)
+</a><a href="#h0-15-4" id="h0-15-4" class="i">+			uuResp, err := b.client.GetUploadPartURL(ctx, uuReq)
+</a> 			if err != nil {
+ 				return nil, b.createError(err)
+ 			}
+<a href="#h0-16" id="h0-16" class="h">@@ -443,7 +443,7 @@ func (b *B2) StreamPutObject(ctx context.Context, stream chan *service.PutObject
+</a> 			Data:          io.NopCloser(bytes.NewReader(request.Request.Data)),
+ 		}
+ 
+<a href="#h0-16-3" id="h0-16-3" class="d">-		upResp, err := b.client.UploadPart(upReq)
+</a><a href="#h0-16-4" id="h0-16-4" class="i">+		upResp, err := b.client.UploadPart(ctx, upReq)
+</a> 		if err != nil {
+ 			return nil, b.createError(err)
+ 		}
+<a href="#h0-17" id="h0-17" class="h">@@ -459,7 +459,7 @@ func (b *B2) StreamPutObject(ctx context.Context, stream chan *service.PutObject
+</a> 		PartSHA1Array: checksums,
+ 	}
+ 
+<a href="#h0-17-3" id="h0-17-3" class="d">-	ffResp, err := b.client.FinishLargeFile(ffReq)
+</a><a href="#h0-17-4" id="h0-17-4" class="i">+	ffResp, err := b.client.FinishLargeFile(ctx, ffReq)
+</a> 	if err != nil {
+ 		return nil, b.createError(err)
+ 	}
+<a href="#h0-18" id="h0-18" class="h">@@ -481,7 +481,7 @@ func (b *B2) StreamPutObject(ctx context.Context, stream chan *service.PutObject
+</a> 
+ // DeleteObject deletes the requested file.
+ func (b *B2) DeleteObject(ctx context.Context, request *service.DeleteObjectRequest) (*service.DeleteObjectResponse, error) {
+<a href="#h0-18-3" id="h0-18-3" class="d">-	auth, err := b.authorizeAccount()
+</a><a href="#h0-18-4" id="h0-18-4" class="i">+	auth, err := b.authorizeAccount(ctx)
+</a> 	if err != nil {
+ 		return nil, b.createError(err)
+ 	}
+<a href="#h0-19" id="h0-19" class="h">@@ -493,7 +493,7 @@ func (b *B2) DeleteObject(ctx context.Context, request *service.DeleteObjectRequ
+</a> 		BucketName:    request.Resource.Bucket,
+ 	}
+ 
+<a href="#h0-19-3" id="h0-19-3" class="d">-	lbResp, err := b.client.ListBuckets(lbReq)
+</a><a href="#h0-19-4" id="h0-19-4" class="i">+	lbResp, err := b.client.ListBuckets(ctx, lbReq)
+</a> 	if err != nil {
+ 		return nil, b.createError(err)
+ 	}
+<a href="#h0-20" id="h0-20" class="h">@@ -516,7 +516,7 @@ func (b *B2) DeleteObject(ctx context.Context, request *service.DeleteObjectRequ
+</a> 		Prefix:        request.Key,
+ 	}
+ 
+<a href="#h0-20-3" id="h0-20-3" class="d">-	lfResp, err := b.client.ListFileNames(lfReq)
+</a><a href="#h0-20-4" id="h0-20-4" class="i">+	lfResp, err := b.client.ListFileNames(ctx, lfReq)
+</a> 	if err != nil {
+ 		return nil, b.createError(err)
+ 	}
+<a href="#h0-21" id="h0-21" class="h">@@ -537,7 +537,7 @@ func (b *B2) DeleteObject(ctx context.Context, request *service.DeleteObjectRequ
+</a> 		FileID:        lfResp.Files[0].FileID,
+ 	}
+ 
+<a href="#h0-21-3" id="h0-21-3" class="d">-	if _, err := b.client.DeleteFileVersion(dfReq); err != nil {
+</a><a href="#h0-21-4" id="h0-21-4" class="i">+	if _, err := b.client.DeleteFileVersion(ctx, dfReq); err != nil {
+</a> 		return nil, b.createError(err)
+ 	}
+ 
+<a href="#h0-22" id="h0-22" class="h">@@ -546,7 +546,7 @@ func (b *B2) DeleteObject(ctx context.Context, request *service.DeleteObjectRequ
+</a> 
+ // ListObjects retrieves metadata for all files that start with the specified key prefix.
+ func (b *B2) ListObjects(ctx context.Context, request *service.ListObjectsRequest) (*service.ListObjectsResponse, error) {
+<a href="#h0-22-3" id="h0-22-3" class="d">-	auth, err := b.authorizeAccount()
+</a><a href="#h0-22-4" id="h0-22-4" class="i">+	auth, err := b.authorizeAccount(ctx)
+</a> 	if err != nil {
+ 		return nil, b.createError(err)
+ 	}
+<a href="#h0-23" id="h0-23" class="h">@@ -558,7 +558,7 @@ func (b *B2) ListObjects(ctx context.Context, request *service.ListObjectsReques
+</a> 		BucketName:    request.Resource.Bucket,
+ 	}
+ 
+<a href="#h0-23-3" id="h0-23-3" class="d">-	lbResp, err := b.client.ListBuckets(lbReq)
+</a><a href="#h0-23-4" id="h0-23-4" class="i">+	lbResp, err := b.client.ListBuckets(ctx, lbReq)
+</a> 	if err != nil {
+ 		return nil, b.createError(err)
+ 	}
+<a href="#h0-24" id="h0-24" class="h">@@ -586,7 +586,7 @@ func (b *B2) ListObjects(ctx context.Context, request *service.ListObjectsReques
+</a> 		lfReq.Delimiter = &quot;/&quot;
+ 	}
+ 
+<a href="#h0-24-3" id="h0-24-3" class="d">-	lfResp, err := b.client.ListFileNames(lfReq)
+</a><a href="#h0-24-4" id="h0-24-4" class="i">+	lfResp, err := b.client.ListFileNames(ctx, lfReq)
+</a> 	if err != nil {
+ 		return nil, b.createError(err)
+ 	}
+<a href="#h0-25" id="h0-25" class="h">@@ -623,7 +623,7 @@ func (b *B2) String() string {
+</a> // authorizeAccount invokes the B2 account authorization API to obtain a short-lived authorization
+ // token for subsequent API calls. Authentication state is cached local to the backend instance and
+ // refreshed at a regular interval.
+<a href="#h0-25-3" id="h0-25-3" class="d">-func (b *B2) authorizeAccount() (*authenticationState, error) {
+</a><a href="#h0-25-4" id="h0-25-4" class="i">+func (b *B2) authorizeAccount(ctx context.Context) (*authenticationState, error) {
+</a> 	b.authMutex.Lock()
+ 	defer b.authMutex.Unlock()
+ 
+<a href="#h0-26" id="h0-26" class="h">@@ -639,7 +639,7 @@ func (b *B2) authorizeAccount() (*authenticationState, error) {
+</a> 		ApplicationKey:   b.applicationKey,
+ 	}
+ 
+<a href="#h0-26-3" id="h0-26-3" class="d">-	resp, err := b.client.AuthorizeAccount(req)
+</a><a href="#h0-26-4" id="h0-26-4" class="i">+	resp, err := b.client.AuthorizeAccount(ctx, req)
+</a> 	if err != nil {
+ 		return nil, err
+ 	}
+<b>diff --git a/<a id="h1" href="../file/pkg/client/b2/client.go">pkg/client/b2/client.go</a> b/<a href="../file/pkg/client/b2/client.go">pkg/client/b2/client.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -2,6 +2,7 @@ package b2
+</a> 
+ import (
+ 	&quot;bytes&quot;
+<a href="#h1-0-3" id="h1-0-3" class="i">+	&quot;context&quot;
+</a> 	&quot;encoding/json&quot;
+ 	&quot;fmt&quot;
+ 	&quot;io&quot;
+<a href="#h1-1" id="h1-1" class="h">@@ -63,7 +64,7 @@ func WithClientID(id string) Option {
+</a> 
+ // AuthorizeAccount implements the b2_authorize_account API.
+ // Reference: https://www.backblaze.com/b2/docs/b2_authorize_account.html
+<a href="#h1-1-3" id="h1-1-3" class="d">-func (c *Client) AuthorizeAccount(request *AuthorizeAccountRequest) (*AuthorizeAccountResponse, error) {
+</a><a href="#h1-1-4" id="h1-1-4" class="i">+func (c *Client) AuthorizeAccount(ctx context.Context, request *AuthorizeAccountRequest) (*AuthorizeAccountResponse, error) {
+</a> 	var response AuthorizeAccountResponse
+ 
+ 	u, err := url.Parse(APIV2BaseURL)
+<a href="#h1-2" id="h1-2" class="h">@@ -71,7 +72,7 @@ func (c *Client) AuthorizeAccount(request *AuthorizeAccountRequest) (*AuthorizeA
+</a> 		return nil, statusFromError(err)
+ 	}
+ 
+<a href="#h1-2-3" id="h1-2-3" class="d">-	r, err := c.createAPIRequest(u, EndpointAuthorizeAccount, http.MethodGet, request)
+</a><a href="#h1-2-4" id="h1-2-4" class="i">+	r, err := c.createAPIRequest(ctx, u, EndpointAuthorizeAccount, http.MethodGet, request)
+</a> 	if err != nil {
+ 		return nil, err
+ 	}
+<a href="#h1-3" id="h1-3" class="h">@@ -87,10 +88,10 @@ func (c *Client) AuthorizeAccount(request *AuthorizeAccountRequest) (*AuthorizeA
+</a> 
+ // CancelLargeFile implements the b2_cancel_large_file API.
+ // Reference: https://www.backblaze.com/b2/docs/b2_cancel_large_file.html
+<a href="#h1-3-3" id="h1-3-3" class="d">-func (c *Client) CancelLargeFile(request *CancelLargeFileRequest) (*CancelLargeFileResponse, error) {
+</a><a href="#h1-3-4" id="h1-3-4" class="i">+func (c *Client) CancelLargeFile(ctx context.Context, request *CancelLargeFileRequest) (*CancelLargeFileResponse, error) {
+</a> 	var response CancelLargeFileResponse
+ 
+<a href="#h1-3-7" id="h1-3-7" class="d">-	r, err := c.createAPIRequest(request.BaseURL, EndpointCancelLargeFile, http.MethodPost, request)
+</a><a href="#h1-3-8" id="h1-3-8" class="i">+	r, err := c.createAPIRequest(ctx, request.BaseURL, EndpointCancelLargeFile, http.MethodPost, request)
+</a> 	if err != nil {
+ 		return nil, err
+ 	}
+<a href="#h1-4" id="h1-4" class="h">@@ -104,10 +105,10 @@ func (c *Client) CancelLargeFile(request *CancelLargeFileRequest) (*CancelLargeF
+</a> 
+ // DeleteFileVersion implements the b2_delete_file_version API.
+ // Reference: https://www.backblaze.com/b2/docs/b2_delete_file_version.html
+<a href="#h1-4-3" id="h1-4-3" class="d">-func (c *Client) DeleteFileVersion(request *DeleteFileVersionRequest) (*DeleteFileVersionResponse, error) {
+</a><a href="#h1-4-4" id="h1-4-4" class="i">+func (c *Client) DeleteFileVersion(ctx context.Context, request *DeleteFileVersionRequest) (*DeleteFileVersionResponse, error) {
+</a> 	var response DeleteFileVersionResponse
+ 
+<a href="#h1-4-7" id="h1-4-7" class="d">-	r, err := c.createAPIRequest(request.BaseURL, EndpointDeleteFileVersion, http.MethodPost, request)
+</a><a href="#h1-4-8" id="h1-4-8" class="i">+	r, err := c.createAPIRequest(ctx, request.BaseURL, EndpointDeleteFileVersion, http.MethodPost, request)
+</a> 	if err != nil {
+ 		return nil, err
+ 	}
+<a href="#h1-5" id="h1-5" class="h">@@ -121,8 +122,8 @@ func (c *Client) DeleteFileVersion(request *DeleteFileVersionRequest) (*DeleteFi
+</a> 
+ // DownloadFileByName implements the b2_download_file_by_name API.
+ // Reference: https://www.backblaze.com/b2/docs/b2_download_file_by_name.html
+<a href="#h1-5-3" id="h1-5-3" class="d">-func (c *Client) DownloadFileByName(request *DownloadFileByNameRequest) (*DownloadFileByNameResponse, error) {
+</a><a href="#h1-5-4" id="h1-5-4" class="d">-	r, err := c.createAPIRequest(request.DownloadURL, &quot;&quot;, http.MethodGet, request)
+</a><a href="#h1-5-5" id="h1-5-5" class="i">+func (c *Client) DownloadFileByName(ctx context.Context, request *DownloadFileByNameRequest) (*DownloadFileByNameResponse, error) {
+</a><a href="#h1-5-6" id="h1-5-6" class="i">+	r, err := c.createAPIRequest(ctx, request.DownloadURL, &quot;&quot;, http.MethodGet, request)
+</a> 	if err != nil {
+ 		return nil, err
+ 	}
+<a href="#h1-6" id="h1-6" class="h">@@ -194,10 +195,10 @@ func (c *Client) DownloadFileByName(request *DownloadFileByNameRequest) (*Downlo
+</a> 
+ // FinishLargeFile implements the b2_finish_large_file API.
+ // Reference: https://www.backblaze.com/b2/docs/b2_finish_large_file.html
+<a href="#h1-6-3" id="h1-6-3" class="d">-func (c *Client) FinishLargeFile(request *FinishLargeFileRequest) (*FinishLargeFileResponse, error) {
+</a><a href="#h1-6-4" id="h1-6-4" class="i">+func (c *Client) FinishLargeFile(ctx context.Context, request *FinishLargeFileRequest) (*FinishLargeFileResponse, error) {
+</a> 	var response FinishLargeFileResponse
+ 
+<a href="#h1-6-7" id="h1-6-7" class="d">-	r, err := c.createAPIRequest(request.BaseURL, EndpointFinishLargeFile, http.MethodPost, request)
+</a><a href="#h1-6-8" id="h1-6-8" class="i">+	r, err := c.createAPIRequest(ctx, request.BaseURL, EndpointFinishLargeFile, http.MethodPost, request)
+</a> 	if err != nil {
+ 		return nil, err
+ 	}
+<a href="#h1-7" id="h1-7" class="h">@@ -211,10 +212,10 @@ func (c *Client) FinishLargeFile(request *FinishLargeFileRequest) (*FinishLargeF
+</a> 
+ // GetUploadPartURL implements the b2_get_upload_part_url API.
+ // Reference: https://www.backblaze.com/b2/docs/b2_get_upload_part_url.html
+<a href="#h1-7-3" id="h1-7-3" class="d">-func (c *Client) GetUploadPartURL(request *GetUploadPartURLRequest) (*GetUploadPartURLResponse, error) {
+</a><a href="#h1-7-4" id="h1-7-4" class="i">+func (c *Client) GetUploadPartURL(ctx context.Context, request *GetUploadPartURLRequest) (*GetUploadPartURLResponse, error) {
+</a> 	var response GetUploadPartURLResponse
+ 
+<a href="#h1-7-7" id="h1-7-7" class="d">-	r, err := c.createAPIRequest(request.BaseURL, EndpointGetUploadPartURL, http.MethodPost, request)
+</a><a href="#h1-7-8" id="h1-7-8" class="i">+	r, err := c.createAPIRequest(ctx, request.BaseURL, EndpointGetUploadPartURL, http.MethodPost, request)
+</a> 	if err != nil {
+ 		return nil, err
+ 	}
+<a href="#h1-8" id="h1-8" class="h">@@ -228,10 +229,10 @@ func (c *Client) GetUploadPartURL(request *GetUploadPartURLRequest) (*GetUploadP
+</a> 
+ // GetUploadURL implements the b2_get_upload_url API.
+ // Reference: https://www.backblaze.com/b2/docs/b2_get_upload_url.html
+<a href="#h1-8-3" id="h1-8-3" class="d">-func (c *Client) GetUploadURL(request *GetUploadURLRequest) (*GetUploadURLResponse, error) {
+</a><a href="#h1-8-4" id="h1-8-4" class="i">+func (c *Client) GetUploadURL(ctx context.Context, request *GetUploadURLRequest) (*GetUploadURLResponse, error) {
+</a> 	var response GetUploadURLResponse
+ 
+<a href="#h1-8-7" id="h1-8-7" class="d">-	r, err := c.createAPIRequest(request.BaseURL, EndpointGetUploadURL, http.MethodPost, request)
+</a><a href="#h1-8-8" id="h1-8-8" class="i">+	r, err := c.createAPIRequest(ctx, request.BaseURL, EndpointGetUploadURL, http.MethodPost, request)
+</a> 	if err != nil {
+ 		return nil, err
+ 	}
+<a href="#h1-9" id="h1-9" class="h">@@ -245,10 +246,10 @@ func (c *Client) GetUploadURL(request *GetUploadURLRequest) (*GetUploadURLRespon
+</a> 
+ // ListBuckets implements the b2_list_buckets API.
+ // Reference: https://www.backblaze.com/b2/docs/b2_list_buckets.html
+<a href="#h1-9-3" id="h1-9-3" class="d">-func (c *Client) ListBuckets(request *ListBucketsRequest) (*ListBucketsResponse, error) {
+</a><a href="#h1-9-4" id="h1-9-4" class="i">+func (c *Client) ListBuckets(ctx context.Context, request *ListBucketsRequest) (*ListBucketsResponse, error) {
+</a> 	var response ListBucketsResponse
+ 
+<a href="#h1-9-7" id="h1-9-7" class="d">-	r, err := c.createAPIRequest(request.BaseURL, EndpointListBuckets, http.MethodPost, request)
+</a><a href="#h1-9-8" id="h1-9-8" class="i">+	r, err := c.createAPIRequest(ctx, request.BaseURL, EndpointListBuckets, http.MethodPost, request)
+</a> 	if err != nil {
+ 		return nil, err
+ 	}
+<a href="#h1-10" id="h1-10" class="h">@@ -262,10 +263,10 @@ func (c *Client) ListBuckets(request *ListBucketsRequest) (*ListBucketsResponse,
+</a> 
+ // ListFileNames implements the b2_list_file_names API.
+ // Reference: https://www.backblaze.com/b2/docs/b2_list_file_names.html
+<a href="#h1-10-3" id="h1-10-3" class="d">-func (c *Client) ListFileNames(request *ListFileNamesRequest) (*ListFileNamesResponse, error) {
+</a><a href="#h1-10-4" id="h1-10-4" class="i">+func (c *Client) ListFileNames(ctx context.Context, request *ListFileNamesRequest) (*ListFileNamesResponse, error) {
+</a> 	var response ListFileNamesResponse
+ 
+<a href="#h1-10-7" id="h1-10-7" class="d">-	r, err := c.createAPIRequest(request.BaseURL, EndpointListFileNames, http.MethodPost, request)
+</a><a href="#h1-10-8" id="h1-10-8" class="i">+	r, err := c.createAPIRequest(ctx, request.BaseURL, EndpointListFileNames, http.MethodPost, request)
+</a> 	if err != nil {
+ 		return nil, err
+ 	}
+<a href="#h1-11" id="h1-11" class="h">@@ -279,10 +280,10 @@ func (c *Client) ListFileNames(request *ListFileNamesRequest) (*ListFileNamesRes
+</a> 
+ // StartLargeFile implements the b2_start_large_file API.
+ // Reference: https://www.backblaze.com/b2/docs/b2_start_large_file.html
+<a href="#h1-11-3" id="h1-11-3" class="d">-func (c *Client) StartLargeFile(request *StartLargeFileRequest) (*StartLargeFileResponse, error) {
+</a><a href="#h1-11-4" id="h1-11-4" class="i">+func (c *Client) StartLargeFile(ctx context.Context, request *StartLargeFileRequest) (*StartLargeFileResponse, error) {
+</a> 	var response StartLargeFileResponse
+ 
+<a href="#h1-11-7" id="h1-11-7" class="d">-	r, err := c.createAPIRequest(request.BaseURL, EndpointStartLargeFile, http.MethodPost, request)
+</a><a href="#h1-11-8" id="h1-11-8" class="i">+	r, err := c.createAPIRequest(ctx, request.BaseURL, EndpointStartLargeFile, http.MethodPost, request)
+</a> 	if err != nil {
+ 		return nil, err
+ 	}
+<a href="#h1-12" id="h1-12" class="h">@@ -296,10 +297,10 @@ func (c *Client) StartLargeFile(request *StartLargeFileRequest) (*StartLargeFile
+</a> 
+ // UploadFile implements the b2_upload_file API.
+ // Reference: https://www.backblaze.com/b2/docs/b2_upload_file.html
+<a href="#h1-12-3" id="h1-12-3" class="d">-func (c *Client) UploadFile(request *UploadFileRequest) (*UploadFileResponse, error) {
+</a><a href="#h1-12-4" id="h1-12-4" class="i">+func (c *Client) UploadFile(ctx context.Context, request *UploadFileRequest) (*UploadFileResponse, error) {
+</a> 	var response UploadFileResponse
+ 
+<a href="#h1-12-7" id="h1-12-7" class="d">-	r, err := c.createAPIRequest(request.UploadURL, &quot;&quot;, http.MethodPost, request)
+</a><a href="#h1-12-8" id="h1-12-8" class="i">+	r, err := c.createAPIRequest(ctx, request.UploadURL, &quot;&quot;, http.MethodPost, request)
+</a> 	if err != nil {
+ 		return nil, err
+ 	}
+<a href="#h1-13" id="h1-13" class="h">@@ -319,10 +320,10 @@ func (c *Client) UploadFile(request *UploadFileRequest) (*UploadFileResponse, er
+</a> 
+ // UploadPart implements the b2_upload_part API.
+ // Reference: https://www.backblaze.com/b2/docs/b2_upload_part.html
+<a href="#h1-13-3" id="h1-13-3" class="d">-func (c *Client) UploadPart(request *UploadPartRequest) (*UploadPartResponse, error) {
+</a><a href="#h1-13-4" id="h1-13-4" class="i">+func (c *Client) UploadPart(ctx context.Context, request *UploadPartRequest) (*UploadPartResponse, error) {
+</a> 	var response UploadPartResponse
+ 
+<a href="#h1-13-7" id="h1-13-7" class="d">-	r, err := c.createAPIRequest(request.UploadURL, &quot;&quot;, http.MethodPost, request)
+</a><a href="#h1-13-8" id="h1-13-8" class="i">+	r, err := c.createAPIRequest(ctx, request.UploadURL, &quot;&quot;, http.MethodPost, request)
+</a> 	if err != nil {
+ 		return nil, err
+ 	}
+<a href="#h1-14" id="h1-14" class="h">@@ -339,7 +340,7 @@ func (c *Client) UploadPart(request *UploadPartRequest) (*UploadPartResponse, er
+</a> 
+ // createAPIRequest creates a http.Request object, obeying B2 conventions, based on the specified
+ // base URL, endpoint, HTTP method, and request struct.
+<a href="#h1-14-3" id="h1-14-3" class="d">-func (c *Client) createAPIRequest(baseURL *url.URL, endpoint string, method string, request interface{}) (*http.Request, error) {
+</a><a href="#h1-14-4" id="h1-14-4" class="i">+func (c *Client) createAPIRequest(ctx context.Context, baseURL *url.URL, endpoint string, method string, request interface{}) (*http.Request, error) {
+</a> 	var body io.ReadCloser
+ 
+ 	u := baseURL
+<a href="#h1-15" id="h1-15" class="h">@@ -352,6 +353,8 @@ func (c *Client) createAPIRequest(baseURL *url.URL, endpoint string, method stri
+</a> 		return nil, statusFromError(err)
+ 	}
+ 
+<a href="#h1-15-3" id="h1-15-3" class="i">+	headers.Set(&quot;User-Agent&quot;, c.identity)
+</a><a href="#h1-15-4" id="h1-15-4" class="i">+
+</a> 	if method == http.MethodPost {
+ 		payload, err := json.Marshal(request)
+ 		if err != nil {
+<a href="#h1-16" id="h1-16" class="h">@@ -361,14 +364,14 @@ func (c *Client) createAPIRequest(baseURL *url.URL, endpoint string, method stri
+</a> 		body = io.NopCloser(bytes.NewReader(payload))
+ 	}
+ 
+<a href="#h1-16-3" id="h1-16-3" class="d">-	headers.Set(&quot;User-Agent&quot;, c.identity)
+</a><a href="#h1-16-4" id="h1-16-4" class="d">-
+</a><a href="#h1-16-5" id="h1-16-5" class="d">-	return &amp;http.Request{
+</a><a href="#h1-16-6" id="h1-16-6" class="i">+	r := &amp;http.Request{
+</a> 		Method: method,
+ 		URL:    u,
+ 		Header: headers,
+ 		Body:   body,
+<a href="#h1-16-11" id="h1-16-11" class="d">-	}, nil
+</a><a href="#h1-16-12" id="h1-16-12" class="i">+	}
+</a><a href="#h1-16-13" id="h1-16-13" class="i">+
+</a><a href="#h1-16-14" id="h1-16-14" class="i">+	return r.WithContext(ctx), nil
+</a> }
+ 
+ // doAPI executes the request as a canonical API request, whose response body can be parsed as JSON
+</pre>
+</div>
+</body>
+</html>

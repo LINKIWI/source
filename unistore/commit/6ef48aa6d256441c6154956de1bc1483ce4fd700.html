@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>cmd/unistore-cli: Implement download command for GetObject and StreamGetObject - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/6ef48aa6d256441c6154956de1bc1483ce4fd700">6ef48aa6d256441c6154956de1bc1483ce4fd700</a>
+<b>parent</b> <a href="../commit/8d3f64973b6644d2b4be8cef757bc56f2cfeb23c">8d3f64973b6644d2b4be8cef757bc56f2cfeb23c</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Fri 31 Dec 2021 18:41:36 -0800
+
+cmd/unistore-cli: Implement download command for GetObject and StreamGetObject
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">cmd/unistore-cli/main.go</a></td><td> | </td><td class="num">24</td><td><span class="i">++++++++++++++++++++</span><span class="d">----</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">cmd/unistore-cli/service.go</a></td><td> | </td><td class="num">78</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+</table></pre><pre>2 files changed, 98 insertions(+), 4 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/cmd/unistore-cli/main.go">cmd/unistore-cli/main.go</a> b/<a href="../file/cmd/unistore-cli/main.go">cmd/unistore-cli/main.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -24,24 +24,40 @@ var (
+</a> 		Version: meta.Version,
+ 	}
+ 	headCmd = &amp;cobra.Command{
+<a href="#h0-0-3" id="h0-0-3" class="d">-		Use:     &quot;head&quot;,
+</a><a href="#h0-0-4" id="h0-0-4" class="d">-		Short:   &quot;retrieve metadata for an object&quot;,
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+		Use:     &quot;head &lt;key&gt;&quot;,
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+		Short:   &quot;Retrieve metadata for an object&quot;,
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+		Long:    &quot;Retrieve metadata for an object by key.\nStructured data is printed to standard output.&quot;,
+</a> 		Version: rootCmd.Version,
+ 		Args:    cobra.ExactArgs(1),
+ 		RunE:    head,
+ 	}
+<a href="#h0-0-12" id="h0-0-12" class="i">+	downloadCmd = &amp;cobra.Command{
+</a><a href="#h0-0-13" id="h0-0-13" class="i">+		Use:     &quot;download &lt;key&gt;&quot;,
+</a><a href="#h0-0-14" id="h0-0-14" class="i">+		Aliases: []string{&quot;dl&quot;},
+</a><a href="#h0-0-15" id="h0-0-15" class="i">+		Short:   &quot;Download an object&quot;,
+</a><a href="#h0-0-16" id="h0-0-16" class="i">+		Long: &quot;Download an object by key, either in its entirety via a unary call or in chunks via a streaming response.\n&quot; +
+</a><a href="#h0-0-17" id="h0-0-17" class="i">+			&quot;Object data is written to standard output, while verbose logs (when enabled) are written to standard error.&quot;,
+</a><a href="#h0-0-18" id="h0-0-18" class="i">+		Version: rootCmd.Version,
+</a><a href="#h0-0-19" id="h0-0-19" class="i">+		Args:    cobra.ExactArgs(1),
+</a><a href="#h0-0-20" id="h0-0-20" class="i">+		RunE:    download,
+</a><a href="#h0-0-21" id="h0-0-21" class="i">+	}
+</a> )
+ 
+ func init() {
+ 	rootCmd.PersistentFlags().StringVarP(&amp;flagFormat, &quot;format&quot;, &quot;f&quot;, os.Getenv(&quot;UNI_FORMAT&quot;), &quot;output render format; choose from [json text]&quot;)
+ 	rootCmd.PersistentFlags().StringVarP(&amp;flagConfig, &quot;config&quot;, &quot;c&quot;, os.Getenv(&quot;UNI_CONFIG&quot;), &quot;path to the configuration file&quot;)
+<a href="#h0-0-27" id="h0-0-27" class="d">-	rootCmd.PersistentFlags().StringVarP(&amp;flagStore, &quot;store&quot;, &quot;s&quot;, &quot;default&quot;, &quot;server store alias&quot;)
+</a><a href="#h0-0-28" id="h0-0-28" class="i">+	rootCmd.PersistentFlags().StringVarP(&amp;flagStore, &quot;store&quot;, &quot;s&quot;, os.Getenv(&quot;UNI_STORE&quot;), &quot;server store alias&quot;)
+</a> 	rootCmd.PersistentFlags().BoolVarP(&amp;flagVerbose, &quot;verbose&quot;, &quot;v&quot;, false, &quot;enable verbose output&quot;)
+<a href="#h0-0-30" id="h0-0-30" class="d">-	rootCmd.MarkPersistentFlagRequired(&quot;store&quot;)
+</a> 
+ 	headCmd.Flags().StringP(&quot;bucket&quot;, &quot;b&quot;, &quot;&quot;, &quot;bucket name&quot;)
+ 	headCmd.MarkFlagRequired(&quot;bucket&quot;)
+ 	rootCmd.AddCommand(headCmd)
+<a href="#h0-0-35" id="h0-0-35" class="i">+
+</a><a href="#h0-0-36" id="h0-0-36" class="i">+	downloadCmd.Flags().StringP(&quot;bucket&quot;, &quot;b&quot;, &quot;&quot;, &quot;bucket name&quot;)
+</a><a href="#h0-0-37" id="h0-0-37" class="i">+	downloadCmd.Flags().BoolP(&quot;stream&quot;, &quot;t&quot;, false, &quot;stream object contents&quot;)
+</a><a href="#h0-0-38" id="h0-0-38" class="i">+	downloadCmd.Flags().Uint64P(&quot;chunk-size&quot;, &quot;r&quot;, 4096, &quot;stream response chunk size&quot;)
+</a><a href="#h0-0-39" id="h0-0-39" class="i">+	downloadCmd.MarkFlagRequired(&quot;bucket&quot;)
+</a><a href="#h0-0-40" id="h0-0-40" class="i">+	rootCmd.AddCommand(downloadCmd)
+</a> }
+ 
+ func main() {
+<b>diff --git a/<a id="h1" href="../file/cmd/unistore-cli/service.go">cmd/unistore-cli/service.go</a> b/<a href="../file/cmd/unistore-cli/service.go">cmd/unistore-cli/service.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -2,6 +2,7 @@ package main
+</a> 
+ import (
+ 	&quot;context&quot;
+<a href="#h1-0-3" id="h1-0-3" class="i">+	&quot;io&quot;
+</a> 	&quot;os&quot;
+ 	&quot;strings&quot;
+ 
+<a href="#h1-1" id="h1-1" class="h">@@ -48,3 +49,80 @@ func head(cmd *cobra.Command, args []string) error {
+</a> 
+ 	return renderResponse(flagFormat, os.Stdout, response)
+ }
+<a href="#h1-1-3" id="h1-1-3" class="i">+
+</a><a href="#h1-1-4" id="h1-1-4" class="i">+// download is a command line interface for the GetObject and StreamGetObject RPCs.
+</a><a href="#h1-1-5" id="h1-1-5" class="i">+func download(cmd *cobra.Command, args []string) error {
+</a><a href="#h1-1-6" id="h1-1-6" class="i">+	var cancel context.CancelFunc
+</a><a href="#h1-1-7" id="h1-1-7" class="i">+
+</a><a href="#h1-1-8" id="h1-1-8" class="i">+	bucket, _ := cmd.Flags().GetString(&quot;bucket&quot;)
+</a><a href="#h1-1-9" id="h1-1-9" class="i">+	stream, _ := cmd.Flags().GetBool(&quot;stream&quot;)
+</a><a href="#h1-1-10" id="h1-1-10" class="i">+	chunkSize, _ := cmd.Flags().GetUint64(&quot;chunk-size&quot;)
+</a><a href="#h1-1-11" id="h1-1-11" class="i">+	verbose, _ := cmd.Flags().GetBool(&quot;verbose&quot;)
+</a><a href="#h1-1-12" id="h1-1-12" class="i">+
+</a><a href="#h1-1-13" id="h1-1-13" class="i">+	store, err := initStoreConfig(flagConfig, flagStore)
+</a><a href="#h1-1-14" id="h1-1-14" class="i">+	if err != nil {
+</a><a href="#h1-1-15" id="h1-1-15" class="i">+		return err
+</a><a href="#h1-1-16" id="h1-1-16" class="i">+	}
+</a><a href="#h1-1-17" id="h1-1-17" class="i">+
+</a><a href="#h1-1-18" id="h1-1-18" class="i">+	client, err := initUnistoreClient(store)
+</a><a href="#h1-1-19" id="h1-1-19" class="i">+	if err != nil {
+</a><a href="#h1-1-20" id="h1-1-20" class="i">+		return err
+</a><a href="#h1-1-21" id="h1-1-21" class="i">+	}
+</a><a href="#h1-1-22" id="h1-1-22" class="i">+
+</a><a href="#h1-1-23" id="h1-1-23" class="i">+	ctx := context.Background()
+</a><a href="#h1-1-24" id="h1-1-24" class="i">+	if store.Connection.RequestTimeout &gt; 0 {
+</a><a href="#h1-1-25" id="h1-1-25" class="i">+		ctx, cancel = context.WithTimeout(ctx, store.Connection.RequestTimeout)
+</a><a href="#h1-1-26" id="h1-1-26" class="i">+		defer cancel()
+</a><a href="#h1-1-27" id="h1-1-27" class="i">+	}
+</a><a href="#h1-1-28" id="h1-1-28" class="i">+
+</a><a href="#h1-1-29" id="h1-1-29" class="i">+	get := &amp;service.GetObjectRequest{
+</a><a href="#h1-1-30" id="h1-1-30" class="i">+		Resource: &amp;common.Resource{
+</a><a href="#h1-1-31" id="h1-1-31" class="i">+			Backend: common.Backend(common.Backend_value[strings.ToUpper(store.Backend)]),
+</a><a href="#h1-1-32" id="h1-1-32" class="i">+			Bucket:  bucket,
+</a><a href="#h1-1-33" id="h1-1-33" class="i">+		},
+</a><a href="#h1-1-34" id="h1-1-34" class="i">+		Key: args[0],
+</a><a href="#h1-1-35" id="h1-1-35" class="i">+	}
+</a><a href="#h1-1-36" id="h1-1-36" class="i">+
+</a><a href="#h1-1-37" id="h1-1-37" class="i">+	if !stream {
+</a><a href="#h1-1-38" id="h1-1-38" class="i">+		response, err := client.GetObject(ctx, get)
+</a><a href="#h1-1-39" id="h1-1-39" class="i">+		if err != nil {
+</a><a href="#h1-1-40" id="h1-1-40" class="i">+			return err
+</a><a href="#h1-1-41" id="h1-1-41" class="i">+		}
+</a><a href="#h1-1-42" id="h1-1-42" class="i">+
+</a><a href="#h1-1-43" id="h1-1-43" class="i">+		if verbose {
+</a><a href="#h1-1-44" id="h1-1-44" class="i">+			renderResponse(flagFormat, os.Stderr, response)
+</a><a href="#h1-1-45" id="h1-1-45" class="i">+		}
+</a><a href="#h1-1-46" id="h1-1-46" class="i">+
+</a><a href="#h1-1-47" id="h1-1-47" class="i">+		_, err = os.Stdout.Write(response.Data)
+</a><a href="#h1-1-48" id="h1-1-48" class="i">+		return err
+</a><a href="#h1-1-49" id="h1-1-49" class="i">+	}
+</a><a href="#h1-1-50" id="h1-1-50" class="i">+
+</a><a href="#h1-1-51" id="h1-1-51" class="i">+	request := &amp;service.GetObjectStreamRequest{
+</a><a href="#h1-1-52" id="h1-1-52" class="i">+		Request:   get,
+</a><a href="#h1-1-53" id="h1-1-53" class="i">+		ChunkSize: chunkSize,
+</a><a href="#h1-1-54" id="h1-1-54" class="i">+	}
+</a><a href="#h1-1-55" id="h1-1-55" class="i">+
+</a><a href="#h1-1-56" id="h1-1-56" class="i">+	response, err := client.StreamGetObject(ctx, request)
+</a><a href="#h1-1-57" id="h1-1-57" class="i">+	if err != nil {
+</a><a href="#h1-1-58" id="h1-1-58" class="i">+		return err
+</a><a href="#h1-1-59" id="h1-1-59" class="i">+	}
+</a><a href="#h1-1-60" id="h1-1-60" class="i">+
+</a><a href="#h1-1-61" id="h1-1-61" class="i">+	for {
+</a><a href="#h1-1-62" id="h1-1-62" class="i">+		message, err := response.Recv()
+</a><a href="#h1-1-63" id="h1-1-63" class="i">+		if err == io.EOF {
+</a><a href="#h1-1-64" id="h1-1-64" class="i">+			break
+</a><a href="#h1-1-65" id="h1-1-65" class="i">+		} else if err != nil {
+</a><a href="#h1-1-66" id="h1-1-66" class="i">+			return err
+</a><a href="#h1-1-67" id="h1-1-67" class="i">+		}
+</a><a href="#h1-1-68" id="h1-1-68" class="i">+
+</a><a href="#h1-1-69" id="h1-1-69" class="i">+		if verbose {
+</a><a href="#h1-1-70" id="h1-1-70" class="i">+			renderResponse(flagFormat, os.Stderr, message)
+</a><a href="#h1-1-71" id="h1-1-71" class="i">+		}
+</a><a href="#h1-1-72" id="h1-1-72" class="i">+
+</a><a href="#h1-1-73" id="h1-1-73" class="i">+		if _, err = os.Stdout.Write(message.Response.Data); err != nil {
+</a><a href="#h1-1-74" id="h1-1-74" class="i">+			return err
+</a><a href="#h1-1-75" id="h1-1-75" class="i">+		}
+</a><a href="#h1-1-76" id="h1-1-76" class="i">+	}
+</a><a href="#h1-1-77" id="h1-1-77" class="i">+
+</a><a href="#h1-1-78" id="h1-1-78" class="i">+	return nil
+</a><a href="#h1-1-79" id="h1-1-79" class="i">+}
+</a></pre>
+</div>
+</body>
+</html>

@@ -1,0 +1,122 @@
+syntax = "proto3";
+
+package schemas.common;
+
+option go_package = "lib.kevinlin.info/schemas/unistore/common";
+
+// Backend enumerates known storage backend implementations.
+enum Backend {
+  // Empty is the default empty backend.
+  EMPTY = 0;
+  // Composite is a backend that composes one or more other backends with a configurable read and
+  // write dispatch policy.
+  COMPOSITE = 1;
+  // Disk is a storage backend built on top of a local filesystem.
+  DISK = 2;
+  // Unistore allows use of another Unistore server as a storage backend.
+  UNISTORE = 3;
+  // B2 implements cloud-based storage with Backblaze B2.
+  // Reference: https://www.backblaze.com/b2/cloud-storage.html
+  B2 = 4;
+}
+
+// Checksum enumerates known checksum algorithms. It is used in an optional checksum middleware
+// layer responsible for validating client-supplied checksums for inbound puts and writing checksums
+// to clients for outbound gets.
+enum Checksum {
+  // None disables checksum calculation.
+  NONE = 0;
+  // CRC32 is the CRC32 algorithm.
+  // Reference: https://pkg.go.dev/hash/crc32
+  CRC32 = 1;
+  // MD5 is the MD5 algorithm.
+  // Reference: https://pkg.go.dev/crypto/md5
+  MD5 = 2;
+  // SHA1 is the SHA1 algorithm.
+  // Reference: https://pkg.go.dev/crypto/sha1
+  SHA1 = 3;
+  // SHA256 is the SHA256 algorithm.
+  // Reference: https://pkg.go.dev/crypto/sha256
+  SHA256 = 4;
+  // SHA512 is the SHA512 algorithm.
+  // Reference: https://pkg.go.dev/crypto/sha512
+  SHA512 = 5;
+}
+
+// Compression enumerates known compression algorithms. It is used in an optional compression
+// middleware layer responsible for in-flight compression and decompression of object data.
+enum Compression {
+  // Plaintext disables compression; data is transmitted as-is without modification.
+  PLAINTEXT = 0;
+  // gzip is the gzip algorithm.
+  GZIP = 1;
+  // zstd is the zstandard algorithm.
+  ZSTD = 2;
+  // Snappy is the Snappy algorithm.
+  SNAPPY = 3;
+}
+
+// Encryption enumerates known asymmetric encryption mechanisms. It is used in an optional
+// encryption middleware layer responsible for in-flight encryption and decryption of object data.
+enum Encryption {
+  // Unencrypted disables encryption; data is transmitted as-is without modification.
+  UNENCRYPTED = 0;
+  // Age implements encryption with Age, requiring a private and public key.
+  // Reference: https://pkg.go.dev/filippo.io/age
+  AGE = 1;
+}
+
+// Dispatch enumerates known composite backend dispatch policies. It is used to control the behavior
+// of the composite backend when abstracting over multiple other backends.
+enum Dispatch {
+  // Noop dispatch; do nothing.
+  NOOP = 0;
+  // Random selects a backend at random to fulfill the request.
+  RANDOM = 1;
+  // Initial selects the first backend (by order) to fulfill the request.
+  INITIAL = 2;
+  // Failover sequentially dispatches the request to backends in order and returns the first
+  // non-error result. Sequential dispatch ceases after a success is encountered in the chain.
+  FAILOVER = 3;
+  // All sync sequentially dispatches the request to all backends in order. Any errors encountered
+  // in the chain are returned immediately; otherwise, the last successful response is returned.
+  ALL_SYNC = 4;
+  // All async asynchronously dispatches the request to all backends simultaneously and waits for
+  // all requests to complete. If an error is encountered for any backend, it is returned;
+  // otherwise, the first successful response is returned.
+  ALL_ASYNC = 5;
+}
+
+// Resource is a common definition for a resource locator for operations on objects.
+message Resource {
+  // Backend specifies the desired backend for the request.
+  Backend backend = 1;
+  // Bucket specifies the top-level namespace for the request.
+  // Note that usage or non-usage of the bucket is implementation-defined and its semantics are
+  // likely to differ among different storage backends.
+  string bucket = 2;
+  // Tags is a map of arbitrary key-value tags to parameterize the resource definition.
+  // Note that usage or non-usage of tags is implementation-defined.
+  map<string, string> tags = 3;
+}
+
+// Node is a recursively defined container for expressing the structure of a backend composition
+// tree. It is used in metadata APIs for introspecting the initialized state of the server.
+message Node {
+  // Value is a wrapper for the parameter value, which may either be a string constant or a Node.
+  message Value {
+    oneof child {
+      // Value is used for constant parameter values.
+      string value = 1;
+      // Node is used for recursively defined backends.
+      Node node = 2;
+    }
+  }
+  // Name is the name of the backend implementation.
+  string name = 1;
+  // Children defines zero or more parameters of the backend. Each parameter requires a string key
+  // and an associated value, which may either be a string constant or a recursively defined Node.
+  // Children are recursively defined in the case of middleware backends that themselves wrap other
+  // backends.
+  map<string, Value> children = 2;
+}

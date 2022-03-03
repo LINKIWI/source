@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/backend: Implementation of recursive deletions in B2 backend - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/7a6affa9a54bab0aeb6880aa11f7ce8a98aee95f">7a6affa9a54bab0aeb6880aa11f7ce8a98aee95f</a>
+<b>parent</b> <a href="../commit/49c464808d74449761b4fbc54874732d800fcbce">49c464808d74449761b4fbc54874732d800fcbce</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sat 29 Jan 2022 09:08:42 -0800
+
+internal/backend: Implementation of recursive deletions in B2 backend
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/backend/b2.go</a></td><td> | </td><td class="num">48</td><td><span class="i">++++++++++++++++++++++++++++++++++++++</span><span class="d">----------</span></td></tr>
+</table></pre><pre>1 file changed, 38 insertions(+), 10 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/backend/b2.go">internal/backend/b2.go</a> b/<a href="../file/internal/backend/b2.go">internal/backend/b2.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -10,6 +10,7 @@ import (
+</a> 	&quot;net/http&quot;
+ 	&quot;net/url&quot;
+ 	&quot;regexp&quot;
+<a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;strings&quot;
+</a> 	&quot;sync&quot;
+ 	&quot;time&quot;
+ 
+<a href="#h0-1" id="h0-1" class="h">@@ -720,6 +721,12 @@ func (b *B2) DeleteObject(ctx context.Context, request *service.DeleteObjectRequ
+</a> 		StartFileName: request.Key,
+ 		MaxFileCount:  1,
+ 		Prefix:        request.Key,
+<a href="#h0-1-3" id="h0-1-3" class="i">+		Delimiter:     &quot;/&quot;,
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+	}
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+
+</a><a href="#h0-1-6" id="h0-1-6" class="i">+	if request.Recursive {
+</a><a href="#h0-1-7" id="h0-1-7" class="i">+		lfReq.Delimiter = &quot;&quot;
+</a><a href="#h0-1-8" id="h0-1-8" class="i">+		lfReq.MaxFileCount = 10000
+</a> 	}
+ 
+ 	lfResp, err := b.client.ListFileNames(ctx, lfReq)
+<a href="#h0-2" id="h0-2" class="h">@@ -727,27 +734,48 @@ func (b *B2) DeleteObject(ctx context.Context, request *service.DeleteObjectRequ
+</a> 		return nil, b.createError(err)
+ 	}
+ 
+<a href="#h0-2-3" id="h0-2-3" class="d">-	if len(lfResp.Files) != 1 {
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+	if len(lfResp.Files) == 0 {
+</a> 		return nil, status.Errorf(
+ 			codes.NotFound,
+ 			&quot;backend: no files match requested name: bucket=%s name=%s&quot;,
+ 			request.Resource.Bucket,
+ 			request.Key,
+ 		)
+<a href="#h0-2-11" id="h0-2-11" class="i">+	} else if !request.Recursive &amp;&amp; len(lfResp.Files) == 1 &amp;&amp; lfResp.Files[0].FileID == &quot;&quot; {
+</a><a href="#h0-2-12" id="h0-2-12" class="i">+		// To emulate Unistore API semantics, disallow non-recursive deletions on non-empty
+</a><a href="#h0-2-13" id="h0-2-13" class="i">+		// directories. The B2 API represents this a single matched file with no file ID.
+</a><a href="#h0-2-14" id="h0-2-14" class="i">+		return nil, status.Errorf(
+</a><a href="#h0-2-15" id="h0-2-15" class="i">+			codes.FailedPrecondition,
+</a><a href="#h0-2-16" id="h0-2-16" class="i">+			&quot;backend: cannot delete directory without recursive flag: bucket=%s name=%s&quot;,
+</a><a href="#h0-2-17" id="h0-2-17" class="i">+			request.Resource.Bucket,
+</a><a href="#h0-2-18" id="h0-2-18" class="i">+			request.Key,
+</a><a href="#h0-2-19" id="h0-2-19" class="i">+		)
+</a><a href="#h0-2-20" id="h0-2-20" class="i">+	} else if !request.Recursive &amp;&amp; len(lfResp.Files) &gt; 0 &amp;&amp; strings.HasSuffix(request.Key, &quot;/&quot;) {
+</a><a href="#h0-2-21" id="h0-2-21" class="i">+		// Directories can only exist in B2 if there are nonzero children (potentially
+</a><a href="#h0-2-22" id="h0-2-22" class="i">+		// nested arbitrarily deeply). Require such deletions to be recursive.
+</a><a href="#h0-2-23" id="h0-2-23" class="i">+		return nil, status.Errorf(
+</a><a href="#h0-2-24" id="h0-2-24" class="i">+			codes.FailedPrecondition,
+</a><a href="#h0-2-25" id="h0-2-25" class="i">+			&quot;backend: cannot delete non-empty directory without recursive flag: bucket=%s name=%s children=%d&quot;,
+</a><a href="#h0-2-26" id="h0-2-26" class="i">+			request.Resource.Bucket,
+</a><a href="#h0-2-27" id="h0-2-27" class="i">+			request.Key,
+</a><a href="#h0-2-28" id="h0-2-28" class="i">+			len(lfResp.Files),
+</a><a href="#h0-2-29" id="h0-2-29" class="i">+		)
+</a> 	}
+ 
+<a href="#h0-2-32" id="h0-2-32" class="d">-	dfReq := &amp;b2.DeleteFileVersionRequest{
+</a><a href="#h0-2-33" id="h0-2-33" class="d">-		Authorization: auth.authorizationToken,
+</a><a href="#h0-2-34" id="h0-2-34" class="d">-		BaseURL:       auth.apiURL,
+</a><a href="#h0-2-35" id="h0-2-35" class="d">-		FileName:      request.Key,
+</a><a href="#h0-2-36" id="h0-2-36" class="d">-		FileID:        lfResp.Files[0].FileID,
+</a><a href="#h0-2-37" id="h0-2-37" class="d">-	}
+</a><a href="#h0-2-38" id="h0-2-38" class="i">+	for _, file := range lfResp.Files {
+</a><a href="#h0-2-39" id="h0-2-39" class="i">+		dfReq := &amp;b2.DeleteFileVersionRequest{
+</a><a href="#h0-2-40" id="h0-2-40" class="i">+			Authorization: auth.authorizationToken,
+</a><a href="#h0-2-41" id="h0-2-41" class="i">+			BaseURL:       auth.apiURL,
+</a><a href="#h0-2-42" id="h0-2-42" class="i">+			FileName:      file.FileName,
+</a><a href="#h0-2-43" id="h0-2-43" class="i">+			FileID:        file.FileID,
+</a><a href="#h0-2-44" id="h0-2-44" class="i">+		}
+</a> 
+<a href="#h0-2-46" id="h0-2-46" class="d">-	if _, err := b.client.DeleteFileVersion(ctx, dfReq); err != nil {
+</a><a href="#h0-2-47" id="h0-2-47" class="d">-		return nil, b.createError(err)
+</a><a href="#h0-2-48" id="h0-2-48" class="i">+		if _, err := b.client.DeleteFileVersion(ctx, dfReq); err != nil {
+</a><a href="#h0-2-49" id="h0-2-49" class="i">+			return nil, b.createError(err)
+</a><a href="#h0-2-50" id="h0-2-50" class="i">+		}
+</a> 	}
+ 
+<a href="#h0-2-53" id="h0-2-53" class="d">-	return &amp;service.DeleteObjectResponse{}, nil
+</a><a href="#h0-2-54" id="h0-2-54" class="i">+	return &amp;service.DeleteObjectResponse{Deleted: int32(len(lfResp.Files))}, nil
+</a> }
+ 
+ // ListBuckets retrieves metadata for all buckets.
+</pre>
+</div>
+</body>
+</html>

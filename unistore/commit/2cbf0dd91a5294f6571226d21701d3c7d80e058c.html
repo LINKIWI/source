@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/backend, internal/server: Implement HeadBucket in relevant backend layers - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/2cbf0dd91a5294f6571226d21701d3c7d80e058c">2cbf0dd91a5294f6571226d21701d3c7d80e058c</a>
+<b>parent</b> <a href="../commit/9bb7474551a57d25900065a6ba6e0773d1140526">9bb7474551a57d25900065a6ba6e0773d1140526</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Mon 17 Jan 2022 12:00:54 -0800
+
+internal/backend, internal/server: Implement HeadBucket in relevant backend layers
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/backend/alias.go</a></td><td> | </td><td class="num">12</td><td><span class="i">++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">internal/backend/b2.go</a></td><td> | </td><td class="num">49</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">internal/backend/composite.go</a></td><td> | </td><td class="num">14</td><td><span class="i">++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">internal/backend/disk.go</a></td><td> | </td><td class="num">17</td><td><span class="i">+++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h4">internal/backend/instrumentation.go</a></td><td> | </td><td class="num">33</td><td><span class="i">++++++++++++++++++++++++++++++++</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h5">internal/backend/mux.go</a></td><td> | </td><td class="num">14</td><td><span class="i">++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h6">internal/backend/types.go</a></td><td> | </td><td class="num">3</td><td><span class="i">+++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h7">internal/backend/unistore.go</a></td><td> | </td><td class="num">14</td><td><span class="i">++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h8">internal/server/unistore.go</a></td><td> | </td><td class="num">5</td><td><span class="i">+++++</span><span class="d"></span></td></tr>
+</table></pre><pre>9 files changed, 160 insertions(+), 1 deletion(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/backend/alias.go">internal/backend/alias.go</a> b/<a href="../file/internal/backend/alias.go">internal/backend/alias.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -24,6 +24,18 @@ func NewAlias(aliases []*config.Alias, backend Backend) Backend {
+</a> 	}
+ }
+ 
+<a href="#h0-0-3" id="h0-0-3" class="i">+// HeadBucket conditionally overwrites the request bucket and defers to the underlying backend.
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+func (a *Alias) HeadBucket(ctx context.Context, request *service.HeadBucketRequest) (*service.HeadBucketResponse, error) {
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+	for _, alias := range a.aliases {
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+		if alias.Pattern.MatchString(request.Resource.Bucket) {
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+			request.Resource.Bucket = alias.Alias
+</a><a href="#h0-0-8" id="h0-0-8" class="i">+			break
+</a><a href="#h0-0-9" id="h0-0-9" class="i">+		}
+</a><a href="#h0-0-10" id="h0-0-10" class="i">+	}
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+
+</a><a href="#h0-0-12" id="h0-0-12" class="i">+	return a.Backend.HeadBucket(ctx, request)
+</a><a href="#h0-0-13" id="h0-0-13" class="i">+}
+</a><a href="#h0-0-14" id="h0-0-14" class="i">+
+</a> // HeadObject conditionally overwrites the request bucket and defers to the underlying backend.
+ func (a *Alias) HeadObject(ctx context.Context, request *service.HeadObjectRequest) (*service.HeadObjectResponse, error) {
+ 	for _, alias := range a.aliases {
+<b>diff --git a/<a id="h1" href="../file/internal/backend/b2.go">internal/backend/b2.go</a> b/<a href="../file/internal/backend/b2.go">internal/backend/b2.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -98,6 +98,55 @@ func NewB2(cfg *config.B2) (Backend, error) {
+</a> 	return newInstrumentation(&quot;b2&quot;, b), nil
+ }
+ 
+<a href="#h1-0-3" id="h1-0-3" class="i">+// HeadBucket locates the requested bucket by name followed by listing its metadata.
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+func (b *B2) HeadBucket(ctx context.Context, request *service.HeadBucketRequest) (*service.HeadBucketResponse, error) {
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+	var visibility common.Visibility
+</a><a href="#h1-0-6" id="h1-0-6" class="i">+
+</a><a href="#h1-0-7" id="h1-0-7" class="i">+	auth, err := b.authorizeAccount(ctx)
+</a><a href="#h1-0-8" id="h1-0-8" class="i">+	if err != nil {
+</a><a href="#h1-0-9" id="h1-0-9" class="i">+		return nil, b.createError(err)
+</a><a href="#h1-0-10" id="h1-0-10" class="i">+	}
+</a><a href="#h1-0-11" id="h1-0-11" class="i">+
+</a><a href="#h1-0-12" id="h1-0-12" class="i">+	lbReq := &amp;b2.ListBucketsRequest{
+</a><a href="#h1-0-13" id="h1-0-13" class="i">+		Authorization: auth.authorizationToken,
+</a><a href="#h1-0-14" id="h1-0-14" class="i">+		BaseURL:       auth.apiURL,
+</a><a href="#h1-0-15" id="h1-0-15" class="i">+		AccountID:     auth.accountID,
+</a><a href="#h1-0-16" id="h1-0-16" class="i">+		BucketName:    request.Resource.Bucket,
+</a><a href="#h1-0-17" id="h1-0-17" class="i">+	}
+</a><a href="#h1-0-18" id="h1-0-18" class="i">+
+</a><a href="#h1-0-19" id="h1-0-19" class="i">+	lbResp, err := b.client.ListBuckets(ctx, lbReq)
+</a><a href="#h1-0-20" id="h1-0-20" class="i">+	if err != nil {
+</a><a href="#h1-0-21" id="h1-0-21" class="i">+		return nil, b.createError(err)
+</a><a href="#h1-0-22" id="h1-0-22" class="i">+	}
+</a><a href="#h1-0-23" id="h1-0-23" class="i">+
+</a><a href="#h1-0-24" id="h1-0-24" class="i">+	if len(lbResp.Buckets) != 1 {
+</a><a href="#h1-0-25" id="h1-0-25" class="i">+		return nil, status.Errorf(
+</a><a href="#h1-0-26" id="h1-0-26" class="i">+			codes.NotFound,
+</a><a href="#h1-0-27" id="h1-0-27" class="i">+			&quot;backend: unexpected number of buckets matched by name: name=%s buckets=%d&quot;,
+</a><a href="#h1-0-28" id="h1-0-28" class="i">+			request.Resource.Bucket,
+</a><a href="#h1-0-29" id="h1-0-29" class="i">+			len(lbResp.Buckets),
+</a><a href="#h1-0-30" id="h1-0-30" class="i">+		)
+</a><a href="#h1-0-31" id="h1-0-31" class="i">+	}
+</a><a href="#h1-0-32" id="h1-0-32" class="i">+
+</a><a href="#h1-0-33" id="h1-0-33" class="i">+	switch lbResp.Buckets[0].BucketType {
+</a><a href="#h1-0-34" id="h1-0-34" class="i">+	case &quot;allPublic&quot;:
+</a><a href="#h1-0-35" id="h1-0-35" class="i">+		visibility = common.Visibility_PUBLIC
+</a><a href="#h1-0-36" id="h1-0-36" class="i">+	case &quot;allPrivate&quot;, &quot;snapshot&quot;:
+</a><a href="#h1-0-37" id="h1-0-37" class="i">+		visibility = common.Visibility_PRIVATE
+</a><a href="#h1-0-38" id="h1-0-38" class="i">+	default:
+</a><a href="#h1-0-39" id="h1-0-39" class="i">+		visibility = common.Visibility_DEFAULT
+</a><a href="#h1-0-40" id="h1-0-40" class="i">+	}
+</a><a href="#h1-0-41" id="h1-0-41" class="i">+
+</a><a href="#h1-0-42" id="h1-0-42" class="i">+	return &amp;service.HeadBucketResponse{
+</a><a href="#h1-0-43" id="h1-0-43" class="i">+		Bucket: &amp;common.Bucket{
+</a><a href="#h1-0-44" id="h1-0-44" class="i">+			Id:         lbResp.Buckets[0].BucketID,
+</a><a href="#h1-0-45" id="h1-0-45" class="i">+			Name:       lbResp.Buckets[0].BucketName,
+</a><a href="#h1-0-46" id="h1-0-46" class="i">+			Visibility: visibility,
+</a><a href="#h1-0-47" id="h1-0-47" class="i">+			Tags:       lbResp.Buckets[0].BucketInfo,
+</a><a href="#h1-0-48" id="h1-0-48" class="i">+		},
+</a><a href="#h1-0-49" id="h1-0-49" class="i">+	}, nil
+</a><a href="#h1-0-50" id="h1-0-50" class="i">+}
+</a><a href="#h1-0-51" id="h1-0-51" class="i">+
+</a> // HeadObject locates the requested file ID followed by listing its metadata.
+ func (b *B2) HeadObject(ctx context.Context, request *service.HeadObjectRequest) (*service.HeadObjectResponse, error) {
+ 	auth, err := b.authorizeAccount(ctx)
+<b>diff --git a/<a id="h2" href="../file/internal/backend/composite.go">internal/backend/composite.go</a> b/<a href="../file/internal/backend/composite.go">internal/backend/composite.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -36,6 +36,20 @@ func NewComposite(readDispatch string, writeDispatch string, backends []Backend)
+</a> 	return newInstrumentation(&quot;composite&quot;, c)
+ }
+ 
+<a href="#h2-0-3" id="h2-0-3" class="i">+// HeadBucket invokes HeadBucket in one or more composed backends.
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+func (c *Composite) HeadBucket(ctx context.Context, request *service.HeadBucketRequest) (*service.HeadBucketResponse, error) {
+</a><a href="#h2-0-5" id="h2-0-5" class="i">+	rpc := func(backend Backend) (proto.Message, error) {
+</a><a href="#h2-0-6" id="h2-0-6" class="i">+		return backend.HeadBucket(ctx, proto.Clone(request).(*service.HeadBucketRequest))
+</a><a href="#h2-0-7" id="h2-0-7" class="i">+	}
+</a><a href="#h2-0-8" id="h2-0-8" class="i">+
+</a><a href="#h2-0-9" id="h2-0-9" class="i">+	response, err := c.dispatch(c.readDispatch, rpc)
+</a><a href="#h2-0-10" id="h2-0-10" class="i">+	if err != nil {
+</a><a href="#h2-0-11" id="h2-0-11" class="i">+		return nil, err
+</a><a href="#h2-0-12" id="h2-0-12" class="i">+	}
+</a><a href="#h2-0-13" id="h2-0-13" class="i">+
+</a><a href="#h2-0-14" id="h2-0-14" class="i">+	return response.(*service.HeadBucketResponse), nil
+</a><a href="#h2-0-15" id="h2-0-15" class="i">+}
+</a><a href="#h2-0-16" id="h2-0-16" class="i">+
+</a> // HeadObject invokes HeadObject in one or more composed backends.
+ func (c *Composite) HeadObject(ctx context.Context, request *service.HeadObjectRequest) (*service.HeadObjectResponse, error) {
+ 	rpc := func(backend Backend) (proto.Message, error) {
+<b>diff --git a/<a id="h3" href="../file/internal/backend/disk.go">internal/backend/disk.go</a> b/<a href="../file/internal/backend/disk.go">internal/backend/disk.go</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -42,6 +42,23 @@ func NewDisk(cfg *config.Disk) (Backend, error) {
+</a> 	return newInstrumentation(&quot;disk&quot;, d), nil
+ }
+ 
+<a href="#h3-0-3" id="h3-0-3" class="i">+// HeadBucket stats the requested bucket directory.
+</a><a href="#h3-0-4" id="h3-0-4" class="i">+func (d *Disk) HeadBucket(ctx context.Context, request *service.HeadBucketRequest) (*service.HeadBucketResponse, error) {
+</a><a href="#h3-0-5" id="h3-0-5" class="i">+	stat, err := d.client.StatFile(request.Resource.Bucket)
+</a><a href="#h3-0-6" id="h3-0-6" class="i">+	if err != nil {
+</a><a href="#h3-0-7" id="h3-0-7" class="i">+		return nil, d.createError(err)
+</a><a href="#h3-0-8" id="h3-0-8" class="i">+	}
+</a><a href="#h3-0-9" id="h3-0-9" class="i">+
+</a><a href="#h3-0-10" id="h3-0-10" class="i">+	return &amp;service.HeadBucketResponse{
+</a><a href="#h3-0-11" id="h3-0-11" class="i">+		Bucket: &amp;common.Bucket{
+</a><a href="#h3-0-12" id="h3-0-12" class="i">+			Id:        stat.BaseName,
+</a><a href="#h3-0-13" id="h3-0-13" class="i">+			Name:      stat.BaseName,
+</a><a href="#h3-0-14" id="h3-0-14" class="i">+			Timestamp: timestamppb.New(stat.ModifiedTime),
+</a><a href="#h3-0-15" id="h3-0-15" class="i">+			Tags:      stat.Attributes,
+</a><a href="#h3-0-16" id="h3-0-16" class="i">+		},
+</a><a href="#h3-0-17" id="h3-0-17" class="i">+	}, nil
+</a><a href="#h3-0-18" id="h3-0-18" class="i">+}
+</a><a href="#h3-0-19" id="h3-0-19" class="i">+
+</a> // HeadObject stats the requested file.
+ func (d *Disk) HeadObject(ctx context.Context, request *service.HeadObjectRequest) (*service.HeadObjectResponse, error) {
+ 	var objectType common.Object
+<b>diff --git a/<a id="h4" href="../file/internal/backend/instrumentation.go">internal/backend/instrumentation.go</a> b/<a href="../file/internal/backend/instrumentation.go">internal/backend/instrumentation.go</a></b>
+<a href="#h4-0" id="h4-0" class="h">@@ -42,6 +42,37 @@ func newInstrumentation(name string, backend Backend) Backend {
+</a> 	}
+ }
+ 
+<a href="#h4-0-3" id="h4-0-3" class="i">+// HeadBucket defers to the underlying backend and emits relevant metrics.
+</a><a href="#h4-0-4" id="h4-0-4" class="i">+func (i *instrumentation) HeadBucket(ctx context.Context, request *service.HeadBucketRequest) (*service.HeadBucketResponse, error) {
+</a><a href="#h4-0-5" id="h4-0-5" class="i">+	stopwatch := lib.NewStopwatch()
+</a><a href="#h4-0-6" id="h4-0-6" class="i">+	base := lib.MapTag(map[string]interface{}{
+</a><a href="#h4-0-7" id="h4-0-7" class="i">+		&quot;method&quot;:  &quot;HeadBucket&quot;,
+</a><a href="#h4-0-8" id="h4-0-8" class="i">+		&quot;name&quot;:    i.name,
+</a><a href="#h4-0-9" id="h4-0-9" class="i">+		&quot;backend&quot;: request.Resource.Backend,
+</a><a href="#h4-0-10" id="h4-0-10" class="i">+		&quot;bucket&quot;:  request.Resource.Bucket,
+</a><a href="#h4-0-11" id="h4-0-11" class="i">+	})
+</a><a href="#h4-0-12" id="h4-0-12" class="i">+
+</a><a href="#h4-0-13" id="h4-0-13" class="i">+	metrics.Client.Size(metricRequestSize, int64(proto.Size(request)), lib.CombineTags(base))
+</a><a href="#h4-0-14" id="h4-0-14" class="i">+
+</a><a href="#h4-0-15" id="h4-0-15" class="i">+	response, err := i.Backend.HeadBucket(ctx, request)
+</a><a href="#h4-0-16" id="h4-0-16" class="i">+	if err != nil {
+</a><a href="#h4-0-17" id="h4-0-17" class="i">+		st := status.Convert(err)
+</a><a href="#h4-0-18" id="h4-0-18" class="i">+		tags := lib.CombineTags(base, lib.Tag(&quot;code&quot;, st.Code()))
+</a><a href="#h4-0-19" id="h4-0-19" class="i">+
+</a><a href="#h4-0-20" id="h4-0-20" class="i">+		metrics.Client.Incr(metricInvoke, tags)
+</a><a href="#h4-0-21" id="h4-0-21" class="i">+		metrics.Client.Timing(metricDuration, stopwatch.Elapsed(), tags)
+</a><a href="#h4-0-22" id="h4-0-22" class="i">+
+</a><a href="#h4-0-23" id="h4-0-23" class="i">+		return nil, err
+</a><a href="#h4-0-24" id="h4-0-24" class="i">+	}
+</a><a href="#h4-0-25" id="h4-0-25" class="i">+
+</a><a href="#h4-0-26" id="h4-0-26" class="i">+	tags := lib.CombineTags(base, lib.Tag(&quot;code&quot;, codes.OK))
+</a><a href="#h4-0-27" id="h4-0-27" class="i">+	metrics.Client.Incr(metricInvoke, tags)
+</a><a href="#h4-0-28" id="h4-0-28" class="i">+	metrics.Client.Timing(metricDuration, stopwatch.Elapsed(), tags)
+</a><a href="#h4-0-29" id="h4-0-29" class="i">+	metrics.Client.Size(metricResponseSize, int64(proto.Size(response)), tags)
+</a><a href="#h4-0-30" id="h4-0-30" class="i">+
+</a><a href="#h4-0-31" id="h4-0-31" class="i">+	return response, err
+</a><a href="#h4-0-32" id="h4-0-32" class="i">+}
+</a><a href="#h4-0-33" id="h4-0-33" class="i">+
+</a> // HeadObject defers to the underlying backend and emits relevant metrics.
+ func (i *instrumentation) HeadObject(ctx context.Context, request *service.HeadObjectRequest) (*service.HeadObjectResponse, error) {
+ 	stopwatch := lib.NewStopwatch()
+<a href="#h4-1" id="h4-1" class="h">@@ -238,7 +269,7 @@ func (i *instrumentation) StreamPutObject(ctx context.Context, stream chan *serv
+</a> 	if err != nil {
+ 		st := status.Convert(err)
+ 
+<a href="#h4-1-3" id="h4-1-3" class="d">-		backend := common.Backend_DEFAULT
+</a><a href="#h4-1-4" id="h4-1-4" class="i">+		backend := common.Backend_EMPTY
+</a> 		bucket := &quot;unknown&quot;
+ 		if request != nil {
+ 			backend = request.Request.Resource.Backend
+<b>diff --git a/<a id="h5" href="../file/internal/backend/mux.go">internal/backend/mux.go</a> b/<a href="../file/internal/backend/mux.go">internal/backend/mux.go</a></b>
+<a href="#h5-0" id="h5-0" class="h">@@ -21,6 +21,20 @@ func NewMux(backends map[common.Backend]Backend) Backend {
+</a> 	return newInstrumentation(&quot;mux&quot;, &amp;Mux{backends})
+ }
+ 
+<a href="#h5-0-3" id="h5-0-3" class="i">+// HeadBucket demuxes HeadBucket.
+</a><a href="#h5-0-4" id="h5-0-4" class="i">+func (m *Mux) HeadBucket(ctx context.Context, request *service.HeadBucketRequest) (*service.HeadBucketResponse, error) {
+</a><a href="#h5-0-5" id="h5-0-5" class="i">+	backend, ok := m.backends[request.Resource.Backend]
+</a><a href="#h5-0-6" id="h5-0-6" class="i">+	if !ok {
+</a><a href="#h5-0-7" id="h5-0-7" class="i">+		return nil, status.Errorf(
+</a><a href="#h5-0-8" id="h5-0-8" class="i">+			codes.Unimplemented,
+</a><a href="#h5-0-9" id="h5-0-9" class="i">+			&quot;backend: no implementation exists for the requested backend: backend=%v&quot;,
+</a><a href="#h5-0-10" id="h5-0-10" class="i">+			request.Resource.Backend,
+</a><a href="#h5-0-11" id="h5-0-11" class="i">+		)
+</a><a href="#h5-0-12" id="h5-0-12" class="i">+	}
+</a><a href="#h5-0-13" id="h5-0-13" class="i">+
+</a><a href="#h5-0-14" id="h5-0-14" class="i">+	return backend.HeadBucket(ctx, request)
+</a><a href="#h5-0-15" id="h5-0-15" class="i">+}
+</a><a href="#h5-0-16" id="h5-0-16" class="i">+
+</a> // HeadObject demuxes HeadObject.
+ func (m *Mux) HeadObject(ctx context.Context, request *service.HeadObjectRequest) (*service.HeadObjectResponse, error) {
+ 	backend, ok := m.backends[request.Resource.Backend]
+<b>diff --git a/<a id="h6" href="../file/internal/backend/types.go">internal/backend/types.go</a> b/<a href="../file/internal/backend/types.go">internal/backend/types.go</a></b>
+<a href="#h6-0" id="h6-0" class="h">@@ -12,6 +12,9 @@ import (
+</a> type Backend interface {
+ 	fmt.Stringer
+ 
+<a href="#h6-0-3" id="h6-0-3" class="i">+	// HeadBucket retrieves metadata about a bucket.
+</a><a href="#h6-0-4" id="h6-0-4" class="i">+	HeadBucket(ctx context.Context, request *service.HeadBucketRequest) (*service.HeadBucketResponse, error)
+</a><a href="#h6-0-5" id="h6-0-5" class="i">+
+</a> 	// HeadObject retrieves metadata about an object.
+ 	HeadObject(ctx context.Context, request *service.HeadObjectRequest) (*service.HeadObjectResponse, error)
+ 
+<b>diff --git a/<a id="h7" href="../file/internal/backend/unistore.go">internal/backend/unistore.go</a> b/<a href="../file/internal/backend/unistore.go">internal/backend/unistore.go</a></b>
+<a href="#h7-0" id="h7-0" class="h">@@ -85,6 +85,20 @@ func NewUnistore(cfg *config.Unistore, rpc config.RPC) (Backend, error) {
+</a> 	return newInstrumentation(&quot;unistore&quot;, u), nil
+ }
+ 
+<a href="#h7-0-3" id="h7-0-3" class="i">+// HeadBucket invokes the gRPC HeadBucket RPC.
+</a><a href="#h7-0-4" id="h7-0-4" class="i">+func (u *Unistore) HeadBucket(ctx context.Context, request *service.HeadBucketRequest) (*service.HeadBucketResponse, error) {
+</a><a href="#h7-0-5" id="h7-0-5" class="i">+	var cancel context.CancelFunc
+</a><a href="#h7-0-6" id="h7-0-6" class="i">+
+</a><a href="#h7-0-7" id="h7-0-7" class="i">+	if u.connection.RequestTimeout &gt; 0 {
+</a><a href="#h7-0-8" id="h7-0-8" class="i">+		ctx, cancel = context.WithTimeout(ctx, u.connection.RequestTimeout)
+</a><a href="#h7-0-9" id="h7-0-9" class="i">+		defer cancel()
+</a><a href="#h7-0-10" id="h7-0-10" class="i">+	}
+</a><a href="#h7-0-11" id="h7-0-11" class="i">+
+</a><a href="#h7-0-12" id="h7-0-12" class="i">+	request.Resource.Backend = u.backend
+</a><a href="#h7-0-13" id="h7-0-13" class="i">+
+</a><a href="#h7-0-14" id="h7-0-14" class="i">+	return u.client.HeadBucket(ctx, request)
+</a><a href="#h7-0-15" id="h7-0-15" class="i">+}
+</a><a href="#h7-0-16" id="h7-0-16" class="i">+
+</a> // HeadObject invokes the gRPC HeadObject RPC.
+ func (u *Unistore) HeadObject(ctx context.Context, request *service.HeadObjectRequest) (*service.HeadObjectResponse, error) {
+ 	var cancel context.CancelFunc
+<b>diff --git a/<a id="h8" href="../file/internal/server/unistore.go">internal/server/unistore.go</a> b/<a href="../file/internal/server/unistore.go">internal/server/unistore.go</a></b>
+<a href="#h8-0" id="h8-0" class="h">@@ -258,6 +258,11 @@ func newUnistoreService(cfg *config.Server) (service.UnistoreServer, error) {
+</a> 	}, nil
+ }
+ 
+<a href="#h8-0-3" id="h8-0-3" class="i">+// HeadBucket calls into the backend&#39;s HeadBucket.
+</a><a href="#h8-0-4" id="h8-0-4" class="i">+func (u *unistoreService) HeadBucket(ctx context.Context, request *service.HeadBucketRequest) (*service.HeadBucketResponse, error) {
+</a><a href="#h8-0-5" id="h8-0-5" class="i">+	return u.backend.HeadBucket(ctx, request)
+</a><a href="#h8-0-6" id="h8-0-6" class="i">+}
+</a><a href="#h8-0-7" id="h8-0-7" class="i">+
+</a> // HeadObject calls into the backend&#39;s HeadObject.
+ func (u *unistoreService) HeadObject(ctx context.Context, request *service.HeadObjectRequest) (*service.HeadObjectResponse, error) {
+ 	return u.backend.HeadObject(ctx, request)
+</pre>
+</div>
+</body>
+</html>

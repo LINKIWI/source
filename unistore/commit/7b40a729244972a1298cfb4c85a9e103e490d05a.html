@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/backend, internal/config, internal/server: Support maximum unary put size in threshold middleware - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/7b40a729244972a1298cfb4c85a9e103e490d05a">7b40a729244972a1298cfb4c85a9e103e490d05a</a>
+<b>parent</b> <a href="../commit/c88d9ab55b4a3fd790f5ab71286d9b1d6721f03e">c88d9ab55b4a3fd790f5ab71286d9b1d6721f03e</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sat  8 Jan 2022 17:00:27 -0800
+
+internal/backend, internal/config, internal/server: Support maximum unary put size in threshold middleware
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/backend/threshold.go</a></td><td> | </td><td class="num">79</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">---------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">internal/config/types.go</a></td><td> | </td><td class="num">1</td><td><span class="i">+</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">internal/server/unistore.go</a></td><td> | </td><td class="num">7</td><td><span class="i">++++++</span><span class="d">-</span></td></tr>
+</table></pre><pre>3 files changed, 77 insertions(+), 10 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/backend/threshold.go">internal/backend/threshold.go</a> b/<a href="../file/internal/backend/threshold.go">internal/backend/threshold.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -4,30 +4,86 @@ import (
+</a> 	&quot;context&quot;
+ 	&quot;fmt&quot;
+ 
+<a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;google.golang.org/protobuf/proto&quot;
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+
+</a> 	&quot;unistore/schemas/common&quot;
+ 	&quot;unistore/schemas/service&quot;
+ )
+ 
+<a href="#h0-0-9" id="h0-0-9" class="d">-// Threshold is a Backend that enforces a minimum threshold size for streaming puts. Streaming
+</a><a href="#h0-0-10" id="h0-0-10" class="d">-// puts that fail to meet the minimum size threshold are instead converted into unary writes and
+</a><a href="#h0-0-11" id="h0-0-11" class="d">-// flushed with the backend&#39;s PutObject API. Streaming puts that do satisfy the minimum size
+</a><a href="#h0-0-12" id="h0-0-12" class="d">-// threshold are transparently passed to the underlying backend. Note that usage of this backend
+</a><a href="#h0-0-13" id="h0-0-13" class="d">-// implies a maximum memory usage equal to the threshold size, since all pending (not yet flushed)
+</a><a href="#h0-0-14" id="h0-0-14" class="d">-// writes are buffered in memory.
+</a><a href="#h0-0-15" id="h0-0-15" class="i">+// Threshold is a Backend that enforces a minimum threshold size for streaming puts and a maximum
+</a><a href="#h0-0-16" id="h0-0-16" class="i">+// threshold size for unary puts.
+</a><a href="#h0-0-17" id="h0-0-17" class="i">+//
+</a><a href="#h0-0-18" id="h0-0-18" class="i">+// Streaming puts that fail to meet the minimum size threshold are instead converted into unary
+</a><a href="#h0-0-19" id="h0-0-19" class="i">+// writes and flushed with the backend&#39;s PutObject API. Streaming puts that do satisfy the minimum
+</a><a href="#h0-0-20" id="h0-0-20" class="i">+// size threshold are transparently passed to the underlying backend. Note that usage of this
+</a><a href="#h0-0-21" id="h0-0-21" class="i">+// backend implies a maximum memory usage equal to the threshold size, since all pending (not yet
+</a><a href="#h0-0-22" id="h0-0-22" class="i">+// flushed) writes are buffered in memory.
+</a><a href="#h0-0-23" id="h0-0-23" class="i">+//
+</a><a href="#h0-0-24" id="h0-0-24" class="i">+// Unary puts that exceed the maximum size threshold are similarly converted into streaming writes
+</a><a href="#h0-0-25" id="h0-0-25" class="i">+// with the backend&#39;s StreamPutObject API. Unary puts that do satisfy the maximum size threshold are
+</a><a href="#h0-0-26" id="h0-0-26" class="i">+// transparently passed to the underlying backend.
+</a> type Threshold struct {
+ 	minStreamPutSize int
+<a href="#h0-0-29" id="h0-0-29" class="i">+	maxUnaryPutSize  int
+</a> 	Backend
+ }
+ 
+<a href="#h0-0-33" id="h0-0-33" class="d">-// NewThreshold creates a Threshold wrapping an existing Backend with the desired minimum threshold
+</a><a href="#h0-0-34" id="h0-0-34" class="d">-// size, in bytes.
+</a><a href="#h0-0-35" id="h0-0-35" class="d">-func NewThreshold(minStreamPutSize int, backend Backend) Backend {
+</a><a href="#h0-0-36" id="h0-0-36" class="i">+// NewThreshold creates a Threshold wrapping an existing Backend with the desired threshold sizes,
+</a><a href="#h0-0-37" id="h0-0-37" class="i">+// in bytes.
+</a><a href="#h0-0-38" id="h0-0-38" class="i">+func NewThreshold(minStreamPutSize int, maxUnaryPutSize int, backend Backend) Backend {
+</a> 	return &amp;Threshold{
+ 		minStreamPutSize: minStreamPutSize,
+<a href="#h0-0-41" id="h0-0-41" class="i">+		maxUnaryPutSize:  maxUnaryPutSize,
+</a> 		Backend:          backend,
+ 	}
+ }
+ 
+<a href="#h0-0-46" id="h0-0-46" class="i">+// PutObject transparently converts the unary put request to a streaming put request chunked at
+</a><a href="#h0-0-47" id="h0-0-47" class="i">+// maxUnaryPutSize bytes if the total request data size exceeds the maxUnaryPutSize limit.
+</a><a href="#h0-0-48" id="h0-0-48" class="i">+func (t *Threshold) PutObject(ctx context.Context, request *service.PutObjectRequest) (*service.PutObjectResponse, error) {
+</a><a href="#h0-0-49" id="h0-0-49" class="i">+	stream := make(chan *service.PutObjectStreamRequest)
+</a><a href="#h0-0-50" id="h0-0-50" class="i">+
+</a><a href="#h0-0-51" id="h0-0-51" class="i">+	if t.maxUnaryPutSize == 0 || len(request.Data) &lt; t.maxUnaryPutSize {
+</a><a href="#h0-0-52" id="h0-0-52" class="i">+		return t.Backend.PutObject(ctx, request)
+</a><a href="#h0-0-53" id="h0-0-53" class="i">+	}
+</a><a href="#h0-0-54" id="h0-0-54" class="i">+
+</a><a href="#h0-0-55" id="h0-0-55" class="i">+	go func() {
+</a><a href="#h0-0-56" id="h0-0-56" class="i">+		var offset int
+</a><a href="#h0-0-57" id="h0-0-57" class="i">+
+</a><a href="#h0-0-58" id="h0-0-58" class="i">+		// Clone the original request for asynchronous relay to the put stream, but remove
+</a><a href="#h0-0-59" id="h0-0-59" class="i">+		// the attached data payload in order to save memory copy overhead when
+</a><a href="#h0-0-60" id="h0-0-60" class="i">+		// constructing individual stream request messages.
+</a><a href="#h0-0-61" id="h0-0-61" class="i">+		proxyRequest := proto.Clone(request).(*service.PutObjectRequest)
+</a><a href="#h0-0-62" id="h0-0-62" class="i">+		proxyRequest.Data = nil
+</a><a href="#h0-0-63" id="h0-0-63" class="i">+
+</a><a href="#h0-0-64" id="h0-0-64" class="i">+		for {
+</a><a href="#h0-0-65" id="h0-0-65" class="i">+			if offset &gt;= len(request.Data) {
+</a><a href="#h0-0-66" id="h0-0-66" class="i">+				break
+</a><a href="#h0-0-67" id="h0-0-67" class="i">+			}
+</a><a href="#h0-0-68" id="h0-0-68" class="i">+
+</a><a href="#h0-0-69" id="h0-0-69" class="i">+			end := offset + t.maxUnaryPutSize
+</a><a href="#h0-0-70" id="h0-0-70" class="i">+			if end &gt; len(request.Data) {
+</a><a href="#h0-0-71" id="h0-0-71" class="i">+				end = len(request.Data)
+</a><a href="#h0-0-72" id="h0-0-72" class="i">+			}
+</a><a href="#h0-0-73" id="h0-0-73" class="i">+
+</a><a href="#h0-0-74" id="h0-0-74" class="i">+			message := proto.Clone(proxyRequest).(*service.PutObjectRequest)
+</a><a href="#h0-0-75" id="h0-0-75" class="i">+			message.Data = request.Data[offset:end]
+</a><a href="#h0-0-76" id="h0-0-76" class="i">+			stream &lt;- &amp;service.PutObjectStreamRequest{Request: message}
+</a><a href="#h0-0-77" id="h0-0-77" class="i">+
+</a><a href="#h0-0-78" id="h0-0-78" class="i">+			offset += t.maxUnaryPutSize
+</a><a href="#h0-0-79" id="h0-0-79" class="i">+		}
+</a><a href="#h0-0-80" id="h0-0-80" class="i">+
+</a><a href="#h0-0-81" id="h0-0-81" class="i">+		close(stream)
+</a><a href="#h0-0-82" id="h0-0-82" class="i">+	}()
+</a><a href="#h0-0-83" id="h0-0-83" class="i">+
+</a><a href="#h0-0-84" id="h0-0-84" class="i">+	response, err := t.Backend.StreamPutObject(ctx, stream)
+</a><a href="#h0-0-85" id="h0-0-85" class="i">+	if err != nil {
+</a><a href="#h0-0-86" id="h0-0-86" class="i">+		return nil, err
+</a><a href="#h0-0-87" id="h0-0-87" class="i">+	}
+</a><a href="#h0-0-88" id="h0-0-88" class="i">+
+</a><a href="#h0-0-89" id="h0-0-89" class="i">+	return response.Response, nil
+</a><a href="#h0-0-90" id="h0-0-90" class="i">+}
+</a><a href="#h0-0-91" id="h0-0-91" class="i">+
+</a> // StreamPutObject buffers up to a maximum of threshold bytes in memory, followed by either draining
+ // the entire buffer as a single request to the backend&#39;s PutObject API, or passing all the chunks
+ // without modification to the underlying backend.
+<a href="#h0-1" id="h0-1" class="h">@@ -101,6 +157,11 @@ func (t *Threshold) Descriptor() *common.Node {
+</a> 					Value: fmt.Sprintf(&quot;%d&quot;, t.minStreamPutSize),
+ 				},
+ 			},
+<a href="#h0-1-3" id="h0-1-3" class="i">+			&quot;max_unary_put_size&quot;: {
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+				Child: &amp;common.Node_Value_Value{
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+					Value: fmt.Sprintf(&quot;%d&quot;, t.maxUnaryPutSize),
+</a><a href="#h0-1-6" id="h0-1-6" class="i">+				},
+</a><a href="#h0-1-7" id="h0-1-7" class="i">+			},
+</a> 			&quot;backend&quot;: {
+ 				Child: &amp;common.Node_Value_Node{
+ 					Node: t.Backend.Descriptor(),
+<b>diff --git a/<a id="h1" href="../file/internal/config/types.go">internal/config/types.go</a> b/<a href="../file/internal/config/types.go">internal/config/types.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -62,6 +62,7 @@ type Buffer struct {
+</a> // Threshold describes per-backend stream get/put size threshold configuration.
+ type Threshold struct {
+ 	MinStreamPutSize int `yaml:&quot;min_stream_put_size&quot;`
+<a href="#h1-0-3" id="h1-0-3" class="i">+	MaxUnaryPutSize  int `yaml:&quot;max_unary_put_size&quot;`
+</a> }
+ 
+ // Connection describes connection options for remote backends.
+<b>diff --git a/<a id="h2" href="../file/internal/server/unistore.go">internal/server/unistore.go</a> b/<a href="../file/internal/server/unistore.go">internal/server/unistore.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -93,6 +93,7 @@ func newUnistoreService(cfg *config.Server) (service.UnistoreServer, error) {
+</a> 		if cfg.Storage.Unistore.Threshold != nil {
+ 			unistore = backend.NewThreshold(
+ 				cfg.Storage.Unistore.Threshold.MinStreamPutSize,
+<a href="#h2-0-3" id="h2-0-3" class="i">+				cfg.Storage.Unistore.Threshold.MaxUnaryPutSize,
+</a> 				unistore,
+ 			)
+ 		}
+<a href="#h2-1" id="h2-1" class="h">@@ -156,7 +157,11 @@ func newUnistoreService(cfg *config.Server) (service.UnistoreServer, error) {
+</a> 		}
+ 
+ 		if cfg.Storage.B2.Threshold != nil {
+<a href="#h2-1-3" id="h2-1-3" class="d">-			b2 = backend.NewThreshold(cfg.Storage.B2.Threshold.MinStreamPutSize, b2)
+</a><a href="#h2-1-4" id="h2-1-4" class="i">+			b2 = backend.NewThreshold(
+</a><a href="#h2-1-5" id="h2-1-5" class="i">+				cfg.Storage.B2.Threshold.MinStreamPutSize,
+</a><a href="#h2-1-6" id="h2-1-6" class="i">+				cfg.Storage.B2.Threshold.MaxUnaryPutSize,
+</a><a href="#h2-1-7" id="h2-1-7" class="i">+				b2,
+</a><a href="#h2-1-8" id="h2-1-8" class="i">+			)
+</a> 		}
+ 
+ 		if cfg.Storage.B2.Encryption != nil {
+</pre>
+</div>
+</body>
+</html>

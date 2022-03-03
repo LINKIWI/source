@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>cmd/unistore, internal/metrics: Move Aperture initialization to singleton in metrics package - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/aa2dfc54e8c587d95036b4cbc5caab7342d68fe0">aa2dfc54e8c587d95036b4cbc5caab7342d68fe0</a>
+<b>parent</b> <a href="../commit/71e9393ec641f31c3d04add269861499b3a31d2f">71e9393ec641f31c3d04add269861499b3a31d2f</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Wed  5 Jan 2022 21:15:03 -0800
+
+cmd/unistore, internal/metrics: Move Aperture initialization to singleton in metrics package
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">cmd/unistore/main.go</a></td><td> | </td><td class="num">25</td><td><span class="i">+++++</span><span class="d">--------------------</span></td></tr>
+<tr><td class="A">A</td><td><a href="#h1">internal/metrics/client.go</a></td><td> | </td><td class="num">56</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="A">A</td><td><a href="#h2">internal/metrics/doc.go</a></td><td> | </td><td class="num">2</td><td><span class="i">++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">internal/server/server.go</a></td><td> | </td><td class="num">11</td><td><span class="i">++++</span><span class="d">-------</span></td></tr>
+</table></pre><pre>4 files changed, 67 insertions(+), 27 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/cmd/unistore/main.go">cmd/unistore/main.go</a> b/<a href="../file/cmd/unistore/main.go">cmd/unistore/main.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -6,22 +6,19 @@ import (
+</a> 	&quot;os&quot;
+ 	&quot;os/signal&quot;
+ 	&quot;syscall&quot;
+<a href="#h0-0-3" id="h0-0-3" class="d">-	&quot;time&quot;
+</a> 
+ 	&quot;github.com/getsentry/sentry-go&quot;
+ 	&quot;go.uber.org/zap&quot;
+<a href="#h0-0-7" id="h0-0-7" class="d">-	&quot;lib.kevinlin.info/aperture&quot;
+</a><a href="#h0-0-8" id="h0-0-8" class="d">-	&quot;lib.kevinlin.info/aperture/lib&quot;
+</a> 
+ 	&quot;unistore/internal/config&quot;
+ 	&quot;unistore/internal/log&quot;
+ 	&quot;unistore/internal/meta&quot;
+<a href="#h0-0-13" id="h0-0-13" class="i">+	&quot;unistore/internal/metrics&quot;
+</a> 	&quot;unistore/internal/server&quot;
+ )
+ 
+ var (
+<a href="#h0-0-18" id="h0-0-18" class="d">-	cfg     *config.Config
+</a><a href="#h0-0-19" id="h0-0-19" class="d">-	metrics aperture.Statsd = lib.NewNoopStatsd()
+</a><a href="#h0-0-20" id="h0-0-20" class="i">+	cfg *config.Config
+</a> )
+ 
+ var (
+<a href="#h0-1" id="h0-1" class="h">@@ -66,21 +63,9 @@ func main() {
+</a> 			zap.String(&quot;prefix&quot;, cfg.Application.Metrics.Prefix),
+ 		)
+ 
+<a href="#h0-1-3" id="h0-1-3" class="d">-		metrics, err = aperture.NewClient(&amp;aperture.Config{
+</a><a href="#h0-1-4" id="h0-1-4" class="d">-			Address:                     cfg.Application.Metrics.Address,
+</a><a href="#h0-1-5" id="h0-1-5" class="d">-			Prefix:                      cfg.Application.Metrics.Prefix,
+</a><a href="#h0-1-6" id="h0-1-6" class="d">-			Proxy:                       cfg.Application.Metrics.Proxy,
+</a><a href="#h0-1-7" id="h0-1-7" class="d">-			TransportProbeInterval:      10 * time.Second,
+</a><a href="#h0-1-8" id="h0-1-8" class="d">-			LazyTransportInitialization: true,
+</a><a href="#h0-1-9" id="h0-1-9" class="d">-			DefaultTags: map[string]interface{}{
+</a><a href="#h0-1-10" id="h0-1-10" class="d">-				&quot;version&quot;: meta.Version,
+</a><a href="#h0-1-11" id="h0-1-11" class="d">-			},
+</a><a href="#h0-1-12" id="h0-1-12" class="d">-		})
+</a><a href="#h0-1-13" id="h0-1-13" class="d">-		if err != nil {
+</a><a href="#h0-1-14" id="h0-1-14" class="d">-			panic(err)
+</a><a href="#h0-1-15" id="h0-1-15" class="i">+		if err := metrics.Init(cfg.Application.Metrics); err != nil {
+</a><a href="#h0-1-16" id="h0-1-16" class="i">+			zap.L().Fatal(&quot;failed to create metrics client&quot;, zap.Error(err))
+</a> 		}
+<a href="#h0-1-18" id="h0-1-18" class="d">-
+</a><a href="#h0-1-19" id="h0-1-19" class="d">-		metrics = lib.NewAsyncStatsd(metrics)
+</a> 	}
+ 
+ 	if cfg.Application.Errors != nil {
+<a href="#h0-2" id="h0-2" class="h">@@ -102,7 +87,7 @@ func main() {
+</a> 		defer sentry.Recover()
+ 	}
+ 
+<a href="#h0-2-3" id="h0-2-3" class="d">-	srv, err := server.New(cfg.Server, metrics)
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+	srv, err := server.New(cfg.Server)
+</a> 	if err != nil {
+ 		zap.L().Fatal(&quot;error during server initialization&quot;, zap.Error(err))
+ 	}
+<b>diff --git a/<a id="h1" href="../file/internal/metrics/client.go">internal/metrics/client.go</a> b/<a href="../file/internal/metrics/client.go">internal/metrics/client.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -0,0 +1,56 @@
+</a><a href="#h1-0-0" id="h1-0-0" class="i">+package metrics
+</a><a href="#h1-0-1" id="h1-0-1" class="i">+
+</a><a href="#h1-0-2" id="h1-0-2" class="i">+import (
+</a><a href="#h1-0-3" id="h1-0-3" class="i">+	&quot;fmt&quot;
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+	&quot;sync&quot;
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+	&quot;time&quot;
+</a><a href="#h1-0-6" id="h1-0-6" class="i">+
+</a><a href="#h1-0-7" id="h1-0-7" class="i">+	&quot;lib.kevinlin.info/aperture&quot;
+</a><a href="#h1-0-8" id="h1-0-8" class="i">+	&quot;lib.kevinlin.info/aperture/lib&quot;
+</a><a href="#h1-0-9" id="h1-0-9" class="i">+	&quot;lib.kevinlin.info/aperture/protocol&quot;
+</a><a href="#h1-0-10" id="h1-0-10" class="i">+
+</a><a href="#h1-0-11" id="h1-0-11" class="i">+	&quot;unistore/internal/config&quot;
+</a><a href="#h1-0-12" id="h1-0-12" class="i">+	&quot;unistore/internal/meta&quot;
+</a><a href="#h1-0-13" id="h1-0-13" class="i">+)
+</a><a href="#h1-0-14" id="h1-0-14" class="i">+
+</a><a href="#h1-0-15" id="h1-0-15" class="i">+var (
+</a><a href="#h1-0-16" id="h1-0-16" class="i">+	// Client is a globally available Aperture statsd client singleton.
+</a><a href="#h1-0-17" id="h1-0-17" class="i">+	Client aperture.Statsd = lib.NewNoopStatsd()
+</a><a href="#h1-0-18" id="h1-0-18" class="i">+)
+</a><a href="#h1-0-19" id="h1-0-19" class="i">+
+</a><a href="#h1-0-20" id="h1-0-20" class="i">+var (
+</a><a href="#h1-0-21" id="h1-0-21" class="i">+	mutex sync.Mutex
+</a><a href="#h1-0-22" id="h1-0-22" class="i">+)
+</a><a href="#h1-0-23" id="h1-0-23" class="i">+
+</a><a href="#h1-0-24" id="h1-0-24" class="i">+// Init statefully initializes the global metrics client.
+</a><a href="#h1-0-25" id="h1-0-25" class="i">+func Init(cfg *config.Metrics) error {
+</a><a href="#h1-0-26" id="h1-0-26" class="i">+	var err error
+</a><a href="#h1-0-27" id="h1-0-27" class="i">+
+</a><a href="#h1-0-28" id="h1-0-28" class="i">+	mutex.Lock()
+</a><a href="#h1-0-29" id="h1-0-29" class="i">+	defer mutex.Unlock()
+</a><a href="#h1-0-30" id="h1-0-30" class="i">+
+</a><a href="#h1-0-31" id="h1-0-31" class="i">+	serializers := map[string]protocol.LineSerializer{
+</a><a href="#h1-0-32" id="h1-0-32" class="i">+		&quot;&quot;:       protocol.DefaultStatsdLineSerializer,
+</a><a href="#h1-0-33" id="h1-0-33" class="i">+		&quot;statsd&quot;: protocol.DefaultStatsdLineSerializer,
+</a><a href="#h1-0-34" id="h1-0-34" class="i">+		&quot;influx&quot;: protocol.DefaultInfluxLineSerializer,
+</a><a href="#h1-0-35" id="h1-0-35" class="i">+	}
+</a><a href="#h1-0-36" id="h1-0-36" class="i">+
+</a><a href="#h1-0-37" id="h1-0-37" class="i">+	Client, err = aperture.NewClient(&amp;aperture.Config{
+</a><a href="#h1-0-38" id="h1-0-38" class="i">+		Address:                     cfg.Address,
+</a><a href="#h1-0-39" id="h1-0-39" class="i">+		Prefix:                      cfg.Prefix,
+</a><a href="#h1-0-40" id="h1-0-40" class="i">+		Proxy:                       cfg.Proxy,
+</a><a href="#h1-0-41" id="h1-0-41" class="i">+		Serializer:                  serializers[cfg.Serializer],
+</a><a href="#h1-0-42" id="h1-0-42" class="i">+		TransportProbeInterval:      10 * time.Second,
+</a><a href="#h1-0-43" id="h1-0-43" class="i">+		LazyTransportInitialization: true,
+</a><a href="#h1-0-44" id="h1-0-44" class="i">+		DefaultTags: map[string]interface{}{
+</a><a href="#h1-0-45" id="h1-0-45" class="i">+			&quot;version&quot;: meta.Version,
+</a><a href="#h1-0-46" id="h1-0-46" class="i">+		},
+</a><a href="#h1-0-47" id="h1-0-47" class="i">+	})
+</a><a href="#h1-0-48" id="h1-0-48" class="i">+	if err != nil {
+</a><a href="#h1-0-49" id="h1-0-49" class="i">+		return fmt.Errorf(&quot;metrics: error creating Aperture client: err=%v&quot;, err)
+</a><a href="#h1-0-50" id="h1-0-50" class="i">+	}
+</a><a href="#h1-0-51" id="h1-0-51" class="i">+
+</a><a href="#h1-0-52" id="h1-0-52" class="i">+	Client = lib.NewAsyncStatsd(Client)
+</a><a href="#h1-0-53" id="h1-0-53" class="i">+
+</a><a href="#h1-0-54" id="h1-0-54" class="i">+	return nil
+</a><a href="#h1-0-55" id="h1-0-55" class="i">+}
+</a><b>diff --git a/<a id="h2" href="../file/internal/metrics/doc.go">internal/metrics/doc.go</a> b/<a href="../file/internal/metrics/doc.go">internal/metrics/doc.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -0,0 +1,2 @@
+</a><a href="#h2-0-0" id="h2-0-0" class="i">+// Package metrics contains utilities and clients for reporting application metrics.
+</a><a href="#h2-0-1" id="h2-0-1" class="i">+package metrics
+</a><b>diff --git a/<a id="h3" href="../file/internal/server/server.go">internal/server/server.go</a> b/<a href="../file/internal/server/server.go">internal/server/server.go</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -7,7 +7,6 @@ import (
+</a> 	&quot;golang.org/x/net/netutil&quot;
+ 	&quot;google.golang.org/grpc&quot;
+ 	&quot;google.golang.org/grpc/reflection&quot;
+<a href="#h3-0-3" id="h3-0-3" class="d">-	&quot;lib.kevinlin.info/aperture&quot;
+</a> 
+ 	&quot;unistore/internal/config&quot;
+ 	&quot;unistore/internal/server/middleware&quot;
+<a href="#h3-1" id="h3-1" class="h">@@ -16,13 +15,12 @@ import (
+</a> 
+ // Unistore wraps a grpc.Server to provide the core Unistore gRPC services.
+ type Unistore struct {
+<a href="#h3-1-3" id="h3-1-3" class="d">-	cfg     *config.Server
+</a><a href="#h3-1-4" id="h3-1-4" class="d">-	metrics aperture.Statsd
+</a><a href="#h3-1-5" id="h3-1-5" class="i">+	cfg *config.Server
+</a> 	*grpc.Server
+ }
+ 
+ // New creates a new Unistore gRPC server.
+<a href="#h3-1-10" id="h3-1-10" class="d">-func New(cfg *config.Server, metrics aperture.Statsd) (*Unistore, error) {
+</a><a href="#h3-1-11" id="h3-1-11" class="i">+func New(cfg *config.Server) (*Unistore, error) {
+</a> 	var opts []grpc.ServerOption
+ 
+ 	if cfg.RPC.MaxRecvMessageSize &gt; 0 {
+<a href="#h3-2" id="h3-2" class="h">@@ -61,9 +59,8 @@ func New(cfg *config.Server, metrics aperture.Statsd) (*Unistore, error) {
+</a> 	reflection.Register(srv)
+ 
+ 	return &amp;Unistore{
+<a href="#h3-2-3" id="h3-2-3" class="d">-		cfg:     cfg,
+</a><a href="#h3-2-4" id="h3-2-4" class="d">-		metrics: metrics,
+</a><a href="#h3-2-5" id="h3-2-5" class="d">-		Server:  srv,
+</a><a href="#h3-2-6" id="h3-2-6" class="i">+		cfg:    cfg,
+</a><a href="#h3-2-7" id="h3-2-7" class="i">+		Server: srv,
+</a> 	}, nil
+ }
+ 
+</pre>
+</div>
+</body>
+</html>

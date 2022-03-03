@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/backend, pkg/client/b2: Migrate client logger to zap.Logger - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/e99d2d4ab43619355d6a9e2e0be47df2872fcc72">e99d2d4ab43619355d6a9e2e0be47df2872fcc72</a>
+<b>parent</b> <a href="../commit/7325f5042512e022497d72297d884a6ac654e16e">7325f5042512e022497d72297d884a6ac654e16e</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Mon 17 Jan 2022 17:30:48 -0800
+
+internal/backend, pkg/client/b2: Migrate client logger to zap.Logger
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/backend/b2.go</a></td><td> | </td><td class="num">3</td><td><span class="i">+</span><span class="d">--</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">pkg/client/b2/client.go</a></td><td> | </td><td class="num">45</td><td><span class="i">++++++++++++++++++++++++++++</span><span class="d">-----------------</span></td></tr>
+</table></pre><pre>2 files changed, 29 insertions(+), 19 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/backend/b2.go">internal/backend/b2.go</a> b/<a href="../file/internal/backend/b2.go">internal/backend/b2.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -20,7 +20,6 @@ import (
+</a> 	&quot;google.golang.org/protobuf/types/known/timestamppb&quot;
+ 
+ 	&quot;unistore/internal/config&quot;
+<a href="#h0-0-3" id="h0-0-3" class="d">-	&quot;unistore/internal/log&quot;
+</a> 	&quot;unistore/internal/meta&quot;
+ 	&quot;unistore/internal/schemas&quot;
+ 	&quot;unistore/pkg/client/b2&quot;
+<a href="#h0-1" id="h0-1" class="h">@@ -74,7 +73,7 @@ func NewB2(cfg *config.B2) (Backend, error) {
+</a> 	}
+ 
+ 	opts = append(opts, b2.WithTransport(transport))
+<a href="#h0-1-3" id="h0-1-3" class="d">-	opts = append(opts, b2.WithLogger(log.StdDebugLogger))
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+	opts = append(opts, b2.WithLogger(zap.L()))
+</a> 	if cfg.Connection.Identity != &quot;&quot; {
+ 		clientID := fmt.Sprintf(
+ 			&quot;unistore/%s (instance:%s)&quot;,
+<b>diff --git a/<a id="h1" href="../file/pkg/client/b2/client.go">pkg/client/b2/client.go</a> b/<a href="../file/pkg/client/b2/client.go">pkg/client/b2/client.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -6,13 +6,14 @@ import (
+</a> 	&quot;encoding/json&quot;
+ 	&quot;fmt&quot;
+ 	&quot;io&quot;
+<a href="#h1-0-3" id="h1-0-3" class="d">-	&quot;log&quot;
+</a> 	&quot;net/http&quot;
+ 	&quot;net/url&quot;
+ 	&quot;path&quot;
+ 	&quot;regexp&quot;
+ 	&quot;strconv&quot;
+ 	&quot;strings&quot;
+<a href="#h1-0-10" id="h1-0-10" class="i">+
+</a><a href="#h1-0-11" id="h1-0-11" class="i">+	&quot;go.uber.org/zap&quot;
+</a> )
+ 
+ // Option aliases a callback function to apply options on the client.
+<a href="#h1-1" id="h1-1" class="h">@@ -22,7 +23,7 @@ type Option func(*Client)
+</a> // and mostly intends to provide a 1:1 mapping to B2 HTTP APIs.
+ type Client struct {
+ 	http     *http.Client
+<a href="#h1-1-3" id="h1-1-3" class="d">-	log      *log.Logger
+</a><a href="#h1-1-4" id="h1-1-4" class="i">+	log      *zap.Logger
+</a> 	identity string
+ }
+ 
+<a href="#h1-2" id="h1-2" class="h">@@ -30,7 +31,7 @@ type Client struct {
+</a> func New(opts ...Option) (*Client, error) {
+ 	client := &amp;Client{
+ 		http:     http.DefaultClient,
+<a href="#h1-2-3" id="h1-2-3" class="d">-		log:      log.New(io.Discard, &quot;&quot;, 0),
+</a><a href="#h1-2-4" id="h1-2-4" class="i">+		log:      zap.NewNop(),
+</a> 		identity: DefaultClientID,
+ 	}
+ 
+<a href="#h1-3" id="h1-3" class="h">@@ -49,7 +50,7 @@ func WithTransport(transport http.RoundTripper) Option {
+</a> }
+ 
+ // WithLogger enables verbose logging to the specified logger.
+<a href="#h1-3-3" id="h1-3-3" class="d">-func WithLogger(log *log.Logger) Option {
+</a><a href="#h1-3-4" id="h1-3-4" class="i">+func WithLogger(log *zap.Logger) Option {
+</a> 	return func(c *Client) {
+ 		c.log = log
+ 	}
+<a href="#h1-4" id="h1-4" class="h">@@ -418,11 +419,21 @@ func (c *Client) doAPI(request *http.Request, data interface{}) (*http.Response,
+</a> func (c *Client) doRaw(request *http.Request) (*http.Response, error) {
+ 	var status Status
+ 
+<a href="#h1-4-3" id="h1-4-3" class="d">-	c.log.Printf(&quot;b2: dispatching HTTP request: method=%s url=%s&quot;, request.Method, request.URL)
+</a><a href="#h1-4-4" id="h1-4-4" class="i">+	c.log.Debug(
+</a><a href="#h1-4-5" id="h1-4-5" class="i">+		&quot;dispatching HTTP request&quot;,
+</a><a href="#h1-4-6" id="h1-4-6" class="i">+		zap.String(&quot;method&quot;, request.Method),
+</a><a href="#h1-4-7" id="h1-4-7" class="i">+		zap.Stringer(&quot;url&quot;, request.URL),
+</a><a href="#h1-4-8" id="h1-4-8" class="i">+	)
+</a> 
+ 	response, err := c.http.Do(request)
+ 	if err != nil {
+<a href="#h1-4-12" id="h1-4-12" class="d">-		c.log.Printf(&quot;b2: fatal transport error during HTTP dispatch: err=%v&quot;, err)
+</a><a href="#h1-4-13" id="h1-4-13" class="i">+		c.log.Error(
+</a><a href="#h1-4-14" id="h1-4-14" class="i">+			&quot;fatal transport error during HTTP dispatch&quot;,
+</a><a href="#h1-4-15" id="h1-4-15" class="i">+			zap.String(&quot;method&quot;, request.Method),
+</a><a href="#h1-4-16" id="h1-4-16" class="i">+			zap.Stringer(&quot;url&quot;, request.URL),
+</a><a href="#h1-4-17" id="h1-4-17" class="i">+			zap.Error(err),
+</a><a href="#h1-4-18" id="h1-4-18" class="i">+		)
+</a><a href="#h1-4-19" id="h1-4-19" class="i">+
+</a> 		return nil, statusFromError(err)
+ 	}
+ 
+<a href="#h1-5" id="h1-5" class="h">@@ -438,22 +449,22 @@ func (c *Client) doRaw(request *http.Request) (*http.Response, error) {
+</a> 
+ 		response.Body.Close()
+ 
+<a href="#h1-5-3" id="h1-5-3" class="d">-		c.log.Printf(
+</a><a href="#h1-5-4" id="h1-5-4" class="d">-			&quot;b2: received application-level error from API: status=%d code=%s message=%s&quot;,
+</a><a href="#h1-5-5" id="h1-5-5" class="d">-			status.Status,
+</a><a href="#h1-5-6" id="h1-5-6" class="d">-			status.Code,
+</a><a href="#h1-5-7" id="h1-5-7" class="d">-			status.Message,
+</a><a href="#h1-5-8" id="h1-5-8" class="i">+		c.log.Debug(
+</a><a href="#h1-5-9" id="h1-5-9" class="i">+			&quot;received application-level error from B2 API&quot;,
+</a><a href="#h1-5-10" id="h1-5-10" class="i">+			zap.Int(&quot;status&quot;, status.Status),
+</a><a href="#h1-5-11" id="h1-5-11" class="i">+			zap.String(&quot;code&quot;, status.Code),
+</a><a href="#h1-5-12" id="h1-5-12" class="i">+			zap.String(&quot;message&quot;, status.Message),
+</a> 		)
+ 
+ 		return response, &amp;status
+ 	}
+ 
+<a href="#h1-5-18" id="h1-5-18" class="d">-	c.log.Printf(
+</a><a href="#h1-5-19" id="h1-5-19" class="d">-		&quot;b2: successful API response: method=%s url=%s status=%d size=%d&quot;,
+</a><a href="#h1-5-20" id="h1-5-20" class="d">-		response.Request.Method,
+</a><a href="#h1-5-21" id="h1-5-21" class="d">-		response.Request.URL,
+</a><a href="#h1-5-22" id="h1-5-22" class="d">-		response.StatusCode,
+</a><a href="#h1-5-23" id="h1-5-23" class="d">-		response.ContentLength,
+</a><a href="#h1-5-24" id="h1-5-24" class="i">+	c.log.Debug(
+</a><a href="#h1-5-25" id="h1-5-25" class="i">+		&quot;successful B2 API response&quot;,
+</a><a href="#h1-5-26" id="h1-5-26" class="i">+		zap.String(&quot;method&quot;, response.Request.Method),
+</a><a href="#h1-5-27" id="h1-5-27" class="i">+		zap.Stringer(&quot;url&quot;, response.Request.URL),
+</a><a href="#h1-5-28" id="h1-5-28" class="i">+		zap.Int(&quot;status&quot;, response.StatusCode),
+</a><a href="#h1-5-29" id="h1-5-29" class="i">+		zap.Int64(&quot;size&quot;, response.ContentLength),
+</a> 	)
+ 
+ 	return response, nil
+</pre>
+</div>
+</body>
+</html>

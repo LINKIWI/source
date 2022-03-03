@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/backend: Disk object storage backend implementation - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/773191acef3c6c239f7182a938c5735c184fcd25">773191acef3c6c239f7182a938c5735c184fcd25</a>
+<b>parent</b> <a href="../commit/514bc8fae429efdad912ef9bf9d0a796633051c5">514bc8fae429efdad912ef9bf9d0a796633051c5</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sun 26 Dec 2021 14:42:06 -0800
+
+internal/backend: Disk object storage backend implementation
+
+<b>Diffstat:</b>
+<table><tr><td class="A">A</td><td><a href="#h0">internal/backend/disk.go</a></td><td> | </td><td class="num">274</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+</table></pre><pre>1 file changed, 274 insertions(+), 0 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/backend/disk.go">internal/backend/disk.go</a> b/<a href="../file/internal/backend/disk.go">internal/backend/disk.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -0,0 +1,274 @@
+</a><a href="#h0-0-0" id="h0-0-0" class="i">+package backend
+</a><a href="#h0-0-1" id="h0-0-1" class="i">+
+</a><a href="#h0-0-2" id="h0-0-2" class="i">+import (
+</a><a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;bufio&quot;
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+	&quot;bytes&quot;
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+	&quot;io&quot;
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+	&quot;os&quot;
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+	&quot;path/filepath&quot;
+</a><a href="#h0-0-8" id="h0-0-8" class="i">+	&quot;strings&quot;
+</a><a href="#h0-0-9" id="h0-0-9" class="i">+
+</a><a href="#h0-0-10" id="h0-0-10" class="i">+	&quot;google.golang.org/grpc/codes&quot;
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+	&quot;google.golang.org/grpc/status&quot;
+</a><a href="#h0-0-12" id="h0-0-12" class="i">+	&quot;google.golang.org/protobuf/types/known/timestamppb&quot;
+</a><a href="#h0-0-13" id="h0-0-13" class="i">+
+</a><a href="#h0-0-14" id="h0-0-14" class="i">+	&quot;unistore/pkg/disk&quot;
+</a><a href="#h0-0-15" id="h0-0-15" class="i">+	&quot;unistore/schemas/common&quot;
+</a><a href="#h0-0-16" id="h0-0-16" class="i">+	&quot;unistore/schemas/service&quot;
+</a><a href="#h0-0-17" id="h0-0-17" class="i">+)
+</a><a href="#h0-0-18" id="h0-0-18" class="i">+
+</a><a href="#h0-0-19" id="h0-0-19" class="i">+// Disk is a Backend that implements an object storage server on top of a local filesystem.
+</a><a href="#h0-0-20" id="h0-0-20" class="i">+type Disk struct {
+</a><a href="#h0-0-21" id="h0-0-21" class="i">+	client *disk.Client
+</a><a href="#h0-0-22" id="h0-0-22" class="i">+}
+</a><a href="#h0-0-23" id="h0-0-23" class="i">+
+</a><a href="#h0-0-24" id="h0-0-24" class="i">+// NewDisk creates a new Disk backend.
+</a><a href="#h0-0-25" id="h0-0-25" class="i">+func NewDisk(root string) (Backend, error) {
+</a><a href="#h0-0-26" id="h0-0-26" class="i">+	client, err := disk.New(root)
+</a><a href="#h0-0-27" id="h0-0-27" class="i">+	if err != nil {
+</a><a href="#h0-0-28" id="h0-0-28" class="i">+		return nil, err
+</a><a href="#h0-0-29" id="h0-0-29" class="i">+	}
+</a><a href="#h0-0-30" id="h0-0-30" class="i">+
+</a><a href="#h0-0-31" id="h0-0-31" class="i">+	return &amp;Disk{client}, nil
+</a><a href="#h0-0-32" id="h0-0-32" class="i">+}
+</a><a href="#h0-0-33" id="h0-0-33" class="i">+
+</a><a href="#h0-0-34" id="h0-0-34" class="i">+// HeadObject stats the requested file.
+</a><a href="#h0-0-35" id="h0-0-35" class="i">+func (d *Disk) HeadObject(request *service.HeadObjectRequest) (*service.HeadObjectResponse, error) {
+</a><a href="#h0-0-36" id="h0-0-36" class="i">+	target := filepath.Clean(filepath.Join(request.Resource.Bucket, request.Key))
+</a><a href="#h0-0-37" id="h0-0-37" class="i">+
+</a><a href="#h0-0-38" id="h0-0-38" class="i">+	stat, err := d.client.StatFile(target)
+</a><a href="#h0-0-39" id="h0-0-39" class="i">+	if err != nil {
+</a><a href="#h0-0-40" id="h0-0-40" class="i">+		return nil, status.Error(codes.Internal, err.Error())
+</a><a href="#h0-0-41" id="h0-0-41" class="i">+	}
+</a><a href="#h0-0-42" id="h0-0-42" class="i">+
+</a><a href="#h0-0-43" id="h0-0-43" class="i">+	return &amp;service.HeadObjectResponse{
+</a><a href="#h0-0-44" id="h0-0-44" class="i">+		Metadata: &amp;common.Metadata{
+</a><a href="#h0-0-45" id="h0-0-45" class="i">+			Id:           stat.BaseName,
+</a><a href="#h0-0-46" id="h0-0-46" class="i">+			Key:          stat.Path,
+</a><a href="#h0-0-47" id="h0-0-47" class="i">+			Size:         stat.Size,
+</a><a href="#h0-0-48" id="h0-0-48" class="i">+			ModifiedTime: timestamppb.New(stat.ModifiedTime),
+</a><a href="#h0-0-49" id="h0-0-49" class="i">+		},
+</a><a href="#h0-0-50" id="h0-0-50" class="i">+	}, nil
+</a><a href="#h0-0-51" id="h0-0-51" class="i">+}
+</a><a href="#h0-0-52" id="h0-0-52" class="i">+
+</a><a href="#h0-0-53" id="h0-0-53" class="i">+// GetObject opens a file handle for the requested file followed by reading its contents in full.
+</a><a href="#h0-0-54" id="h0-0-54" class="i">+func (d *Disk) GetObject(request *service.GetObjectRequest) (*service.GetObjectResponse, error) {
+</a><a href="#h0-0-55" id="h0-0-55" class="i">+	target := filepath.Clean(filepath.Join(request.Resource.Bucket, request.Key))
+</a><a href="#h0-0-56" id="h0-0-56" class="i">+
+</a><a href="#h0-0-57" id="h0-0-57" class="i">+	file, stat, err := d.client.ReadFile(target)
+</a><a href="#h0-0-58" id="h0-0-58" class="i">+	if err != nil {
+</a><a href="#h0-0-59" id="h0-0-59" class="i">+		return nil, status.Error(codes.Internal, err.Error())
+</a><a href="#h0-0-60" id="h0-0-60" class="i">+	}
+</a><a href="#h0-0-61" id="h0-0-61" class="i">+
+</a><a href="#h0-0-62" id="h0-0-62" class="i">+	defer file.Close()
+</a><a href="#h0-0-63" id="h0-0-63" class="i">+
+</a><a href="#h0-0-64" id="h0-0-64" class="i">+	data, err := io.ReadAll(file)
+</a><a href="#h0-0-65" id="h0-0-65" class="i">+	if err != nil {
+</a><a href="#h0-0-66" id="h0-0-66" class="i">+		return nil, status.Error(codes.Internal, err.Error())
+</a><a href="#h0-0-67" id="h0-0-67" class="i">+	}
+</a><a href="#h0-0-68" id="h0-0-68" class="i">+
+</a><a href="#h0-0-69" id="h0-0-69" class="i">+	return &amp;service.GetObjectResponse{
+</a><a href="#h0-0-70" id="h0-0-70" class="i">+		Data: data,
+</a><a href="#h0-0-71" id="h0-0-71" class="i">+		Metadata: &amp;common.Metadata{
+</a><a href="#h0-0-72" id="h0-0-72" class="i">+			Id:           stat.BaseName,
+</a><a href="#h0-0-73" id="h0-0-73" class="i">+			Key:          stat.Path,
+</a><a href="#h0-0-74" id="h0-0-74" class="i">+			Size:         stat.Size,
+</a><a href="#h0-0-75" id="h0-0-75" class="i">+			ModifiedTime: timestamppb.New(stat.ModifiedTime),
+</a><a href="#h0-0-76" id="h0-0-76" class="i">+		},
+</a><a href="#h0-0-77" id="h0-0-77" class="i">+	}, nil
+</a><a href="#h0-0-78" id="h0-0-78" class="i">+}
+</a><a href="#h0-0-79" id="h0-0-79" class="i">+
+</a><a href="#h0-0-80" id="h0-0-80" class="i">+// StreamGetObject reads the requested file in chunks, each of which is packaged as a single
+</a><a href="#h0-0-81" id="h0-0-81" class="i">+// response instance over the return channel.
+</a><a href="#h0-0-82" id="h0-0-82" class="i">+func (d *Disk) StreamGetObject(request *service.GetObjectStreamRequest) (&lt;-chan *service.GetObjectStreamResponse, error) {
+</a><a href="#h0-0-83" id="h0-0-83" class="i">+	var seek uint64
+</a><a href="#h0-0-84" id="h0-0-84" class="i">+
+</a><a href="#h0-0-85" id="h0-0-85" class="i">+	target := filepath.Clean(filepath.Join(request.Request.Resource.Bucket, request.Request.Key))
+</a><a href="#h0-0-86" id="h0-0-86" class="i">+
+</a><a href="#h0-0-87" id="h0-0-87" class="i">+	file, stat, err := d.client.ReadFile(target)
+</a><a href="#h0-0-88" id="h0-0-88" class="i">+	if err != nil {
+</a><a href="#h0-0-89" id="h0-0-89" class="i">+		return nil, status.Error(codes.Internal, err.Error())
+</a><a href="#h0-0-90" id="h0-0-90" class="i">+	}
+</a><a href="#h0-0-91" id="h0-0-91" class="i">+
+</a><a href="#h0-0-92" id="h0-0-92" class="i">+	stream := make(chan *service.GetObjectStreamResponse)
+</a><a href="#h0-0-93" id="h0-0-93" class="i">+
+</a><a href="#h0-0-94" id="h0-0-94" class="i">+	go func() {
+</a><a href="#h0-0-95" id="h0-0-95" class="i">+		// Wrap the file with a buffered reader in order to normalize the number of actual
+</a><a href="#h0-0-96" id="h0-0-96" class="i">+		// underlying read(2) syscalls on the file descriptor, regardless of the chunk size
+</a><a href="#h0-0-97" id="h0-0-97" class="i">+		// requested by the client.
+</a><a href="#h0-0-98" id="h0-0-98" class="i">+		reader := bufio.NewReader(file)
+</a><a href="#h0-0-99" id="h0-0-99" class="i">+		metadata := &amp;common.Metadata{
+</a><a href="#h0-0-100" id="h0-0-100" class="i">+			Id:           stat.BaseName,
+</a><a href="#h0-0-101" id="h0-0-101" class="i">+			Key:          stat.Path,
+</a><a href="#h0-0-102" id="h0-0-102" class="i">+			Size:         stat.Size,
+</a><a href="#h0-0-103" id="h0-0-103" class="i">+			ModifiedTime: timestamppb.New(stat.ModifiedTime),
+</a><a href="#h0-0-104" id="h0-0-104" class="i">+		}
+</a><a href="#h0-0-105" id="h0-0-105" class="i">+
+</a><a href="#h0-0-106" id="h0-0-106" class="i">+		for {
+</a><a href="#h0-0-107" id="h0-0-107" class="i">+			if seek &gt;= stat.Size {
+</a><a href="#h0-0-108" id="h0-0-108" class="i">+				break
+</a><a href="#h0-0-109" id="h0-0-109" class="i">+			}
+</a><a href="#h0-0-110" id="h0-0-110" class="i">+
+</a><a href="#h0-0-111" id="h0-0-111" class="i">+			n := request.ChunkSize
+</a><a href="#h0-0-112" id="h0-0-112" class="i">+			if n &gt; stat.Size-seek {
+</a><a href="#h0-0-113" id="h0-0-113" class="i">+				n = stat.Size - seek
+</a><a href="#h0-0-114" id="h0-0-114" class="i">+			}
+</a><a href="#h0-0-115" id="h0-0-115" class="i">+
+</a><a href="#h0-0-116" id="h0-0-116" class="i">+			chunk := make([]byte, n)
+</a><a href="#h0-0-117" id="h0-0-117" class="i">+
+</a><a href="#h0-0-118" id="h0-0-118" class="i">+			if _, err := io.ReadFull(reader, chunk); err != nil {
+</a><a href="#h0-0-119" id="h0-0-119" class="i">+				break
+</a><a href="#h0-0-120" id="h0-0-120" class="i">+			}
+</a><a href="#h0-0-121" id="h0-0-121" class="i">+
+</a><a href="#h0-0-122" id="h0-0-122" class="i">+			response := &amp;service.GetObjectStreamResponse{
+</a><a href="#h0-0-123" id="h0-0-123" class="i">+				Response: &amp;service.GetObjectResponse{
+</a><a href="#h0-0-124" id="h0-0-124" class="i">+					Metadata: metadata,
+</a><a href="#h0-0-125" id="h0-0-125" class="i">+					Data:     chunk,
+</a><a href="#h0-0-126" id="h0-0-126" class="i">+				},
+</a><a href="#h0-0-127" id="h0-0-127" class="i">+				Range: &amp;common.Range{
+</a><a href="#h0-0-128" id="h0-0-128" class="i">+					Unit:  &quot;bytes&quot;,
+</a><a href="#h0-0-129" id="h0-0-129" class="i">+					Start: seek,
+</a><a href="#h0-0-130" id="h0-0-130" class="i">+					End:   seek + n,
+</a><a href="#h0-0-131" id="h0-0-131" class="i">+					Total: stat.Size,
+</a><a href="#h0-0-132" id="h0-0-132" class="i">+				},
+</a><a href="#h0-0-133" id="h0-0-133" class="i">+			}
+</a><a href="#h0-0-134" id="h0-0-134" class="i">+
+</a><a href="#h0-0-135" id="h0-0-135" class="i">+			stream &lt;- response
+</a><a href="#h0-0-136" id="h0-0-136" class="i">+			seek += n
+</a><a href="#h0-0-137" id="h0-0-137" class="i">+		}
+</a><a href="#h0-0-138" id="h0-0-138" class="i">+
+</a><a href="#h0-0-139" id="h0-0-139" class="i">+		file.Close()
+</a><a href="#h0-0-140" id="h0-0-140" class="i">+		close(stream)
+</a><a href="#h0-0-141" id="h0-0-141" class="i">+	}()
+</a><a href="#h0-0-142" id="h0-0-142" class="i">+
+</a><a href="#h0-0-143" id="h0-0-143" class="i">+	return stream, nil
+</a><a href="#h0-0-144" id="h0-0-144" class="i">+}
+</a><a href="#h0-0-145" id="h0-0-145" class="i">+
+</a><a href="#h0-0-146" id="h0-0-146" class="i">+// PutObject opens a file handle at the requested path followed by writing the request data payload
+</a><a href="#h0-0-147" id="h0-0-147" class="i">+// to the file in full.
+</a><a href="#h0-0-148" id="h0-0-148" class="i">+func (d *Disk) PutObject(request *service.PutObjectRequest) (*service.PutObjectResponse, error) {
+</a><a href="#h0-0-149" id="h0-0-149" class="i">+	target := filepath.Clean(filepath.Join(request.Resource.Bucket, request.Key))
+</a><a href="#h0-0-150" id="h0-0-150" class="i">+
+</a><a href="#h0-0-151" id="h0-0-151" class="i">+	if err := d.client.CreateDirectory(filepath.Dir(target)); err != nil {
+</a><a href="#h0-0-152" id="h0-0-152" class="i">+		return nil, status.Error(codes.Internal, err.Error())
+</a><a href="#h0-0-153" id="h0-0-153" class="i">+	}
+</a><a href="#h0-0-154" id="h0-0-154" class="i">+
+</a><a href="#h0-0-155" id="h0-0-155" class="i">+	w, err := d.client.WriteFile(target)
+</a><a href="#h0-0-156" id="h0-0-156" class="i">+	if err != nil {
+</a><a href="#h0-0-157" id="h0-0-157" class="i">+		return nil, status.Error(codes.Internal, err.Error())
+</a><a href="#h0-0-158" id="h0-0-158" class="i">+	}
+</a><a href="#h0-0-159" id="h0-0-159" class="i">+
+</a><a href="#h0-0-160" id="h0-0-160" class="i">+	defer w.Close()
+</a><a href="#h0-0-161" id="h0-0-161" class="i">+
+</a><a href="#h0-0-162" id="h0-0-162" class="i">+	n, err := io.Copy(w, bytes.NewReader(request.Data))
+</a><a href="#h0-0-163" id="h0-0-163" class="i">+	if err != nil {
+</a><a href="#h0-0-164" id="h0-0-164" class="i">+		return nil, status.Error(codes.Internal, err.Error())
+</a><a href="#h0-0-165" id="h0-0-165" class="i">+	}
+</a><a href="#h0-0-166" id="h0-0-166" class="i">+
+</a><a href="#h0-0-167" id="h0-0-167" class="i">+	return &amp;service.PutObjectResponse{Size: uint64(n)}, nil
+</a><a href="#h0-0-168" id="h0-0-168" class="i">+}
+</a><a href="#h0-0-169" id="h0-0-169" class="i">+
+</a><a href="#h0-0-170" id="h0-0-170" class="i">+// StreamPutObject writes the request file in chunks, where each request over the request channel
+</a><a href="#h0-0-171" id="h0-0-171" class="i">+// specifies a single chunk of data.
+</a><a href="#h0-0-172" id="h0-0-172" class="i">+func (d *Disk) StreamPutObject(stream chan *service.PutObjectStreamRequest) (*service.PutObjectStreamResponse, error) {
+</a><a href="#h0-0-173" id="h0-0-173" class="i">+	var err error
+</a><a href="#h0-0-174" id="h0-0-174" class="i">+	var size int
+</a><a href="#h0-0-175" id="h0-0-175" class="i">+	var file disk.WriteSeekCloser
+</a><a href="#h0-0-176" id="h0-0-176" class="i">+
+</a><a href="#h0-0-177" id="h0-0-177" class="i">+	for request := range stream {
+</a><a href="#h0-0-178" id="h0-0-178" class="i">+		// Initialize the file descriptor for only the first request in the channel
+</a><a href="#h0-0-179" id="h0-0-179" class="i">+		if file == nil {
+</a><a href="#h0-0-180" id="h0-0-180" class="i">+			target := filepath.Clean(filepath.Join(request.Request.Resource.Bucket, request.Request.Key))
+</a><a href="#h0-0-181" id="h0-0-181" class="i">+
+</a><a href="#h0-0-182" id="h0-0-182" class="i">+			if err := d.client.CreateDirectory(filepath.Dir(target)); err != nil {
+</a><a href="#h0-0-183" id="h0-0-183" class="i">+				return nil, status.Error(codes.Internal, err.Error())
+</a><a href="#h0-0-184" id="h0-0-184" class="i">+			}
+</a><a href="#h0-0-185" id="h0-0-185" class="i">+
+</a><a href="#h0-0-186" id="h0-0-186" class="i">+			file, err = d.client.WriteFile(target)
+</a><a href="#h0-0-187" id="h0-0-187" class="i">+			if err != nil {
+</a><a href="#h0-0-188" id="h0-0-188" class="i">+				return nil, status.Error(codes.Internal, err.Error())
+</a><a href="#h0-0-189" id="h0-0-189" class="i">+			}
+</a><a href="#h0-0-190" id="h0-0-190" class="i">+
+</a><a href="#h0-0-191" id="h0-0-191" class="i">+			defer file.Close()
+</a><a href="#h0-0-192" id="h0-0-192" class="i">+		}
+</a><a href="#h0-0-193" id="h0-0-193" class="i">+
+</a><a href="#h0-0-194" id="h0-0-194" class="i">+		if request.Range != nil &amp;&amp; request.Range.Start &gt; 0 &amp;&amp; request.Range.End &gt; request.Range.Start {
+</a><a href="#h0-0-195" id="h0-0-195" class="i">+			if uint64(len(request.Request.Data)) != request.Range.End-request.Range.Start {
+</a><a href="#h0-0-196" id="h0-0-196" class="i">+				return nil, status.Error(
+</a><a href="#h0-0-197" id="h0-0-197" class="i">+					codes.InvalidArgument,
+</a><a href="#h0-0-198" id="h0-0-198" class="i">+					&quot;backend: write payload size is inconsistent with range specification&quot;,
+</a><a href="#h0-0-199" id="h0-0-199" class="i">+				)
+</a><a href="#h0-0-200" id="h0-0-200" class="i">+			}
+</a><a href="#h0-0-201" id="h0-0-201" class="i">+
+</a><a href="#h0-0-202" id="h0-0-202" class="i">+			if _, err := file.Seek(int64(request.Range.Start), io.SeekStart); err != nil {
+</a><a href="#h0-0-203" id="h0-0-203" class="i">+				return nil, status.Error(codes.OutOfRange, err.Error())
+</a><a href="#h0-0-204" id="h0-0-204" class="i">+			}
+</a><a href="#h0-0-205" id="h0-0-205" class="i">+		}
+</a><a href="#h0-0-206" id="h0-0-206" class="i">+
+</a><a href="#h0-0-207" id="h0-0-207" class="i">+		n, err := file.Write(request.Request.Data)
+</a><a href="#h0-0-208" id="h0-0-208" class="i">+		if err != nil {
+</a><a href="#h0-0-209" id="h0-0-209" class="i">+			return nil, status.Error(codes.Internal, err.Error())
+</a><a href="#h0-0-210" id="h0-0-210" class="i">+		}
+</a><a href="#h0-0-211" id="h0-0-211" class="i">+
+</a><a href="#h0-0-212" id="h0-0-212" class="i">+		size += n
+</a><a href="#h0-0-213" id="h0-0-213" class="i">+	}
+</a><a href="#h0-0-214" id="h0-0-214" class="i">+
+</a><a href="#h0-0-215" id="h0-0-215" class="i">+	return &amp;service.PutObjectStreamResponse{
+</a><a href="#h0-0-216" id="h0-0-216" class="i">+		Response: &amp;service.PutObjectResponse{
+</a><a href="#h0-0-217" id="h0-0-217" class="i">+			Size: uint64(size),
+</a><a href="#h0-0-218" id="h0-0-218" class="i">+		},
+</a><a href="#h0-0-219" id="h0-0-219" class="i">+	}, nil
+</a><a href="#h0-0-220" id="h0-0-220" class="i">+}
+</a><a href="#h0-0-221" id="h0-0-221" class="i">+
+</a><a href="#h0-0-222" id="h0-0-222" class="i">+// DeleteObject deletes the requested file.
+</a><a href="#h0-0-223" id="h0-0-223" class="i">+func (d *Disk) DeleteObject(request *service.DeleteObjectRequest) (*service.DeleteObjectResponse, error) {
+</a><a href="#h0-0-224" id="h0-0-224" class="i">+	target := filepath.Clean(filepath.Join(request.Resource.Bucket, request.Key))
+</a><a href="#h0-0-225" id="h0-0-225" class="i">+
+</a><a href="#h0-0-226" id="h0-0-226" class="i">+	if err := d.client.DeleteFile(target); err != nil {
+</a><a href="#h0-0-227" id="h0-0-227" class="i">+		return nil, status.Error(codes.Internal, err.Error())
+</a><a href="#h0-0-228" id="h0-0-228" class="i">+	}
+</a><a href="#h0-0-229" id="h0-0-229" class="i">+
+</a><a href="#h0-0-230" id="h0-0-230" class="i">+	return &amp;service.DeleteObjectResponse{}, nil
+</a><a href="#h0-0-231" id="h0-0-231" class="i">+}
+</a><a href="#h0-0-232" id="h0-0-232" class="i">+
+</a><a href="#h0-0-233" id="h0-0-233" class="i">+// ListObjects recursively lists files matching the requested prefix.
+</a><a href="#h0-0-234" id="h0-0-234" class="i">+func (d *Disk) ListObjects(request *service.ListObjectsRequest) (*service.ListObjectsResponse, error) {
+</a><a href="#h0-0-235" id="h0-0-235" class="i">+	var objects []*service.HeadObjectResponse
+</a><a href="#h0-0-236" id="h0-0-236" class="i">+
+</a><a href="#h0-0-237" id="h0-0-237" class="i">+	target := filepath.Clean(filepath.Join(request.Resource.Bucket, request.Prefix))
+</a><a href="#h0-0-238" id="h0-0-238" class="i">+	parent := filepath.Dir(target)
+</a><a href="#h0-0-239" id="h0-0-239" class="i">+
+</a><a href="#h0-0-240" id="h0-0-240" class="i">+	// The requested path may itself already be a directory, in which case the previously
+</a><a href="#h0-0-241" id="h0-0-241" class="i">+	// determined dirname should be discarded.
+</a><a href="#h0-0-242" id="h0-0-242" class="i">+	stat, err := d.client.StatFile(target)
+</a><a href="#h0-0-243" id="h0-0-243" class="i">+	if err == nil &amp;&amp; stat.Mode.IsDir() {
+</a><a href="#h0-0-244" id="h0-0-244" class="i">+		parent = target
+</a><a href="#h0-0-245" id="h0-0-245" class="i">+	}
+</a><a href="#h0-0-246" id="h0-0-246" class="i">+
+</a><a href="#h0-0-247" id="h0-0-247" class="i">+	files, err := d.client.ListFiles(parent)
+</a><a href="#h0-0-248" id="h0-0-248" class="i">+	if err != nil {
+</a><a href="#h0-0-249" id="h0-0-249" class="i">+		return nil, status.Error(codes.Internal, err.Error())
+</a><a href="#h0-0-250" id="h0-0-250" class="i">+	}
+</a><a href="#h0-0-251" id="h0-0-251" class="i">+
+</a><a href="#h0-0-252" id="h0-0-252" class="i">+	for _, file := range files {
+</a><a href="#h0-0-253" id="h0-0-253" class="i">+		// Exclude the bucket name in the file path key for purposes of prefix evaluation
+</a><a href="#h0-0-254" id="h0-0-254" class="i">+		key := filepath.Join(strings.Split(file.Path, string(os.PathSeparator))[1:]...)
+</a><a href="#h0-0-255" id="h0-0-255" class="i">+
+</a><a href="#h0-0-256" id="h0-0-256" class="i">+		if !strings.HasPrefix(key, filepath.Clean(request.Prefix)) {
+</a><a href="#h0-0-257" id="h0-0-257" class="i">+			continue
+</a><a href="#h0-0-258" id="h0-0-258" class="i">+		}
+</a><a href="#h0-0-259" id="h0-0-259" class="i">+
+</a><a href="#h0-0-260" id="h0-0-260" class="i">+		head := &amp;service.HeadObjectResponse{
+</a><a href="#h0-0-261" id="h0-0-261" class="i">+			Metadata: &amp;common.Metadata{
+</a><a href="#h0-0-262" id="h0-0-262" class="i">+				Id:           file.BaseName,
+</a><a href="#h0-0-263" id="h0-0-263" class="i">+				Key:          file.Path,
+</a><a href="#h0-0-264" id="h0-0-264" class="i">+				Size:         file.Size,
+</a><a href="#h0-0-265" id="h0-0-265" class="i">+				ModifiedTime: timestamppb.New(file.ModifiedTime),
+</a><a href="#h0-0-266" id="h0-0-266" class="i">+			},
+</a><a href="#h0-0-267" id="h0-0-267" class="i">+		}
+</a><a href="#h0-0-268" id="h0-0-268" class="i">+
+</a><a href="#h0-0-269" id="h0-0-269" class="i">+		objects = append(objects, head)
+</a><a href="#h0-0-270" id="h0-0-270" class="i">+	}
+</a><a href="#h0-0-271" id="h0-0-271" class="i">+
+</a><a href="#h0-0-272" id="h0-0-272" class="i">+	return &amp;service.ListObjectsResponse{Objects: objects}, nil
+</a><a href="#h0-0-273" id="h0-0-273" class="i">+}
+</a></pre>
+</div>
+</body>
+</html>

@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>pkg/client/b2: Parse file upload timestamp in DownloadFileByName - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/ec77acb9c66d11cfecf7f33671470f219d247536">ec77acb9c66d11cfecf7f33671470f219d247536</a>
+<b>parent</b> <a href="../commit/45142d389049488fa80567bd41dc98bd8473d15f">45142d389049488fa80567bd41dc98bd8473d15f</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Mon 27 Dec 2021 14:27:22 -0800
+
+pkg/client/b2: Parse file upload timestamp in DownloadFileByName
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">pkg/client/b2/client.go</a></td><td> | </td><td class="num">20</td><td><span class="i">+++++++++++++</span><span class="d">-------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">pkg/client/b2/types.go</a></td><td> | </td><td class="num">15</td><td><span class="i">++++++++</span><span class="d">-------</span></td></tr>
+</table></pre><pre>2 files changed, 21 insertions(+), 14 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/pkg/client/b2/client.go">pkg/client/b2/client.go</a> b/<a href="../file/pkg/client/b2/client.go">pkg/client/b2/client.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -165,14 +165,20 @@ func (c *Client) DownloadFileByName(request *DownloadFileByNameRequest) (*Downlo
+</a> 		contentRange.Total = total
+ 	}
+ 
+<a href="#h0-0-3" id="h0-0-3" class="i">+	var uploadTimestamp UnixTimestamp
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+	if err := json.Unmarshal([]byte(response.Header.Get(&quot;X-Bz-Upload-Timestamp&quot;)), &amp;uploadTimestamp); err != nil {
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+		return nil, statusFromError(err)
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+	}
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+
+</a> 	return &amp;DownloadFileByNameResponse{
+<a href="#h0-0-9" id="h0-0-9" class="d">-		FileID:      response.Header.Get(&quot;X-Bz-File-Id&quot;),
+</a><a href="#h0-0-10" id="h0-0-10" class="d">-		FileName:    response.Header.Get(&quot;X-Bz-File-Name&quot;),
+</a><a href="#h0-0-11" id="h0-0-11" class="d">-		ContentSHA1: response.Header.Get(&quot;X-Bz-Content-Sha1&quot;),
+</a><a href="#h0-0-12" id="h0-0-12" class="d">-		Size:        size,
+</a><a href="#h0-0-13" id="h0-0-13" class="d">-		ContentType: response.Header.Get(&quot;Content-Type&quot;),
+</a><a href="#h0-0-14" id="h0-0-14" class="d">-		Range:       contentRange,
+</a><a href="#h0-0-15" id="h0-0-15" class="d">-		Data:        response.Body,
+</a><a href="#h0-0-16" id="h0-0-16" class="i">+		FileID:          response.Header.Get(&quot;X-Bz-File-Id&quot;),
+</a><a href="#h0-0-17" id="h0-0-17" class="i">+		FileName:        response.Header.Get(&quot;X-Bz-File-Name&quot;),
+</a><a href="#h0-0-18" id="h0-0-18" class="i">+		ContentSHA1:     response.Header.Get(&quot;X-Bz-Content-Sha1&quot;),
+</a><a href="#h0-0-19" id="h0-0-19" class="i">+		Size:            size,
+</a><a href="#h0-0-20" id="h0-0-20" class="i">+		ContentType:     response.Header.Get(&quot;Content-Type&quot;),
+</a><a href="#h0-0-21" id="h0-0-21" class="i">+		Range:           contentRange,
+</a><a href="#h0-0-22" id="h0-0-22" class="i">+		UploadTimestamp: &amp;uploadTimestamp,
+</a><a href="#h0-0-23" id="h0-0-23" class="i">+		Data:            response.Body,
+</a> 	}, nil
+ }
+ 
+<b>diff --git a/<a id="h1" href="../file/pkg/client/b2/types.go">pkg/client/b2/types.go</a> b/<a href="../file/pkg/client/b2/types.go">pkg/client/b2/types.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -96,13 +96,14 @@ type DownloadFileByNameRequest struct {
+</a> 
+ // DownloadFileByNameResponse is the response schema for b2_download_file_by_name.
+ type DownloadFileByNameResponse struct {
+<a href="#h1-0-3" id="h1-0-3" class="d">-	FileID      string
+</a><a href="#h1-0-4" id="h1-0-4" class="d">-	FileName    string
+</a><a href="#h1-0-5" id="h1-0-5" class="d">-	ContentSHA1 string
+</a><a href="#h1-0-6" id="h1-0-6" class="d">-	Size        int
+</a><a href="#h1-0-7" id="h1-0-7" class="d">-	ContentType string
+</a><a href="#h1-0-8" id="h1-0-8" class="d">-	Range       Range
+</a><a href="#h1-0-9" id="h1-0-9" class="d">-	Data        io.ReadCloser
+</a><a href="#h1-0-10" id="h1-0-10" class="i">+	FileID          string
+</a><a href="#h1-0-11" id="h1-0-11" class="i">+	FileName        string
+</a><a href="#h1-0-12" id="h1-0-12" class="i">+	ContentSHA1     string
+</a><a href="#h1-0-13" id="h1-0-13" class="i">+	Size            int
+</a><a href="#h1-0-14" id="h1-0-14" class="i">+	ContentType     string
+</a><a href="#h1-0-15" id="h1-0-15" class="i">+	Range           Range
+</a><a href="#h1-0-16" id="h1-0-16" class="i">+	UploadTimestamp *UnixTimestamp
+</a><a href="#h1-0-17" id="h1-0-17" class="i">+	Data            io.ReadCloser
+</a> }
+ 
+ // FinishLargeFileRequest is the request schema for b2_finish_large_file.
+</pre>
+</div>
+</body>
+</html>

@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>processor.go - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../../../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../../../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../../../log">Log</a> | <a href="../../../files">Files</a> | <a href="../../../refs">Refs</a> | <a href="../../../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<p>internal/backend/<strong>processor.go</strong> (10498B) (<a href="../../../raw/internal/backend/processor.go">raw</a>) (<a href="../../../blame/internal/backend/processor.go">blame</a>)</p><hr/>
+<pre id="blob">
+<a href="#l1" class="line" id="l1">      1</a> package backend
+<a href="#l2" class="line" id="l2">      2</a> 
+<a href="#l3" class="line" id="l3">      3</a> import (
+<a href="#l4" class="line" id="l4">      4</a> 	&quot;bufio&quot;
+<a href="#l5" class="line" id="l5">      5</a> 	&quot;bytes&quot;
+<a href="#l6" class="line" id="l6">      6</a> 	&quot;context&quot;
+<a href="#l7" class="line" id="l7">      7</a> 	&quot;io&quot;
+<a href="#l8" class="line" id="l8">      8</a> 
+<a href="#l9" class="line" id="l9">      9</a> 	&quot;google.golang.org/grpc/codes&quot;
+<a href="#l10" class="line" id="l10">     10</a> 	&quot;google.golang.org/grpc/status&quot;
+<a href="#l11" class="line" id="l11">     11</a> 	&quot;google.golang.org/protobuf/proto&quot;
+<a href="#l12" class="line" id="l12">     12</a> 
+<a href="#l13" class="line" id="l13">     13</a> 	&quot;unistore/internal/util&quot;
+<a href="#l14" class="line" id="l14">     14</a> 	&quot;unistore/schemas/common&quot;
+<a href="#l15" class="line" id="l15">     15</a> 	&quot;unistore/schemas/service&quot;
+<a href="#l16" class="line" id="l16">     16</a> )
+<a href="#l17" class="line" id="l17">     17</a> 
+<a href="#l18" class="line" id="l18">     18</a> var (
+<a href="#l19" class="line" id="l19">     19</a> 	// defaultStreamingWriteChunkSize is the default chunk size used for streaming puts to the
+<a href="#l20" class="line" id="l20">     20</a> 	// backend. An explicit chunk size is required since the volume of put chunks to the
+<a href="#l21" class="line" id="l21">     21</a> 	// backend may be mismatched relative to the input if there is a non-unity size
+<a href="#l22" class="line" id="l22">     22</a> 	// amplification factor.
+<a href="#l23" class="line" id="l23">     23</a> 	defaultStreamingWriteChunkSize = uint64(5 * 1024 * 1024) // 5 MB
+<a href="#l24" class="line" id="l24">     24</a> )
+<a href="#l25" class="line" id="l25">     25</a> 
+<a href="#l26" class="line" id="l26">     26</a> // readerFactory is a type alias for a function that creates an io.ReadCloser from an io.Reader.
+<a href="#l27" class="line" id="l27">     27</a> type readerFactory func(io.Reader) (io.ReadCloser, error)
+<a href="#l28" class="line" id="l28">     28</a> 
+<a href="#l29" class="line" id="l29">     29</a> // writerFactory is a type alias for a function that creates an io.WriteCloser from an io.Writer.
+<a href="#l30" class="line" id="l30">     30</a> type writerFactory func(io.Writer) (io.WriteCloser, error)
+<a href="#l31" class="line" id="l31">     31</a> 
+<a href="#l32" class="line" id="l32">     32</a> // ioProcessor is a wrapper over a Backend that performs in-flight mutation of data streams using
+<a href="#l33" class="line" id="l33">     33</a> // the provided io.Reader and io.Writer factories. In particular, reads (gets and streaming gets)
+<a href="#l34" class="line" id="l34">     34</a> // proxy their data through the provided io.Reader factory; writes (puts and streaming puts) proxy
+<a href="#l35" class="line" id="l35">     35</a> // their data through the provided io.Writer factory.
+<a href="#l36" class="line" id="l36">     36</a> //
+<a href="#l37" class="line" id="l37">     37</a> // The io.Reader factory accepts an io.Reader for original input, and provides an io.Reader from
+<a href="#l38" class="line" id="l38">     38</a> // which the transformed data stream can be read.
+<a href="#l39" class="line" id="l39">     39</a> // The io.Writer factory accepts an io.Writer into which the transformed output is written, and
+<a href="#l40" class="line" id="l40">     40</a> // provides an io.Writer into which the original data should be written.
+<a href="#l41" class="line" id="l41">     41</a> //
+<a href="#l42" class="line" id="l42">     42</a> // The streaming read and write chunk sizes are used to specify a desired chunk size for reads and
+<a href="#l43" class="line" id="l43">     43</a> // writes from and to the proxied io.Reader and io.Writer, respectively. When 0, the streaming read
+<a href="#l44" class="line" id="l44">     44</a> // routine retains the original chunk size specified in the request, and the streaming write routine
+<a href="#l45" class="line" id="l45">     45</a> // uses a default chunk size.
+<a href="#l46" class="line" id="l46">     46</a> type ioProcessor struct {
+<a href="#l47" class="line" id="l47">     47</a> 	reader                  func(io.Reader) (io.ReadCloser, error)
+<a href="#l48" class="line" id="l48">     48</a> 	writer                  func(io.Writer) (io.WriteCloser, error)
+<a href="#l49" class="line" id="l49">     49</a> 	streamingReadChunkSize  uint64
+<a href="#l50" class="line" id="l50">     50</a> 	streamingWriteChunkSize uint64
+<a href="#l51" class="line" id="l51">     51</a> 	Backend
+<a href="#l52" class="line" id="l52">     52</a> }
+<a href="#l53" class="line" id="l53">     53</a> 
+<a href="#l54" class="line" id="l54">     54</a> // newIOProcessor creates a new ioProcessor.
+<a href="#l55" class="line" id="l55">     55</a> func newIOProcessor(
+<a href="#l56" class="line" id="l56">     56</a> 	reader readerFactory,
+<a href="#l57" class="line" id="l57">     57</a> 	writer writerFactory,
+<a href="#l58" class="line" id="l58">     58</a> 	streamingReadChunkSize uint64,
+<a href="#l59" class="line" id="l59">     59</a> 	streamingWriteChunkSize uint64,
+<a href="#l60" class="line" id="l60">     60</a> 	backend Backend,
+<a href="#l61" class="line" id="l61">     61</a> ) Backend {
+<a href="#l62" class="line" id="l62">     62</a> 	if reader == nil {
+<a href="#l63" class="line" id="l63">     63</a> 		reader = func(raw io.Reader) (io.ReadCloser, error) {
+<a href="#l64" class="line" id="l64">     64</a> 			return io.NopCloser(raw), nil
+<a href="#l65" class="line" id="l65">     65</a> 		}
+<a href="#l66" class="line" id="l66">     66</a> 	}
+<a href="#l67" class="line" id="l67">     67</a> 
+<a href="#l68" class="line" id="l68">     68</a> 	if writer == nil {
+<a href="#l69" class="line" id="l69">     69</a> 		writer = func(raw io.Writer) (io.WriteCloser, error) {
+<a href="#l70" class="line" id="l70">     70</a> 			return util.NopWriteCloser(raw), nil
+<a href="#l71" class="line" id="l71">     71</a> 		}
+<a href="#l72" class="line" id="l72">     72</a> 	}
+<a href="#l73" class="line" id="l73">     73</a> 
+<a href="#l74" class="line" id="l74">     74</a> 	if streamingWriteChunkSize == 0 {
+<a href="#l75" class="line" id="l75">     75</a> 		streamingWriteChunkSize = defaultStreamingWriteChunkSize
+<a href="#l76" class="line" id="l76">     76</a> 	}
+<a href="#l77" class="line" id="l77">     77</a> 
+<a href="#l78" class="line" id="l78">     78</a> 	return &amp;ioProcessor{
+<a href="#l79" class="line" id="l79">     79</a> 		reader:                  reader,
+<a href="#l80" class="line" id="l80">     80</a> 		writer:                  writer,
+<a href="#l81" class="line" id="l81">     81</a> 		streamingReadChunkSize:  streamingReadChunkSize,
+<a href="#l82" class="line" id="l82">     82</a> 		streamingWriteChunkSize: streamingWriteChunkSize,
+<a href="#l83" class="line" id="l83">     83</a> 		Backend:                 backend,
+<a href="#l84" class="line" id="l84">     84</a> 	}
+<a href="#l85" class="line" id="l85">     85</a> }
+<a href="#l86" class="line" id="l86">     86</a> 
+<a href="#l87" class="line" id="l87">     87</a> // GetObject defers to the underlying backend followed by performing transparent transformation of
+<a href="#l88" class="line" id="l88">     88</a> // the full payload.
+<a href="#l89" class="line" id="l89">     89</a> func (p *ioProcessor) GetObject(ctx context.Context, request *service.GetObjectRequest) (*service.GetObjectResponse, error) {
+<a href="#l90" class="line" id="l90">     90</a> 	resp, err := p.Backend.GetObject(ctx, request)
+<a href="#l91" class="line" id="l91">     91</a> 	if err != nil {
+<a href="#l92" class="line" id="l92">     92</a> 		return nil, err
+<a href="#l93" class="line" id="l93">     93</a> 	}
+<a href="#l94" class="line" id="l94">     94</a> 
+<a href="#l95" class="line" id="l95">     95</a> 	proxyReader, err := p.reader(bytes.NewReader(resp.Data))
+<a href="#l96" class="line" id="l96">     96</a> 	if err != nil {
+<a href="#l97" class="line" id="l97">     97</a> 		return nil, status.Error(codes.Unknown, err.Error())
+<a href="#l98" class="line" id="l98">     98</a> 	}
+<a href="#l99" class="line" id="l99">     99</a> 
+<a href="#l100" class="line" id="l100">    100</a> 	defer proxyReader.Close()
+<a href="#l101" class="line" id="l101">    101</a> 
+<a href="#l102" class="line" id="l102">    102</a> 	resp.Data, err = io.ReadAll(proxyReader)
+<a href="#l103" class="line" id="l103">    103</a> 	if err != nil {
+<a href="#l104" class="line" id="l104">    104</a> 		return nil, status.Error(codes.Unknown, err.Error())
+<a href="#l105" class="line" id="l105">    105</a> 	}
+<a href="#l106" class="line" id="l106">    106</a> 
+<a href="#l107" class="line" id="l107">    107</a> 	return resp, nil
+<a href="#l108" class="line" id="l108">    108</a> }
+<a href="#l109" class="line" id="l109">    109</a> 
+<a href="#l110" class="line" id="l110">    110</a> // StreamGetObject is a streaming implementation of GetObject that transforms data chunk-by-chunk.
+<a href="#l111" class="line" id="l111">    111</a> func (p *ioProcessor) StreamGetObject(ctx context.Context, request *service.GetObjectStreamRequest) (&lt;-chan *service.GetObjectStreamResponse, chan error) {
+<a href="#l112" class="line" id="l112">    112</a> 	var metadata *common.Metadata
+<a href="#l113" class="line" id="l113">    113</a> 
+<a href="#l114" class="line" id="l114">    114</a> 	proxyRequest := request
+<a href="#l115" class="line" id="l115">    115</a> 	if p.streamingReadChunkSize &gt; 0 {
+<a href="#l116" class="line" id="l116">    116</a> 		// Clone the inbound request in order to overwrite the chunk size to the desired
+<a href="#l117" class="line" id="l117">    117</a> 		// streaming read chunk size. The request-level chunk reshaping applies only to the
+<a href="#l118" class="line" id="l118">    118</a> 		// chunk reads done internally by the backend; the original chunk size requested by
+<a href="#l119" class="line" id="l119">    119</a> 		// the client is still respected for outbound stream responses.
+<a href="#l120" class="line" id="l120">    120</a> 		proxyRequest = proto.Clone(request).(*service.GetObjectStreamRequest)
+<a href="#l121" class="line" id="l121">    121</a> 		proxyRequest.ChunkSize = p.streamingReadChunkSize
+<a href="#l122" class="line" id="l122">    122</a> 	}
+<a href="#l123" class="line" id="l123">    123</a> 
+<a href="#l124" class="line" id="l124">    124</a> 	stream, errs := p.Backend.StreamGetObject(ctx, proxyRequest)
+<a href="#l125" class="line" id="l125">    125</a> 	if stream == nil {
+<a href="#l126" class="line" id="l126">    126</a> 		return nil, errs
+<a href="#l127" class="line" id="l127">    127</a> 	}
+<a href="#l128" class="line" id="l128">    128</a> 
+<a href="#l129" class="line" id="l129">    129</a> 	responseProxy := make(chan *service.GetObjectStreamResponse)
+<a href="#l130" class="line" id="l130">    130</a> 	errsProxy := make(chan error, 1)
+<a href="#l131" class="line" id="l131">    131</a> 	r, w := io.Pipe()
+<a href="#l132" class="line" id="l132">    132</a> 
+<a href="#l133" class="line" id="l133">    133</a> 	if request.ChunkSize == 0 {
+<a href="#l134" class="line" id="l134">    134</a> 		errsProxy &lt;- status.Error(
+<a href="#l135" class="line" id="l135">    135</a> 			codes.InvalidArgument,
+<a href="#l136" class="line" id="l136">    136</a> 			&quot;backend: I/O processor streaming get chunk size must be greater than zero&quot;,
+<a href="#l137" class="line" id="l137">    137</a> 		)
+<a href="#l138" class="line" id="l138">    138</a> 		return nil, errsProxy
+<a href="#l139" class="line" id="l139">    139</a> 	}
+<a href="#l140" class="line" id="l140">    140</a> 
+<a href="#l141" class="line" id="l141">    141</a> 	go func() {
+<a href="#l142" class="line" id="l142">    142</a> 		// The stream has concluded gracefully; close the writer to signal to the client
+<a href="#l143" class="line" id="l143">    143</a> 		// pipe that control should be transferred to the reader.
+<a href="#l144" class="line" id="l144">    144</a> 		defer w.Close()
+<a href="#l145" class="line" id="l145">    145</a> 
+<a href="#l146" class="line" id="l146">    146</a> 		for {
+<a href="#l147" class="line" id="l147">    147</a> 			select {
+<a href="#l148" class="line" id="l148">    148</a> 			case err := &lt;-errs:
+<a href="#l149" class="line" id="l149">    149</a> 				errsProxy &lt;- err
+<a href="#l150" class="line" id="l150">    150</a> 				return
+<a href="#l151" class="line" id="l151">    151</a> 			case response, ok := &lt;-stream:
+<a href="#l152" class="line" id="l152">    152</a> 				if !ok {
+<a href="#l153" class="line" id="l153">    153</a> 					return
+<a href="#l154" class="line" id="l154">    154</a> 				}
+<a href="#l155" class="line" id="l155">    155</a> 
+<a href="#l156" class="line" id="l156">    156</a> 				// Capture the first available metadata payload to mirror in the
+<a href="#l157" class="line" id="l157">    157</a> 				// underlying response.
+<a href="#l158" class="line" id="l158">    158</a> 				if metadata == nil {
+<a href="#l159" class="line" id="l159">    159</a> 					metadata = response.Response.Metadata
+<a href="#l160" class="line" id="l160">    160</a> 				}
+<a href="#l161" class="line" id="l161">    161</a> 
+<a href="#l162" class="line" id="l162">    162</a> 				// Simply relay the response data to the pipe for asynchronous
+<a href="#l163" class="line" id="l163">    163</a> 				// consumption by the reader routine.
+<a href="#l164" class="line" id="l164">    164</a> 				if _, err := w.Write(response.Response.Data); err != nil {
+<a href="#l165" class="line" id="l165">    165</a> 					errsProxy &lt;- err
+<a href="#l166" class="line" id="l166">    166</a> 					return
+<a href="#l167" class="line" id="l167">    167</a> 				}
+<a href="#l168" class="line" id="l168">    168</a> 			}
+<a href="#l169" class="line" id="l169">    169</a> 		}
+<a href="#l170" class="line" id="l170">    170</a> 	}()
+<a href="#l171" class="line" id="l171">    171</a> 
+<a href="#l172" class="line" id="l172">    172</a> 	go func() {
+<a href="#l173" class="line" id="l173">    173</a> 		var offset int
+<a href="#l174" class="line" id="l174">    174</a> 
+<a href="#l175" class="line" id="l175">    175</a> 		proxyReader, err := p.reader(r)
+<a href="#l176" class="line" id="l176">    176</a> 		if err != nil {
+<a href="#l177" class="line" id="l177">    177</a> 			errsProxy &lt;- err
+<a href="#l178" class="line" id="l178">    178</a> 			close(responseProxy)
+<a href="#l179" class="line" id="l179">    179</a> 			return
+<a href="#l180" class="line" id="l180">    180</a> 		}
+<a href="#l181" class="line" id="l181">    181</a> 
+<a href="#l182" class="line" id="l182">    182</a> 		defer proxyReader.Close()
+<a href="#l183" class="line" id="l183">    183</a> 
+<a href="#l184" class="line" id="l184">    184</a> 		for {
+<a href="#l185" class="line" id="l185">    185</a> 			chunk := make([]byte, request.ChunkSize)
+<a href="#l186" class="line" id="l186">    186</a> 			n, err := io.ReadFull(proxyReader, chunk)
+<a href="#l187" class="line" id="l187">    187</a> 
+<a href="#l188" class="line" id="l188">    188</a> 			if n &gt; 0 {
+<a href="#l189" class="line" id="l189">    189</a> 				responseProxy &lt;- &amp;service.GetObjectStreamResponse{
+<a href="#l190" class="line" id="l190">    190</a> 					Response: &amp;service.GetObjectResponse{
+<a href="#l191" class="line" id="l191">    191</a> 						Metadata: metadata,
+<a href="#l192" class="line" id="l192">    192</a> 						Data:     chunk[:n],
+<a href="#l193" class="line" id="l193">    193</a> 					},
+<a href="#l194" class="line" id="l194">    194</a> 					Range: &amp;common.Range{
+<a href="#l195" class="line" id="l195">    195</a> 						Unit:  &quot;bytes&quot;,
+<a href="#l196" class="line" id="l196">    196</a> 						Start: uint64(offset),
+<a href="#l197" class="line" id="l197">    197</a> 						End:   uint64(offset + n),
+<a href="#l198" class="line" id="l198">    198</a> 						// Due to the streaming nature of the operation, the
+<a href="#l199" class="line" id="l199">    199</a> 						// total size is not known in advance.
+<a href="#l200" class="line" id="l200">    200</a> 					},
+<a href="#l201" class="line" id="l201">    201</a> 				}
+<a href="#l202" class="line" id="l202">    202</a> 
+<a href="#l203" class="line" id="l203">    203</a> 				offset += n
+<a href="#l204" class="line" id="l204">    204</a> 			}
+<a href="#l205" class="line" id="l205">    205</a> 
+<a href="#l206" class="line" id="l206">    206</a> 			if err != nil {
+<a href="#l207" class="line" id="l207">    207</a> 				if err != io.EOF &amp;&amp; err != io.ErrUnexpectedEOF {
+<a href="#l208" class="line" id="l208">    208</a> 					errsProxy &lt;- err
+<a href="#l209" class="line" id="l209">    209</a> 				}
+<a href="#l210" class="line" id="l210">    210</a> 				break
+<a href="#l211" class="line" id="l211">    211</a> 			}
+<a href="#l212" class="line" id="l212">    212</a> 		}
+<a href="#l213" class="line" id="l213">    213</a> 
+<a href="#l214" class="line" id="l214">    214</a> 		close(responseProxy)
+<a href="#l215" class="line" id="l215">    215</a> 	}()
+<a href="#l216" class="line" id="l216">    216</a> 
+<a href="#l217" class="line" id="l217">    217</a> 	return responseProxy, errsProxy
+<a href="#l218" class="line" id="l218">    218</a> }
+<a href="#l219" class="line" id="l219">    219</a> 
+<a href="#l220" class="line" id="l220">    220</a> // PutObject transparently transforms the full data payload followed by replacing the data in the
+<a href="#l221" class="line" id="l221">    221</a> // outbound request to the underlying backend.
+<a href="#l222" class="line" id="l222">    222</a> func (p *ioProcessor) PutObject(ctx context.Context, request *service.PutObjectRequest) (*service.PutObjectResponse, error) {
+<a href="#l223" class="line" id="l223">    223</a> 	errs := make(chan error, 2)
+<a href="#l224" class="line" id="l224">    224</a> 	r, w := io.Pipe()
+<a href="#l225" class="line" id="l225">    225</a> 
+<a href="#l226" class="line" id="l226">    226</a> 	go func() {
+<a href="#l227" class="line" id="l227">    227</a> 		defer w.Close()
+<a href="#l228" class="line" id="l228">    228</a> 
+<a href="#l229" class="line" id="l229">    229</a> 		proxyWriter, err := p.writer(w)
+<a href="#l230" class="line" id="l230">    230</a> 		if err != nil {
+<a href="#l231" class="line" id="l231">    231</a> 			errs &lt;- err
+<a href="#l232" class="line" id="l232">    232</a> 			return
+<a href="#l233" class="line" id="l233">    233</a> 		}
+<a href="#l234" class="line" id="l234">    234</a> 
+<a href="#l235" class="line" id="l235">    235</a> 		defer proxyWriter.Close()
+<a href="#l236" class="line" id="l236">    236</a> 
+<a href="#l237" class="line" id="l237">    237</a> 		if _, err = proxyWriter.Write(request.Data); err != nil {
+<a href="#l238" class="line" id="l238">    238</a> 			errs &lt;- err
+<a href="#l239" class="line" id="l239">    239</a> 			return
+<a href="#l240" class="line" id="l240">    240</a> 		}
+<a href="#l241" class="line" id="l241">    241</a> 
+<a href="#l242" class="line" id="l242">    242</a> 		errs &lt;- nil
+<a href="#l243" class="line" id="l243">    243</a> 	}()
+<a href="#l244" class="line" id="l244">    244</a> 
+<a href="#l245" class="line" id="l245">    245</a> 	go func() {
+<a href="#l246" class="line" id="l246">    246</a> 		transformed, err := io.ReadAll(r)
+<a href="#l247" class="line" id="l247">    247</a> 		if err != nil {
+<a href="#l248" class="line" id="l248">    248</a> 			errs &lt;- err
+<a href="#l249" class="line" id="l249">    249</a> 			return
+<a href="#l250" class="line" id="l250">    250</a> 		}
+<a href="#l251" class="line" id="l251">    251</a> 
+<a href="#l252" class="line" id="l252">    252</a> 		request.Data = transformed
+<a href="#l253" class="line" id="l253">    253</a> 		errs &lt;- nil
+<a href="#l254" class="line" id="l254">    254</a> 	}()
+<a href="#l255" class="line" id="l255">    255</a> 
+<a href="#l256" class="line" id="l256">    256</a> 	for i := 0; i &lt; 2; i++ {
+<a href="#l257" class="line" id="l257">    257</a> 		if err := &lt;-errs; err != nil {
+<a href="#l258" class="line" id="l258">    258</a> 			return nil, status.Error(codes.Unknown, err.Error())
+<a href="#l259" class="line" id="l259">    259</a> 		}
+<a href="#l260" class="line" id="l260">    260</a> 	}
+<a href="#l261" class="line" id="l261">    261</a> 
+<a href="#l262" class="line" id="l262">    262</a> 	return p.Backend.PutObject(ctx, request)
+<a href="#l263" class="line" id="l263">    263</a> }
+<a href="#l264" class="line" id="l264">    264</a> 
+<a href="#l265" class="line" id="l265">    265</a> // StreamPutObject is a streaming implementation of PutObject that transforms data chunk-by-chunk.
+<a href="#l266" class="line" id="l266">    266</a> func (p *ioProcessor) StreamPutObject(ctx context.Context, stream chan *service.PutObjectStreamRequest) (*service.PutObjectStreamResponse, error) {
+<a href="#l267" class="line" id="l267">    267</a> 	var request *service.PutObjectStreamRequest
+<a href="#l268" class="line" id="l268">    268</a> 
+<a href="#l269" class="line" id="l269">    269</a> 	proxyRequest := make(chan *service.PutObjectStreamRequest)
+<a href="#l270" class="line" id="l270">    270</a> 	responses := make(chan *service.PutObjectStreamResponse)
+<a href="#l271" class="line" id="l271">    271</a> 	errs := make(chan error)
+<a href="#l272" class="line" id="l272">    272</a> 	peek := &lt;-stream
+<a href="#l273" class="line" id="l273">    273</a> 
+<a href="#l274" class="line" id="l274">    274</a> 	if peek == nil {
+<a href="#l275" class="line" id="l275">    275</a> 		return nil, status.Error(
+<a href="#l276" class="line" id="l276">    276</a> 			codes.InvalidArgument,
+<a href="#l277" class="line" id="l277">    277</a> 			&quot;backend: error reading first chunk from stream&quot;,
+<a href="#l278" class="line" id="l278">    278</a> 		)
+<a href="#l279" class="line" id="l279">    279</a> 	}
+<a href="#l280" class="line" id="l280">    280</a> 
+<a href="#l281" class="line" id="l281">    281</a> 	if peek.Range != nil {
+<a href="#l282" class="line" id="l282">    282</a> 		return nil, status.Errorf(
+<a href="#l283" class="line" id="l283">    283</a> 			codes.InvalidArgument,
+<a href="#l284" class="line" id="l284">    284</a> 			&quot;backend: range specifications are not supported for streaming puts: range=%v&quot;,
+<a href="#l285" class="line" id="l285">    285</a> 			peek.Range,
+<a href="#l286" class="line" id="l286">    286</a> 		)
+<a href="#l287" class="line" id="l287">    287</a> 	}
+<a href="#l288" class="line" id="l288">    288</a> 
+<a href="#l289" class="line" id="l289">    289</a> 	r, w := io.Pipe()
+<a href="#l290" class="line" id="l290">    290</a> 
+<a href="#l291" class="line" id="l291">    291</a> 	// Wrap the pipe writer in a buffered writer in order to reduce the number of individual
+<a href="#l292" class="line" id="l292">    292</a> 	// reads (and thus backend put requests) that need to be invoked on the opposite end of the
+<a href="#l293" class="line" id="l293">    293</a> 	// pipe. Note that this requires explicitly flushing the buffer after no additional writes
+<a href="#l294" class="line" id="l294">    294</a> 	// are expected.
+<a href="#l295" class="line" id="l295">    295</a> 	wb := bufio.NewWriter(w)
+<a href="#l296" class="line" id="l296">    296</a> 
+<a href="#l297" class="line" id="l297">    297</a> 	go func() {
+<a href="#l298" class="line" id="l298">    298</a> 		for {
+<a href="#l299" class="line" id="l299">    299</a> 			chunk := make([]byte, p.streamingWriteChunkSize)
+<a href="#l300" class="line" id="l300">    300</a> 			n, err := io.ReadFull(r, chunk)
+<a href="#l301" class="line" id="l301">    301</a> 
+<a href="#l302" class="line" id="l302">    302</a> 			if n &gt; 0 {
+<a href="#l303" class="line" id="l303">    303</a> 				// Pass along a duplicated instance of the request from the original
+<a href="#l304" class="line" id="l304">    304</a> 				// stream, but with the data overridden to the output from the I/O
+<a href="#l305" class="line" id="l305">    305</a> 				// processor. Note that there is almost necessarily a mismatch
+<a href="#l306" class="line" id="l306">    306</a> 				// between the number of requests in the original stream and the
+<a href="#l307" class="line" id="l307">    307</a> 				// number of outbound requests after applying mid-stream I/O; it is
+<a href="#l308" class="line" id="l308">    308</a> 				// impossible to achieve a 1:1 mapping of metadata between the
+<a href="#l309" class="line" id="l309">    309</a> 				// original stream and the transformed stream. Instead, this routine
+<a href="#l310" class="line" id="l310">    310</a> 				// makes a best-effort attempt to fetch the latest processed inbound
+<a href="#l311" class="line" id="l311">    311</a> 				// request as the base onto which the transformed data chunk is
+<a href="#l312" class="line" id="l312">    312</a> 				// applied.
+<a href="#l313" class="line" id="l313">    313</a> 				current := request
+<a href="#l314" class="line" id="l314">    314</a> 				if current == nil {
+<a href="#l315" class="line" id="l315">    315</a> 					current = peek
+<a href="#l316" class="line" id="l316">    316</a> 				}
+<a href="#l317" class="line" id="l317">    317</a> 
+<a href="#l318" class="line" id="l318">    318</a> 				message := proto.Clone(current.Request).(*service.PutObjectRequest)
+<a href="#l319" class="line" id="l319">    319</a> 				message.Data = chunk[:n]
+<a href="#l320" class="line" id="l320">    320</a> 				proxyRequest &lt;- &amp;service.PutObjectStreamRequest{Request: message}
+<a href="#l321" class="line" id="l321">    321</a> 			}
+<a href="#l322" class="line" id="l322">    322</a> 
+<a href="#l323" class="line" id="l323">    323</a> 			if err != nil {
+<a href="#l324" class="line" id="l324">    324</a> 				if err != io.EOF &amp;&amp; err != io.ErrUnexpectedEOF {
+<a href="#l325" class="line" id="l325">    325</a> 					errs &lt;- err
+<a href="#l326" class="line" id="l326">    326</a> 				}
+<a href="#l327" class="line" id="l327">    327</a> 				break
+<a href="#l328" class="line" id="l328">    328</a> 			}
+<a href="#l329" class="line" id="l329">    329</a> 		}
+<a href="#l330" class="line" id="l330">    330</a> 
+<a href="#l331" class="line" id="l331">    331</a> 		close(proxyRequest)
+<a href="#l332" class="line" id="l332">    332</a> 	}()
+<a href="#l333" class="line" id="l333">    333</a> 
+<a href="#l334" class="line" id="l334">    334</a> 	go func() {
+<a href="#l335" class="line" id="l335">    335</a> 		defer func() {
+<a href="#l336" class="line" id="l336">    336</a> 			// At this point, the streaming put has completed and there are no remaining
+<a href="#l337" class="line" id="l337">    337</a> 			// bytes to write to the output writer. Flush any remaining bytes from the
+<a href="#l338" class="line" id="l338">    338</a> 			// buffered writer and signal to the pipe reader via io.EOF that no
+<a href="#l339" class="line" id="l339">    339</a> 			// additional writes are to be expected.
+<a href="#l340" class="line" id="l340">    340</a> 			wb.Flush()
+<a href="#l341" class="line" id="l341">    341</a> 			w.Close()
+<a href="#l342" class="line" id="l342">    342</a> 		}()
+<a href="#l343" class="line" id="l343">    343</a> 
+<a href="#l344" class="line" id="l344">    344</a> 		proxyWriter, err := p.writer(wb)
+<a href="#l345" class="line" id="l345">    345</a> 		if err != nil {
+<a href="#l346" class="line" id="l346">    346</a> 			errs &lt;- err
+<a href="#l347" class="line" id="l347">    347</a> 			return
+<a href="#l348" class="line" id="l348">    348</a> 		}
+<a href="#l349" class="line" id="l349">    349</a> 
+<a href="#l350" class="line" id="l350">    350</a> 		defer proxyWriter.Close()
+<a href="#l351" class="line" id="l351">    351</a> 
+<a href="#l352" class="line" id="l352">    352</a> 		if _, err := proxyWriter.Write(peek.Request.Data); err != nil {
+<a href="#l353" class="line" id="l353">    353</a> 			errs &lt;- err
+<a href="#l354" class="line" id="l354">    354</a> 			return
+<a href="#l355" class="line" id="l355">    355</a> 		}
+<a href="#l356" class="line" id="l356">    356</a> 
+<a href="#l357" class="line" id="l357">    357</a> 		for request = range stream {
+<a href="#l358" class="line" id="l358">    358</a> 			if _, err := proxyWriter.Write(request.Request.Data); err != nil {
+<a href="#l359" class="line" id="l359">    359</a> 				errs &lt;- err
+<a href="#l360" class="line" id="l360">    360</a> 				return
+<a href="#l361" class="line" id="l361">    361</a> 			}
+<a href="#l362" class="line" id="l362">    362</a> 		}
+<a href="#l363" class="line" id="l363">    363</a> 	}()
+<a href="#l364" class="line" id="l364">    364</a> 
+<a href="#l365" class="line" id="l365">    365</a> 	go func() {
+<a href="#l366" class="line" id="l366">    366</a> 		response, err := p.Backend.StreamPutObject(ctx, proxyRequest)
+<a href="#l367" class="line" id="l367">    367</a> 		if err != nil {
+<a href="#l368" class="line" id="l368">    368</a> 			errs &lt;- err
+<a href="#l369" class="line" id="l369">    369</a> 		} else {
+<a href="#l370" class="line" id="l370">    370</a> 			responses &lt;- response
+<a href="#l371" class="line" id="l371">    371</a> 		}
+<a href="#l372" class="line" id="l372">    372</a> 	}()
+<a href="#l373" class="line" id="l373">    373</a> 
+<a href="#l374" class="line" id="l374">    374</a> 	select {
+<a href="#l375" class="line" id="l375">    375</a> 	case err := &lt;-errs:
+<a href="#l376" class="line" id="l376">    376</a> 		return nil, err
+<a href="#l377" class="line" id="l377">    377</a> 	case response := &lt;-responses:
+<a href="#l378" class="line" id="l378">    378</a> 		return response, nil
+<a href="#l379" class="line" id="l379">    379</a> 	}
+<a href="#l380" class="line" id="l380">    380</a> }
+</pre>
+</div>
+</body>
+</html>

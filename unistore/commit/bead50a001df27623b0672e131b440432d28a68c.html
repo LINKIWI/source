@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>cmd/unistore-cli: Upload command for PutObject and StreamPutObject RPCs - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/bead50a001df27623b0672e131b440432d28a68c">bead50a001df27623b0672e131b440432d28a68c</a>
+<b>parent</b> <a href="../commit/6ef48aa6d256441c6154956de1bc1483ce4fd700">6ef48aa6d256441c6154956de1bc1483ce4fd700</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Fri 31 Dec 2021 19:06:45 -0800
+
+cmd/unistore-cli: Upload command for PutObject and StreamPutObject RPCs
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">cmd/unistore-cli/main.go</a></td><td> | </td><td class="num">17</td><td><span class="i">+++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">cmd/unistore-cli/service.go</a></td><td> | </td><td class="num">85</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+</table></pre><pre>2 files changed, 102 insertions(+), 0 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/cmd/unistore-cli/main.go">cmd/unistore-cli/main.go</a> b/<a href="../file/cmd/unistore-cli/main.go">cmd/unistore-cli/main.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -41,6 +41,16 @@ var (
+</a> 		Args:    cobra.ExactArgs(1),
+ 		RunE:    download,
+ 	}
+<a href="#h0-0-3" id="h0-0-3" class="i">+	uploadCmd = &amp;cobra.Command{
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+		Use:     &quot;upload &lt;key&gt;&quot;,
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+		Aliases: []string{&quot;up&quot;},
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+		Short:   &quot;Upload an object&quot;,
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+		Long: &quot;Upload an object with the specified key, either in its entirety via a unary call or in chunks via a streaming request.\n&quot; +
+</a><a href="#h0-0-8" id="h0-0-8" class="i">+			&quot;Object data is read from standard input. Verbose logs (when enabled) are written to standard error.&quot;,
+</a><a href="#h0-0-9" id="h0-0-9" class="i">+		Version: rootCmd.Version,
+</a><a href="#h0-0-10" id="h0-0-10" class="i">+		Args:    cobra.ExactArgs(1),
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+		RunE:    upload,
+</a><a href="#h0-0-12" id="h0-0-12" class="i">+	}
+</a> )
+ 
+ func init() {
+<a href="#h0-1" id="h0-1" class="h">@@ -58,6 +68,13 @@ func init() {
+</a> 	downloadCmd.Flags().Uint64P(&quot;chunk-size&quot;, &quot;r&quot;, 4096, &quot;stream response chunk size&quot;)
+ 	downloadCmd.MarkFlagRequired(&quot;bucket&quot;)
+ 	rootCmd.AddCommand(downloadCmd)
+<a href="#h0-1-3" id="h0-1-3" class="i">+
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+	uploadCmd.Flags().StringP(&quot;bucket&quot;, &quot;b&quot;, &quot;&quot;, &quot;bucket name&quot;)
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+	uploadCmd.Flags().BoolP(&quot;stream&quot;, &quot;t&quot;, false, &quot;stream object contents&quot;)
+</a><a href="#h0-1-6" id="h0-1-6" class="i">+	uploadCmd.Flags().Uint64P(&quot;chunk-size&quot;, &quot;r&quot;, 4096, &quot;stream request chunk size&quot;)
+</a><a href="#h0-1-7" id="h0-1-7" class="i">+	uploadCmd.Flags().StringP(&quot;checksum&quot;, &quot;k&quot;, &quot;&quot;, &quot;object contents checksum (only for unary RPC)&quot;)
+</a><a href="#h0-1-8" id="h0-1-8" class="i">+	uploadCmd.MarkFlagRequired(&quot;bucket&quot;)
+</a><a href="#h0-1-9" id="h0-1-9" class="i">+	rootCmd.AddCommand(uploadCmd)
+</a> }
+ 
+ func main() {
+<b>diff --git a/<a id="h1" href="../file/cmd/unistore-cli/service.go">cmd/unistore-cli/service.go</a> b/<a href="../file/cmd/unistore-cli/service.go">cmd/unistore-cli/service.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -126,3 +126,88 @@ func download(cmd *cobra.Command, args []string) error {
+</a> 
+ 	return nil
+ }
+<a href="#h1-0-3" id="h1-0-3" class="i">+
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+// upload is a command line interface for the PutObject and StreamPutObject RPCs.
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+func upload(cmd *cobra.Command, args []string) error {
+</a><a href="#h1-0-6" id="h1-0-6" class="i">+	var cancel context.CancelFunc
+</a><a href="#h1-0-7" id="h1-0-7" class="i">+
+</a><a href="#h1-0-8" id="h1-0-8" class="i">+	bucket, _ := cmd.Flags().GetString(&quot;bucket&quot;)
+</a><a href="#h1-0-9" id="h1-0-9" class="i">+	stream, _ := cmd.Flags().GetBool(&quot;stream&quot;)
+</a><a href="#h1-0-10" id="h1-0-10" class="i">+	chunkSize, _ := cmd.Flags().GetUint64(&quot;chunk-size&quot;)
+</a><a href="#h1-0-11" id="h1-0-11" class="i">+	checksum, _ := cmd.Flags().GetString(&quot;checksum&quot;)
+</a><a href="#h1-0-12" id="h1-0-12" class="i">+	verbose, _ := cmd.Flags().GetBool(&quot;verbose&quot;)
+</a><a href="#h1-0-13" id="h1-0-13" class="i">+
+</a><a href="#h1-0-14" id="h1-0-14" class="i">+	store, err := initStoreConfig(flagConfig, flagStore)
+</a><a href="#h1-0-15" id="h1-0-15" class="i">+	if err != nil {
+</a><a href="#h1-0-16" id="h1-0-16" class="i">+		return err
+</a><a href="#h1-0-17" id="h1-0-17" class="i">+	}
+</a><a href="#h1-0-18" id="h1-0-18" class="i">+
+</a><a href="#h1-0-19" id="h1-0-19" class="i">+	client, err := initUnistoreClient(store)
+</a><a href="#h1-0-20" id="h1-0-20" class="i">+	if err != nil {
+</a><a href="#h1-0-21" id="h1-0-21" class="i">+		return err
+</a><a href="#h1-0-22" id="h1-0-22" class="i">+	}
+</a><a href="#h1-0-23" id="h1-0-23" class="i">+
+</a><a href="#h1-0-24" id="h1-0-24" class="i">+	ctx := context.Background()
+</a><a href="#h1-0-25" id="h1-0-25" class="i">+	if store.Connection.RequestTimeout &gt; 0 {
+</a><a href="#h1-0-26" id="h1-0-26" class="i">+		ctx, cancel = context.WithTimeout(ctx, store.Connection.RequestTimeout)
+</a><a href="#h1-0-27" id="h1-0-27" class="i">+		defer cancel()
+</a><a href="#h1-0-28" id="h1-0-28" class="i">+	}
+</a><a href="#h1-0-29" id="h1-0-29" class="i">+
+</a><a href="#h1-0-30" id="h1-0-30" class="i">+	put := &amp;service.PutObjectRequest{
+</a><a href="#h1-0-31" id="h1-0-31" class="i">+		Resource: &amp;common.Resource{
+</a><a href="#h1-0-32" id="h1-0-32" class="i">+			Backend: common.Backend(common.Backend_value[strings.ToUpper(store.Backend)]),
+</a><a href="#h1-0-33" id="h1-0-33" class="i">+			Bucket:  bucket,
+</a><a href="#h1-0-34" id="h1-0-34" class="i">+		},
+</a><a href="#h1-0-35" id="h1-0-35" class="i">+		Key:      args[0],
+</a><a href="#h1-0-36" id="h1-0-36" class="i">+		Checksum: checksum,
+</a><a href="#h1-0-37" id="h1-0-37" class="i">+	}
+</a><a href="#h1-0-38" id="h1-0-38" class="i">+
+</a><a href="#h1-0-39" id="h1-0-39" class="i">+	if !stream {
+</a><a href="#h1-0-40" id="h1-0-40" class="i">+		data, err := io.ReadAll(os.Stdin)
+</a><a href="#h1-0-41" id="h1-0-41" class="i">+		if err != nil {
+</a><a href="#h1-0-42" id="h1-0-42" class="i">+			return err
+</a><a href="#h1-0-43" id="h1-0-43" class="i">+		}
+</a><a href="#h1-0-44" id="h1-0-44" class="i">+
+</a><a href="#h1-0-45" id="h1-0-45" class="i">+		put.Data = data
+</a><a href="#h1-0-46" id="h1-0-46" class="i">+
+</a><a href="#h1-0-47" id="h1-0-47" class="i">+		response, err := client.PutObject(ctx, put)
+</a><a href="#h1-0-48" id="h1-0-48" class="i">+		if err != nil {
+</a><a href="#h1-0-49" id="h1-0-49" class="i">+			return err
+</a><a href="#h1-0-50" id="h1-0-50" class="i">+		}
+</a><a href="#h1-0-51" id="h1-0-51" class="i">+
+</a><a href="#h1-0-52" id="h1-0-52" class="i">+		return renderResponse(flagFormat, os.Stderr, response)
+</a><a href="#h1-0-53" id="h1-0-53" class="i">+	}
+</a><a href="#h1-0-54" id="h1-0-54" class="i">+
+</a><a href="#h1-0-55" id="h1-0-55" class="i">+	request, err := client.StreamPutObject(ctx)
+</a><a href="#h1-0-56" id="h1-0-56" class="i">+	if err != nil {
+</a><a href="#h1-0-57" id="h1-0-57" class="i">+		return err
+</a><a href="#h1-0-58" id="h1-0-58" class="i">+	}
+</a><a href="#h1-0-59" id="h1-0-59" class="i">+
+</a><a href="#h1-0-60" id="h1-0-60" class="i">+	for {
+</a><a href="#h1-0-61" id="h1-0-61" class="i">+		chunk := make([]byte, chunkSize)
+</a><a href="#h1-0-62" id="h1-0-62" class="i">+		n, err := os.Stdin.Read(chunk)
+</a><a href="#h1-0-63" id="h1-0-63" class="i">+		if err == io.EOF {
+</a><a href="#h1-0-64" id="h1-0-64" class="i">+			break
+</a><a href="#h1-0-65" id="h1-0-65" class="i">+		} else if err != nil {
+</a><a href="#h1-0-66" id="h1-0-66" class="i">+			return err
+</a><a href="#h1-0-67" id="h1-0-67" class="i">+		}
+</a><a href="#h1-0-68" id="h1-0-68" class="i">+
+</a><a href="#h1-0-69" id="h1-0-69" class="i">+		message := &amp;service.PutObjectStreamRequest{Request: put}
+</a><a href="#h1-0-70" id="h1-0-70" class="i">+		message.Request.Data = chunk[:n]
+</a><a href="#h1-0-71" id="h1-0-71" class="i">+
+</a><a href="#h1-0-72" id="h1-0-72" class="i">+		if verbose {
+</a><a href="#h1-0-73" id="h1-0-73" class="i">+			renderResponse(flagFormat, os.Stderr, message)
+</a><a href="#h1-0-74" id="h1-0-74" class="i">+		}
+</a><a href="#h1-0-75" id="h1-0-75" class="i">+
+</a><a href="#h1-0-76" id="h1-0-76" class="i">+		if err := request.Send(message); err != nil {
+</a><a href="#h1-0-77" id="h1-0-77" class="i">+			return err
+</a><a href="#h1-0-78" id="h1-0-78" class="i">+		}
+</a><a href="#h1-0-79" id="h1-0-79" class="i">+	}
+</a><a href="#h1-0-80" id="h1-0-80" class="i">+
+</a><a href="#h1-0-81" id="h1-0-81" class="i">+	response, err := request.CloseAndRecv()
+</a><a href="#h1-0-82" id="h1-0-82" class="i">+	if err != nil {
+</a><a href="#h1-0-83" id="h1-0-83" class="i">+		return err
+</a><a href="#h1-0-84" id="h1-0-84" class="i">+	}
+</a><a href="#h1-0-85" id="h1-0-85" class="i">+
+</a><a href="#h1-0-86" id="h1-0-86" class="i">+	return renderResponse(flagFormat, os.Stdout, response)
+</a><a href="#h1-0-87" id="h1-0-87" class="i">+}
+</a></pre>
+</div>
+</body>
+</html>

@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/server: Move backend initialization to Unistore service implementation - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/95c2da2e68a8d97270eca15a4110fa8a2000e0e5">95c2da2e68a8d97270eca15a4110fa8a2000e0e5</a>
+<b>parent</b> <a href="../commit/1e8875a5cd05cb4bfb6350e0d3a748456a6bcb6c">1e8875a5cd05cb4bfb6350e0d3a748456a6bcb6c</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Wed 29 Dec 2021 20:42:01 -0800
+
+internal/server: Move backend initialization to Unistore service implementation
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/server/server.go</a></td><td> | </td><td class="num">139</td><td><span class="i">+++</span><span class="d">----------------------------------------------------------------------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">internal/server/unistore.go</a></td><td> | </td><td class="num">138</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">---</span></td></tr>
+</table></pre><pre>2 files changed, 138 insertions(+), 139 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/server/server.go">internal/server/server.go</a> b/<a href="../file/internal/server/server.go">internal/server/server.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -1,14 +1,13 @@
+</a> package server
+ 
+ import (
+<a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;fmt&quot;
+</a> 	&quot;net&quot;
+ 
+ 	&quot;google.golang.org/grpc&quot;
+ 	&quot;google.golang.org/grpc/reflection&quot;
+ 
+<a href="#h0-0-9" id="h0-0-9" class="d">-	&quot;unistore/internal/backend&quot;
+</a> 	&quot;unistore/internal/config&quot;
+<a href="#h0-0-11" id="h0-0-11" class="d">-	&quot;unistore/schemas/common&quot;
+</a> 	&quot;unistore/schemas/service&quot;
+ )
+ 
+<a href="#h0-1" id="h0-1" class="h">@@ -30,12 +29,12 @@ func New(cfg config.Server) (*Unistore, error) {
+</a> 
+ 	srv := grpc.NewServer(opts...)
+ 
+<a href="#h0-1-3" id="h0-1-3" class="d">-	backends, err := initBackends(cfg.Storage)
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+	unistoreSrv, err := newUnistoreService(cfg.Storage)
+</a> 	if err != nil {
+<a href="#h0-1-6" id="h0-1-6" class="d">-		return nil, err
+</a><a href="#h0-1-7" id="h0-1-7" class="i">+		return nil, fmt.Errorf(&quot;server: error initializing Unistore service: err=%v&quot;, err)
+</a> 	}
+ 
+<a href="#h0-1-10" id="h0-1-10" class="d">-	service.RegisterUnistoreServer(srv, newUnistoreService(backend.NewMux(backends)))
+</a><a href="#h0-1-11" id="h0-1-11" class="i">+	service.RegisterUnistoreServer(srv, unistoreSrv)
+</a> 	reflection.Register(srv)
+ 
+ 	return &amp;Unistore{srv}, nil
+<a href="#h0-2" id="h0-2" class="h">@@ -45,133 +44,3 @@ func New(cfg config.Server) (*Unistore, error) {
+</a> func (u *Unistore) Serve(ln net.Listener) error {
+ 	return u.Server.Serve(ln)
+ }
+<a href="#h0-2-3" id="h0-2-3" class="d">-
+</a><a href="#h0-2-4" id="h0-2-4" class="d">-// initBackends creates a map of eligible backends for serving.
+</a><a href="#h0-2-5" id="h0-2-5" class="d">-func initBackends(cfg config.Storage) (map[common.Backend]backend.Backend, error) {
+</a><a href="#h0-2-6" id="h0-2-6" class="d">-	backends := map[common.Backend]backend.Backend{}
+</a><a href="#h0-2-7" id="h0-2-7" class="d">-
+</a><a href="#h0-2-8" id="h0-2-8" class="d">-	if cfg.Disk != nil {
+</a><a href="#h0-2-9" id="h0-2-9" class="d">-		disk, err := backend.NewDisk(cfg.Disk.Root)
+</a><a href="#h0-2-10" id="h0-2-10" class="d">-		if err != nil {
+</a><a href="#h0-2-11" id="h0-2-11" class="d">-			return nil, err
+</a><a href="#h0-2-12" id="h0-2-12" class="d">-		}
+</a><a href="#h0-2-13" id="h0-2-13" class="d">-
+</a><a href="#h0-2-14" id="h0-2-14" class="d">-		if cfg.Disk.GetChunkSize &gt; 0 || cfg.Disk.PutChunkSize &gt; 0 {
+</a><a href="#h0-2-15" id="h0-2-15" class="d">-			disk = backend.NewBuffer(cfg.Disk.GetChunkSize, cfg.Disk.PutChunkSize, disk)
+</a><a href="#h0-2-16" id="h0-2-16" class="d">-		}
+</a><a href="#h0-2-17" id="h0-2-17" class="d">-
+</a><a href="#h0-2-18" id="h0-2-18" class="d">-		if cfg.Disk.Encryption != nil {
+</a><a href="#h0-2-19" id="h0-2-19" class="d">-			disk, err = backend.NewEncrypt(
+</a><a href="#h0-2-20" id="h0-2-20" class="d">-				cfg.Disk.Encryption.Mechanism,
+</a><a href="#h0-2-21" id="h0-2-21" class="d">-				cfg.Disk.Encryption.PrivateKey,
+</a><a href="#h0-2-22" id="h0-2-22" class="d">-				cfg.Disk.Encryption.PublicKey,
+</a><a href="#h0-2-23" id="h0-2-23" class="d">-				disk,
+</a><a href="#h0-2-24" id="h0-2-24" class="d">-			)
+</a><a href="#h0-2-25" id="h0-2-25" class="d">-			if err != nil {
+</a><a href="#h0-2-26" id="h0-2-26" class="d">-				return nil, err
+</a><a href="#h0-2-27" id="h0-2-27" class="d">-			}
+</a><a href="#h0-2-28" id="h0-2-28" class="d">-		}
+</a><a href="#h0-2-29" id="h0-2-29" class="d">-
+</a><a href="#h0-2-30" id="h0-2-30" class="d">-		if cfg.Disk.Compression != nil {
+</a><a href="#h0-2-31" id="h0-2-31" class="d">-			disk, err = backend.NewCompression(
+</a><a href="#h0-2-32" id="h0-2-32" class="d">-				cfg.Disk.Compression.Algorithm,
+</a><a href="#h0-2-33" id="h0-2-33" class="d">-				cfg.Disk.Compression.Level,
+</a><a href="#h0-2-34" id="h0-2-34" class="d">-				disk,
+</a><a href="#h0-2-35" id="h0-2-35" class="d">-			)
+</a><a href="#h0-2-36" id="h0-2-36" class="d">-		}
+</a><a href="#h0-2-37" id="h0-2-37" class="d">-
+</a><a href="#h0-2-38" id="h0-2-38" class="d">-		if cfg.Disk.Checksum != nil {
+</a><a href="#h0-2-39" id="h0-2-39" class="d">-			disk, err = backend.NewChecksum(cfg.Disk.Checksum.Algorithm, disk)
+</a><a href="#h0-2-40" id="h0-2-40" class="d">-		}
+</a><a href="#h0-2-41" id="h0-2-41" class="d">-
+</a><a href="#h0-2-42" id="h0-2-42" class="d">-		if len(cfg.Disk.BucketAliases) &gt; 0 {
+</a><a href="#h0-2-43" id="h0-2-43" class="d">-			disk = backend.NewAlias(cfg.Disk.BucketAliases, disk)
+</a><a href="#h0-2-44" id="h0-2-44" class="d">-		}
+</a><a href="#h0-2-45" id="h0-2-45" class="d">-
+</a><a href="#h0-2-46" id="h0-2-46" class="d">-		backends[common.Backend_DISK] = disk
+</a><a href="#h0-2-47" id="h0-2-47" class="d">-	}
+</a><a href="#h0-2-48" id="h0-2-48" class="d">-
+</a><a href="#h0-2-49" id="h0-2-49" class="d">-	if cfg.Unistore != nil {
+</a><a href="#h0-2-50" id="h0-2-50" class="d">-		unistore, err := backend.NewUnistore(cfg.Unistore.Address, cfg.Unistore.Backend)
+</a><a href="#h0-2-51" id="h0-2-51" class="d">-		if err != nil {
+</a><a href="#h0-2-52" id="h0-2-52" class="d">-			return nil, err
+</a><a href="#h0-2-53" id="h0-2-53" class="d">-		}
+</a><a href="#h0-2-54" id="h0-2-54" class="d">-
+</a><a href="#h0-2-55" id="h0-2-55" class="d">-		if cfg.Unistore.Encryption != nil {
+</a><a href="#h0-2-56" id="h0-2-56" class="d">-			unistore, err = backend.NewEncrypt(
+</a><a href="#h0-2-57" id="h0-2-57" class="d">-				cfg.Unistore.Encryption.Mechanism,
+</a><a href="#h0-2-58" id="h0-2-58" class="d">-				cfg.Unistore.Encryption.PrivateKey,
+</a><a href="#h0-2-59" id="h0-2-59" class="d">-				cfg.Unistore.Encryption.PublicKey,
+</a><a href="#h0-2-60" id="h0-2-60" class="d">-				unistore,
+</a><a href="#h0-2-61" id="h0-2-61" class="d">-			)
+</a><a href="#h0-2-62" id="h0-2-62" class="d">-		}
+</a><a href="#h0-2-63" id="h0-2-63" class="d">-
+</a><a href="#h0-2-64" id="h0-2-64" class="d">-		if cfg.Unistore.Compression != nil {
+</a><a href="#h0-2-65" id="h0-2-65" class="d">-			unistore, err = backend.NewCompression(
+</a><a href="#h0-2-66" id="h0-2-66" class="d">-				cfg.Unistore.Compression.Algorithm,
+</a><a href="#h0-2-67" id="h0-2-67" class="d">-				cfg.Unistore.Compression.Level,
+</a><a href="#h0-2-68" id="h0-2-68" class="d">-				unistore,
+</a><a href="#h0-2-69" id="h0-2-69" class="d">-			)
+</a><a href="#h0-2-70" id="h0-2-70" class="d">-		}
+</a><a href="#h0-2-71" id="h0-2-71" class="d">-
+</a><a href="#h0-2-72" id="h0-2-72" class="d">-		if cfg.Unistore.Checksum != nil {
+</a><a href="#h0-2-73" id="h0-2-73" class="d">-			unistore, err = backend.NewChecksum(
+</a><a href="#h0-2-74" id="h0-2-74" class="d">-				cfg.Unistore.Checksum.Algorithm,
+</a><a href="#h0-2-75" id="h0-2-75" class="d">-				unistore,
+</a><a href="#h0-2-76" id="h0-2-76" class="d">-			)
+</a><a href="#h0-2-77" id="h0-2-77" class="d">-		}
+</a><a href="#h0-2-78" id="h0-2-78" class="d">-
+</a><a href="#h0-2-79" id="h0-2-79" class="d">-		if len(cfg.Unistore.BucketAliases) &gt; 0 {
+</a><a href="#h0-2-80" id="h0-2-80" class="d">-			unistore = backend.NewAlias(cfg.Unistore.BucketAliases, unistore)
+</a><a href="#h0-2-81" id="h0-2-81" class="d">-		}
+</a><a href="#h0-2-82" id="h0-2-82" class="d">-
+</a><a href="#h0-2-83" id="h0-2-83" class="d">-		backends[common.Backend_UNISTORE] = unistore
+</a><a href="#h0-2-84" id="h0-2-84" class="d">-	}
+</a><a href="#h0-2-85" id="h0-2-85" class="d">-
+</a><a href="#h0-2-86" id="h0-2-86" class="d">-	if cfg.B2 != nil {
+</a><a href="#h0-2-87" id="h0-2-87" class="d">-		b2, err := backend.NewB2(cfg.B2.ApplicationKeyID, cfg.B2.ApplicationKey)
+</a><a href="#h0-2-88" id="h0-2-88" class="d">-		if err != nil {
+</a><a href="#h0-2-89" id="h0-2-89" class="d">-			return nil, err
+</a><a href="#h0-2-90" id="h0-2-90" class="d">-		}
+</a><a href="#h0-2-91" id="h0-2-91" class="d">-
+</a><a href="#h0-2-92" id="h0-2-92" class="d">-		if cfg.B2.GetChunkSize &gt; 0 || cfg.B2.PutChunkSize &gt; 0 {
+</a><a href="#h0-2-93" id="h0-2-93" class="d">-			b2 = backend.NewBuffer(cfg.B2.GetChunkSize, cfg.B2.PutChunkSize, b2)
+</a><a href="#h0-2-94" id="h0-2-94" class="d">-		}
+</a><a href="#h0-2-95" id="h0-2-95" class="d">-
+</a><a href="#h0-2-96" id="h0-2-96" class="d">-		if cfg.B2.StreamPutThresholdSize &gt; 0 {
+</a><a href="#h0-2-97" id="h0-2-97" class="d">-			b2 = backend.NewThreshold(cfg.B2.StreamPutThresholdSize, b2)
+</a><a href="#h0-2-98" id="h0-2-98" class="d">-		}
+</a><a href="#h0-2-99" id="h0-2-99" class="d">-
+</a><a href="#h0-2-100" id="h0-2-100" class="d">-		if cfg.B2.Encryption != nil {
+</a><a href="#h0-2-101" id="h0-2-101" class="d">-			b2, err = backend.NewEncrypt(
+</a><a href="#h0-2-102" id="h0-2-102" class="d">-				cfg.B2.Encryption.Mechanism,
+</a><a href="#h0-2-103" id="h0-2-103" class="d">-				cfg.B2.Encryption.PrivateKey,
+</a><a href="#h0-2-104" id="h0-2-104" class="d">-				cfg.B2.Encryption.PublicKey,
+</a><a href="#h0-2-105" id="h0-2-105" class="d">-				b2,
+</a><a href="#h0-2-106" id="h0-2-106" class="d">-			)
+</a><a href="#h0-2-107" id="h0-2-107" class="d">-			if err != nil {
+</a><a href="#h0-2-108" id="h0-2-108" class="d">-				return nil, err
+</a><a href="#h0-2-109" id="h0-2-109" class="d">-			}
+</a><a href="#h0-2-110" id="h0-2-110" class="d">-		}
+</a><a href="#h0-2-111" id="h0-2-111" class="d">-
+</a><a href="#h0-2-112" id="h0-2-112" class="d">-		if cfg.B2.Compression != nil {
+</a><a href="#h0-2-113" id="h0-2-113" class="d">-			b2, err = backend.NewCompression(
+</a><a href="#h0-2-114" id="h0-2-114" class="d">-				cfg.B2.Compression.Algorithm,
+</a><a href="#h0-2-115" id="h0-2-115" class="d">-				cfg.B2.Compression.Level,
+</a><a href="#h0-2-116" id="h0-2-116" class="d">-				b2,
+</a><a href="#h0-2-117" id="h0-2-117" class="d">-			)
+</a><a href="#h0-2-118" id="h0-2-118" class="d">-		}
+</a><a href="#h0-2-119" id="h0-2-119" class="d">-
+</a><a href="#h0-2-120" id="h0-2-120" class="d">-		if cfg.B2.Checksum != nil {
+</a><a href="#h0-2-121" id="h0-2-121" class="d">-			b2, err = backend.NewChecksum(cfg.B2.Checksum.Algorithm, b2)
+</a><a href="#h0-2-122" id="h0-2-122" class="d">-		}
+</a><a href="#h0-2-123" id="h0-2-123" class="d">-
+</a><a href="#h0-2-124" id="h0-2-124" class="d">-		if len(cfg.B2.BucketAliases) &gt; 0 {
+</a><a href="#h0-2-125" id="h0-2-125" class="d">-			b2 = backend.NewAlias(cfg.B2.BucketAliases, b2)
+</a><a href="#h0-2-126" id="h0-2-126" class="d">-		}
+</a><a href="#h0-2-127" id="h0-2-127" class="d">-
+</a><a href="#h0-2-128" id="h0-2-128" class="d">-		backends[common.Backend_B2] = b2
+</a><a href="#h0-2-129" id="h0-2-129" class="d">-	}
+</a><a href="#h0-2-130" id="h0-2-130" class="d">-
+</a><a href="#h0-2-131" id="h0-2-131" class="d">-	return backends, nil
+</a><a href="#h0-2-132" id="h0-2-132" class="d">-}
+</a><b>diff --git a/<a id="h1" href="../file/internal/server/unistore.go">internal/server/unistore.go</a> b/<a href="../file/internal/server/unistore.go">internal/server/unistore.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -3,6 +3,9 @@ package server
+</a> import (
+ 	&quot;context&quot;
+ 
+<a href="#h1-0-3" id="h1-0-3" class="i">+	&quot;unistore/internal/config&quot;
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+	&quot;unistore/schemas/common&quot;
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+
+</a> 	&quot;google.golang.org/grpc/codes&quot;
+ 	&quot;google.golang.org/grpc/status&quot;
+ 
+<a href="#h1-1" id="h1-1" class="h">@@ -10,15 +13,142 @@ import (
+</a> 	&quot;unistore/schemas/service&quot;
+ )
+ 
+<a href="#h1-1-3" id="h1-1-3" class="d">-// unistoreService is an implementation of service.UnistoreServer gRPC service.
+</a><a href="#h1-1-4" id="h1-1-4" class="i">+// unistoreService is an implementation of the service.UnistoreServer gRPC service.
+</a> type unistoreService struct {
+ 	backend backend.Backend
+ 	service.UnimplementedUnistoreServer
+ }
+ 
+<a href="#h1-1-10" id="h1-1-10" class="d">-// newUnistoreService creates a new Unistore gRPC service from a backend.
+</a><a href="#h1-1-11" id="h1-1-11" class="d">-func newUnistoreService(backend backend.Backend) service.UnistoreServer {
+</a><a href="#h1-1-12" id="h1-1-12" class="d">-	return &amp;unistoreService{backend: backend}
+</a><a href="#h1-1-13" id="h1-1-13" class="i">+// newUnistoreService creates a new Unistore gRPC service from storage configuration.
+</a><a href="#h1-1-14" id="h1-1-14" class="i">+func newUnistoreService(cfg config.Storage) (service.UnistoreServer, error) {
+</a><a href="#h1-1-15" id="h1-1-15" class="i">+	backends := make(map[common.Backend]backend.Backend)
+</a><a href="#h1-1-16" id="h1-1-16" class="i">+
+</a><a href="#h1-1-17" id="h1-1-17" class="i">+	if cfg.Disk != nil {
+</a><a href="#h1-1-18" id="h1-1-18" class="i">+		disk, err := backend.NewDisk(cfg.Disk.Root)
+</a><a href="#h1-1-19" id="h1-1-19" class="i">+		if err != nil {
+</a><a href="#h1-1-20" id="h1-1-20" class="i">+			return nil, err
+</a><a href="#h1-1-21" id="h1-1-21" class="i">+		}
+</a><a href="#h1-1-22" id="h1-1-22" class="i">+
+</a><a href="#h1-1-23" id="h1-1-23" class="i">+		if cfg.Disk.GetChunkSize &gt; 0 || cfg.Disk.PutChunkSize &gt; 0 {
+</a><a href="#h1-1-24" id="h1-1-24" class="i">+			disk = backend.NewBuffer(cfg.Disk.GetChunkSize, cfg.Disk.PutChunkSize, disk)
+</a><a href="#h1-1-25" id="h1-1-25" class="i">+		}
+</a><a href="#h1-1-26" id="h1-1-26" class="i">+
+</a><a href="#h1-1-27" id="h1-1-27" class="i">+		if cfg.Disk.Encryption != nil {
+</a><a href="#h1-1-28" id="h1-1-28" class="i">+			disk, err = backend.NewEncrypt(
+</a><a href="#h1-1-29" id="h1-1-29" class="i">+				cfg.Disk.Encryption.Mechanism,
+</a><a href="#h1-1-30" id="h1-1-30" class="i">+				cfg.Disk.Encryption.PrivateKey,
+</a><a href="#h1-1-31" id="h1-1-31" class="i">+				cfg.Disk.Encryption.PublicKey,
+</a><a href="#h1-1-32" id="h1-1-32" class="i">+				disk,
+</a><a href="#h1-1-33" id="h1-1-33" class="i">+			)
+</a><a href="#h1-1-34" id="h1-1-34" class="i">+			if err != nil {
+</a><a href="#h1-1-35" id="h1-1-35" class="i">+				return nil, err
+</a><a href="#h1-1-36" id="h1-1-36" class="i">+			}
+</a><a href="#h1-1-37" id="h1-1-37" class="i">+		}
+</a><a href="#h1-1-38" id="h1-1-38" class="i">+
+</a><a href="#h1-1-39" id="h1-1-39" class="i">+		if cfg.Disk.Compression != nil {
+</a><a href="#h1-1-40" id="h1-1-40" class="i">+			disk, err = backend.NewCompression(
+</a><a href="#h1-1-41" id="h1-1-41" class="i">+				cfg.Disk.Compression.Algorithm,
+</a><a href="#h1-1-42" id="h1-1-42" class="i">+				cfg.Disk.Compression.Level,
+</a><a href="#h1-1-43" id="h1-1-43" class="i">+				disk,
+</a><a href="#h1-1-44" id="h1-1-44" class="i">+			)
+</a><a href="#h1-1-45" id="h1-1-45" class="i">+		}
+</a><a href="#h1-1-46" id="h1-1-46" class="i">+
+</a><a href="#h1-1-47" id="h1-1-47" class="i">+		if cfg.Disk.Checksum != nil {
+</a><a href="#h1-1-48" id="h1-1-48" class="i">+			disk, err = backend.NewChecksum(cfg.Disk.Checksum.Algorithm, disk)
+</a><a href="#h1-1-49" id="h1-1-49" class="i">+		}
+</a><a href="#h1-1-50" id="h1-1-50" class="i">+
+</a><a href="#h1-1-51" id="h1-1-51" class="i">+		if len(cfg.Disk.BucketAliases) &gt; 0 {
+</a><a href="#h1-1-52" id="h1-1-52" class="i">+			disk = backend.NewAlias(cfg.Disk.BucketAliases, disk)
+</a><a href="#h1-1-53" id="h1-1-53" class="i">+		}
+</a><a href="#h1-1-54" id="h1-1-54" class="i">+
+</a><a href="#h1-1-55" id="h1-1-55" class="i">+		backends[common.Backend_DISK] = disk
+</a><a href="#h1-1-56" id="h1-1-56" class="i">+	}
+</a><a href="#h1-1-57" id="h1-1-57" class="i">+
+</a><a href="#h1-1-58" id="h1-1-58" class="i">+	if cfg.Unistore != nil {
+</a><a href="#h1-1-59" id="h1-1-59" class="i">+		unistore, err := backend.NewUnistore(cfg.Unistore.Address, cfg.Unistore.Backend)
+</a><a href="#h1-1-60" id="h1-1-60" class="i">+		if err != nil {
+</a><a href="#h1-1-61" id="h1-1-61" class="i">+			return nil, err
+</a><a href="#h1-1-62" id="h1-1-62" class="i">+		}
+</a><a href="#h1-1-63" id="h1-1-63" class="i">+
+</a><a href="#h1-1-64" id="h1-1-64" class="i">+		if cfg.Unistore.Encryption != nil {
+</a><a href="#h1-1-65" id="h1-1-65" class="i">+			unistore, err = backend.NewEncrypt(
+</a><a href="#h1-1-66" id="h1-1-66" class="i">+				cfg.Unistore.Encryption.Mechanism,
+</a><a href="#h1-1-67" id="h1-1-67" class="i">+				cfg.Unistore.Encryption.PrivateKey,
+</a><a href="#h1-1-68" id="h1-1-68" class="i">+				cfg.Unistore.Encryption.PublicKey,
+</a><a href="#h1-1-69" id="h1-1-69" class="i">+				unistore,
+</a><a href="#h1-1-70" id="h1-1-70" class="i">+			)
+</a><a href="#h1-1-71" id="h1-1-71" class="i">+		}
+</a><a href="#h1-1-72" id="h1-1-72" class="i">+
+</a><a href="#h1-1-73" id="h1-1-73" class="i">+		if cfg.Unistore.Compression != nil {
+</a><a href="#h1-1-74" id="h1-1-74" class="i">+			unistore, err = backend.NewCompression(
+</a><a href="#h1-1-75" id="h1-1-75" class="i">+				cfg.Unistore.Compression.Algorithm,
+</a><a href="#h1-1-76" id="h1-1-76" class="i">+				cfg.Unistore.Compression.Level,
+</a><a href="#h1-1-77" id="h1-1-77" class="i">+				unistore,
+</a><a href="#h1-1-78" id="h1-1-78" class="i">+			)
+</a><a href="#h1-1-79" id="h1-1-79" class="i">+		}
+</a><a href="#h1-1-80" id="h1-1-80" class="i">+
+</a><a href="#h1-1-81" id="h1-1-81" class="i">+		if cfg.Unistore.Checksum != nil {
+</a><a href="#h1-1-82" id="h1-1-82" class="i">+			unistore, err = backend.NewChecksum(
+</a><a href="#h1-1-83" id="h1-1-83" class="i">+				cfg.Unistore.Checksum.Algorithm,
+</a><a href="#h1-1-84" id="h1-1-84" class="i">+				unistore,
+</a><a href="#h1-1-85" id="h1-1-85" class="i">+			)
+</a><a href="#h1-1-86" id="h1-1-86" class="i">+		}
+</a><a href="#h1-1-87" id="h1-1-87" class="i">+
+</a><a href="#h1-1-88" id="h1-1-88" class="i">+		if len(cfg.Unistore.BucketAliases) &gt; 0 {
+</a><a href="#h1-1-89" id="h1-1-89" class="i">+			unistore = backend.NewAlias(cfg.Unistore.BucketAliases, unistore)
+</a><a href="#h1-1-90" id="h1-1-90" class="i">+		}
+</a><a href="#h1-1-91" id="h1-1-91" class="i">+
+</a><a href="#h1-1-92" id="h1-1-92" class="i">+		backends[common.Backend_UNISTORE] = unistore
+</a><a href="#h1-1-93" id="h1-1-93" class="i">+	}
+</a><a href="#h1-1-94" id="h1-1-94" class="i">+
+</a><a href="#h1-1-95" id="h1-1-95" class="i">+	if cfg.B2 != nil {
+</a><a href="#h1-1-96" id="h1-1-96" class="i">+		b2, err := backend.NewB2(cfg.B2.ApplicationKeyID, cfg.B2.ApplicationKey)
+</a><a href="#h1-1-97" id="h1-1-97" class="i">+		if err != nil {
+</a><a href="#h1-1-98" id="h1-1-98" class="i">+			return nil, err
+</a><a href="#h1-1-99" id="h1-1-99" class="i">+		}
+</a><a href="#h1-1-100" id="h1-1-100" class="i">+
+</a><a href="#h1-1-101" id="h1-1-101" class="i">+		if cfg.B2.GetChunkSize &gt; 0 || cfg.B2.PutChunkSize &gt; 0 {
+</a><a href="#h1-1-102" id="h1-1-102" class="i">+			b2 = backend.NewBuffer(cfg.B2.GetChunkSize, cfg.B2.PutChunkSize, b2)
+</a><a href="#h1-1-103" id="h1-1-103" class="i">+		}
+</a><a href="#h1-1-104" id="h1-1-104" class="i">+
+</a><a href="#h1-1-105" id="h1-1-105" class="i">+		if cfg.B2.StreamPutThresholdSize &gt; 0 {
+</a><a href="#h1-1-106" id="h1-1-106" class="i">+			b2 = backend.NewThreshold(cfg.B2.StreamPutThresholdSize, b2)
+</a><a href="#h1-1-107" id="h1-1-107" class="i">+		}
+</a><a href="#h1-1-108" id="h1-1-108" class="i">+
+</a><a href="#h1-1-109" id="h1-1-109" class="i">+		if cfg.B2.Encryption != nil {
+</a><a href="#h1-1-110" id="h1-1-110" class="i">+			b2, err = backend.NewEncrypt(
+</a><a href="#h1-1-111" id="h1-1-111" class="i">+				cfg.B2.Encryption.Mechanism,
+</a><a href="#h1-1-112" id="h1-1-112" class="i">+				cfg.B2.Encryption.PrivateKey,
+</a><a href="#h1-1-113" id="h1-1-113" class="i">+				cfg.B2.Encryption.PublicKey,
+</a><a href="#h1-1-114" id="h1-1-114" class="i">+				b2,
+</a><a href="#h1-1-115" id="h1-1-115" class="i">+			)
+</a><a href="#h1-1-116" id="h1-1-116" class="i">+			if err != nil {
+</a><a href="#h1-1-117" id="h1-1-117" class="i">+				return nil, err
+</a><a href="#h1-1-118" id="h1-1-118" class="i">+			}
+</a><a href="#h1-1-119" id="h1-1-119" class="i">+		}
+</a><a href="#h1-1-120" id="h1-1-120" class="i">+
+</a><a href="#h1-1-121" id="h1-1-121" class="i">+		if cfg.B2.Compression != nil {
+</a><a href="#h1-1-122" id="h1-1-122" class="i">+			b2, err = backend.NewCompression(
+</a><a href="#h1-1-123" id="h1-1-123" class="i">+				cfg.B2.Compression.Algorithm,
+</a><a href="#h1-1-124" id="h1-1-124" class="i">+				cfg.B2.Compression.Level,
+</a><a href="#h1-1-125" id="h1-1-125" class="i">+				b2,
+</a><a href="#h1-1-126" id="h1-1-126" class="i">+			)
+</a><a href="#h1-1-127" id="h1-1-127" class="i">+		}
+</a><a href="#h1-1-128" id="h1-1-128" class="i">+
+</a><a href="#h1-1-129" id="h1-1-129" class="i">+		if cfg.B2.Checksum != nil {
+</a><a href="#h1-1-130" id="h1-1-130" class="i">+			b2, err = backend.NewChecksum(cfg.B2.Checksum.Algorithm, b2)
+</a><a href="#h1-1-131" id="h1-1-131" class="i">+		}
+</a><a href="#h1-1-132" id="h1-1-132" class="i">+
+</a><a href="#h1-1-133" id="h1-1-133" class="i">+		if len(cfg.B2.BucketAliases) &gt; 0 {
+</a><a href="#h1-1-134" id="h1-1-134" class="i">+			b2 = backend.NewAlias(cfg.B2.BucketAliases, b2)
+</a><a href="#h1-1-135" id="h1-1-135" class="i">+		}
+</a><a href="#h1-1-136" id="h1-1-136" class="i">+
+</a><a href="#h1-1-137" id="h1-1-137" class="i">+		backends[common.Backend_B2] = b2
+</a><a href="#h1-1-138" id="h1-1-138" class="i">+	}
+</a><a href="#h1-1-139" id="h1-1-139" class="i">+
+</a><a href="#h1-1-140" id="h1-1-140" class="i">+	return &amp;unistoreService{
+</a><a href="#h1-1-141" id="h1-1-141" class="i">+		backend: backend.NewMux(backends),
+</a><a href="#h1-1-142" id="h1-1-142" class="i">+	}, nil
+</a> }
+ 
+ // HeadObject calls into the backend&#39;s HeadObject.
+</pre>
+</div>
+</body>
+</html>

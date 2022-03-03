@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/backend: Configure custom http.Transport with circuit breakers for B2 client - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/17a40d86ae1454956b3b629eb91a295b0fd1b838">17a40d86ae1454956b3b629eb91a295b0fd1b838</a>
+<b>parent</b> <a href="../commit/b575caa61cde1a8e4bd119f424b2d9aad8fa51da">b575caa61cde1a8e4bd119f424b2d9aad8fa51da</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Thu 30 Dec 2021 18:22:19 -0800
+
+internal/backend: Configure custom http.Transport with circuit breakers for B2 client
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/backend/b2.go</a></td><td> | </td><td class="num">12</td><td><span class="i">+++++++++++</span><span class="d">-</span></td></tr>
+</table></pre><pre>1 file changed, 11 insertions(+), 1 deletion(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/backend/b2.go">internal/backend/b2.go</a> b/<a href="../file/internal/backend/b2.go">internal/backend/b2.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -5,6 +5,8 @@ import (
+</a> 	&quot;crypto/sha1&quot;
+ 	&quot;fmt&quot;
+ 	&quot;io&quot;
+<a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;net&quot;
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+	&quot;net/http&quot;
+</a> 	&quot;net/url&quot;
+ 	&quot;sync&quot;
+ 	&quot;time&quot;
+<a href="#h0-1" id="h0-1" class="h">@@ -14,6 +16,7 @@ import (
+</a> 	&quot;google.golang.org/grpc/status&quot;
+ 	&quot;google.golang.org/protobuf/types/known/timestamppb&quot;
+ 
+<a href="#h0-1-3" id="h0-1-3" class="i">+	&quot;unistore/internal/log&quot;
+</a> 	&quot;unistore/pkg/client/b2&quot;
+ 	&quot;unistore/schemas/common&quot;
+ 	&quot;unistore/schemas/service&quot;
+<a href="#h0-2" id="h0-2" class="h">@@ -48,7 +51,14 @@ type B2 struct {
+</a> 
+ // NewB2 creates a new B2 backend.
+ func NewB2(applicationKeyID string, applicationKey string) (Backend, error) {
+<a href="#h0-2-3" id="h0-2-3" class="d">-	client, err := b2.New()
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+	dialer := &amp;net.Dialer{Timeout: 5 * time.Second}
+</a><a href="#h0-2-5" id="h0-2-5" class="i">+	transport := &amp;http.Transport{
+</a><a href="#h0-2-6" id="h0-2-6" class="i">+		DialContext:         dialer.DialContext,
+</a><a href="#h0-2-7" id="h0-2-7" class="i">+		TLSHandshakeTimeout: 5 * time.Second,
+</a><a href="#h0-2-8" id="h0-2-8" class="i">+		ForceAttemptHTTP2:   true,
+</a><a href="#h0-2-9" id="h0-2-9" class="i">+	}
+</a><a href="#h0-2-10" id="h0-2-10" class="i">+
+</a><a href="#h0-2-11" id="h0-2-11" class="i">+	client, err := b2.New(b2.WithTransport(transport), b2.WithLogger(log.StdDebugLogger))
+</a> 	if err != nil {
+ 		return nil, err
+ 	}
+</pre>
+</div>
+</body>
+</html>

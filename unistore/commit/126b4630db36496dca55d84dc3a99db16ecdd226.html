@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/backend, internal/config: Permission controls for HeadBucket and ListBuckets - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/126b4630db36496dca55d84dc3a99db16ecdd226">126b4630db36496dca55d84dc3a99db16ecdd226</a>
+<b>parent</b> <a href="../commit/ecc57de301a291067b7b53805d894e16ed0b1bea">ecc57de301a291067b7b53805d894e16ed0b1bea</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Mon 17 Jan 2022 12:32:54 -0800
+
+internal/backend, internal/config: Permission controls for HeadBucket and ListBuckets
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/backend/permission.go</a></td><td> | </td><td class="num">75</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">internal/config/types.go</a></td><td> | </td><td class="num">2</td><td><span class="i">++</span><span class="d"></span></td></tr>
+</table></pre><pre>2 files changed, 77 insertions(+), 0 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/backend/permission.go">internal/backend/permission.go</a> b/<a href="../file/internal/backend/permission.go">internal/backend/permission.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -35,6 +35,43 @@ func NewPermission(permissions []*config.Permission, backend Backend) Backend {
+</a> 	}
+ }
+ 
+<a href="#h0-0-3" id="h0-0-3" class="i">+// HeadBucket defers to the underlying backend only when permitted by the bucket ACL, and populates
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+// the permissions ACL in the metadata response.
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+func (p *Permission) HeadBucket(ctx context.Context, request *service.HeadBucketRequest) (*service.HeadBucketResponse, error) {
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+	var allowed bool
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+	var permission *config.Permission
+</a><a href="#h0-0-8" id="h0-0-8" class="i">+
+</a><a href="#h0-0-9" id="h0-0-9" class="i">+	for _, permission = range p.permissions {
+</a><a href="#h0-0-10" id="h0-0-10" class="i">+		if permission.Pattern.MatchString(request.Resource.Bucket) {
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+			allowed = permission.RPC.HeadBucket
+</a><a href="#h0-0-12" id="h0-0-12" class="i">+			break
+</a><a href="#h0-0-13" id="h0-0-13" class="i">+		}
+</a><a href="#h0-0-14" id="h0-0-14" class="i">+	}
+</a><a href="#h0-0-15" id="h0-0-15" class="i">+
+</a><a href="#h0-0-16" id="h0-0-16" class="i">+	if !allowed {
+</a><a href="#h0-0-17" id="h0-0-17" class="i">+		return nil, errBucketPermissionDenied
+</a><a href="#h0-0-18" id="h0-0-18" class="i">+	}
+</a><a href="#h0-0-19" id="h0-0-19" class="i">+
+</a><a href="#h0-0-20" id="h0-0-20" class="i">+	response, err := p.Backend.HeadBucket(ctx, request)
+</a><a href="#h0-0-21" id="h0-0-21" class="i">+	if err != nil {
+</a><a href="#h0-0-22" id="h0-0-22" class="i">+		return nil, err
+</a><a href="#h0-0-23" id="h0-0-23" class="i">+	}
+</a><a href="#h0-0-24" id="h0-0-24" class="i">+
+</a><a href="#h0-0-25" id="h0-0-25" class="i">+	response.Bucket.Permissions = &amp;common.Permissions{
+</a><a href="#h0-0-26" id="h0-0-26" class="i">+		HeadBucket:      permission.RPC.HeadBucket,
+</a><a href="#h0-0-27" id="h0-0-27" class="i">+		HeadObject:      permission.RPC.HeadObject,
+</a><a href="#h0-0-28" id="h0-0-28" class="i">+		GetObject:       permission.RPC.GetObject,
+</a><a href="#h0-0-29" id="h0-0-29" class="i">+		StreamGetObject: permission.RPC.StreamGetObject,
+</a><a href="#h0-0-30" id="h0-0-30" class="i">+		PutObject:       permission.RPC.PutObject,
+</a><a href="#h0-0-31" id="h0-0-31" class="i">+		StreamPutObject: permission.RPC.StreamPutObject,
+</a><a href="#h0-0-32" id="h0-0-32" class="i">+		DeleteObject:    permission.RPC.DeleteObject,
+</a><a href="#h0-0-33" id="h0-0-33" class="i">+		ListBuckets:     permission.RPC.ListBuckets,
+</a><a href="#h0-0-34" id="h0-0-34" class="i">+		ListObjects:     permission.RPC.ListObjects,
+</a><a href="#h0-0-35" id="h0-0-35" class="i">+	}
+</a><a href="#h0-0-36" id="h0-0-36" class="i">+
+</a><a href="#h0-0-37" id="h0-0-37" class="i">+	return response, nil
+</a><a href="#h0-0-38" id="h0-0-38" class="i">+}
+</a><a href="#h0-0-39" id="h0-0-39" class="i">+
+</a> // HeadObject defers to the underlying backend only when permitted by the bucket ACL.
+ func (p *Permission) HeadObject(ctx context.Context, request *service.HeadObjectRequest) (*service.HeadObjectResponse, error) {
+ 	var allowed bool
+<a href="#h0-1" id="h0-1" class="h">@@ -173,6 +210,44 @@ func (p *Permission) DeleteObject(ctx context.Context, request *service.DeleteOb
+</a> 	return p.Backend.DeleteObject(ctx, request)
+ }
+ 
+<a href="#h0-1-3" id="h0-1-3" class="i">+// ListBuckets defers to the underlying backend to obtain a list of buckets and filters out those
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+// that are disallowed by bucket ACL.
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+func (p *Permission) ListBuckets(ctx context.Context, request *service.ListBucketsRequest) (*service.ListBucketsResponse, error) {
+</a><a href="#h0-1-6" id="h0-1-6" class="i">+	var buckets []*service.HeadBucketResponse
+</a><a href="#h0-1-7" id="h0-1-7" class="i">+
+</a><a href="#h0-1-8" id="h0-1-8" class="i">+	response, err := p.Backend.ListBuckets(ctx, request)
+</a><a href="#h0-1-9" id="h0-1-9" class="i">+	if err != nil {
+</a><a href="#h0-1-10" id="h0-1-10" class="i">+		return nil, err
+</a><a href="#h0-1-11" id="h0-1-11" class="i">+	}
+</a><a href="#h0-1-12" id="h0-1-12" class="i">+
+</a><a href="#h0-1-13" id="h0-1-13" class="i">+	for _, bucket := range response.Buckets {
+</a><a href="#h0-1-14" id="h0-1-14" class="i">+		// Include in the response only those buckets that are readable based on its
+</a><a href="#h0-1-15" id="h0-1-15" class="i">+		// ListBuckets RPC permission flag. Buckets encountered without this permission are
+</a><a href="#h0-1-16" id="h0-1-16" class="i">+		// transparently omitted.
+</a><a href="#h0-1-17" id="h0-1-17" class="i">+
+</a><a href="#h0-1-18" id="h0-1-18" class="i">+		for _, permission := range p.permissions {
+</a><a href="#h0-1-19" id="h0-1-19" class="i">+			if permission.Pattern.MatchString(bucket.Bucket.Name) &amp;&amp; permission.RPC.ListBuckets {
+</a><a href="#h0-1-20" id="h0-1-20" class="i">+				bucket.Bucket.Permissions = &amp;common.Permissions{
+</a><a href="#h0-1-21" id="h0-1-21" class="i">+					HeadBucket:      permission.RPC.HeadBucket,
+</a><a href="#h0-1-22" id="h0-1-22" class="i">+					HeadObject:      permission.RPC.HeadObject,
+</a><a href="#h0-1-23" id="h0-1-23" class="i">+					GetObject:       permission.RPC.GetObject,
+</a><a href="#h0-1-24" id="h0-1-24" class="i">+					StreamGetObject: permission.RPC.StreamGetObject,
+</a><a href="#h0-1-25" id="h0-1-25" class="i">+					PutObject:       permission.RPC.PutObject,
+</a><a href="#h0-1-26" id="h0-1-26" class="i">+					StreamPutObject: permission.RPC.StreamPutObject,
+</a><a href="#h0-1-27" id="h0-1-27" class="i">+					DeleteObject:    permission.RPC.DeleteObject,
+</a><a href="#h0-1-28" id="h0-1-28" class="i">+					ListBuckets:     permission.RPC.ListBuckets,
+</a><a href="#h0-1-29" id="h0-1-29" class="i">+					ListObjects:     permission.RPC.ListObjects,
+</a><a href="#h0-1-30" id="h0-1-30" class="i">+				}
+</a><a href="#h0-1-31" id="h0-1-31" class="i">+
+</a><a href="#h0-1-32" id="h0-1-32" class="i">+				buckets = append(buckets, bucket)
+</a><a href="#h0-1-33" id="h0-1-33" class="i">+				break
+</a><a href="#h0-1-34" id="h0-1-34" class="i">+			}
+</a><a href="#h0-1-35" id="h0-1-35" class="i">+		}
+</a><a href="#h0-1-36" id="h0-1-36" class="i">+	}
+</a><a href="#h0-1-37" id="h0-1-37" class="i">+
+</a><a href="#h0-1-38" id="h0-1-38" class="i">+	return &amp;service.ListBucketsResponse{Buckets: buckets}, nil
+</a><a href="#h0-1-39" id="h0-1-39" class="i">+}
+</a><a href="#h0-1-40" id="h0-1-40" class="i">+
+</a> // ListObjects defers to the underlying backend only when permitted by the bucket ACL.
+ func (p *Permission) ListObjects(ctx context.Context, request *service.ListObjectsRequest) (*service.ListObjectsResponse, error) {
+ 	var allowed bool
+<b>diff --git a/<a id="h1" href="../file/internal/config/types.go">internal/config/types.go</a> b/<a href="../file/internal/config/types.go">internal/config/types.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -14,12 +14,14 @@ type Alias struct {
+</a> type Permission struct {
+ 	Pattern *Regex `yaml:&quot;pattern&quot;`
+ 	RPC     struct {
+<a href="#h1-0-3" id="h1-0-3" class="i">+		HeadBucket      bool `yaml:&quot;head_bucket&quot;`
+</a> 		HeadObject      bool `yaml:&quot;head_object&quot;`
+ 		GetObject       bool `yaml:&quot;get_object&quot;`
+ 		StreamGetObject bool `yaml:&quot;stream_get_object&quot;`
+ 		PutObject       bool `yaml:&quot;put_object&quot;`
+ 		StreamPutObject bool `yaml:&quot;stream_put_object&quot;`
+ 		DeleteObject    bool `yaml:&quot;delete_object&quot;`
+<a href="#h1-0-10" id="h1-0-10" class="i">+		ListBuckets     bool `yaml:&quot;list_buckets&quot;`
+</a> 		ListObjects     bool `yaml:&quot;list_objects&quot;`
+ 	} `yaml:&quot;rpc&quot;`
+ }
+</pre>
+</div>
+</body>
+</html>

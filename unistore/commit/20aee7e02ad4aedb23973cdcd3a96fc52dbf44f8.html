@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/server/middleware: Implement gRPC stream logger interceptor - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/20aee7e02ad4aedb23973cdcd3a96fc52dbf44f8">20aee7e02ad4aedb23973cdcd3a96fc52dbf44f8</a>
+<b>parent</b> <a href="../commit/2e8a85c68b79f36bd10f138495c1e1ff0d9e3cb8">2e8a85c68b79f36bd10f138495c1e1ff0d9e3cb8</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sun  2 Jan 2022 15:23:56 -0800
+
+internal/server/middleware: Implement gRPC stream logger interceptor
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/server/middleware/log.go</a></td><td> | </td><td class="num">117</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">internal/server/server.go</a></td><td> | </td><td class="num">6</td><td><span class="i">+++++</span><span class="d">-</span></td></tr>
+</table></pre><pre>2 files changed, 122 insertions(+), 1 deletion(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/server/middleware/log.go">internal/server/middleware/log.go</a> b/<a href="../file/internal/server/middleware/log.go">internal/server/middleware/log.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -3,6 +3,7 @@ package middleware
+</a> import (
+ 	&quot;context&quot;
+ 	&quot;fmt&quot;
+<a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;sync/atomic&quot;
+</a> 
+ 	&quot;go.uber.org/zap&quot;
+ 	&quot;google.golang.org/grpc&quot;
+<a href="#h0-1" id="h0-1" class="h">@@ -46,3 +47,119 @@ func NewLogUnaryInterceptor() grpc.UnaryServerInterceptor {
+</a> 		return response, err
+ 	}
+ }
+<a href="#h0-1-3" id="h0-1-3" class="i">+
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+// NewLogStreamInterceptor creates a new grpc.StreamServerInterceptor for logging metadata about
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+// stream requests, including individual messages exchanged in the stream.
+</a><a href="#h0-1-6" id="h0-1-6" class="i">+func NewLogStreamInterceptor() grpc.StreamServerInterceptor {
+</a><a href="#h0-1-7" id="h0-1-7" class="i">+	return func(
+</a><a href="#h0-1-8" id="h0-1-8" class="i">+		srv interface{},
+</a><a href="#h0-1-9" id="h0-1-9" class="i">+		ss grpc.ServerStream,
+</a><a href="#h0-1-10" id="h0-1-10" class="i">+		info *grpc.StreamServerInfo,
+</a><a href="#h0-1-11" id="h0-1-11" class="i">+		handler grpc.StreamHandler,
+</a><a href="#h0-1-12" id="h0-1-12" class="i">+	) error {
+</a><a href="#h0-1-13" id="h0-1-13" class="i">+		stopwatch := lib.NewStopwatch()
+</a><a href="#h0-1-14" id="h0-1-14" class="i">+		err := handler(srv, newLogServerStream(info, ss))
+</a><a href="#h0-1-15" id="h0-1-15" class="i">+
+</a><a href="#h0-1-16" id="h0-1-16" class="i">+		if err != nil {
+</a><a href="#h0-1-17" id="h0-1-17" class="i">+			st := status.Convert(err)
+</a><a href="#h0-1-18" id="h0-1-18" class="i">+			zap.L().Warn(
+</a><a href="#h0-1-19" id="h0-1-19" class="i">+				&quot;error serving gRPC stream request&quot;,
+</a><a href="#h0-1-20" id="h0-1-20" class="i">+				zap.String(&quot;method&quot;, info.FullMethod),
+</a><a href="#h0-1-21" id="h0-1-21" class="i">+				zap.Duration(&quot;duration&quot;, stopwatch.Elapsed()),
+</a><a href="#h0-1-22" id="h0-1-22" class="i">+				zap.Bool(&quot;client_stream&quot;, info.IsClientStream),
+</a><a href="#h0-1-23" id="h0-1-23" class="i">+				zap.Bool(&quot;server_stream&quot;, info.IsServerStream),
+</a><a href="#h0-1-24" id="h0-1-24" class="i">+				zap.Stringer(&quot;code&quot;, st.Code()),
+</a><a href="#h0-1-25" id="h0-1-25" class="i">+				zap.String(&quot;error&quot;, st.Message()),
+</a><a href="#h0-1-26" id="h0-1-26" class="i">+			)
+</a><a href="#h0-1-27" id="h0-1-27" class="i">+		} else {
+</a><a href="#h0-1-28" id="h0-1-28" class="i">+			zap.L().Debug(
+</a><a href="#h0-1-29" id="h0-1-29" class="i">+				&quot;served gRPC stream request&quot;,
+</a><a href="#h0-1-30" id="h0-1-30" class="i">+				zap.String(&quot;method&quot;, info.FullMethod),
+</a><a href="#h0-1-31" id="h0-1-31" class="i">+				zap.Duration(&quot;duration&quot;, stopwatch.Elapsed()),
+</a><a href="#h0-1-32" id="h0-1-32" class="i">+				zap.Bool(&quot;client_stream&quot;, info.IsClientStream),
+</a><a href="#h0-1-33" id="h0-1-33" class="i">+				zap.Bool(&quot;server_stream&quot;, info.IsServerStream),
+</a><a href="#h0-1-34" id="h0-1-34" class="i">+			)
+</a><a href="#h0-1-35" id="h0-1-35" class="i">+		}
+</a><a href="#h0-1-36" id="h0-1-36" class="i">+
+</a><a href="#h0-1-37" id="h0-1-37" class="i">+		return err
+</a><a href="#h0-1-38" id="h0-1-38" class="i">+	}
+</a><a href="#h0-1-39" id="h0-1-39" class="i">+}
+</a><a href="#h0-1-40" id="h0-1-40" class="i">+
+</a><a href="#h0-1-41" id="h0-1-41" class="i">+// logServerStream is a grpc.ServerStream wrapper that logs metadata about messages exchanged
+</a><a href="#h0-1-42" id="h0-1-42" class="i">+// through the stream.
+</a><a href="#h0-1-43" id="h0-1-43" class="i">+type logServerStream struct {
+</a><a href="#h0-1-44" id="h0-1-44" class="i">+	info         *grpc.StreamServerInfo
+</a><a href="#h0-1-45" id="h0-1-45" class="i">+	stopwatch    *lib.Stopwatch
+</a><a href="#h0-1-46" id="h0-1-46" class="i">+	recvMessages *uint64
+</a><a href="#h0-1-47" id="h0-1-47" class="i">+	sentMessages *uint64
+</a><a href="#h0-1-48" id="h0-1-48" class="i">+	grpc.ServerStream
+</a><a href="#h0-1-49" id="h0-1-49" class="i">+}
+</a><a href="#h0-1-50" id="h0-1-50" class="i">+
+</a><a href="#h0-1-51" id="h0-1-51" class="i">+// newLogServerStream creates a new logServerStream while initializing internal state.
+</a><a href="#h0-1-52" id="h0-1-52" class="i">+func newLogServerStream(info *grpc.StreamServerInfo, stream grpc.ServerStream) grpc.ServerStream {
+</a><a href="#h0-1-53" id="h0-1-53" class="i">+	return &amp;logServerStream{
+</a><a href="#h0-1-54" id="h0-1-54" class="i">+		info:         info,
+</a><a href="#h0-1-55" id="h0-1-55" class="i">+		stopwatch:    lib.NewStopwatch(),
+</a><a href="#h0-1-56" id="h0-1-56" class="i">+		recvMessages: new(uint64),
+</a><a href="#h0-1-57" id="h0-1-57" class="i">+		sentMessages: new(uint64),
+</a><a href="#h0-1-58" id="h0-1-58" class="i">+		ServerStream: stream,
+</a><a href="#h0-1-59" id="h0-1-59" class="i">+	}
+</a><a href="#h0-1-60" id="h0-1-60" class="i">+}
+</a><a href="#h0-1-61" id="h0-1-61" class="i">+
+</a><a href="#h0-1-62" id="h0-1-62" class="i">+// SendMsg wraps the underlying stream&#39;s SendMsg while providing logging.
+</a><a href="#h0-1-63" id="h0-1-63" class="i">+func (l *logServerStream) SendMsg(m interface{}) error {
+</a><a href="#h0-1-64" id="h0-1-64" class="i">+	err := l.ServerStream.SendMsg(m)
+</a><a href="#h0-1-65" id="h0-1-65" class="i">+
+</a><a href="#h0-1-66" id="h0-1-66" class="i">+	if err != nil {
+</a><a href="#h0-1-67" id="h0-1-67" class="i">+		st := status.Convert(err)
+</a><a href="#h0-1-68" id="h0-1-68" class="i">+		zap.L().Warn(
+</a><a href="#h0-1-69" id="h0-1-69" class="i">+			&quot;error sending message over gRPC stream&quot;,
+</a><a href="#h0-1-70" id="h0-1-70" class="i">+			zap.String(&quot;method&quot;, l.info.FullMethod),
+</a><a href="#h0-1-71" id="h0-1-71" class="i">+			zap.Uint64(&quot;sequence&quot;, atomic.LoadUint64(l.sentMessages)),
+</a><a href="#h0-1-72" id="h0-1-72" class="i">+			zap.Duration(&quot;elapsed&quot;, l.stopwatch.Elapsed()),
+</a><a href="#h0-1-73" id="h0-1-73" class="i">+			zap.String(&quot;request&quot;, fmt.Sprintf(&quot;%T&quot;, m)),
+</a><a href="#h0-1-74" id="h0-1-74" class="i">+			zap.Stringer(&quot;code&quot;, st.Code()),
+</a><a href="#h0-1-75" id="h0-1-75" class="i">+			zap.String(&quot;error&quot;, st.Message()),
+</a><a href="#h0-1-76" id="h0-1-76" class="i">+		)
+</a><a href="#h0-1-77" id="h0-1-77" class="i">+	} else {
+</a><a href="#h0-1-78" id="h0-1-78" class="i">+		atomic.AddUint64(l.sentMessages, 1)
+</a><a href="#h0-1-79" id="h0-1-79" class="i">+		zap.L().Debug(
+</a><a href="#h0-1-80" id="h0-1-80" class="i">+			&quot;sent message over gRPC stream&quot;,
+</a><a href="#h0-1-81" id="h0-1-81" class="i">+			zap.String(&quot;method&quot;, l.info.FullMethod),
+</a><a href="#h0-1-82" id="h0-1-82" class="i">+			zap.Uint64(&quot;sequence&quot;, atomic.LoadUint64(l.sentMessages)),
+</a><a href="#h0-1-83" id="h0-1-83" class="i">+			zap.Duration(&quot;elapsed&quot;, l.stopwatch.Elapsed()),
+</a><a href="#h0-1-84" id="h0-1-84" class="i">+			zap.String(&quot;message&quot;, fmt.Sprintf(&quot;%T&quot;, m)),
+</a><a href="#h0-1-85" id="h0-1-85" class="i">+		)
+</a><a href="#h0-1-86" id="h0-1-86" class="i">+	}
+</a><a href="#h0-1-87" id="h0-1-87" class="i">+
+</a><a href="#h0-1-88" id="h0-1-88" class="i">+	return err
+</a><a href="#h0-1-89" id="h0-1-89" class="i">+}
+</a><a href="#h0-1-90" id="h0-1-90" class="i">+
+</a><a href="#h0-1-91" id="h0-1-91" class="i">+// RecvMsg wraps the underlying stream&#39;s RecvMsg while providing logging.
+</a><a href="#h0-1-92" id="h0-1-92" class="i">+func (l *logServerStream) RecvMsg(m interface{}) error {
+</a><a href="#h0-1-93" id="h0-1-93" class="i">+	err := l.ServerStream.RecvMsg(m)
+</a><a href="#h0-1-94" id="h0-1-94" class="i">+
+</a><a href="#h0-1-95" id="h0-1-95" class="i">+	if err != nil {
+</a><a href="#h0-1-96" id="h0-1-96" class="i">+		st := status.Convert(err)
+</a><a href="#h0-1-97" id="h0-1-97" class="i">+		zap.L().Warn(
+</a><a href="#h0-1-98" id="h0-1-98" class="i">+			&quot;error receiving message over gRPC stream&quot;,
+</a><a href="#h0-1-99" id="h0-1-99" class="i">+			zap.String(&quot;method&quot;, l.info.FullMethod),
+</a><a href="#h0-1-100" id="h0-1-100" class="i">+			zap.Uint64(&quot;sequence&quot;, atomic.LoadUint64(l.recvMessages)),
+</a><a href="#h0-1-101" id="h0-1-101" class="i">+			zap.Duration(&quot;elapsed&quot;, l.stopwatch.Elapsed()),
+</a><a href="#h0-1-102" id="h0-1-102" class="i">+			zap.String(&quot;request&quot;, fmt.Sprintf(&quot;%T&quot;, m)),
+</a><a href="#h0-1-103" id="h0-1-103" class="i">+			zap.Stringer(&quot;code&quot;, st.Code()),
+</a><a href="#h0-1-104" id="h0-1-104" class="i">+			zap.String(&quot;error&quot;, st.Message()),
+</a><a href="#h0-1-105" id="h0-1-105" class="i">+		)
+</a><a href="#h0-1-106" id="h0-1-106" class="i">+	} else {
+</a><a href="#h0-1-107" id="h0-1-107" class="i">+		atomic.AddUint64(l.recvMessages, 1)
+</a><a href="#h0-1-108" id="h0-1-108" class="i">+		zap.L().Debug(
+</a><a href="#h0-1-109" id="h0-1-109" class="i">+			&quot;received message over gRPC stream&quot;,
+</a><a href="#h0-1-110" id="h0-1-110" class="i">+			zap.String(&quot;method&quot;, l.info.FullMethod),
+</a><a href="#h0-1-111" id="h0-1-111" class="i">+			zap.Uint64(&quot;sequence&quot;, atomic.LoadUint64(l.recvMessages)),
+</a><a href="#h0-1-112" id="h0-1-112" class="i">+			zap.Duration(&quot;elapsed&quot;, l.stopwatch.Elapsed()),
+</a><a href="#h0-1-113" id="h0-1-113" class="i">+			zap.String(&quot;message&quot;, fmt.Sprintf(&quot;%T&quot;, m)),
+</a><a href="#h0-1-114" id="h0-1-114" class="i">+		)
+</a><a href="#h0-1-115" id="h0-1-115" class="i">+	}
+</a><a href="#h0-1-116" id="h0-1-116" class="i">+
+</a><a href="#h0-1-117" id="h0-1-117" class="i">+	return err
+</a><a href="#h0-1-118" id="h0-1-118" class="i">+}
+</a><b>diff --git a/<a id="h1" href="../file/internal/server/server.go">internal/server/server.go</a> b/<a href="../file/internal/server/server.go">internal/server/server.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -29,7 +29,11 @@ func New(cfg *config.Server) (*Unistore, error) {
+</a> 		opts = append(opts, grpc.MaxSendMsgSize(cfg.RPC.MaxSendMessageSize))
+ 	}
+ 
+<a href="#h1-0-3" id="h1-0-3" class="d">-	opts = append(opts, grpc.ChainUnaryInterceptor(middleware.NewLogUnaryInterceptor()))
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+	opts = append(
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+		opts,
+</a><a href="#h1-0-6" id="h1-0-6" class="i">+		grpc.ChainUnaryInterceptor(middleware.NewLogUnaryInterceptor()),
+</a><a href="#h1-0-7" id="h1-0-7" class="i">+		grpc.ChainStreamInterceptor(middleware.NewLogStreamInterceptor()),
+</a><a href="#h1-0-8" id="h1-0-8" class="i">+	)
+</a> 
+ 	srv := grpc.NewServer(opts...)
+ 
+</pre>
+</div>
+</body>
+</html>

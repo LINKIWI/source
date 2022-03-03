@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/backend: Populate object type for all disk and B2 backend RPCs - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/a58b52c0af14edc217a0124313440aedc0ed3ee4">a58b52c0af14edc217a0124313440aedc0ed3ee4</a>
+<b>parent</b> <a href="../commit/12efdb817c16aa399d6b1ece7c28d8aa2d6aaeba">12efdb817c16aa399d6b1ece7c28d8aa2d6aaeba</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sun  2 Jan 2022 14:03:03 -0800
+
+internal/backend: Populate object type for all disk and B2 backend RPCs
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/backend/b2.go</a></td><td> | </td><td class="num">7</td><td><span class="i">++++++</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">internal/backend/disk.go</a></td><td> | </td><td class="num">13</td><td><span class="i">+++++++++++++</span><span class="d"></span></td></tr>
+</table></pre><pre>2 files changed, 19 insertions(+), 1 deletion(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/backend/b2.go">internal/backend/b2.go</a> b/<a href="../file/internal/backend/b2.go">internal/backend/b2.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -130,7 +130,7 @@ func (b *B2) HeadObject(request *service.HeadObjectRequest) (*service.HeadObject
+</a> 		return nil, b.createError(err)
+ 	}
+ 
+<a href="#h0-0-3" id="h0-0-3" class="d">-	if len(lfResp.Files) != 1 {
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+	if len(lfResp.Files) != 1 || lfResp.Files[0].FileName != request.Key {
+</a> 		return nil, status.Errorf(
+ 			codes.NotFound,
+ 			&quot;backend: no files match requested name: bucket=%s name=%s&quot;,
+<a href="#h0-1" id="h0-1" class="h">@@ -144,6 +144,7 @@ func (b *B2) HeadObject(request *service.HeadObjectRequest) (*service.HeadObject
+</a> 			Id:           lfResp.Files[0].FileID,
+ 			Key:          lfResp.Files[0].FileName,
+ 			Size:         uint64(lfResp.Files[0].ContentLength),
+<a href="#h0-1-3" id="h0-1-3" class="i">+			ObjectType:   common.Object_REGULAR,
+</a> 			MimeType:     lfResp.Files[0].ContentType,
+ 			ModifiedTime: timestamppb.New(lfResp.Files[0].UploadTimestamp.Time),
+ 			Checksum:     lfResp.Files[0].ContentSHA1,
+<a href="#h0-2" id="h0-2" class="h">@@ -182,6 +183,7 @@ func (b *B2) GetObject(request *service.GetObjectRequest) (*service.GetObjectRes
+</a> 			Id:           dfResp.FileID,
+ 			Key:          dfResp.FileName,
+ 			Size:         uint64(dfResp.Size),
+<a href="#h0-2-3" id="h0-2-3" class="i">+			ObjectType:   common.Object_REGULAR,
+</a> 			MimeType:     dfResp.ContentType,
+ 			ModifiedTime: timestamppb.New(dfResp.UploadTimestamp.Time),
+ 			Checksum:     dfResp.ContentSHA1,
+<a href="#h0-3" id="h0-3" class="h">@@ -252,6 +254,7 @@ func (b *B2) StreamGetObject(request *service.GetObjectStreamRequest) (&lt;-chan *s
+</a> 						Id:           dfResp.FileID,
+ 						Key:          dfResp.FileName,
+ 						Size:         uint64(dfResp.Size),
+<a href="#h0-3-3" id="h0-3-3" class="i">+						ObjectType:   common.Object_REGULAR,
+</a> 						MimeType:     dfResp.ContentType,
+ 						ModifiedTime: timestamppb.New(dfResp.UploadTimestamp.Time),
+ 						Checksum:     dfResp.ContentSHA1,
+<a href="#h0-4" id="h0-4" class="h">@@ -342,6 +345,7 @@ func (b *B2) PutObject(request *service.PutObjectRequest) (*service.PutObjectRes
+</a> 			Id:           upResp.FileID,
+ 			Key:          upResp.FileName,
+ 			Size:         uint64(upResp.ContentLength),
+<a href="#h0-4-3" id="h0-4-3" class="i">+			ObjectType:   common.Object_REGULAR,
+</a> 			MimeType:     upResp.ContentType,
+ 			ModifiedTime: timestamppb.New(upResp.UploadTimestamp.Time),
+ 			Checksum:     upResp.ContentSHA1,
+<a href="#h0-5" id="h0-5" class="h">@@ -465,6 +469,7 @@ func (b *B2) StreamPutObject(stream chan *service.PutObjectStreamRequest) (*serv
+</a> 				Id:           ffResp.FileID,
+ 				Key:          ffResp.FileName,
+ 				Size:         uint64(ffResp.ContentLength),
+<a href="#h0-5-3" id="h0-5-3" class="i">+				ObjectType:   common.Object_REGULAR,
+</a> 				MimeType:     ffResp.ContentType,
+ 				ModifiedTime: timestamppb.New(ffResp.UploadTimestamp.Time),
+ 				Checksum:     ffResp.ContentSHA1,
+<b>diff --git a/<a id="h1" href="../file/internal/backend/disk.go">internal/backend/disk.go</a> b/<a href="../file/internal/backend/disk.go">internal/backend/disk.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -40,6 +40,8 @@ func NewDisk(cfg *config.Disk) (Backend, error) {
+</a> 
+ // HeadObject stats the requested file.
+ func (d *Disk) HeadObject(request *service.HeadObjectRequest) (*service.HeadObjectResponse, error) {
+<a href="#h1-0-3" id="h1-0-3" class="i">+	var objectType common.Object
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+
+</a> 	target, err := d.resolveFileTarget(request.Resource.Bucket, request.Key)
+ 	if err != nil {
+ 		return nil, status.Error(codes.PermissionDenied, err.Error())
+<a href="#h1-1" id="h1-1" class="h">@@ -50,11 +52,18 @@ func (d *Disk) HeadObject(request *service.HeadObjectRequest) (*service.HeadObje
+</a> 		return nil, d.createError(err)
+ 	}
+ 
+<a href="#h1-1-3" id="h1-1-3" class="i">+	if stat.Mode.IsRegular() {
+</a><a href="#h1-1-4" id="h1-1-4" class="i">+		objectType = common.Object_REGULAR
+</a><a href="#h1-1-5" id="h1-1-5" class="i">+	} else if stat.Mode.IsDir() {
+</a><a href="#h1-1-6" id="h1-1-6" class="i">+		objectType = common.Object_DIRECTORY
+</a><a href="#h1-1-7" id="h1-1-7" class="i">+	}
+</a><a href="#h1-1-8" id="h1-1-8" class="i">+
+</a> 	return &amp;service.HeadObjectResponse{
+ 		Metadata: &amp;common.Metadata{
+ 			Id:           stat.BaseName,
+ 			Key:          stat.Path,
+ 			Size:         stat.Size,
+<a href="#h1-1-14" id="h1-1-14" class="i">+			ObjectType:   objectType,
+</a> 			ModifiedTime: timestamppb.New(stat.ModifiedTime),
+ 		},
+ 	}, nil
+<a href="#h1-2" id="h1-2" class="h">@@ -85,6 +94,7 @@ func (d *Disk) GetObject(request *service.GetObjectRequest) (*service.GetObjectR
+</a> 			Id:           stat.BaseName,
+ 			Key:          stat.Path,
+ 			Size:         stat.Size,
+<a href="#h1-2-3" id="h1-2-3" class="i">+			ObjectType:   common.Object_REGULAR,
+</a> 			ModifiedTime: timestamppb.New(stat.ModifiedTime),
+ 		},
+ 	}, nil
+<a href="#h1-3" id="h1-3" class="h">@@ -116,6 +126,7 @@ func (d *Disk) StreamGetObject(request *service.GetObjectStreamRequest) (&lt;-chan 
+</a> 			Id:           stat.BaseName,
+ 			Key:          stat.Path,
+ 			Size:         stat.Size,
+<a href="#h1-3-3" id="h1-3-3" class="i">+			ObjectType:   common.Object_REGULAR,
+</a> 			ModifiedTime: timestamppb.New(stat.ModifiedTime),
+ 		}
+ 
+<a href="#h1-4" id="h1-4" class="h">@@ -192,6 +203,7 @@ func (d *Disk) PutObject(request *service.PutObjectRequest) (*service.PutObjectR
+</a> 			Id:           stat.BaseName,
+ 			Key:          stat.Path,
+ 			Size:         stat.Size,
+<a href="#h1-4-3" id="h1-4-3" class="i">+			ObjectType:   common.Object_REGULAR,
+</a> 			ModifiedTime: timestamppb.New(stat.ModifiedTime),
+ 		},
+ 	}, nil
+<a href="#h1-5" id="h1-5" class="h">@@ -253,6 +265,7 @@ func (d *Disk) StreamPutObject(stream chan *service.PutObjectStreamRequest) (*se
+</a> 				Id:           stat.BaseName,
+ 				Key:          stat.Path,
+ 				Size:         stat.Size,
+<a href="#h1-5-3" id="h1-5-3" class="i">+				ObjectType:   common.Object_REGULAR,
+</a> 				ModifiedTime: timestamppb.New(stat.ModifiedTime),
+ 			},
+ 		},
+</pre>
+</div>
+</body>
+</html>

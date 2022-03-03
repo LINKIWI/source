@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>cmd/unistore-cli: Add head-bucket and list-buckets CLI commands - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/e0ffabff983d2b9e0da3ad8a606e1c34712b3acf">e0ffabff983d2b9e0da3ad8a606e1c34712b3acf</a>
+<b>parent</b> <a href="../commit/126b4630db36496dca55d84dc3a99db16ecdd226">126b4630db36496dca55d84dc3a99db16ecdd226</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Mon 17 Jan 2022 13:48:25 -0800
+
+cmd/unistore-cli: Add head-bucket and list-buckets CLI commands
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">cmd/unistore-cli/main.go</a></td><td> | </td><td class="num">64</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">----------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">cmd/unistore-cli/render.go</a></td><td> | </td><td class="num">24</td><td><span class="i">++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">cmd/unistore-cli/service.go</a></td><td> | </td><td class="num">73</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">----</span></td></tr>
+</table></pre><pre>3 files changed, 141 insertions(+), 20 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/cmd/unistore-cli/main.go">cmd/unistore-cli/main.go</a> b/<a href="../file/cmd/unistore-cli/main.go">cmd/unistore-cli/main.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -55,9 +55,22 @@ var (
+</a> 		Args:    cobra.NoArgs,
+ 		RunE:    runConfig,
+ 	}
+<a href="#h0-0-3" id="h0-0-3" class="d">-	headCmd = &amp;cobra.Command{
+</a><a href="#h0-0-4" id="h0-0-4" class="d">-		Use:     &quot;head &lt;key&gt;&quot;,
+</a><a href="#h0-0-5" id="h0-0-5" class="d">-		Aliases: []string{&quot;stat&quot;},
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+	headBucketCmd = &amp;cobra.Command{
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+		Use:     &quot;head-bucket&quot;,
+</a><a href="#h0-0-8" id="h0-0-8" class="i">+		Aliases: []string{&quot;headb&quot;, &quot;hb&quot;},
+</a><a href="#h0-0-9" id="h0-0-9" class="i">+		Short:   &quot;Retrieve metadata for a bucket&quot;,
+</a><a href="#h0-0-10" id="h0-0-10" class="i">+		Long:    &quot;Retrieve metadata for a bucket by name.\nStructured data is printed to standard output.&quot;,
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+		Example: strings.Join([]string{
+</a><a href="#h0-0-12" id="h0-0-12" class="i">+			&quot;Head a bucket by name:&quot;,
+</a><a href="#h0-0-13" id="h0-0-13" class="i">+			&quot;  $ uni head-bucket --store default --bucket bucket&quot;,
+</a><a href="#h0-0-14" id="h0-0-14" class="i">+		}, &quot;\n&quot;),
+</a><a href="#h0-0-15" id="h0-0-15" class="i">+		Version: rootCmd.Version,
+</a><a href="#h0-0-16" id="h0-0-16" class="i">+		Args:    cobra.NoArgs,
+</a><a href="#h0-0-17" id="h0-0-17" class="i">+		RunE:    runHeadBucket,
+</a><a href="#h0-0-18" id="h0-0-18" class="i">+	}
+</a><a href="#h0-0-19" id="h0-0-19" class="i">+	headObjectCmd = &amp;cobra.Command{
+</a><a href="#h0-0-20" id="h0-0-20" class="i">+		Use:     &quot;head-object &lt;key&gt;&quot;,
+</a><a href="#h0-0-21" id="h0-0-21" class="i">+		Aliases: []string{&quot;head&quot;, &quot;ho&quot;, &quot;stat&quot;},
+</a> 		Short:   &quot;Retrieve metadata for an object&quot;,
+ 		Long:    &quot;Retrieve metadata for an object by key.\nStructured data is printed to standard output.&quot;,
+ 		Example: strings.Join([]string{
+<a href="#h0-1" id="h0-1" class="h">@@ -66,7 +79,7 @@ var (
+</a> 		}, &quot;\n&quot;),
+ 		Version: rootCmd.Version,
+ 		Args:    cobra.ExactArgs(1),
+<a href="#h0-1-3" id="h0-1-3" class="d">-		RunE:    runHead,
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+		RunE:    runHeadObject,
+</a> 	}
+ 	downloadCmd = &amp;cobra.Command{
+ 		Use:     &quot;download &lt;key&gt;&quot;,
+<a href="#h0-2" id="h0-2" class="h">@@ -100,7 +113,7 @@ var (
+</a> 			&quot;Upload an object from stdin using streaming with the default chunk size:&quot;,
+ 			&quot;  $ cat file | uni upload --store default --bucket bucket --stream key&quot;,
+ 			&quot;Upload an object, preserving its original modification time in associated metadata:&quot;,
+<a href="#h0-2-3" id="h0-2-3" class="d">-			&quot;  $ uni upload --store default --bucket bucket key --timestamp $(stat --format=\&quot;%.9Y\&quot; file | sed &#39;s/\\.//g&#39;) &lt; file&quot;,
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+			&quot;  $ uni upload --store default --bucket bucket --timestamp $(stat --format=\&quot;%.9Y\&quot; file | sed &#39;s/\\.//g&#39;) key &lt; file&quot;,
+</a> 		}, &quot;\n&quot;),
+ 		Version: rootCmd.Version,
+ 		Args:    cobra.ExactArgs(1),
+<a href="#h0-3" id="h0-3" class="h">@@ -119,9 +132,22 @@ var (
+</a> 		Args:    cobra.ExactArgs(1),
+ 		RunE:    runDelete,
+ 	}
+<a href="#h0-3-3" id="h0-3-3" class="d">-	listCmd = &amp;cobra.Command{
+</a><a href="#h0-3-4" id="h0-3-4" class="d">-		Use:     &quot;list &lt;prefix&gt;&quot;,
+</a><a href="#h0-3-5" id="h0-3-5" class="d">-		Aliases: []string{&quot;ls&quot;},
+</a><a href="#h0-3-6" id="h0-3-6" class="i">+	listBucketsCmd = &amp;cobra.Command{
+</a><a href="#h0-3-7" id="h0-3-7" class="i">+		Use:     &quot;list-buckets&quot;,
+</a><a href="#h0-3-8" id="h0-3-8" class="i">+		Aliases: []string{&quot;listb&quot;, &quot;lb&quot;},
+</a><a href="#h0-3-9" id="h0-3-9" class="i">+		Short:   &quot;List all buckets&quot;,
+</a><a href="#h0-3-10" id="h0-3-10" class="i">+		Long:    &quot;List all buckets. Structured data is printed to standard output.&quot;,
+</a><a href="#h0-3-11" id="h0-3-11" class="i">+		Example: strings.Join([]string{
+</a><a href="#h0-3-12" id="h0-3-12" class="i">+			&quot;List all buckets:&quot;,
+</a><a href="#h0-3-13" id="h0-3-13" class="i">+			&quot;  $ uni list-buckets --store default&quot;,
+</a><a href="#h0-3-14" id="h0-3-14" class="i">+		}, &quot;\n&quot;),
+</a><a href="#h0-3-15" id="h0-3-15" class="i">+		Version: rootCmd.Version,
+</a><a href="#h0-3-16" id="h0-3-16" class="i">+		Args:    cobra.NoArgs,
+</a><a href="#h0-3-17" id="h0-3-17" class="i">+		RunE:    runListBuckets,
+</a><a href="#h0-3-18" id="h0-3-18" class="i">+	}
+</a><a href="#h0-3-19" id="h0-3-19" class="i">+	listObjectsCmd = &amp;cobra.Command{
+</a><a href="#h0-3-20" id="h0-3-20" class="i">+		Use:     &quot;list-objects &lt;prefix&gt;&quot;,
+</a><a href="#h0-3-21" id="h0-3-21" class="i">+		Aliases: []string{&quot;list&quot;, &quot;lo&quot;, &quot;ls&quot;},
+</a> 		Short:   &quot;List objects by prefix&quot;,
+ 		Long: &quot;List objects by prefix, recursively through any hierarchical delimiters (e.g. directories).\n&quot; +
+ 			&quot;Structured data is printed to standard output.&quot;,
+<a href="#h0-4" id="h0-4" class="h">@@ -135,7 +161,7 @@ var (
+</a> 		}, &quot;\n&quot;),
+ 		Version: rootCmd.Version,
+ 		Args:    cobra.MaximumNArgs(1),
+<a href="#h0-4-3" id="h0-4-3" class="d">-		RunE:    runList,
+</a><a href="#h0-4-4" id="h0-4-4" class="i">+		RunE:    runListObjects,
+</a> 	}
+ )
+ 
+<a href="#h0-5" id="h0-5" class="h">@@ -175,9 +201,13 @@ func init() {
+</a> 	rootCmd.AddCommand(infoCmd)
+ 	rootCmd.AddCommand(configCmd)
+ 
+<a href="#h0-5-3" id="h0-5-3" class="d">-	headCmd.Flags().StringP(&quot;bucket&quot;, &quot;b&quot;, &quot;&quot;, &quot;bucket name&quot;)
+</a><a href="#h0-5-4" id="h0-5-4" class="d">-	headCmd.MarkFlagRequired(&quot;bucket&quot;)
+</a><a href="#h0-5-5" id="h0-5-5" class="d">-	rootCmd.AddCommand(headCmd)
+</a><a href="#h0-5-6" id="h0-5-6" class="i">+	headBucketCmd.Flags().StringP(&quot;bucket&quot;, &quot;b&quot;, &quot;&quot;, &quot;bucket name&quot;)
+</a><a href="#h0-5-7" id="h0-5-7" class="i">+	headBucketCmd.MarkFlagRequired(&quot;bucket&quot;)
+</a><a href="#h0-5-8" id="h0-5-8" class="i">+	rootCmd.AddCommand(headBucketCmd)
+</a><a href="#h0-5-9" id="h0-5-9" class="i">+
+</a><a href="#h0-5-10" id="h0-5-10" class="i">+	headObjectCmd.Flags().StringP(&quot;bucket&quot;, &quot;b&quot;, &quot;&quot;, &quot;bucket name&quot;)
+</a><a href="#h0-5-11" id="h0-5-11" class="i">+	headObjectCmd.MarkFlagRequired(&quot;bucket&quot;)
+</a><a href="#h0-5-12" id="h0-5-12" class="i">+	rootCmd.AddCommand(headObjectCmd)
+</a> 
+ 	downloadCmd.Flags().StringP(&quot;bucket&quot;, &quot;b&quot;, &quot;&quot;, &quot;bucket name&quot;)
+ 	downloadCmd.Flags().BoolP(&quot;stream&quot;, &quot;t&quot;, false, &quot;stream object contents&quot;)
+<a href="#h0-6" id="h0-6" class="h">@@ -199,10 +229,12 @@ func init() {
+</a> 	deleteCmd.MarkFlagRequired(&quot;bucket&quot;)
+ 	rootCmd.AddCommand(deleteCmd)
+ 
+<a href="#h0-6-3" id="h0-6-3" class="d">-	listCmd.Flags().StringP(&quot;bucket&quot;, &quot;b&quot;, &quot;&quot;, &quot;bucket name&quot;)
+</a><a href="#h0-6-4" id="h0-6-4" class="d">-	listCmd.Flags().BoolP(&quot;recursive&quot;, &quot;r&quot;, false, &quot;traverse key delimiters recursively&quot;)
+</a><a href="#h0-6-5" id="h0-6-5" class="d">-	listCmd.MarkFlagRequired(&quot;bucket&quot;)
+</a><a href="#h0-6-6" id="h0-6-6" class="d">-	rootCmd.AddCommand(listCmd)
+</a><a href="#h0-6-7" id="h0-6-7" class="i">+	rootCmd.AddCommand(listBucketsCmd)
+</a><a href="#h0-6-8" id="h0-6-8" class="i">+
+</a><a href="#h0-6-9" id="h0-6-9" class="i">+	listObjectsCmd.Flags().StringP(&quot;bucket&quot;, &quot;b&quot;, &quot;&quot;, &quot;bucket name&quot;)
+</a><a href="#h0-6-10" id="h0-6-10" class="i">+	listObjectsCmd.Flags().BoolP(&quot;recursive&quot;, &quot;r&quot;, false, &quot;traverse key delimiters recursively&quot;)
+</a><a href="#h0-6-11" id="h0-6-11" class="i">+	listObjectsCmd.MarkFlagRequired(&quot;bucket&quot;)
+</a><a href="#h0-6-12" id="h0-6-12" class="i">+	rootCmd.AddCommand(listObjectsCmd)
+</a> }
+ 
+ func main() {
+<b>diff --git a/<a id="h1" href="../file/cmd/unistore-cli/render.go">cmd/unistore-cli/render.go</a> b/<a href="../file/cmd/unistore-cli/render.go">cmd/unistore-cli/render.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -154,6 +154,8 @@ func (h *humanRenderer) proto(message proto.Message) error {
+</a> 	switch m := message.(type) {
+ 	case *service.InfoResponse:
+ 		return h.protoInfoResponse(m)
+<a href="#h1-0-3" id="h1-0-3" class="i">+	case *service.ListBucketsResponse:
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+		return h.protoListBucketsResponse(m)
+</a> 	case *service.ListObjectsResponse:
+ 		return h.protoListObjectsResponse(m)
+ 	default:
+<a href="#h1-1" id="h1-1" class="h">@@ -212,6 +214,28 @@ func (h *humanRenderer) protoInfoResponse(response *service.InfoResponse) error 
+</a> 	return nil
+ }
+ 
+<a href="#h1-1-3" id="h1-1-3" class="i">+// protoListBucketsResponse renders a service.ListBucketsResponse.
+</a><a href="#h1-1-4" id="h1-1-4" class="i">+func (h *humanRenderer) protoListBucketsResponse(response *service.ListBucketsResponse) error {
+</a><a href="#h1-1-5" id="h1-1-5" class="i">+	var objects service.ListObjectsResponse
+</a><a href="#h1-1-6" id="h1-1-6" class="i">+
+</a><a href="#h1-1-7" id="h1-1-7" class="i">+	// Reuse the existing renderer for ListObjects by reshaping the ListBuckets response to
+</a><a href="#h1-1-8" id="h1-1-8" class="i">+	// a list of objects with Object.DIRECTORY type.
+</a><a href="#h1-1-9" id="h1-1-9" class="i">+
+</a><a href="#h1-1-10" id="h1-1-10" class="i">+	for _, bucket := range response.Buckets {
+</a><a href="#h1-1-11" id="h1-1-11" class="i">+		head := &amp;service.HeadObjectResponse{
+</a><a href="#h1-1-12" id="h1-1-12" class="i">+			Metadata: &amp;common.Metadata{
+</a><a href="#h1-1-13" id="h1-1-13" class="i">+				Key:          bucket.Bucket.Name,
+</a><a href="#h1-1-14" id="h1-1-14" class="i">+				ModifiedTime: bucket.Bucket.Timestamp,
+</a><a href="#h1-1-15" id="h1-1-15" class="i">+				ObjectType:   common.Object_DIRECTORY,
+</a><a href="#h1-1-16" id="h1-1-16" class="i">+			},
+</a><a href="#h1-1-17" id="h1-1-17" class="i">+		}
+</a><a href="#h1-1-18" id="h1-1-18" class="i">+
+</a><a href="#h1-1-19" id="h1-1-19" class="i">+		objects.Objects = append(objects.Objects, head)
+</a><a href="#h1-1-20" id="h1-1-20" class="i">+	}
+</a><a href="#h1-1-21" id="h1-1-21" class="i">+
+</a><a href="#h1-1-22" id="h1-1-22" class="i">+	return h.protoListObjectsResponse(&amp;objects)
+</a><a href="#h1-1-23" id="h1-1-23" class="i">+}
+</a><a href="#h1-1-24" id="h1-1-24" class="i">+
+</a> // protoListObjectsResponse renders a service.ListObjectsResponse.
+ func (h *humanRenderer) protoListObjectsResponse(response *service.ListObjectsResponse) error {
+ 	// Sort the objects alphabetically by key name, while grouping directories at the
+<b>diff --git a/<a id="h2" href="../file/cmd/unistore-cli/service.go">cmd/unistore-cli/service.go</a> b/<a href="../file/cmd/unistore-cli/service.go">cmd/unistore-cli/service.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -61,8 +61,41 @@ func runConfig(cmd *cobra.Command, args []string) error {
+</a> 	return newRenderer(flagFormat, os.Stdout).any(cfg.Client)
+ }
+ 
+<a href="#h2-0-3" id="h2-0-3" class="d">-// runHead is a command line interface for the HeadObject RPC.
+</a><a href="#h2-0-4" id="h2-0-4" class="d">-func runHead(cmd *cobra.Command, args []string) error {
+</a><a href="#h2-0-5" id="h2-0-5" class="i">+func runHeadBucket(cmd *cobra.Command, args []string) error {
+</a><a href="#h2-0-6" id="h2-0-6" class="i">+	rdr := newRenderer(flagFormat, os.Stdout)
+</a><a href="#h2-0-7" id="h2-0-7" class="i">+	bucket, _ := cmd.Flags().GetString(&quot;bucket&quot;)
+</a><a href="#h2-0-8" id="h2-0-8" class="i">+
+</a><a href="#h2-0-9" id="h2-0-9" class="i">+	store, rpc, err := newClientConfig(flagConfig, flagStore)
+</a><a href="#h2-0-10" id="h2-0-10" class="i">+	if err != nil {
+</a><a href="#h2-0-11" id="h2-0-11" class="i">+		return err
+</a><a href="#h2-0-12" id="h2-0-12" class="i">+	}
+</a><a href="#h2-0-13" id="h2-0-13" class="i">+
+</a><a href="#h2-0-14" id="h2-0-14" class="i">+	client, err := newUnistoreClient(store, rpc)
+</a><a href="#h2-0-15" id="h2-0-15" class="i">+	if err != nil {
+</a><a href="#h2-0-16" id="h2-0-16" class="i">+		return err
+</a><a href="#h2-0-17" id="h2-0-17" class="i">+	}
+</a><a href="#h2-0-18" id="h2-0-18" class="i">+
+</a><a href="#h2-0-19" id="h2-0-19" class="i">+	request := &amp;service.HeadBucketRequest{
+</a><a href="#h2-0-20" id="h2-0-20" class="i">+		Resource: &amp;common.Resource{
+</a><a href="#h2-0-21" id="h2-0-21" class="i">+			Backend: common.Backend(common.Backend_value[strings.ToUpper(store.Backend)]),
+</a><a href="#h2-0-22" id="h2-0-22" class="i">+			Bucket:  bucket,
+</a><a href="#h2-0-23" id="h2-0-23" class="i">+		},
+</a><a href="#h2-0-24" id="h2-0-24" class="i">+	}
+</a><a href="#h2-0-25" id="h2-0-25" class="i">+
+</a><a href="#h2-0-26" id="h2-0-26" class="i">+	if flagVerbose {
+</a><a href="#h2-0-27" id="h2-0-27" class="i">+		rdr.proto(request)
+</a><a href="#h2-0-28" id="h2-0-28" class="i">+	}
+</a><a href="#h2-0-29" id="h2-0-29" class="i">+
+</a><a href="#h2-0-30" id="h2-0-30" class="i">+	response, err := client.HeadBucket(context.Background(), request)
+</a><a href="#h2-0-31" id="h2-0-31" class="i">+	if err != nil {
+</a><a href="#h2-0-32" id="h2-0-32" class="i">+		return err
+</a><a href="#h2-0-33" id="h2-0-33" class="i">+	}
+</a><a href="#h2-0-34" id="h2-0-34" class="i">+
+</a><a href="#h2-0-35" id="h2-0-35" class="i">+	return rdr.proto(response)
+</a><a href="#h2-0-36" id="h2-0-36" class="i">+}
+</a><a href="#h2-0-37" id="h2-0-37" class="i">+
+</a><a href="#h2-0-38" id="h2-0-38" class="i">+// runHeadObject is a command line interface for the HeadObject RPC.
+</a><a href="#h2-0-39" id="h2-0-39" class="i">+func runHeadObject(cmd *cobra.Command, args []string) error {
+</a> 	rdr := newRenderer(flagFormat, os.Stdout)
+ 	bucket, _ := cmd.Flags().GetString(&quot;bucket&quot;)
+ 
+<a href="#h2-1" id="h2-1" class="h">@@ -366,8 +399,40 @@ func runDelete(cmd *cobra.Command, args []string) error {
+</a> 	return rdr.proto(response)
+ }
+ 
+<a href="#h2-1-3" id="h2-1-3" class="d">-// runList is a command line interface for the ListObjects RPC.
+</a><a href="#h2-1-4" id="h2-1-4" class="d">-func runList(cmd *cobra.Command, args []string) error {
+</a><a href="#h2-1-5" id="h2-1-5" class="i">+// runListBuckets is a command line interface for the ListObjects RPC.
+</a><a href="#h2-1-6" id="h2-1-6" class="i">+func runListBuckets(cmd *cobra.Command, args []string) error {
+</a><a href="#h2-1-7" id="h2-1-7" class="i">+	rdr := newRenderer(flagFormat, os.Stdout)
+</a><a href="#h2-1-8" id="h2-1-8" class="i">+
+</a><a href="#h2-1-9" id="h2-1-9" class="i">+	store, rpc, err := newClientConfig(flagConfig, flagStore)
+</a><a href="#h2-1-10" id="h2-1-10" class="i">+	if err != nil {
+</a><a href="#h2-1-11" id="h2-1-11" class="i">+		return err
+</a><a href="#h2-1-12" id="h2-1-12" class="i">+	}
+</a><a href="#h2-1-13" id="h2-1-13" class="i">+
+</a><a href="#h2-1-14" id="h2-1-14" class="i">+	client, err := newUnistoreClient(store, rpc)
+</a><a href="#h2-1-15" id="h2-1-15" class="i">+	if err != nil {
+</a><a href="#h2-1-16" id="h2-1-16" class="i">+		return err
+</a><a href="#h2-1-17" id="h2-1-17" class="i">+	}
+</a><a href="#h2-1-18" id="h2-1-18" class="i">+
+</a><a href="#h2-1-19" id="h2-1-19" class="i">+	request := &amp;service.ListBucketsRequest{
+</a><a href="#h2-1-20" id="h2-1-20" class="i">+		Resource: &amp;common.Resource{
+</a><a href="#h2-1-21" id="h2-1-21" class="i">+			Backend: common.Backend(common.Backend_value[strings.ToUpper(store.Backend)]),
+</a><a href="#h2-1-22" id="h2-1-22" class="i">+		},
+</a><a href="#h2-1-23" id="h2-1-23" class="i">+	}
+</a><a href="#h2-1-24" id="h2-1-24" class="i">+
+</a><a href="#h2-1-25" id="h2-1-25" class="i">+	if flagVerbose {
+</a><a href="#h2-1-26" id="h2-1-26" class="i">+		rdr.proto(request)
+</a><a href="#h2-1-27" id="h2-1-27" class="i">+	}
+</a><a href="#h2-1-28" id="h2-1-28" class="i">+
+</a><a href="#h2-1-29" id="h2-1-29" class="i">+	response, err := client.ListBuckets(context.Background(), request)
+</a><a href="#h2-1-30" id="h2-1-30" class="i">+	if err != nil {
+</a><a href="#h2-1-31" id="h2-1-31" class="i">+		return err
+</a><a href="#h2-1-32" id="h2-1-32" class="i">+	}
+</a><a href="#h2-1-33" id="h2-1-33" class="i">+
+</a><a href="#h2-1-34" id="h2-1-34" class="i">+	return rdr.proto(response)
+</a><a href="#h2-1-35" id="h2-1-35" class="i">+}
+</a><a href="#h2-1-36" id="h2-1-36" class="i">+
+</a><a href="#h2-1-37" id="h2-1-37" class="i">+// runListObjects is a command line interface for the ListObjects RPC.
+</a><a href="#h2-1-38" id="h2-1-38" class="i">+func runListObjects(cmd *cobra.Command, args []string) error {
+</a> 	rdr := newRenderer(flagFormat, os.Stdout)
+ 	bucket, _ := cmd.Flags().GetString(&quot;bucket&quot;)
+ 	recursive, _ := cmd.Flags().GetBool(&quot;recursive&quot;)
+</pre>
+</div>
+</body>
+</html>

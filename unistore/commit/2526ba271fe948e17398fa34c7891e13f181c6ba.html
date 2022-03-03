@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/backend, internal/server: Simplify middleware instantiation due to enum validity check during config validation - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/2526ba271fe948e17398fa34c7891e13f181c6ba">2526ba271fe948e17398fa34c7891e13f181c6ba</a>
+<b>parent</b> <a href="../commit/6794cd87e1265daad987e106ed7c8d43a9863dfa">6794cd87e1265daad987e106ed7c8d43a9863dfa</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Fri 31 Dec 2021 15:54:57 -0800
+
+internal/backend, internal/server: Simplify middleware instantiation due to enum validity check during config validation
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/backend/checksum.go</a></td><td> | </td><td class="num">14</td><td><span class="i">+++</span><span class="d">-----------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">internal/backend/compression.go</a></td><td> | </td><td class="num">13</td><td><span class="i">+++</span><span class="d">----------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">internal/backend/encrypt.go</a></td><td> | </td><td class="num">14</td><td><span class="i">+++</span><span class="d">-----------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">internal/server/unistore.go</a></td><td> | </td><td class="num">21</td><td><span class="i">+++++++++</span><span class="d">------------</span></td></tr>
+</table></pre><pre>4 files changed, 18 insertions(+), 44 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/backend/checksum.go">internal/backend/checksum.go</a> b/<a href="../file/internal/backend/checksum.go">internal/backend/checksum.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -27,19 +27,11 @@ type Checksum struct {
+</a> }
+ 
+ // NewChecksum creates a Checksum with the specified algorithm.
+<a href="#h0-0-3" id="h0-0-3" class="d">-func NewChecksum(algorithm string, backend Backend) (Backend, error) {
+</a><a href="#h0-0-4" id="h0-0-4" class="d">-	var parsed common.Checksum
+</a><a href="#h0-0-5" id="h0-0-5" class="d">-
+</a><a href="#h0-0-6" id="h0-0-6" class="d">-	if c, ok := common.Checksum_value[strings.ToUpper(algorithm)]; ok {
+</a><a href="#h0-0-7" id="h0-0-7" class="d">-		parsed = common.Checksum(c)
+</a><a href="#h0-0-8" id="h0-0-8" class="d">-	} else {
+</a><a href="#h0-0-9" id="h0-0-9" class="d">-		return nil, fmt.Errorf(&quot;backend: unknown checksum: algorithm=%s&quot;, algorithm)
+</a><a href="#h0-0-10" id="h0-0-10" class="d">-	}
+</a><a href="#h0-0-11" id="h0-0-11" class="d">-
+</a><a href="#h0-0-12" id="h0-0-12" class="i">+func NewChecksum(algorithm string, backend Backend) Backend {
+</a> 	return &amp;Checksum{
+<a href="#h0-0-14" id="h0-0-14" class="d">-		algorithm: parsed,
+</a><a href="#h0-0-15" id="h0-0-15" class="i">+		algorithm: common.Checksum(common.Checksum_value[strings.ToUpper(algorithm)]),
+</a> 		Backend:   backend,
+<a href="#h0-0-17" id="h0-0-17" class="d">-	}, nil
+</a><a href="#h0-0-18" id="h0-0-18" class="i">+	}
+</a> }
+ 
+ // GetObject defers to the underlying Backend and transparently injects a checksum in the response
+<b>diff --git a/<a id="h1" href="../file/internal/backend/compression.go">internal/backend/compression.go</a> b/<a href="../file/internal/backend/compression.go">internal/backend/compression.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -14,18 +14,11 @@ import (
+</a> )
+ 
+ // NewCompression creates a new Compression with the specified algorithm and compression level.
+<a href="#h1-0-3" id="h1-0-3" class="d">-func NewCompression(algorithm string, level int, backend Backend) (Backend, error) {
+</a><a href="#h1-0-4" id="h1-0-4" class="d">-	var parsed common.Compression
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+func NewCompression(algorithm string, level int, backend Backend) Backend {
+</a> 	var compressor func(io.Writer) (io.WriteCloser, error)
+ 	var decompressor func(io.Reader) (io.ReadCloser, error)
+ 
+<a href="#h1-0-9" id="h1-0-9" class="d">-	if c, ok := common.Compression_value[strings.ToUpper(algorithm)]; ok {
+</a><a href="#h1-0-10" id="h1-0-10" class="d">-		parsed = common.Compression(c)
+</a><a href="#h1-0-11" id="h1-0-11" class="d">-	} else {
+</a><a href="#h1-0-12" id="h1-0-12" class="d">-		return nil, fmt.Errorf(&quot;backend: unknown compression: algorithm=%s&quot;, algorithm)
+</a><a href="#h1-0-13" id="h1-0-13" class="d">-	}
+</a><a href="#h1-0-14" id="h1-0-14" class="d">-
+</a><a href="#h1-0-15" id="h1-0-15" class="d">-	switch parsed {
+</a><a href="#h1-0-16" id="h1-0-16" class="i">+	switch common.Compression(common.Compression_value[strings.ToUpper(algorithm)]) {
+</a> 	case common.Compression_GZIP:
+ 		compressor = func(raw io.Writer) (io.WriteCloser, error) {
+ 			if level == 0 {
+<a href="#h1-1" id="h1-1" class="h">@@ -89,5 +82,5 @@ func NewCompression(algorithm string, level int, backend Backend) (Backend, erro
+</a> 		}
+ 	}
+ 
+<a href="#h1-1-3" id="h1-1-3" class="d">-	return newIOProcessor(decompressor, compressor, 0, 0, backend), nil
+</a><a href="#h1-1-4" id="h1-1-4" class="i">+	return newIOProcessor(decompressor, compressor, 0, 0, backend)
+</a> }
+<b>diff --git a/<a id="h2" href="../file/internal/backend/encrypt.go">internal/backend/encrypt.go</a> b/<a href="../file/internal/backend/encrypt.go">internal/backend/encrypt.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -1,7 +1,6 @@
+</a> package backend
+ 
+ import (
+<a href="#h2-0-3" id="h2-0-3" class="d">-	&quot;fmt&quot;
+</a> 	&quot;io&quot;
+ 	&quot;strings&quot;
+ 
+<a href="#h2-1" id="h2-1" class="h">@@ -13,18 +12,11 @@ import (
+</a> 
+ // NewEncrypt creates a new Encrypt with the specified private and public keys for decryption and
+ // encryption, respectively.
+<a href="#h2-1-3" id="h2-1-3" class="d">-func NewEncrypt(mechanism string, privateKey string, publicKey string, backend Backend) (Backend, error) {
+</a><a href="#h2-1-4" id="h2-1-4" class="d">-	var parsed common.Encryption
+</a><a href="#h2-1-5" id="h2-1-5" class="i">+func NewEncrypt(mechanism string, privateKey string, publicKey string, backend Backend) Backend {
+</a> 	var encryptor func(io.Writer) (io.WriteCloser, error)
+ 	var decryptor func(io.Reader) (io.ReadCloser, error)
+ 
+<a href="#h2-1-9" id="h2-1-9" class="d">-	if e, ok := common.Encryption_value[strings.ToUpper(mechanism)]; ok {
+</a><a href="#h2-1-10" id="h2-1-10" class="d">-		parsed = common.Encryption(e)
+</a><a href="#h2-1-11" id="h2-1-11" class="d">-	} else {
+</a><a href="#h2-1-12" id="h2-1-12" class="d">-		return nil, fmt.Errorf(&quot;backend: unknown encryption: mechanism=%s&quot;, mechanism)
+</a><a href="#h2-1-13" id="h2-1-13" class="d">-	}
+</a><a href="#h2-1-14" id="h2-1-14" class="d">-
+</a><a href="#h2-1-15" id="h2-1-15" class="d">-	switch parsed {
+</a><a href="#h2-1-16" id="h2-1-16" class="i">+	switch common.Encryption(common.Encryption_value[strings.ToUpper(mechanism)]) {
+</a> 	case common.Encryption_AGE:
+ 		encryptor = func(raw io.Writer) (io.WriteCloser, error) {
+ 			recipient, err := age.ParseX25519Recipient(publicKey)
+<a href="#h2-2" id="h2-2" class="h">@@ -57,5 +49,5 @@ func NewEncrypt(mechanism string, privateKey string, publicKey string, backend B
+</a> 		}
+ 	}
+ 
+<a href="#h2-2-3" id="h2-2-3" class="d">-	return newIOProcessor(decryptor, encryptor, 0, 0, backend), nil
+</a><a href="#h2-2-4" id="h2-2-4" class="i">+	return newIOProcessor(decryptor, encryptor, 0, 0, backend)
+</a> }
+<b>diff --git a/<a id="h3" href="../file/internal/server/unistore.go">internal/server/unistore.go</a> b/<a href="../file/internal/server/unistore.go">internal/server/unistore.go</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -33,7 +33,7 @@ func newUnistoreService(cfg config.Storage) (service.UnistoreServer, error) {
+</a> 		}
+ 
+ 		if cfg.Disk.Encryption != nil {
+<a href="#h3-0-3" id="h3-0-3" class="d">-			disk, err = backend.NewEncrypt(
+</a><a href="#h3-0-4" id="h3-0-4" class="i">+			disk = backend.NewEncrypt(
+</a> 				cfg.Disk.Encryption.Mechanism,
+ 				cfg.Disk.Encryption.PrivateKey,
+ 				cfg.Disk.Encryption.PublicKey,
+<a href="#h3-1" id="h3-1" class="h">@@ -45,7 +45,7 @@ func newUnistoreService(cfg config.Storage) (service.UnistoreServer, error) {
+</a> 		}
+ 
+ 		if cfg.Disk.Compression != nil {
+<a href="#h3-1-3" id="h3-1-3" class="d">-			disk, err = backend.NewCompression(
+</a><a href="#h3-1-4" id="h3-1-4" class="i">+			disk = backend.NewCompression(
+</a> 				cfg.Disk.Compression.Algorithm,
+ 				cfg.Disk.Compression.Level,
+ 				disk,
+<a href="#h3-2" id="h3-2" class="h">@@ -53,7 +53,7 @@ func newUnistoreService(cfg config.Storage) (service.UnistoreServer, error) {
+</a> 		}
+ 
+ 		if cfg.Disk.Checksum != nil {
+<a href="#h3-2-3" id="h3-2-3" class="d">-			disk, err = backend.NewChecksum(cfg.Disk.Checksum.Algorithm, disk)
+</a><a href="#h3-2-4" id="h3-2-4" class="i">+			disk = backend.NewChecksum(cfg.Disk.Checksum.Algorithm, disk)
+</a> 		}
+ 
+ 		if len(cfg.Disk.BucketAliases) &gt; 0 {
+<a href="#h3-3" id="h3-3" class="h">@@ -70,7 +70,7 @@ func newUnistoreService(cfg config.Storage) (service.UnistoreServer, error) {
+</a> 		}
+ 
+ 		if cfg.Unistore.Encryption != nil {
+<a href="#h3-3-3" id="h3-3-3" class="d">-			unistore, err = backend.NewEncrypt(
+</a><a href="#h3-3-4" id="h3-3-4" class="i">+			unistore = backend.NewEncrypt(
+</a> 				cfg.Unistore.Encryption.Mechanism,
+ 				cfg.Unistore.Encryption.PrivateKey,
+ 				cfg.Unistore.Encryption.PublicKey,
+<a href="#h3-4" id="h3-4" class="h">@@ -79,7 +79,7 @@ func newUnistoreService(cfg config.Storage) (service.UnistoreServer, error) {
+</a> 		}
+ 
+ 		if cfg.Unistore.Compression != nil {
+<a href="#h3-4-3" id="h3-4-3" class="d">-			unistore, err = backend.NewCompression(
+</a><a href="#h3-4-4" id="h3-4-4" class="i">+			unistore = backend.NewCompression(
+</a> 				cfg.Unistore.Compression.Algorithm,
+ 				cfg.Unistore.Compression.Level,
+ 				unistore,
+<a href="#h3-5" id="h3-5" class="h">@@ -87,7 +87,7 @@ func newUnistoreService(cfg config.Storage) (service.UnistoreServer, error) {
+</a> 		}
+ 
+ 		if cfg.Unistore.Checksum != nil {
+<a href="#h3-5-3" id="h3-5-3" class="d">-			unistore, err = backend.NewChecksum(
+</a><a href="#h3-5-4" id="h3-5-4" class="i">+			unistore = backend.NewChecksum(
+</a> 				cfg.Unistore.Checksum.Algorithm,
+ 				unistore,
+ 			)
+<a href="#h3-6" id="h3-6" class="h">@@ -115,19 +115,16 @@ func newUnistoreService(cfg config.Storage) (service.UnistoreServer, error) {
+</a> 		}
+ 
+ 		if cfg.B2.Encryption != nil {
+<a href="#h3-6-3" id="h3-6-3" class="d">-			b2, err = backend.NewEncrypt(
+</a><a href="#h3-6-4" id="h3-6-4" class="i">+			b2 = backend.NewEncrypt(
+</a> 				cfg.B2.Encryption.Mechanism,
+ 				cfg.B2.Encryption.PrivateKey,
+ 				cfg.B2.Encryption.PublicKey,
+ 				b2,
+ 			)
+<a href="#h3-6-10" id="h3-6-10" class="d">-			if err != nil {
+</a><a href="#h3-6-11" id="h3-6-11" class="d">-				return nil, err
+</a><a href="#h3-6-12" id="h3-6-12" class="d">-			}
+</a> 		}
+ 
+ 		if cfg.B2.Compression != nil {
+<a href="#h3-6-16" id="h3-6-16" class="d">-			b2, err = backend.NewCompression(
+</a><a href="#h3-6-17" id="h3-6-17" class="i">+			b2 = backend.NewCompression(
+</a> 				cfg.B2.Compression.Algorithm,
+ 				cfg.B2.Compression.Level,
+ 				b2,
+<a href="#h3-7" id="h3-7" class="h">@@ -135,7 +132,7 @@ func newUnistoreService(cfg config.Storage) (service.UnistoreServer, error) {
+</a> 		}
+ 
+ 		if cfg.B2.Checksum != nil {
+<a href="#h3-7-3" id="h3-7-3" class="d">-			b2, err = backend.NewChecksum(cfg.B2.Checksum.Algorithm, b2)
+</a><a href="#h3-7-4" id="h3-7-4" class="i">+			b2 = backend.NewChecksum(cfg.B2.Checksum.Algorithm, b2)
+</a> 		}
+ 
+ 		if len(cfg.B2.BucketAliases) &gt; 0 {
+</pre>
+</div>
+</body>
+</html>

@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/backend: Migrate to Zap logging - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/b575caa61cde1a8e4bd119f424b2d9aad8fa51da">b575caa61cde1a8e4bd119f424b2d9aad8fa51da</a>
+<b>parent</b> <a href="../commit/ec636a8fd232bb738ba7bab3289ed6e8f5f60461">ec636a8fd232bb738ba7bab3289ed6e8f5f60461</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Thu 30 Dec 2021 18:11:40 -0800
+
+internal/backend: Migrate to Zap logging
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/backend/b2.go</a></td><td> | </td><td class="num">17</td><td><span class="i">++++++++++++++</span><span class="d">---</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">internal/backend/processor.go</a></td><td> | </td><td class="num">22</td><td><span class="i">++++++++</span><span class="d">--------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">internal/backend/unistore.go</a></td><td> | </td><td class="num">4</td><td><span class="i">++</span><span class="d">--</span></td></tr>
+</table></pre><pre>3 files changed, 24 insertions(+), 19 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/backend/b2.go">internal/backend/b2.go</a> b/<a href="../file/internal/backend/b2.go">internal/backend/b2.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -5,11 +5,11 @@ import (
+</a> 	&quot;crypto/sha1&quot;
+ 	&quot;fmt&quot;
+ 	&quot;io&quot;
+<a href="#h0-0-3" id="h0-0-3" class="d">-	&quot;log&quot;
+</a> 	&quot;net/url&quot;
+ 	&quot;sync&quot;
+ 	&quot;time&quot;
+ 
+<a href="#h0-0-8" id="h0-0-8" class="i">+	&quot;go.uber.org/zap&quot;
+</a> 	&quot;google.golang.org/grpc/codes&quot;
+ 	&quot;google.golang.org/grpc/status&quot;
+ 	&quot;google.golang.org/protobuf/types/known/timestamppb&quot;
+<a href="#h0-1" id="h0-1" class="h">@@ -196,13 +196,24 @@ func (b *B2) StreamGetObject(request *service.GetObjectStreamRequest) (&lt;-chan *s
+</a> 
+ 			dfResp, err := b.client.DownloadFileByName(dfReq)
+ 			if err != nil {
+<a href="#h0-1-3" id="h0-1-3" class="d">-				log.Printf(&quot;backend: error during file download: err=%v&quot;, err)
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+				zap.L().Error(
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+					&quot;error during file download&quot;,
+</a><a href="#h0-1-6" id="h0-1-6" class="i">+					zap.String(&quot;bucket&quot;, request.Request.Resource.Bucket),
+</a><a href="#h0-1-7" id="h0-1-7" class="i">+					zap.String(&quot;key&quot;, request.Request.Key),
+</a><a href="#h0-1-8" id="h0-1-8" class="i">+					zap.Error(err),
+</a><a href="#h0-1-9" id="h0-1-9" class="i">+				)
+</a> 				break
+ 			}
+ 
+ 			chunk, err := io.ReadAll(dfResp.Data)
+ 			if err != nil {
+<a href="#h0-1-15" id="h0-1-15" class="d">-				log.Printf(&quot;backend: error in downloaded file read: err=%v&quot;, err)
+</a><a href="#h0-1-16" id="h0-1-16" class="i">+				zap.L().Error(
+</a><a href="#h0-1-17" id="h0-1-17" class="i">+					&quot;error in downloaded file read&quot;,
+</a><a href="#h0-1-18" id="h0-1-18" class="i">+					zap.String(&quot;bucket&quot;, request.Request.Resource.Bucket),
+</a><a href="#h0-1-19" id="h0-1-19" class="i">+					zap.String(&quot;key&quot;, request.Request.Key),
+</a><a href="#h0-1-20" id="h0-1-20" class="i">+					zap.String(&quot;id&quot;, dfResp.FileID),
+</a><a href="#h0-1-21" id="h0-1-21" class="i">+					zap.Error(err),
+</a><a href="#h0-1-22" id="h0-1-22" class="i">+				)
+</a> 				break
+ 			}
+ 
+<b>diff --git a/<a id="h1" href="../file/internal/backend/processor.go">internal/backend/processor.go</a> b/<a href="../file/internal/backend/processor.go">internal/backend/processor.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -4,8 +4,8 @@ import (
+</a> 	&quot;bufio&quot;
+ 	&quot;bytes&quot;
+ 	&quot;io&quot;
+<a href="#h1-0-3" id="h1-0-3" class="d">-	&quot;log&quot;
+</a> 
+<a href="#h1-0-5" id="h1-0-5" class="i">+	&quot;go.uber.org/zap&quot;
+</a> 	&quot;google.golang.org/grpc/codes&quot;
+ 	&quot;google.golang.org/grpc/status&quot;
+ 	&quot;google.golang.org/protobuf/proto&quot;
+<a href="#h1-1" id="h1-1" class="h">@@ -140,7 +140,7 @@ func (p *ioProcessor) StreamGetObject(request *service.GetObjectStreamRequest) (
+</a> 			// Simply relay the response data to the pipe for asynchronous consumption
+ 			// by the reader routine.
+ 			if _, err := w.Write(response.Response.Data); err != nil {
+<a href="#h1-1-3" id="h1-1-3" class="d">-				log.Printf(&quot;backend: error writing response data chunk: err=%v&quot;, err)
+</a><a href="#h1-1-4" id="h1-1-4" class="i">+				zap.L().Error(&quot;error writing response data chunk&quot;, zap.Error(err))
+</a> 				break
+ 			}
+ 		}
+<a href="#h1-2" id="h1-2" class="h">@@ -155,7 +155,7 @@ func (p *ioProcessor) StreamGetObject(request *service.GetObjectStreamRequest) (
+</a> 
+ 		proxyReader, err := p.reader(r)
+ 		if err != nil {
+<a href="#h1-2-3" id="h1-2-3" class="d">-			log.Printf(&quot;backend: error creating streaming reader: err=%v&quot;, err)
+</a><a href="#h1-2-4" id="h1-2-4" class="i">+			zap.L().Error(&quot;error creating streaming reader&quot;, zap.Error(err))
+</a> 			return
+ 		}
+ 
+<a href="#h1-3" id="h1-3" class="h">@@ -185,10 +185,7 @@ func (p *ioProcessor) StreamGetObject(request *service.GetObjectStreamRequest) (
+</a> 
+ 			if err != nil {
+ 				if err != io.EOF &amp;&amp; err != io.ErrUnexpectedEOF {
+<a href="#h1-3-3" id="h1-3-3" class="d">-					log.Printf(
+</a><a href="#h1-3-4" id="h1-3-4" class="d">-						&quot;backend: unexpected error reading chunk: err=%v&quot;,
+</a><a href="#h1-3-5" id="h1-3-5" class="d">-						err,
+</a><a href="#h1-3-6" id="h1-3-6" class="d">-					)
+</a><a href="#h1-3-7" id="h1-3-7" class="i">+					zap.L().Error(&quot;unexpected error reading chunk&quot;, zap.Error(err))
+</a> 				}
+ 				break
+ 			}
+<a href="#h1-4" id="h1-4" class="h">@@ -288,10 +285,7 @@ func (p *ioProcessor) StreamPutObject(stream chan *service.PutObjectStreamReques
+</a> 
+ 			if err != nil {
+ 				if err != io.EOF &amp;&amp; err != io.ErrUnexpectedEOF {
+<a href="#h1-4-3" id="h1-4-3" class="d">-					log.Printf(
+</a><a href="#h1-4-4" id="h1-4-4" class="d">-						&quot;backend: unexpected error reading chunk: err=%v&quot;,
+</a><a href="#h1-4-5" id="h1-4-5" class="d">-						err,
+</a><a href="#h1-4-6" id="h1-4-6" class="d">-					)
+</a><a href="#h1-4-7" id="h1-4-7" class="i">+					zap.L().Error(&quot;unexpected error reading chunk&quot;, zap.Error(err))
+</a> 				}
+ 				break
+ 			}
+<a href="#h1-5" id="h1-5" class="h">@@ -312,20 +306,20 @@ func (p *ioProcessor) StreamPutObject(stream chan *service.PutObjectStreamReques
+</a> 
+ 		proxyWriter, err := p.writer(wb)
+ 		if err != nil {
+<a href="#h1-5-3" id="h1-5-3" class="d">-			log.Printf(&quot;backend: error creating streaming writer: err=%v&quot;, err)
+</a><a href="#h1-5-4" id="h1-5-4" class="i">+			zap.L().Error(&quot;error creating streaming writer&quot;, zap.Error(err))
+</a> 			return
+ 		}
+ 
+ 		defer proxyWriter.Close()
+ 
+ 		if _, err := proxyWriter.Write(peek.Request.Data); err != nil {
+<a href="#h1-5-11" id="h1-5-11" class="d">-			log.Printf(&quot;backend: error writing request data chunk: err=%v&quot;, err)
+</a><a href="#h1-5-12" id="h1-5-12" class="i">+			zap.L().Error(&quot;error writing request data chunk&quot;, zap.Error(err))
+</a> 			return
+ 		}
+ 
+ 		for request := range stream {
+ 			if _, err := proxyWriter.Write(request.Request.Data); err != nil {
+<a href="#h1-5-18" id="h1-5-18" class="d">-				log.Printf(&quot;backend: error writing request data chunk: err=%v&quot;, err)
+</a><a href="#h1-5-19" id="h1-5-19" class="i">+				zap.L().Error(&quot;error writing request data chunk&quot;, zap.Error(err))
+</a> 				return
+ 			}
+ 		}
+<b>diff --git a/<a id="h2" href="../file/internal/backend/unistore.go">internal/backend/unistore.go</a> b/<a href="../file/internal/backend/unistore.go">internal/backend/unistore.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -4,9 +4,9 @@ import (
+</a> 	&quot;context&quot;
+ 	&quot;fmt&quot;
+ 	&quot;io&quot;
+<a href="#h2-0-3" id="h2-0-3" class="d">-	&quot;log&quot;
+</a> 	&quot;strings&quot;
+ 
+<a href="#h2-0-6" id="h2-0-6" class="i">+	&quot;go.uber.org/zap&quot;
+</a> 	&quot;google.golang.org/grpc&quot;
+ 	&quot;google.golang.org/grpc/credentials/insecure&quot;
+ 
+<a href="#h2-1" id="h2-1" class="h">@@ -74,7 +74,7 @@ func (u Unistore) StreamGetObject(request *service.GetObjectStreamRequest) (&lt;-ch
+</a> 			response, err := stream.Recv()
+ 			if err != nil {
+ 				if err != io.EOF {
+<a href="#h2-1-3" id="h2-1-3" class="d">-					log.Printf(&quot;backend: unexpected error during stream: err=%v&quot;, err)
+</a><a href="#h2-1-4" id="h2-1-4" class="i">+					zap.L().Error(&quot;unexpected error during stream&quot;, zap.Error(err))
+</a> 				}
+ 				break
+ 			}
+</pre>
+</div>
+</body>
+</html>

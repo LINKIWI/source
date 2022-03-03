@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/backend: Apply request timeout to B2 http.Transport and Unistore unary RPCs - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/bb5ceb6c7d1d227ef9188082781fd1865bac7132">bb5ceb6c7d1d227ef9188082781fd1865bac7132</a>
+<b>parent</b> <a href="../commit/05159f6a1e9756699827cf23819ab70dc468c2e8">05159f6a1e9756699827cf23819ab70dc468c2e8</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Fri 31 Dec 2021 08:21:10 -0800
+
+internal/backend: Apply request timeout to B2 http.Transport and Unistore unary RPCs
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/backend/b2.go</a></td><td> | </td><td class="num">7</td><td><span class="i">++++</span><span class="d">---</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">internal/backend/unistore.go</a></td><td> | </td><td class="num">60</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">---------</span></td></tr>
+</table></pre><pre>2 files changed, 55 insertions(+), 12 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/backend/b2.go">internal/backend/b2.go</a> b/<a href="../file/internal/backend/b2.go">internal/backend/b2.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -54,9 +54,10 @@ type B2 struct {
+</a> func NewB2(cfg *config.B2) (Backend, error) {
+ 	dialer := &amp;net.Dialer{Timeout: cfg.Connection.ConnectTimeout}
+ 	transport := &amp;http.Transport{
+<a href="#h0-0-3" id="h0-0-3" class="d">-		DialContext:         dialer.DialContext,
+</a><a href="#h0-0-4" id="h0-0-4" class="d">-		TLSHandshakeTimeout: cfg.Connection.ConnectTimeout,
+</a><a href="#h0-0-5" id="h0-0-5" class="d">-		ForceAttemptHTTP2:   true,
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+		DialContext:           dialer.DialContext,
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+		TLSHandshakeTimeout:   cfg.Connection.ConnectTimeout,
+</a><a href="#h0-0-8" id="h0-0-8" class="i">+		ResponseHeaderTimeout: cfg.Connection.RequestTimeout,
+</a><a href="#h0-0-9" id="h0-0-9" class="i">+		ForceAttemptHTTP2:     true,
+</a> 	}
+ 
+ 	client, err := b2.New(b2.WithTransport(transport), b2.WithLogger(log.StdDebugLogger))
+<b>diff --git a/<a id="h1" href="../file/internal/backend/unistore.go">internal/backend/unistore.go</a> b/<a href="../file/internal/backend/unistore.go">internal/backend/unistore.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -18,8 +18,9 @@ import (
+</a> 
+ // Unistore is a Backend that proxies to another Unistore server. Delightfully meta!
+ type Unistore struct {
+<a href="#h1-0-3" id="h1-0-3" class="d">-	backend common.Backend
+</a><a href="#h1-0-4" id="h1-0-4" class="d">-	client  *unistore.Client
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+	backend    common.Backend
+</a><a href="#h1-0-6" id="h1-0-6" class="i">+	connection config.Connection
+</a><a href="#h1-0-7" id="h1-0-7" class="i">+	client     *unistore.Client
+</a> }
+ 
+ // NewUnistore creates a new Unistore backend pointed at the specified address and authority,
+<a href="#h1-1" id="h1-1" class="h">@@ -51,23 +52,40 @@ func NewUnistore(cfg *config.Unistore) (Backend, error) {
+</a> 	}
+ 
+ 	return &amp;Unistore{
+<a href="#h1-1-3" id="h1-1-3" class="d">-		backend: common.Backend(bid),
+</a><a href="#h1-1-4" id="h1-1-4" class="d">-		client:  client,
+</a><a href="#h1-1-5" id="h1-1-5" class="i">+		backend:    common.Backend(bid),
+</a><a href="#h1-1-6" id="h1-1-6" class="i">+		connection: cfg.Connection,
+</a><a href="#h1-1-7" id="h1-1-7" class="i">+		client:     client,
+</a> 	}, nil
+ }
+ 
+ // HeadObject invokes the gRPC HeadObject RPC.
+ func (u Unistore) HeadObject(request *service.HeadObjectRequest) (*service.HeadObjectResponse, error) {
+<a href="#h1-1-13" id="h1-1-13" class="i">+	var cancel context.CancelFunc
+</a><a href="#h1-1-14" id="h1-1-14" class="i">+
+</a><a href="#h1-1-15" id="h1-1-15" class="i">+	ctx := context.Background()
+</a><a href="#h1-1-16" id="h1-1-16" class="i">+	if u.connection.RequestTimeout &gt; 0 {
+</a><a href="#h1-1-17" id="h1-1-17" class="i">+		ctx, cancel = context.WithTimeout(ctx, u.connection.RequestTimeout)
+</a><a href="#h1-1-18" id="h1-1-18" class="i">+		defer cancel()
+</a><a href="#h1-1-19" id="h1-1-19" class="i">+	}
+</a><a href="#h1-1-20" id="h1-1-20" class="i">+
+</a> 	request.Resource.Backend = u.backend
+ 
+<a href="#h1-1-23" id="h1-1-23" class="d">-	return u.client.HeadObject(context.Background(), request)
+</a><a href="#h1-1-24" id="h1-1-24" class="i">+	return u.client.HeadObject(ctx, request)
+</a> }
+ 
+ // GetObject invokes the gRPC GetObject RPC.
+ func (u Unistore) GetObject(request *service.GetObjectRequest) (*service.GetObjectResponse, error) {
+<a href="#h1-1-29" id="h1-1-29" class="i">+	var cancel context.CancelFunc
+</a><a href="#h1-1-30" id="h1-1-30" class="i">+
+</a><a href="#h1-1-31" id="h1-1-31" class="i">+	ctx := context.Background()
+</a><a href="#h1-1-32" id="h1-1-32" class="i">+	if u.connection.RequestTimeout &gt; 0 {
+</a><a href="#h1-1-33" id="h1-1-33" class="i">+		ctx, cancel = context.WithTimeout(ctx, u.connection.RequestTimeout)
+</a><a href="#h1-1-34" id="h1-1-34" class="i">+		defer cancel()
+</a><a href="#h1-1-35" id="h1-1-35" class="i">+	}
+</a><a href="#h1-1-36" id="h1-1-36" class="i">+
+</a> 	request.Resource.Backend = u.backend
+ 
+<a href="#h1-1-39" id="h1-1-39" class="d">-	return u.client.GetObject(context.Background(), request)
+</a><a href="#h1-1-40" id="h1-1-40" class="i">+	return u.client.GetObject(ctx, request)
+</a> }
+ 
+ // StreamGetObject invokes the gRPC StreamGetObject RPC and adapts the response stream to a channel.
+<a href="#h1-2" id="h1-2" class="h">@@ -102,9 +120,17 @@ func (u Unistore) StreamGetObject(request *service.GetObjectStreamRequest) (&lt;-ch
+</a> 
+ // PutObject invokes the gRPC PutObject RPC.
+ func (u Unistore) PutObject(request *service.PutObjectRequest) (*service.PutObjectResponse, error) {
+<a href="#h1-2-3" id="h1-2-3" class="i">+	var cancel context.CancelFunc
+</a><a href="#h1-2-4" id="h1-2-4" class="i">+
+</a><a href="#h1-2-5" id="h1-2-5" class="i">+	ctx := context.Background()
+</a><a href="#h1-2-6" id="h1-2-6" class="i">+	if u.connection.RequestTimeout &gt; 0 {
+</a><a href="#h1-2-7" id="h1-2-7" class="i">+		ctx, cancel = context.WithTimeout(ctx, u.connection.RequestTimeout)
+</a><a href="#h1-2-8" id="h1-2-8" class="i">+		defer cancel()
+</a><a href="#h1-2-9" id="h1-2-9" class="i">+	}
+</a><a href="#h1-2-10" id="h1-2-10" class="i">+
+</a> 	request.Resource.Backend = u.backend
+ 
+<a href="#h1-2-13" id="h1-2-13" class="d">-	return u.client.PutObject(context.Background(), request)
+</a><a href="#h1-2-14" id="h1-2-14" class="i">+	return u.client.PutObject(ctx, request)
+</a> }
+ 
+ // StreamPutObject invokes the gRPC StreamPutObject RPC and adapts the request stream to a channel.
+<a href="#h1-3" id="h1-3" class="h">@@ -127,14 +153,30 @@ func (u Unistore) StreamPutObject(stream chan *service.PutObjectStreamRequest) (
+</a> 
+ // DeleteObject invokes the gRPC DeleteObject RPC.
+ func (u Unistore) DeleteObject(request *service.DeleteObjectRequest) (*service.DeleteObjectResponse, error) {
+<a href="#h1-3-3" id="h1-3-3" class="i">+	var cancel context.CancelFunc
+</a><a href="#h1-3-4" id="h1-3-4" class="i">+
+</a><a href="#h1-3-5" id="h1-3-5" class="i">+	ctx := context.Background()
+</a><a href="#h1-3-6" id="h1-3-6" class="i">+	if u.connection.RequestTimeout &gt; 0 {
+</a><a href="#h1-3-7" id="h1-3-7" class="i">+		ctx, cancel = context.WithTimeout(ctx, u.connection.RequestTimeout)
+</a><a href="#h1-3-8" id="h1-3-8" class="i">+		defer cancel()
+</a><a href="#h1-3-9" id="h1-3-9" class="i">+	}
+</a><a href="#h1-3-10" id="h1-3-10" class="i">+
+</a> 	request.Resource.Backend = u.backend
+ 
+<a href="#h1-3-13" id="h1-3-13" class="d">-	return u.client.DeleteObject(context.Background(), request)
+</a><a href="#h1-3-14" id="h1-3-14" class="i">+	return u.client.DeleteObject(ctx, request)
+</a> }
+ 
+ // ListObjects invokes the gRPC ListObjects RPC.
+ func (u Unistore) ListObjects(request *service.ListObjectsRequest) (*service.ListObjectsResponse, error) {
+<a href="#h1-3-19" id="h1-3-19" class="i">+	var cancel context.CancelFunc
+</a><a href="#h1-3-20" id="h1-3-20" class="i">+
+</a><a href="#h1-3-21" id="h1-3-21" class="i">+	ctx := context.Background()
+</a><a href="#h1-3-22" id="h1-3-22" class="i">+	if u.connection.RequestTimeout &gt; 0 {
+</a><a href="#h1-3-23" id="h1-3-23" class="i">+		ctx, cancel = context.WithTimeout(ctx, u.connection.RequestTimeout)
+</a><a href="#h1-3-24" id="h1-3-24" class="i">+		defer cancel()
+</a><a href="#h1-3-25" id="h1-3-25" class="i">+	}
+</a><a href="#h1-3-26" id="h1-3-26" class="i">+
+</a> 	request.Resource.Backend = u.backend
+ 
+<a href="#h1-3-29" id="h1-3-29" class="d">-	return u.client.ListObjects(context.Background(), request)
+</a><a href="#h1-3-30" id="h1-3-30" class="i">+	return u.client.ListObjects(ctx, request)
+</a> }
+</pre>
+</div>
+</body>
+</html>

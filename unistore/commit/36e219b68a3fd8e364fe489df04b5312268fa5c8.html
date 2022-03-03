@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>cmd/unistore-cli: Abstracted renderer types, stub for human-format renderer - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a>
+<b>parent</b> <a href="../commit/6fcf43e8d6bbf8b0d2d4fc980807f7442b4d00b6">6fcf43e8d6bbf8b0d2d4fc980807f7442b4d00b6</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sat  8 Jan 2022 12:01:47 -0800
+
+cmd/unistore-cli: Abstracted renderer types, stub for human-format renderer
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">cmd/unistore-cli/main.go</a></td><td> | </td><td class="num">5</td><td><span class="i">++++</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">cmd/unistore-cli/render.go</a></td><td> | </td><td class="num">150</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">-----------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">cmd/unistore-cli/service.go</a></td><td> | </td><td class="num">41</td><td><span class="i">++++++++++++++++++++++++</span><span class="d">-----------------</span></td></tr>
+</table></pre><pre>3 files changed, 147 insertions(+), 49 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/cmd/unistore-cli/main.go">cmd/unistore-cli/main.go</a> b/<a href="../file/cmd/unistore-cli/main.go">cmd/unistore-cli/main.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -143,7 +143,10 @@ func init() {
+</a> 		&quot;format&quot;,
+ 		&quot;f&quot;,
+ 		os.Getenv(&quot;UNI_FORMAT&quot;),
+<a href="#h0-0-3" id="h0-0-3" class="d">-		fmt.Sprintf(&quot;output render format; choose from %v&quot;, []string{outputFormatJSON, outputFormatText}),
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+		fmt.Sprintf(
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+			&quot;output render format; choose from %v&quot;,
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+			[]string{outputFormatJSON, outputFormatText, outputFormatHuman},
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+		),
+</a> 	)
+ 	rootCmd.PersistentFlags().StringVarP(
+ 		&amp;flagConfig,
+<b>diff --git a/<a id="h1" href="../file/cmd/unistore-cli/render.go">cmd/unistore-cli/render.go</a> b/<a href="../file/cmd/unistore-cli/render.go">cmd/unistore-cli/render.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -2,6 +2,7 @@ package main
+</a> 
+ import (
+ 	&quot;encoding/json&quot;
+<a href="#h1-0-3" id="h1-0-3" class="i">+	&quot;errors&quot;
+</a> 	&quot;fmt&quot;
+ 	&quot;io&quot;
+ 	&quot;strings&quot;
+<a href="#h1-1" id="h1-1" class="h">@@ -16,6 +17,7 @@ const (
+</a> 	outputFormatJSON    = &quot;json&quot;
+ 	outputFormatText    = &quot;text&quot;
+ 	outputFormatYAML    = &quot;yaml&quot;
+<a href="#h1-1-3" id="h1-1-3" class="i">+	outputFormatHuman   = &quot;human&quot;
+</a> 	outputFormatDefault = &quot;&quot;
+ )
+ 
+<a href="#h1-2" id="h1-2" class="h">@@ -24,47 +26,133 @@ const (
+</a> 	defaultIndent = &quot;    &quot;
+ )
+ 
+<a href="#h1-2-3" id="h1-2-3" class="d">-// renderResponse is a utility for text rendering of a Unistore gRPC service response.
+</a><a href="#h1-2-4" id="h1-2-4" class="d">-func renderResponse(format string, output io.Writer, response interface{}) error {
+</a><a href="#h1-2-5" id="h1-2-5" class="d">-	var rendered []byte
+</a><a href="#h1-2-6" id="h1-2-6" class="d">-	var err error
+</a><a href="#h1-2-7" id="h1-2-7" class="i">+var (
+</a><a href="#h1-2-8" id="h1-2-8" class="i">+	// errUnsupportedMessage is returned when attempting to use a format renderer with no
+</a><a href="#h1-2-9" id="h1-2-9" class="i">+	// implementation for the accepted message type.
+</a><a href="#h1-2-10" id="h1-2-10" class="i">+	errUnsupportedMessage = errors.New(&quot;unsupported message type for format renderer&quot;)
+</a><a href="#h1-2-11" id="h1-2-11" class="i">+)
+</a><a href="#h1-2-12" id="h1-2-12" class="i">+
+</a><a href="#h1-2-13" id="h1-2-13" class="i">+// renderer provides the capability to render formatted messages to an output.
+</a><a href="#h1-2-14" id="h1-2-14" class="i">+type renderer interface {
+</a><a href="#h1-2-15" id="h1-2-15" class="i">+	// proto is used for rendering Protobuf messages.
+</a><a href="#h1-2-16" id="h1-2-16" class="i">+	proto(message proto.Message) error
+</a> 
+<a href="#h1-2-18" id="h1-2-18" class="i">+	// any is used for interface{} messages of arbitrary type.
+</a><a href="#h1-2-19" id="h1-2-19" class="i">+	any(message interface{}) error
+</a><a href="#h1-2-20" id="h1-2-20" class="i">+}
+</a><a href="#h1-2-21" id="h1-2-21" class="i">+
+</a><a href="#h1-2-22" id="h1-2-22" class="i">+// newRenderer creates a new renderer for the desired output format.
+</a><a href="#h1-2-23" id="h1-2-23" class="i">+func newRenderer(format string, output io.Writer) renderer {
+</a> 	switch format {
+ 	case outputFormatJSON:
+<a href="#h1-2-26" id="h1-2-26" class="d">-		rendered, err = json.MarshalIndent(response, &quot;&quot;, defaultIndent)
+</a><a href="#h1-2-27" id="h1-2-27" class="d">-		if err != nil {
+</a><a href="#h1-2-28" id="h1-2-28" class="d">-			return err
+</a><a href="#h1-2-29" id="h1-2-29" class="d">-		}
+</a><a href="#h1-2-30" id="h1-2-30" class="d">-
+</a><a href="#h1-2-31" id="h1-2-31" class="i">+		return &amp;jsonRenderer{output}
+</a> 	case outputFormatYAML:
+<a href="#h1-2-33" id="h1-2-33" class="d">-		rendered, err = yaml.Marshal(response)
+</a><a href="#h1-2-34" id="h1-2-34" class="d">-		if err != nil {
+</a><a href="#h1-2-35" id="h1-2-35" class="d">-			return err
+</a><a href="#h1-2-36" id="h1-2-36" class="d">-		}
+</a><a href="#h1-2-37" id="h1-2-37" class="d">-
+</a><a href="#h1-2-38" id="h1-2-38" class="i">+		return &amp;yamlRenderer{output}
+</a><a href="#h1-2-39" id="h1-2-39" class="i">+	case outputFormatHuman:
+</a><a href="#h1-2-40" id="h1-2-40" class="i">+		return &amp;humanRenderer{output}
+</a> 	case outputFormatDefault, outputFormatText:
+<a href="#h1-2-42" id="h1-2-42" class="d">-		opts := prototext.MarshalOptions{
+</a><a href="#h1-2-43" id="h1-2-43" class="d">-			Multiline: true,
+</a><a href="#h1-2-44" id="h1-2-44" class="d">-			Indent:    defaultIndent,
+</a><a href="#h1-2-45" id="h1-2-45" class="d">-		}
+</a><a href="#h1-2-46" id="h1-2-46" class="i">+		return &amp;textRenderer{output}
+</a><a href="#h1-2-47" id="h1-2-47" class="i">+	default:
+</a><a href="#h1-2-48" id="h1-2-48" class="i">+		return &amp;defaultRenderer{output}
+</a><a href="#h1-2-49" id="h1-2-49" class="i">+	}
+</a><a href="#h1-2-50" id="h1-2-50" class="i">+}
+</a><a href="#h1-2-51" id="h1-2-51" class="i">+
+</a><a href="#h1-2-52" id="h1-2-52" class="i">+// defaultRenderer is a default implementation for unknown output formats.
+</a><a href="#h1-2-53" id="h1-2-53" class="i">+type defaultRenderer struct {
+</a><a href="#h1-2-54" id="h1-2-54" class="i">+	output io.Writer
+</a><a href="#h1-2-55" id="h1-2-55" class="i">+}
+</a> 
+<a href="#h1-2-57" id="h1-2-57" class="d">-		message, ok := response.(proto.Message)
+</a><a href="#h1-2-58" id="h1-2-58" class="d">-		if !ok {
+</a><a href="#h1-2-59" id="h1-2-59" class="d">-			return fmt.Errorf(&quot;response is not a Protobuf message: type=%T&quot;, response)
+</a><a href="#h1-2-60" id="h1-2-60" class="d">-		}
+</a><a href="#h1-2-61" id="h1-2-61" class="i">+// proto errors with errUnsupportedMessage.
+</a><a href="#h1-2-62" id="h1-2-62" class="i">+func (d *defaultRenderer) proto(message proto.Message) error {
+</a><a href="#h1-2-63" id="h1-2-63" class="i">+	return errUnsupportedMessage
+</a><a href="#h1-2-64" id="h1-2-64" class="i">+}
+</a> 
+<a href="#h1-2-66" id="h1-2-66" class="d">-		rendered, err = opts.Marshal(message)
+</a><a href="#h1-2-67" id="h1-2-67" class="d">-		if err != nil {
+</a><a href="#h1-2-68" id="h1-2-68" class="d">-			return err
+</a><a href="#h1-2-69" id="h1-2-69" class="d">-		}
+</a><a href="#h1-2-70" id="h1-2-70" class="i">+// any errors with errUnsupportedMessage.
+</a><a href="#h1-2-71" id="h1-2-71" class="i">+func (d *defaultRenderer) any(message interface{}) error {
+</a><a href="#h1-2-72" id="h1-2-72" class="i">+	return errUnsupportedMessage
+</a><a href="#h1-2-73" id="h1-2-73" class="i">+}
+</a> 
+<a href="#h1-2-75" id="h1-2-75" class="d">-	default:
+</a><a href="#h1-2-76" id="h1-2-76" class="d">-		return fmt.Errorf(&quot;unknown output format: format=%s&quot;, format)
+</a><a href="#h1-2-77" id="h1-2-77" class="i">+// jsonRenderer is a JSON renderer.
+</a><a href="#h1-2-78" id="h1-2-78" class="i">+type jsonRenderer struct {
+</a><a href="#h1-2-79" id="h1-2-79" class="i">+	output io.Writer
+</a><a href="#h1-2-80" id="h1-2-80" class="i">+}
+</a><a href="#h1-2-81" id="h1-2-81" class="i">+
+</a><a href="#h1-2-82" id="h1-2-82" class="i">+// proto reuses the implementation for interface{} types.
+</a><a href="#h1-2-83" id="h1-2-83" class="i">+func (j *jsonRenderer) proto(message proto.Message) error {
+</a><a href="#h1-2-84" id="h1-2-84" class="i">+	return j.any(message)
+</a><a href="#h1-2-85" id="h1-2-85" class="i">+}
+</a><a href="#h1-2-86" id="h1-2-86" class="i">+
+</a><a href="#h1-2-87" id="h1-2-87" class="i">+// any marshals any type implementing json.Marshaler or any struct with JSON tags.
+</a><a href="#h1-2-88" id="h1-2-88" class="i">+func (j *jsonRenderer) any(message interface{}) error {
+</a><a href="#h1-2-89" id="h1-2-89" class="i">+	rendered, err := json.MarshalIndent(message, &quot;&quot;, defaultIndent)
+</a><a href="#h1-2-90" id="h1-2-90" class="i">+	if err != nil {
+</a><a href="#h1-2-91" id="h1-2-91" class="i">+		return err
+</a><a href="#h1-2-92" id="h1-2-92" class="i">+	}
+</a><a href="#h1-2-93" id="h1-2-93" class="i">+
+</a><a href="#h1-2-94" id="h1-2-94" class="i">+	_, err = fmt.Fprintln(j.output, strings.TrimSpace(string(rendered)))
+</a><a href="#h1-2-95" id="h1-2-95" class="i">+	return err
+</a><a href="#h1-2-96" id="h1-2-96" class="i">+}
+</a><a href="#h1-2-97" id="h1-2-97" class="i">+
+</a><a href="#h1-2-98" id="h1-2-98" class="i">+// yamlRenderer is a YAML renderer.
+</a><a href="#h1-2-99" id="h1-2-99" class="i">+type yamlRenderer struct {
+</a><a href="#h1-2-100" id="h1-2-100" class="i">+	output io.Writer
+</a><a href="#h1-2-101" id="h1-2-101" class="i">+}
+</a><a href="#h1-2-102" id="h1-2-102" class="i">+
+</a><a href="#h1-2-103" id="h1-2-103" class="i">+// proto errors with errUnsupportedMessage.
+</a><a href="#h1-2-104" id="h1-2-104" class="i">+// Go-generated code from Protobuf message do not include YAML tags.
+</a><a href="#h1-2-105" id="h1-2-105" class="i">+func (y *yamlRenderer) proto(message proto.Message) error {
+</a><a href="#h1-2-106" id="h1-2-106" class="i">+	return errUnsupportedMessage
+</a><a href="#h1-2-107" id="h1-2-107" class="i">+}
+</a><a href="#h1-2-108" id="h1-2-108" class="i">+
+</a><a href="#h1-2-109" id="h1-2-109" class="i">+// any marshals any type implementing yaml.Marshaler or any struct with YAML tags.
+</a><a href="#h1-2-110" id="h1-2-110" class="i">+func (y *yamlRenderer) any(message interface{}) error {
+</a><a href="#h1-2-111" id="h1-2-111" class="i">+	rendered, err := yaml.Marshal(message)
+</a><a href="#h1-2-112" id="h1-2-112" class="i">+	if err != nil {
+</a><a href="#h1-2-113" id="h1-2-113" class="i">+		return err
+</a><a href="#h1-2-114" id="h1-2-114" class="i">+	}
+</a><a href="#h1-2-115" id="h1-2-115" class="i">+
+</a><a href="#h1-2-116" id="h1-2-116" class="i">+	_, err = fmt.Fprintln(y.output, strings.TrimSpace(string(rendered)))
+</a><a href="#h1-2-117" id="h1-2-117" class="i">+	return err
+</a><a href="#h1-2-118" id="h1-2-118" class="i">+}
+</a><a href="#h1-2-119" id="h1-2-119" class="i">+
+</a><a href="#h1-2-120" id="h1-2-120" class="i">+// textRenderer is a Protobuf textproto format renderer.
+</a><a href="#h1-2-121" id="h1-2-121" class="i">+type textRenderer struct {
+</a><a href="#h1-2-122" id="h1-2-122" class="i">+	output io.Writer
+</a><a href="#h1-2-123" id="h1-2-123" class="i">+}
+</a><a href="#h1-2-124" id="h1-2-124" class="i">+
+</a><a href="#h1-2-125" id="h1-2-125" class="i">+// proto renders the message with the textproto format.
+</a><a href="#h1-2-126" id="h1-2-126" class="i">+func (t *textRenderer) proto(message proto.Message) error {
+</a><a href="#h1-2-127" id="h1-2-127" class="i">+	opts := prototext.MarshalOptions{
+</a><a href="#h1-2-128" id="h1-2-128" class="i">+		Multiline: true,
+</a><a href="#h1-2-129" id="h1-2-129" class="i">+		Indent:    defaultIndent,
+</a> 	}
+ 
+<a href="#h1-2-132" id="h1-2-132" class="d">-	if _, err := fmt.Fprintln(output, strings.TrimSpace(string(rendered))); err != nil {
+</a><a href="#h1-2-133" id="h1-2-133" class="d">-		return fmt.Errorf(&quot;error writing rendered text to output: err=%v&quot;, err)
+</a><a href="#h1-2-134" id="h1-2-134" class="i">+	rendered, err := opts.Marshal(message)
+</a><a href="#h1-2-135" id="h1-2-135" class="i">+	if err != nil {
+</a><a href="#h1-2-136" id="h1-2-136" class="i">+		return err
+</a> 	}
+ 
+<a href="#h1-2-139" id="h1-2-139" class="d">-	return nil
+</a><a href="#h1-2-140" id="h1-2-140" class="i">+	_, err = fmt.Fprintln(t.output, strings.TrimSpace(string(rendered)))
+</a><a href="#h1-2-141" id="h1-2-141" class="i">+	return err
+</a><a href="#h1-2-142" id="h1-2-142" class="i">+}
+</a><a href="#h1-2-143" id="h1-2-143" class="i">+
+</a><a href="#h1-2-144" id="h1-2-144" class="i">+// any errors with errUnsupportedMessage.
+</a><a href="#h1-2-145" id="h1-2-145" class="i">+func (t *textRenderer) any(message interface{}) error {
+</a><a href="#h1-2-146" id="h1-2-146" class="i">+	return errUnsupportedMessage
+</a><a href="#h1-2-147" id="h1-2-147" class="i">+}
+</a><a href="#h1-2-148" id="h1-2-148" class="i">+
+</a><a href="#h1-2-149" id="h1-2-149" class="i">+// humanRenderer is a message type-dependent renderer expressing messages in an easily
+</a><a href="#h1-2-150" id="h1-2-150" class="i">+// human-readable form. Implementations are defined manually by message type.
+</a><a href="#h1-2-151" id="h1-2-151" class="i">+type humanRenderer struct {
+</a><a href="#h1-2-152" id="h1-2-152" class="i">+	output io.Writer
+</a><a href="#h1-2-153" id="h1-2-153" class="i">+}
+</a><a href="#h1-2-154" id="h1-2-154" class="i">+
+</a><a href="#h1-2-155" id="h1-2-155" class="i">+// proto errors with errUnsupportedMessage.
+</a><a href="#h1-2-156" id="h1-2-156" class="i">+func (h *humanRenderer) proto(message proto.Message) error {
+</a><a href="#h1-2-157" id="h1-2-157" class="i">+	return errUnsupportedMessage
+</a><a href="#h1-2-158" id="h1-2-158" class="i">+}
+</a><a href="#h1-2-159" id="h1-2-159" class="i">+
+</a><a href="#h1-2-160" id="h1-2-160" class="i">+// any errors with errUnsupportedMessage.
+</a><a href="#h1-2-161" id="h1-2-161" class="i">+func (h *humanRenderer) any(message interface{}) error {
+</a><a href="#h1-2-162" id="h1-2-162" class="i">+	return errUnsupportedMessage
+</a> }
+<b>diff --git a/<a id="h2" href="../file/cmd/unistore-cli/service.go">cmd/unistore-cli/service.go</a> b/<a href="../file/cmd/unistore-cli/service.go">cmd/unistore-cli/service.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -19,6 +19,8 @@ import (
+</a> 
+ // runInfo prints server metadata information via the Meta service Info RPC.
+ func runInfo(cmd *cobra.Command, args []string) error {
+<a href="#h2-0-3" id="h2-0-3" class="i">+	rdr := newRenderer(flagFormat, os.Stdout)
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+
+</a> 	store, rpc, err := newClientConfig(flagConfig, flagStore)
+ 	if err != nil {
+ 		return err
+<a href="#h2-1" id="h2-1" class="h">@@ -32,7 +34,7 @@ func runInfo(cmd *cobra.Command, args []string) error {
+</a> 	request := &amp;service.InfoRequest{}
+ 
+ 	if flagVerbose {
+<a href="#h2-1-3" id="h2-1-3" class="d">-		renderResponse(flagFormat, os.Stdout, request)
+</a><a href="#h2-1-4" id="h2-1-4" class="i">+		rdr.proto(request)
+</a> 	}
+ 
+ 	response, err := client.Meta().Info(context.Background(), request)
+<a href="#h2-2" id="h2-2" class="h">@@ -40,7 +42,7 @@ func runInfo(cmd *cobra.Command, args []string) error {
+</a> 		return err
+ 	}
+ 
+<a href="#h2-2-3" id="h2-2-3" class="d">-	return renderResponse(flagFormat, os.Stdout, response)
+</a><a href="#h2-2-4" id="h2-2-4" class="i">+	return rdr.proto(response)
+</a> }
+ 
+ // runConfig prints parsed client configuration.
+<a href="#h2-3" id="h2-3" class="h">@@ -55,11 +57,12 @@ func runConfig(cmd *cobra.Command, args []string) error {
+</a> 		flagFormat = outputFormatYAML
+ 	}
+ 
+<a href="#h2-3-3" id="h2-3-3" class="d">-	return renderResponse(flagFormat, os.Stdout, cfg.Client)
+</a><a href="#h2-3-4" id="h2-3-4" class="i">+	return newRenderer(flagFormat, os.Stdout).any(cfg.Client)
+</a> }
+ 
+ // runHead is a command line interface for the HeadObject RPC.
+ func runHead(cmd *cobra.Command, args []string) error {
+<a href="#h2-3-9" id="h2-3-9" class="i">+	rdr := newRenderer(flagFormat, os.Stdout)
+</a> 	bucket, _ := cmd.Flags().GetString(&quot;bucket&quot;)
+ 
+ 	store, rpc, err := newClientConfig(flagConfig, flagStore)
+<a href="#h2-4" id="h2-4" class="h">@@ -81,7 +84,7 @@ func runHead(cmd *cobra.Command, args []string) error {
+</a> 	}
+ 
+ 	if flagVerbose {
+<a href="#h2-4-3" id="h2-4-3" class="d">-		renderResponse(flagFormat, os.Stdout, request)
+</a><a href="#h2-4-4" id="h2-4-4" class="i">+		rdr.proto(request)
+</a> 	}
+ 
+ 	response, err := client.HeadObject(context.Background(), request)
+<a href="#h2-5" id="h2-5" class="h">@@ -89,11 +92,12 @@ func runHead(cmd *cobra.Command, args []string) error {
+</a> 		return err
+ 	}
+ 
+<a href="#h2-5-3" id="h2-5-3" class="d">-	return renderResponse(flagFormat, os.Stdout, response)
+</a><a href="#h2-5-4" id="h2-5-4" class="i">+	return rdr.proto(response)
+</a> }
+ 
+ // runDownload is a command line interface for the GetObject and StreamGetObject RPCs.
+ func runDownload(cmd *cobra.Command, args []string) error {
+<a href="#h2-5-9" id="h2-5-9" class="i">+	rdr := newRenderer(flagFormat, os.Stdout)
+</a> 	bucket, _ := cmd.Flags().GetString(&quot;bucket&quot;)
+ 	stream, _ := cmd.Flags().GetBool(&quot;stream&quot;)
+ 	chunkSize, _ := cmd.Flags().GetUint64(&quot;chunk-size&quot;)
+<a href="#h2-6" id="h2-6" class="h">@@ -119,7 +123,7 @@ func runDownload(cmd *cobra.Command, args []string) error {
+</a> 
+ 	if !stream {
+ 		if flagVerbose {
+<a href="#h2-6-3" id="h2-6-3" class="d">-			renderResponse(flagFormat, os.Stderr, get)
+</a><a href="#h2-6-4" id="h2-6-4" class="i">+			rdr.proto(get)
+</a> 		}
+ 
+ 		response, err := client.GetObject(context.Background(), get)
+<a href="#h2-7" id="h2-7" class="h">@@ -128,7 +132,7 @@ func runDownload(cmd *cobra.Command, args []string) error {
+</a> 		}
+ 
+ 		if flagVerbose {
+<a href="#h2-7-3" id="h2-7-3" class="d">-			renderResponse(flagFormat, os.Stderr, response)
+</a><a href="#h2-7-4" id="h2-7-4" class="i">+			rdr.proto(response)
+</a> 		}
+ 
+ 		_, err = os.Stdout.Write(response.Data)
+<a href="#h2-8" id="h2-8" class="h">@@ -141,7 +145,7 @@ func runDownload(cmd *cobra.Command, args []string) error {
+</a> 	}
+ 
+ 	if flagVerbose {
+<a href="#h2-8-3" id="h2-8-3" class="d">-		renderResponse(flagFormat, os.Stderr, request)
+</a><a href="#h2-8-4" id="h2-8-4" class="i">+		rdr.proto(request)
+</a> 	}
+ 
+ 	response, err := client.StreamGetObject(context.Background(), request)
+<a href="#h2-9" id="h2-9" class="h">@@ -184,7 +188,7 @@ func runDownload(cmd *cobra.Command, args []string) error {
+</a> 		atomic.AddUint64(downloaded, uint64(len(message.Response.Data)))
+ 
+ 		if flagVerbose {
+<a href="#h2-9-3" id="h2-9-3" class="d">-			renderResponse(flagFormat, os.Stderr, message)
+</a><a href="#h2-9-4" id="h2-9-4" class="i">+			rdr.proto(message)
+</a> 		}
+ 
+ 		if _, err = os.Stdout.Write(message.Response.Data); err != nil {
+<a href="#h2-10" id="h2-10" class="h">@@ -206,6 +210,7 @@ func runDownload(cmd *cobra.Command, args []string) error {
+</a> 
+ // runUpload is a command line interface for the PutObject and StreamPutObject RPCs.
+ func runUpload(cmd *cobra.Command, args []string) error {
+<a href="#h2-10-3" id="h2-10-3" class="i">+	rdr := newRenderer(flagFormat, os.Stdout)
+</a> 	bucket, _ := cmd.Flags().GetString(&quot;bucket&quot;)
+ 	stream, _ := cmd.Flags().GetBool(&quot;stream&quot;)
+ 	chunkSize, _ := cmd.Flags().GetUint64(&quot;chunk-size&quot;)
+<a href="#h2-11" id="h2-11" class="h">@@ -240,7 +245,7 @@ func runUpload(cmd *cobra.Command, args []string) error {
+</a> 		put.Data = data
+ 
+ 		if flagVerbose {
+<a href="#h2-11-3" id="h2-11-3" class="d">-			renderResponse(flagFormat, os.Stdout, put)
+</a><a href="#h2-11-4" id="h2-11-4" class="i">+			rdr.proto(put)
+</a> 		}
+ 
+ 		response, err := client.PutObject(context.Background(), put)
+<a href="#h2-12" id="h2-12" class="h">@@ -248,7 +253,7 @@ func runUpload(cmd *cobra.Command, args []string) error {
+</a> 			return err
+ 		}
+ 
+<a href="#h2-12-3" id="h2-12-3" class="d">-		return renderResponse(flagFormat, os.Stdout, response)
+</a><a href="#h2-12-4" id="h2-12-4" class="i">+		return rdr.proto(response)
+</a> 	}
+ 
+ 	request, err := client.StreamPutObject(context.Background())
+<a href="#h2-13" id="h2-13" class="h">@@ -294,7 +299,7 @@ func runUpload(cmd *cobra.Command, args []string) error {
+</a> 		atomic.AddUint64(uploaded, uint64(n))
+ 
+ 		if flagVerbose {
+<a href="#h2-13-3" id="h2-13-3" class="d">-			renderResponse(flagFormat, os.Stdout, message)
+</a><a href="#h2-13-4" id="h2-13-4" class="i">+			rdr.proto(message)
+</a> 		}
+ 
+ 		if err := request.Send(message); err != nil {
+<a href="#h2-14" id="h2-14" class="h">@@ -315,11 +320,12 @@ func runUpload(cmd *cobra.Command, args []string) error {
+</a> 		)
+ 	}
+ 
+<a href="#h2-14-3" id="h2-14-3" class="d">-	return renderResponse(flagFormat, os.Stdout, response)
+</a><a href="#h2-14-4" id="h2-14-4" class="i">+	return rdr.proto(response)
+</a> }
+ 
+ // runDelete is a command line interface for the DeleteObject RPC.
+ func runDelete(cmd *cobra.Command, args []string) error {
+<a href="#h2-14-9" id="h2-14-9" class="i">+	rdr := newRenderer(flagFormat, os.Stdout)
+</a> 	bucket, _ := cmd.Flags().GetString(&quot;bucket&quot;)
+ 
+ 	store, rpc, err := newClientConfig(flagConfig, flagStore)
+<a href="#h2-15" id="h2-15" class="h">@@ -341,7 +347,7 @@ func runDelete(cmd *cobra.Command, args []string) error {
+</a> 	}
+ 
+ 	if flagVerbose {
+<a href="#h2-15-3" id="h2-15-3" class="d">-		renderResponse(flagFormat, os.Stdout, request)
+</a><a href="#h2-15-4" id="h2-15-4" class="i">+		rdr.proto(request)
+</a> 	}
+ 
+ 	response, err := client.DeleteObject(context.Background(), request)
+<a href="#h2-16" id="h2-16" class="h">@@ -349,11 +355,12 @@ func runDelete(cmd *cobra.Command, args []string) error {
+</a> 		return err
+ 	}
+ 
+<a href="#h2-16-3" id="h2-16-3" class="d">-	return renderResponse(flagFormat, os.Stdout, response)
+</a><a href="#h2-16-4" id="h2-16-4" class="i">+	return rdr.proto(response)
+</a> }
+ 
+ // runList is a command line interface for the ListObjects RPC.
+ func runList(cmd *cobra.Command, args []string) error {
+<a href="#h2-16-9" id="h2-16-9" class="i">+	rdr := newRenderer(flagFormat, os.Stdout)
+</a> 	bucket, _ := cmd.Flags().GetString(&quot;bucket&quot;)
+ 	recursive, _ := cmd.Flags().GetBool(&quot;recursive&quot;)
+ 
+<a href="#h2-17" id="h2-17" class="h">@@ -382,7 +389,7 @@ func runList(cmd *cobra.Command, args []string) error {
+</a> 	}
+ 
+ 	if flagVerbose {
+<a href="#h2-17-3" id="h2-17-3" class="d">-		renderResponse(flagFormat, os.Stdout, request)
+</a><a href="#h2-17-4" id="h2-17-4" class="i">+		rdr.proto(request)
+</a> 	}
+ 
+ 	response, err := client.ListObjects(context.Background(), request)
+<a href="#h2-18" id="h2-18" class="h">@@ -390,5 +397,5 @@ func runList(cmd *cobra.Command, args []string) error {
+</a> 		return err
+ 	}
+ 
+<a href="#h2-18-3" id="h2-18-3" class="d">-	return renderResponse(flagFormat, os.Stdout, response)
+</a><a href="#h2-18-4" id="h2-18-4" class="i">+	return rdr.proto(response)
+</a> }
+</pre>
+</div>
+</body>
+</html>

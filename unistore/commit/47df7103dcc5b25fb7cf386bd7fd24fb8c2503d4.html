@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>schemas: Bucket metadata schema and HeadBucket RPC - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/47df7103dcc5b25fb7cf386bd7fd24fb8c2503d4">47df7103dcc5b25fb7cf386bd7fd24fb8c2503d4</a>
+<b>parent</b> <a href="../commit/0c38fc5c2afbe138bc19de2511b2fcb9f30771ae">0c38fc5c2afbe138bc19de2511b2fcb9f30771ae</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Mon 17 Jan 2022 11:49:36 -0800
+
+schemas: Bucket metadata schema and HeadBucket RPC
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">schemas/common/backend.proto</a></td><td> | </td><td class="num">4</td><td><span class="i">++</span><span class="d">--</span></td></tr>
+<tr><td class="A">A</td><td><a href="#h1">schemas/common/bucket.proto</a></td><td> | </td><td class="num">56</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">schemas/service/unistore.proto</a></td><td> | </td><td class="num">15</td><td><span class="i">+++++++++++++++</span><span class="d"></span></td></tr>
+</table></pre><pre>3 files changed, 73 insertions(+), 2 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/schemas/common/backend.proto">schemas/common/backend.proto</a> b/<a href="../file/schemas/common/backend.proto">schemas/common/backend.proto</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -6,8 +6,8 @@ option go_package = &quot;lib.kevinlin.info/schemas/unistore/common&quot;;
+</a> 
+ // Backend enumerates known storage backend implementations.
+ enum Backend {
+<a href="#h0-0-3" id="h0-0-3" class="d">-  // Default is the default empty backend.
+</a><a href="#h0-0-4" id="h0-0-4" class="d">-  DEFAULT = 0;
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+  // Empty is the default empty backend.
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+  EMPTY = 0;
+</a>   // Composite is a backend that composes one or more other backends with a configurable read and
+   // write dispatch policy.
+   COMPOSITE = 1;
+<b>diff --git a/<a id="h1" href="../file/schemas/common/bucket.proto">schemas/common/bucket.proto</a> b/<a href="../file/schemas/common/bucket.proto">schemas/common/bucket.proto</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -0,0 +1,56 @@
+</a><a href="#h1-0-0" id="h1-0-0" class="i">+syntax = &quot;proto3&quot;;
+</a><a href="#h1-0-1" id="h1-0-1" class="i">+
+</a><a href="#h1-0-2" id="h1-0-2" class="i">+package schemas.common;
+</a><a href="#h1-0-3" id="h1-0-3" class="i">+
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+option go_package = &quot;lib.kevinlin.info/schemas/unistore/common&quot;;
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+
+</a><a href="#h1-0-6" id="h1-0-6" class="i">+import &quot;google/protobuf/timestamp.proto&quot;;
+</a><a href="#h1-0-7" id="h1-0-7" class="i">+
+</a><a href="#h1-0-8" id="h1-0-8" class="i">+// Visibility enumerates known bucket visibility types.
+</a><a href="#h1-0-9" id="h1-0-9" class="i">+enum Visibility {
+</a><a href="#h1-0-10" id="h1-0-10" class="i">+  // Default is used when no visibility option is available, or for backends that do not support
+</a><a href="#h1-0-11" id="h1-0-11" class="i">+  // configurable bucket visibility.
+</a><a href="#h1-0-12" id="h1-0-12" class="i">+  DEFAULT = 0;
+</a><a href="#h1-0-13" id="h1-0-13" class="i">+  // Public describes publicly accessible buckets.
+</a><a href="#h1-0-14" id="h1-0-14" class="i">+  PUBLIC = 1;
+</a><a href="#h1-0-15" id="h1-0-15" class="i">+  // Private describes private buckets.
+</a><a href="#h1-0-16" id="h1-0-16" class="i">+  PRIVATE = 2;
+</a><a href="#h1-0-17" id="h1-0-17" class="i">+}
+</a><a href="#h1-0-18" id="h1-0-18" class="i">+
+</a><a href="#h1-0-19" id="h1-0-19" class="i">+// Permissions describes the configuration-defined access permissions on this bucket.
+</a><a href="#h1-0-20" id="h1-0-20" class="i">+message Permissions {
+</a><a href="#h1-0-21" id="h1-0-21" class="i">+  // Head bucket is true when the HeadBucket RPC is permitted.
+</a><a href="#h1-0-22" id="h1-0-22" class="i">+  bool head_bucket = 1;
+</a><a href="#h1-0-23" id="h1-0-23" class="i">+  // Head object is true when the HeadObject RPC is permitted.
+</a><a href="#h1-0-24" id="h1-0-24" class="i">+  bool head_object = 2;
+</a><a href="#h1-0-25" id="h1-0-25" class="i">+  // Get object is true when the GetObject RPC is permitted.
+</a><a href="#h1-0-26" id="h1-0-26" class="i">+  bool get_object = 3;
+</a><a href="#h1-0-27" id="h1-0-27" class="i">+  // Stream get object is true when the StreamGetObject RPC is permitted.
+</a><a href="#h1-0-28" id="h1-0-28" class="i">+  bool stream_get_object = 4;
+</a><a href="#h1-0-29" id="h1-0-29" class="i">+  // Put object is true when the PutObject RPC is permitted.
+</a><a href="#h1-0-30" id="h1-0-30" class="i">+  bool put_object = 5;
+</a><a href="#h1-0-31" id="h1-0-31" class="i">+  // Stream put object is true when the StreamPutObject RPC is permitted.
+</a><a href="#h1-0-32" id="h1-0-32" class="i">+  bool stream_put_object = 6;
+</a><a href="#h1-0-33" id="h1-0-33" class="i">+  // Delete object is true when the DeleteObject RPC is permitted.
+</a><a href="#h1-0-34" id="h1-0-34" class="i">+  bool delete_object = 7;
+</a><a href="#h1-0-35" id="h1-0-35" class="i">+  // List buckets is true when the ListBuckets RPC is permitted.
+</a><a href="#h1-0-36" id="h1-0-36" class="i">+  bool list_buckets = 8;
+</a><a href="#h1-0-37" id="h1-0-37" class="i">+  // List objects is true when the ListObjects RPC is permitted.
+</a><a href="#h1-0-38" id="h1-0-38" class="i">+  bool list_objects = 9;
+</a><a href="#h1-0-39" id="h1-0-39" class="i">+}
+</a><a href="#h1-0-40" id="h1-0-40" class="i">+
+</a><a href="#h1-0-41" id="h1-0-41" class="i">+// Bucket describes metadata about a bucket.
+</a><a href="#h1-0-42" id="h1-0-42" class="i">+message Bucket {
+</a><a href="#h1-0-43" id="h1-0-43" class="i">+  // ID is the bucket&#39;s backend-defined unique ID.
+</a><a href="#h1-0-44" id="h1-0-44" class="i">+  string id = 1;
+</a><a href="#h1-0-45" id="h1-0-45" class="i">+  // Name is the bucket name.
+</a><a href="#h1-0-46" id="h1-0-46" class="i">+  string name = 2;
+</a><a href="#h1-0-47" id="h1-0-47" class="i">+  // Timestamp is the creation or modification timestamp of the bucket, if available.
+</a><a href="#h1-0-48" id="h1-0-48" class="i">+  google.protobuf.Timestamp timestamp = 3;
+</a><a href="#h1-0-49" id="h1-0-49" class="i">+  // Visibility is the bucket visibility type.
+</a><a href="#h1-0-50" id="h1-0-50" class="i">+  Visibility visibility = 4;
+</a><a href="#h1-0-51" id="h1-0-51" class="i">+  // Permissions is the set of permissions associated with the bucket, if available.
+</a><a href="#h1-0-52" id="h1-0-52" class="i">+  Permissions permissions = 5;
+</a><a href="#h1-0-53" id="h1-0-53" class="i">+  // Tags is a map of additional backend-defined metadata associated with the bucket.
+</a><a href="#h1-0-54" id="h1-0-54" class="i">+  map&lt;string, string&gt; tags = 6;
+</a><a href="#h1-0-55" id="h1-0-55" class="i">+}
+</a><b>diff --git a/<a id="h2" href="../file/schemas/service/unistore.proto">schemas/service/unistore.proto</a> b/<a href="../file/schemas/service/unistore.proto">schemas/service/unistore.proto</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -5,8 +5,21 @@ package schemas.service;
+</a> option go_package = &quot;lib.kevinlin.info/schemas/unistore/service&quot;;
+ 
+ import &quot;schemas/common/backend.proto&quot;;
+<a href="#h2-0-3" id="h2-0-3" class="i">+import &quot;schemas/common/bucket.proto&quot;;
+</a> import &quot;schemas/common/object.proto&quot;;
+ 
+<a href="#h2-0-6" id="h2-0-6" class="i">+// HeadBucketRequest is the request definition for HeadBucket.
+</a><a href="#h2-0-7" id="h2-0-7" class="i">+message HeadBucketRequest {
+</a><a href="#h2-0-8" id="h2-0-8" class="i">+  // Resource is the resource targeted by this request.
+</a><a href="#h2-0-9" id="h2-0-9" class="i">+  common.Resource resource = 1;
+</a><a href="#h2-0-10" id="h2-0-10" class="i">+}
+</a><a href="#h2-0-11" id="h2-0-11" class="i">+
+</a><a href="#h2-0-12" id="h2-0-12" class="i">+// HeadBucketResponse is the request definition for HeadBucket.
+</a><a href="#h2-0-13" id="h2-0-13" class="i">+message HeadBucketResponse {
+</a><a href="#h2-0-14" id="h2-0-14" class="i">+  // Bucket is the retrieved bucket metadata.
+</a><a href="#h2-0-15" id="h2-0-15" class="i">+  common.Bucket bucket = 1;
+</a><a href="#h2-0-16" id="h2-0-16" class="i">+}
+</a><a href="#h2-0-17" id="h2-0-17" class="i">+
+</a> // HeadObjectRequest is the request definition for HeadObject.
+ message HeadObjectRequest {
+   // Resource is the resource targeted by this request.
+<a href="#h2-1" id="h2-1" class="h">@@ -124,6 +137,8 @@ message ListObjectsResponse {
+</a> 
+ // Unistore provides the main Unistore object storage service.
+ service Unistore {
+<a href="#h2-1-3" id="h2-1-3" class="i">+  // HeadBucket obtains metadata about a bucket.
+</a><a href="#h2-1-4" id="h2-1-4" class="i">+  rpc HeadBucket(HeadBucketRequest) returns (HeadBucketResponse);
+</a>   // HeadObject obtains metadata about an object.
+   rpc HeadObject(HeadObjectRequest) returns (HeadObjectResponse);
+   // GetObject obtains the full contents of an object.
+</pre>
+</div>
+</body>
+</html>

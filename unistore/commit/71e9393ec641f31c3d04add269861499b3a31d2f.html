@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>cmd/unistore-cli: --progress flag to display download/upload transfer status during streams - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/71e9393ec641f31c3d04add269861499b3a31d2f">71e9393ec641f31c3d04add269861499b3a31d2f</a>
+<b>parent</b> <a href="../commit/4b78522a3c75184bf8a35445d5aa07a10cf61c50">4b78522a3c75184bf8a35445d5aa07a10cf61c50</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Tue  4 Jan 2022 21:55:04 -0800
+
+cmd/unistore-cli: --progress flag to display download/upload transfer status during streams
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">cmd/unistore-cli/main.go</a></td><td> | </td><td class="num">2</td><td><span class="i">++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">cmd/unistore-cli/service.go</a></td><td> | </td><td class="num">74</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">go.mod</a></td><td> | </td><td class="num">1</td><td><span class="i">+</span><span class="d"></span></td></tr>
+</table></pre><pre>3 files changed, 77 insertions(+), 0 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/cmd/unistore-cli/main.go">cmd/unistore-cli/main.go</a> b/<a href="../file/cmd/unistore-cli/main.go">cmd/unistore-cli/main.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -177,6 +177,7 @@ func init() {
+</a> 	downloadCmd.Flags().StringP(&quot;bucket&quot;, &quot;b&quot;, &quot;&quot;, &quot;bucket name&quot;)
+ 	downloadCmd.Flags().BoolP(&quot;stream&quot;, &quot;t&quot;, false, &quot;stream object contents&quot;)
+ 	downloadCmd.Flags().Uint64P(&quot;chunk-size&quot;, &quot;r&quot;, 10*1024, &quot;stream response chunk size&quot;)
+<a href="#h0-0-3" id="h0-0-3" class="i">+	downloadCmd.Flags().BoolP(&quot;progress&quot;, &quot;p&quot;, false, &quot;periodically print downloaded bytes and transfer rate (only for stream RPC)&quot;)
+</a> 	downloadCmd.MarkFlagRequired(&quot;bucket&quot;)
+ 	rootCmd.AddCommand(downloadCmd)
+ 
+<a href="#h0-1" id="h0-1" class="h">@@ -184,6 +185,7 @@ func init() {
+</a> 	uploadCmd.Flags().BoolP(&quot;stream&quot;, &quot;t&quot;, false, &quot;stream object contents&quot;)
+ 	uploadCmd.Flags().Uint64P(&quot;chunk-size&quot;, &quot;r&quot;, 10*1024, &quot;stream request chunk size&quot;)
+ 	uploadCmd.Flags().StringP(&quot;checksum&quot;, &quot;k&quot;, &quot;&quot;, &quot;object contents checksum (only for unary RPC)&quot;)
+<a href="#h0-1-3" id="h0-1-3" class="i">+	uploadCmd.Flags().BoolP(&quot;progress&quot;, &quot;p&quot;, false, &quot;periodically print uploaded bytes and transfer rate (only for stream RPC)&quot;)
+</a> 	uploadCmd.MarkFlagRequired(&quot;bucket&quot;)
+ 	rootCmd.AddCommand(uploadCmd)
+ 
+<b>diff --git a/<a id="h1" href="../file/cmd/unistore-cli/service.go">cmd/unistore-cli/service.go</a> b/<a href="../file/cmd/unistore-cli/service.go">cmd/unistore-cli/service.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -2,10 +2,14 @@ package main
+</a> 
+ import (
+ 	&quot;context&quot;
+<a href="#h1-0-3" id="h1-0-3" class="i">+	&quot;fmt&quot;
+</a> 	&quot;io&quot;
+ 	&quot;os&quot;
+ 	&quot;strings&quot;
+<a href="#h1-0-7" id="h1-0-7" class="i">+	&quot;sync/atomic&quot;
+</a><a href="#h1-0-8" id="h1-0-8" class="i">+	&quot;time&quot;
+</a> 
+<a href="#h1-0-10" id="h1-0-10" class="i">+	&quot;github.com/dustin/go-humanize&quot;
+</a> 	&quot;github.com/spf13/cobra&quot;
+ 
+ 	&quot;unistore/internal/config&quot;
+<a href="#h1-1" id="h1-1" class="h">@@ -93,6 +97,7 @@ func runDownload(cmd *cobra.Command, args []string) error {
+</a> 	bucket, _ := cmd.Flags().GetString(&quot;bucket&quot;)
+ 	stream, _ := cmd.Flags().GetBool(&quot;stream&quot;)
+ 	chunkSize, _ := cmd.Flags().GetUint64(&quot;chunk-size&quot;)
+<a href="#h1-1-3" id="h1-1-3" class="i">+	progress, _ := cmd.Flags().GetBool(&quot;progress&quot;)
+</a> 
+ 	store, rpc, err := newClientConfig(flagConfig, flagStore)
+ 	if err != nil {
+<a href="#h1-2" id="h1-2" class="h">@@ -144,6 +149,30 @@ func runDownload(cmd *cobra.Command, args []string) error {
+</a> 		return err
+ 	}
+ 
+<a href="#h1-2-3" id="h1-2-3" class="i">+	start := time.Now()
+</a><a href="#h1-2-4" id="h1-2-4" class="i">+	downloaded := new(uint64)
+</a><a href="#h1-2-5" id="h1-2-5" class="i">+
+</a><a href="#h1-2-6" id="h1-2-6" class="i">+	if progress {
+</a><a href="#h1-2-7" id="h1-2-7" class="i">+		ticker := time.NewTicker(5 * time.Second)
+</a><a href="#h1-2-8" id="h1-2-8" class="i">+		defer ticker.Stop()
+</a><a href="#h1-2-9" id="h1-2-9" class="i">+
+</a><a href="#h1-2-10" id="h1-2-10" class="i">+		go func() {
+</a><a href="#h1-2-11" id="h1-2-11" class="i">+			prev := atomic.LoadUint64(downloaded)
+</a><a href="#h1-2-12" id="h1-2-12" class="i">+
+</a><a href="#h1-2-13" id="h1-2-13" class="i">+			for range ticker.C {
+</a><a href="#h1-2-14" id="h1-2-14" class="i">+				current := atomic.LoadUint64(downloaded)
+</a><a href="#h1-2-15" id="h1-2-15" class="i">+				fmt.Fprintf(
+</a><a href="#h1-2-16" id="h1-2-16" class="i">+					os.Stderr,
+</a><a href="#h1-2-17" id="h1-2-17" class="i">+					&quot;%v: downloaded %s (%s/s)\n&quot;,
+</a><a href="#h1-2-18" id="h1-2-18" class="i">+					time.Since(start),
+</a><a href="#h1-2-19" id="h1-2-19" class="i">+					humanize.Bytes(current),
+</a><a href="#h1-2-20" id="h1-2-20" class="i">+					humanize.Bytes((current-prev)/5),
+</a><a href="#h1-2-21" id="h1-2-21" class="i">+				)
+</a><a href="#h1-2-22" id="h1-2-22" class="i">+				prev = current
+</a><a href="#h1-2-23" id="h1-2-23" class="i">+			}
+</a><a href="#h1-2-24" id="h1-2-24" class="i">+		}()
+</a><a href="#h1-2-25" id="h1-2-25" class="i">+	}
+</a><a href="#h1-2-26" id="h1-2-26" class="i">+
+</a> 	for {
+ 		message, err := response.Recv()
+ 		if err == io.EOF {
+<a href="#h1-3" id="h1-3" class="h">@@ -152,6 +181,8 @@ func runDownload(cmd *cobra.Command, args []string) error {
+</a> 			return err
+ 		}
+ 
+<a href="#h1-3-3" id="h1-3-3" class="i">+		atomic.AddUint64(downloaded, uint64(len(message.Response.Data)))
+</a><a href="#h1-3-4" id="h1-3-4" class="i">+
+</a> 		if flagVerbose {
+ 			renderResponse(flagFormat, os.Stderr, message)
+ 		}
+<a href="#h1-4" id="h1-4" class="h">@@ -161,6 +192,15 @@ func runDownload(cmd *cobra.Command, args []string) error {
+</a> 		}
+ 	}
+ 
+<a href="#h1-4-3" id="h1-4-3" class="i">+	if progress {
+</a><a href="#h1-4-4" id="h1-4-4" class="i">+		fmt.Fprintf(
+</a><a href="#h1-4-5" id="h1-4-5" class="i">+			os.Stderr,
+</a><a href="#h1-4-6" id="h1-4-6" class="i">+			&quot;%v: completed download of %s\n&quot;,
+</a><a href="#h1-4-7" id="h1-4-7" class="i">+			time.Since(start),
+</a><a href="#h1-4-8" id="h1-4-8" class="i">+			humanize.Bytes(atomic.LoadUint64(downloaded)),
+</a><a href="#h1-4-9" id="h1-4-9" class="i">+		)
+</a><a href="#h1-4-10" id="h1-4-10" class="i">+	}
+</a><a href="#h1-4-11" id="h1-4-11" class="i">+
+</a> 	return nil
+ }
+ 
+<a href="#h1-5" id="h1-5" class="h">@@ -170,6 +210,7 @@ func runUpload(cmd *cobra.Command, args []string) error {
+</a> 	stream, _ := cmd.Flags().GetBool(&quot;stream&quot;)
+ 	chunkSize, _ := cmd.Flags().GetUint64(&quot;chunk-size&quot;)
+ 	checksum, _ := cmd.Flags().GetString(&quot;checksum&quot;)
+<a href="#h1-5-3" id="h1-5-3" class="i">+	progress, _ := cmd.Flags().GetBool(&quot;progress&quot;)
+</a> 
+ 	store, rpc, err := newClientConfig(flagConfig, flagStore)
+ 	if err != nil {
+<a href="#h1-6" id="h1-6" class="h">@@ -215,6 +256,29 @@ func runUpload(cmd *cobra.Command, args []string) error {
+</a> 		return err
+ 	}
+ 
+<a href="#h1-6-3" id="h1-6-3" class="i">+	start := time.Now()
+</a><a href="#h1-6-4" id="h1-6-4" class="i">+	uploaded := new(uint64)
+</a><a href="#h1-6-5" id="h1-6-5" class="i">+
+</a><a href="#h1-6-6" id="h1-6-6" class="i">+	if progress {
+</a><a href="#h1-6-7" id="h1-6-7" class="i">+		ticker := time.NewTicker(5 * time.Second)
+</a><a href="#h1-6-8" id="h1-6-8" class="i">+		defer ticker.Stop()
+</a><a href="#h1-6-9" id="h1-6-9" class="i">+
+</a><a href="#h1-6-10" id="h1-6-10" class="i">+		go func() {
+</a><a href="#h1-6-11" id="h1-6-11" class="i">+			prev := atomic.LoadUint64(uploaded)
+</a><a href="#h1-6-12" id="h1-6-12" class="i">+
+</a><a href="#h1-6-13" id="h1-6-13" class="i">+			for range ticker.C {
+</a><a href="#h1-6-14" id="h1-6-14" class="i">+				current := atomic.LoadUint64(uploaded)
+</a><a href="#h1-6-15" id="h1-6-15" class="i">+				fmt.Printf(
+</a><a href="#h1-6-16" id="h1-6-16" class="i">+					&quot;%v: uploaded %s (%s/s)\n&quot;,
+</a><a href="#h1-6-17" id="h1-6-17" class="i">+					time.Since(start),
+</a><a href="#h1-6-18" id="h1-6-18" class="i">+					humanize.Bytes(current),
+</a><a href="#h1-6-19" id="h1-6-19" class="i">+					humanize.Bytes((current-prev)/5),
+</a><a href="#h1-6-20" id="h1-6-20" class="i">+				)
+</a><a href="#h1-6-21" id="h1-6-21" class="i">+				prev = current
+</a><a href="#h1-6-22" id="h1-6-22" class="i">+			}
+</a><a href="#h1-6-23" id="h1-6-23" class="i">+		}()
+</a><a href="#h1-6-24" id="h1-6-24" class="i">+	}
+</a><a href="#h1-6-25" id="h1-6-25" class="i">+
+</a> 	for {
+ 		chunk := make([]byte, chunkSize)
+ 		n, err := os.Stdin.Read(chunk)
+<a href="#h1-7" id="h1-7" class="h">@@ -227,6 +291,8 @@ func runUpload(cmd *cobra.Command, args []string) error {
+</a> 		message := &amp;service.PutObjectStreamRequest{Request: put}
+ 		message.Request.Data = chunk[:n]
+ 
+<a href="#h1-7-3" id="h1-7-3" class="i">+		atomic.AddUint64(uploaded, uint64(n))
+</a><a href="#h1-7-4" id="h1-7-4" class="i">+
+</a> 		if flagVerbose {
+ 			renderResponse(flagFormat, os.Stdout, message)
+ 		}
+<a href="#h1-8" id="h1-8" class="h">@@ -241,6 +307,14 @@ func runUpload(cmd *cobra.Command, args []string) error {
+</a> 		return err
+ 	}
+ 
+<a href="#h1-8-3" id="h1-8-3" class="i">+	if progress {
+</a><a href="#h1-8-4" id="h1-8-4" class="i">+		fmt.Printf(
+</a><a href="#h1-8-5" id="h1-8-5" class="i">+			&quot;%v: completed upload of %s\n&quot;,
+</a><a href="#h1-8-6" id="h1-8-6" class="i">+			time.Since(start),
+</a><a href="#h1-8-7" id="h1-8-7" class="i">+			humanize.Bytes(atomic.LoadUint64(uploaded)),
+</a><a href="#h1-8-8" id="h1-8-8" class="i">+		)
+</a><a href="#h1-8-9" id="h1-8-9" class="i">+	}
+</a><a href="#h1-8-10" id="h1-8-10" class="i">+
+</a> 	return renderResponse(flagFormat, os.Stdout, response)
+ }
+ 
+<b>diff --git a/<a id="h2" href="../file/go.mod">go.mod</a> b/<a href="../file/go.mod">go.mod</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -4,6 +4,7 @@ go 1.17
+</a> 
+ require (
+ 	filippo.io/age v1.0.0
+<a href="#h2-0-3" id="h2-0-3" class="i">+	github.com/dustin/go-humanize v1.0.0
+</a> 	github.com/getsentry/sentry-go v0.12.0
+ 	github.com/klauspost/compress v1.13.6
+ 	github.com/spf13/cobra v1.3.0
+</pre>
+</div>
+</body>
+</html>

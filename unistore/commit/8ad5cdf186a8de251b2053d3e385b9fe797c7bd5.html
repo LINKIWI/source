@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>schemas: Protobuf definition for object attributes, utilities for marshal/unmarshal to/from string map - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/8ad5cdf186a8de251b2053d3e385b9fe797c7bd5">8ad5cdf186a8de251b2053d3e385b9fe797c7bd5</a>
+<b>parent</b> <a href="../commit/fbf71d9ffa5f7b03e5a3a2cf9e771791acd6d613">fbf71d9ffa5f7b03e5a3a2cf9e771791acd6d613</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sun  9 Jan 2022 21:24:27 -0800
+
+schemas: Protobuf definition for object attributes, utilities for marshal/unmarshal to/from string map
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">schemas/common/object.proto</a></td><td> | </td><td class="num">25</td><td><span class="i">+++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="A">A</td><td><a href="#h1">schemas/extra/object.go</a></td><td> | </td><td class="num">163</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">schemas/service/unistore.proto</a></td><td> | </td><td class="num">4</td><td><span class="i">++++</span><span class="d"></span></td></tr>
+</table></pre><pre>3 files changed, 192 insertions(+), 0 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/schemas/common/object.proto">schemas/common/object.proto</a> b/<a href="../file/schemas/common/object.proto">schemas/common/object.proto</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -4,6 +4,7 @@ package schemas.common;
+</a> 
+ option go_package = &quot;unistore/schemas/common&quot;;
+ 
+<a href="#h0-0-3" id="h0-0-3" class="i">+import &quot;common/backend.proto&quot;;
+</a> import &quot;google/protobuf/timestamp.proto&quot;;
+ 
+ // Object enumerates known object types.
+<a href="#h0-1" id="h0-1" class="h">@@ -53,4 +54,28 @@ message Metadata {
+</a>   google.protobuf.Timestamp modified_time = 6;
+   // Checksum is the object&#39;s checksum, in a backend-defined format.
+   string checksum = 7;
+<a href="#h0-1-3" id="h0-1-3" class="i">+  // Attributes describes storage-colocated properties about the object, assigned by the server.
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+  Attributes attributes = 8;
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+}
+</a><a href="#h0-1-6" id="h0-1-6" class="i">+
+</a><a href="#h0-1-7" id="h0-1-7" class="i">+// Attributes describes server-assigned extended metadata about an object.
+</a><a href="#h0-1-8" id="h0-1-8" class="i">+// It differs from Metadata in that its values, with the exception of extra, depend on the state of
+</a><a href="#h0-1-9" id="h0-1-9" class="i">+// the server and its configuration. Attributes are typically colocated with the object data in
+</a><a href="#h0-1-10" id="h0-1-10" class="i">+// storage.
+</a><a href="#h0-1-11" id="h0-1-11" class="i">+message Attributes {
+</a><a href="#h0-1-12" id="h0-1-12" class="i">+  // Server is the hostname of the server instance that originally wrote the object.
+</a><a href="#h0-1-13" id="h0-1-13" class="i">+  string server = 1;
+</a><a href="#h0-1-14" id="h0-1-14" class="i">+  // Version is the Unistore version that originally wrote the object.
+</a><a href="#h0-1-15" id="h0-1-15" class="i">+  string version = 2;
+</a><a href="#h0-1-16" id="h0-1-16" class="i">+  // Timestamp is the server timestamp recorded when the object is written.
+</a><a href="#h0-1-17" id="h0-1-17" class="i">+  google.protobuf.Timestamp timestamp = 3;
+</a><a href="#h0-1-18" id="h0-1-18" class="i">+  // Compression is the compression algorithm used in-flight, if applicable.
+</a><a href="#h0-1-19" id="h0-1-19" class="i">+  common.Compression compression = 4;
+</a><a href="#h0-1-20" id="h0-1-20" class="i">+  // Encryption is the encryption algorithm used in-flight, if applicable.
+</a><a href="#h0-1-21" id="h0-1-21" class="i">+  common.Encryption encryption = 5;
+</a><a href="#h0-1-22" id="h0-1-22" class="i">+  // Size is the original size of the object as read from the client, before any middleware filters
+</a><a href="#h0-1-23" id="h0-1-23" class="i">+  // that may change the effective size of the file in storage.
+</a><a href="#h0-1-24" id="h0-1-24" class="i">+  uint64 size = 6;
+</a><a href="#h0-1-25" id="h0-1-25" class="i">+  // Extra is a map of additional tags that may be specified by the user.
+</a><a href="#h0-1-26" id="h0-1-26" class="i">+  map&lt;string, string&gt; extra = 7;
+</a> }
+<b>diff --git a/<a id="h1" href="../file/schemas/extra/object.go">schemas/extra/object.go</a> b/<a href="../file/schemas/extra/object.go">schemas/extra/object.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -0,0 +1,163 @@
+</a><a href="#h1-0-0" id="h1-0-0" class="i">+package extra
+</a><a href="#h1-0-1" id="h1-0-1" class="i">+
+</a><a href="#h1-0-2" id="h1-0-2" class="i">+import (
+</a><a href="#h1-0-3" id="h1-0-3" class="i">+	&quot;fmt&quot;
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+	&quot;regexp&quot;
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+	&quot;strconv&quot;
+</a><a href="#h1-0-6" id="h1-0-6" class="i">+	&quot;strings&quot;
+</a><a href="#h1-0-7" id="h1-0-7" class="i">+	&quot;time&quot;
+</a><a href="#h1-0-8" id="h1-0-8" class="i">+
+</a><a href="#h1-0-9" id="h1-0-9" class="i">+	&quot;google.golang.org/protobuf/types/known/timestamppb&quot;
+</a><a href="#h1-0-10" id="h1-0-10" class="i">+
+</a><a href="#h1-0-11" id="h1-0-11" class="i">+	&quot;unistore/schemas/common&quot;
+</a><a href="#h1-0-12" id="h1-0-12" class="i">+)
+</a><a href="#h1-0-13" id="h1-0-13" class="i">+
+</a><a href="#h1-0-14" id="h1-0-14" class="i">+// Canonical attribute names for known attribute types.
+</a><a href="#h1-0-15" id="h1-0-15" class="i">+const (
+</a><a href="#h1-0-16" id="h1-0-16" class="i">+	attrPrefixMetadata = &quot;unistore.metadata&quot;
+</a><a href="#h1-0-17" id="h1-0-17" class="i">+	attrPrefixExtra    = &quot;unistore.extra&quot;
+</a><a href="#h1-0-18" id="h1-0-18" class="i">+
+</a><a href="#h1-0-19" id="h1-0-19" class="i">+	attrServer      = attrPrefixMetadata + &quot;.server&quot;
+</a><a href="#h1-0-20" id="h1-0-20" class="i">+	attrVersion     = attrPrefixMetadata + &quot;.version&quot;
+</a><a href="#h1-0-21" id="h1-0-21" class="i">+	attrTimestamp   = attrPrefixMetadata + &quot;.timestamp&quot;
+</a><a href="#h1-0-22" id="h1-0-22" class="i">+	attrCompression = attrPrefixMetadata + &quot;.compression&quot;
+</a><a href="#h1-0-23" id="h1-0-23" class="i">+	attrEncryption  = attrPrefixMetadata + &quot;.encryption&quot;
+</a><a href="#h1-0-24" id="h1-0-24" class="i">+	attrSize        = attrPrefixMetadata + &quot;.size&quot;
+</a><a href="#h1-0-25" id="h1-0-25" class="i">+)
+</a><a href="#h1-0-26" id="h1-0-26" class="i">+
+</a><a href="#h1-0-27" id="h1-0-27" class="i">+var (
+</a><a href="#h1-0-28" id="h1-0-28" class="i">+	// extraAttrRe is a regular expression denoting acceptable characters in an attribute name.
+</a><a href="#h1-0-29" id="h1-0-29" class="i">+	extraAttrRe = regexp.MustCompile(&quot;^[a-z0-9-_]{1,128}$&quot;)
+</a><a href="#h1-0-30" id="h1-0-30" class="i">+)
+</a><a href="#h1-0-31" id="h1-0-31" class="i">+
+</a><a href="#h1-0-32" id="h1-0-32" class="i">+// AttributesEncodingOptions describes options for marshaling and unmarshalling attributes.
+</a><a href="#h1-0-33" id="h1-0-33" class="i">+type AttributesEncodingOptions struct {
+</a><a href="#h1-0-34" id="h1-0-34" class="i">+	Prefix string
+</a><a href="#h1-0-35" id="h1-0-35" class="i">+}
+</a><a href="#h1-0-36" id="h1-0-36" class="i">+
+</a><a href="#h1-0-37" id="h1-0-37" class="i">+// MarshalAttributes marshals a structured set of attributes to a key-value string map suitable for
+</a><a href="#h1-0-38" id="h1-0-38" class="i">+// storage in the underlying backend.
+</a><a href="#h1-0-39" id="h1-0-39" class="i">+func MarshalAttributes(attributes *common.Attributes, opts *AttributesEncodingOptions) (map[string]string, error) {
+</a><a href="#h1-0-40" id="h1-0-40" class="i">+	if opts == nil {
+</a><a href="#h1-0-41" id="h1-0-41" class="i">+		opts = &amp;AttributesEncodingOptions{}
+</a><a href="#h1-0-42" id="h1-0-42" class="i">+	}
+</a><a href="#h1-0-43" id="h1-0-43" class="i">+
+</a><a href="#h1-0-44" id="h1-0-44" class="i">+	out := map[string]string{
+</a><a href="#h1-0-45" id="h1-0-45" class="i">+		attrServer:      attributes.Server,
+</a><a href="#h1-0-46" id="h1-0-46" class="i">+		attrVersion:     attributes.Version,
+</a><a href="#h1-0-47" id="h1-0-47" class="i">+		attrTimestamp:   attributes.Timestamp.AsTime().Format(time.RFC3339Nano),
+</a><a href="#h1-0-48" id="h1-0-48" class="i">+		attrCompression: attributes.Compression.String(),
+</a><a href="#h1-0-49" id="h1-0-49" class="i">+		attrEncryption:  attributes.Encryption.String(),
+</a><a href="#h1-0-50" id="h1-0-50" class="i">+		attrSize:        fmt.Sprintf(&quot;%d&quot;, attributes.Size),
+</a><a href="#h1-0-51" id="h1-0-51" class="i">+	}
+</a><a href="#h1-0-52" id="h1-0-52" class="i">+
+</a><a href="#h1-0-53" id="h1-0-53" class="i">+	if attributes.Extra != nil {
+</a><a href="#h1-0-54" id="h1-0-54" class="i">+		for extra, value := range attributes.Extra {
+</a><a href="#h1-0-55" id="h1-0-55" class="i">+			if !extraAttrRe.MatchString(extra) {
+</a><a href="#h1-0-56" id="h1-0-56" class="i">+				return nil, fmt.Errorf(
+</a><a href="#h1-0-57" id="h1-0-57" class="i">+					&quot;extra: attribute name is illegal: pattern=%v attribute=%s&quot;,
+</a><a href="#h1-0-58" id="h1-0-58" class="i">+					extraAttrRe,
+</a><a href="#h1-0-59" id="h1-0-59" class="i">+					extra,
+</a><a href="#h1-0-60" id="h1-0-60" class="i">+				)
+</a><a href="#h1-0-61" id="h1-0-61" class="i">+			}
+</a><a href="#h1-0-62" id="h1-0-62" class="i">+
+</a><a href="#h1-0-63" id="h1-0-63" class="i">+			out[fmt.Sprintf(&quot;%s.%s&quot;, attrPrefixExtra, extra)] = value
+</a><a href="#h1-0-64" id="h1-0-64" class="i">+		}
+</a><a href="#h1-0-65" id="h1-0-65" class="i">+	}
+</a><a href="#h1-0-66" id="h1-0-66" class="i">+
+</a><a href="#h1-0-67" id="h1-0-67" class="i">+	if opts.Prefix != &quot;&quot; {
+</a><a href="#h1-0-68" id="h1-0-68" class="i">+		prefixed := make(map[string]string)
+</a><a href="#h1-0-69" id="h1-0-69" class="i">+
+</a><a href="#h1-0-70" id="h1-0-70" class="i">+		for attr, value := range out {
+</a><a href="#h1-0-71" id="h1-0-71" class="i">+			prefixed[fmt.Sprintf(&quot;%s.%s&quot;, opts.Prefix, attr)] = value
+</a><a href="#h1-0-72" id="h1-0-72" class="i">+		}
+</a><a href="#h1-0-73" id="h1-0-73" class="i">+
+</a><a href="#h1-0-74" id="h1-0-74" class="i">+		out = prefixed
+</a><a href="#h1-0-75" id="h1-0-75" class="i">+	}
+</a><a href="#h1-0-76" id="h1-0-76" class="i">+
+</a><a href="#h1-0-77" id="h1-0-77" class="i">+	return out, nil
+</a><a href="#h1-0-78" id="h1-0-78" class="i">+}
+</a><a href="#h1-0-79" id="h1-0-79" class="i">+
+</a><a href="#h1-0-80" id="h1-0-80" class="i">+// UnmarshalAttributes parses a key-value string map of attributes into a structured data.
+</a><a href="#h1-0-81" id="h1-0-81" class="i">+func UnmarshalAttributes(attributes map[string]string, opts *AttributesEncodingOptions) (*common.Attributes, error) {
+</a><a href="#h1-0-82" id="h1-0-82" class="i">+	if opts == nil {
+</a><a href="#h1-0-83" id="h1-0-83" class="i">+		opts = &amp;AttributesEncodingOptions{}
+</a><a href="#h1-0-84" id="h1-0-84" class="i">+	}
+</a><a href="#h1-0-85" id="h1-0-85" class="i">+
+</a><a href="#h1-0-86" id="h1-0-86" class="i">+	out := &amp;common.Attributes{
+</a><a href="#h1-0-87" id="h1-0-87" class="i">+		Extra: make(map[string]string),
+</a><a href="#h1-0-88" id="h1-0-88" class="i">+	}
+</a><a href="#h1-0-89" id="h1-0-89" class="i">+
+</a><a href="#h1-0-90" id="h1-0-90" class="i">+	// Each element is keyed by the canonical attribute name, and points to a function that
+</a><a href="#h1-0-91" id="h1-0-91" class="i">+	// can arbitrarily modify a *common.Attributes pointer.
+</a><a href="#h1-0-92" id="h1-0-92" class="i">+	parsers := map[string]func(attr string, value string, out *common.Attributes) error{
+</a><a href="#h1-0-93" id="h1-0-93" class="i">+		attrServer: func(attr string, value string, out *common.Attributes) error {
+</a><a href="#h1-0-94" id="h1-0-94" class="i">+			out.Server = value
+</a><a href="#h1-0-95" id="h1-0-95" class="i">+			return nil
+</a><a href="#h1-0-96" id="h1-0-96" class="i">+		},
+</a><a href="#h1-0-97" id="h1-0-97" class="i">+		attrVersion: func(attr string, value string, out *common.Attributes) error {
+</a><a href="#h1-0-98" id="h1-0-98" class="i">+			out.Version = value
+</a><a href="#h1-0-99" id="h1-0-99" class="i">+			return nil
+</a><a href="#h1-0-100" id="h1-0-100" class="i">+		},
+</a><a href="#h1-0-101" id="h1-0-101" class="i">+		attrTimestamp: func(attr string, value string, out *common.Attributes) error {
+</a><a href="#h1-0-102" id="h1-0-102" class="i">+			t, err := time.Parse(time.RFC3339Nano, value)
+</a><a href="#h1-0-103" id="h1-0-103" class="i">+			if err != nil {
+</a><a href="#h1-0-104" id="h1-0-104" class="i">+				return err
+</a><a href="#h1-0-105" id="h1-0-105" class="i">+			}
+</a><a href="#h1-0-106" id="h1-0-106" class="i">+
+</a><a href="#h1-0-107" id="h1-0-107" class="i">+			out.Timestamp = timestamppb.New(t)
+</a><a href="#h1-0-108" id="h1-0-108" class="i">+			return nil
+</a><a href="#h1-0-109" id="h1-0-109" class="i">+		},
+</a><a href="#h1-0-110" id="h1-0-110" class="i">+		attrCompression: func(attr string, value string, out *common.Attributes) error {
+</a><a href="#h1-0-111" id="h1-0-111" class="i">+			if c, ok := common.Compression_value[strings.ToUpper(value)]; ok {
+</a><a href="#h1-0-112" id="h1-0-112" class="i">+				out.Compression = common.Compression(c)
+</a><a href="#h1-0-113" id="h1-0-113" class="i">+				return nil
+</a><a href="#h1-0-114" id="h1-0-114" class="i">+			}
+</a><a href="#h1-0-115" id="h1-0-115" class="i">+
+</a><a href="#h1-0-116" id="h1-0-116" class="i">+			return fmt.Errorf(&quot;extra: unknown compression value: compression=%s&quot;, value)
+</a><a href="#h1-0-117" id="h1-0-117" class="i">+		},
+</a><a href="#h1-0-118" id="h1-0-118" class="i">+		attrEncryption: func(attr string, value string, out *common.Attributes) error {
+</a><a href="#h1-0-119" id="h1-0-119" class="i">+			if e, ok := common.Encryption_value[strings.ToUpper(value)]; ok {
+</a><a href="#h1-0-120" id="h1-0-120" class="i">+				out.Encryption = common.Encryption(e)
+</a><a href="#h1-0-121" id="h1-0-121" class="i">+				return nil
+</a><a href="#h1-0-122" id="h1-0-122" class="i">+			}
+</a><a href="#h1-0-123" id="h1-0-123" class="i">+
+</a><a href="#h1-0-124" id="h1-0-124" class="i">+			return fmt.Errorf(&quot;extra: unknown encryption value: encryption=%s&quot;, value)
+</a><a href="#h1-0-125" id="h1-0-125" class="i">+		},
+</a><a href="#h1-0-126" id="h1-0-126" class="i">+		attrSize: func(attr string, value string, out *common.Attributes) error {
+</a><a href="#h1-0-127" id="h1-0-127" class="i">+			s, err := strconv.ParseUint(value, 10, 64)
+</a><a href="#h1-0-128" id="h1-0-128" class="i">+			if err != nil {
+</a><a href="#h1-0-129" id="h1-0-129" class="i">+				return err
+</a><a href="#h1-0-130" id="h1-0-130" class="i">+			}
+</a><a href="#h1-0-131" id="h1-0-131" class="i">+
+</a><a href="#h1-0-132" id="h1-0-132" class="i">+			out.Size = s
+</a><a href="#h1-0-133" id="h1-0-133" class="i">+			return nil
+</a><a href="#h1-0-134" id="h1-0-134" class="i">+		},
+</a><a href="#h1-0-135" id="h1-0-135" class="i">+		// Default, catch-all visitor
+</a><a href="#h1-0-136" id="h1-0-136" class="i">+		&quot;&quot;: func(attr string, value string, out *common.Attributes) error {
+</a><a href="#h1-0-137" id="h1-0-137" class="i">+			// Custom extra attributes
+</a><a href="#h1-0-138" id="h1-0-138" class="i">+			if strings.HasPrefix(attr, fmt.Sprintf(&quot;%s.&quot;, attrPrefixExtra)) {
+</a><a href="#h1-0-139" id="h1-0-139" class="i">+				out.Extra[attr[len(attrPrefixExtra)+1:]] = value
+</a><a href="#h1-0-140" id="h1-0-140" class="i">+			}
+</a><a href="#h1-0-141" id="h1-0-141" class="i">+
+</a><a href="#h1-0-142" id="h1-0-142" class="i">+			return nil
+</a><a href="#h1-0-143" id="h1-0-143" class="i">+		},
+</a><a href="#h1-0-144" id="h1-0-144" class="i">+	}
+</a><a href="#h1-0-145" id="h1-0-145" class="i">+
+</a><a href="#h1-0-146" id="h1-0-146" class="i">+	for attr, value := range attributes {
+</a><a href="#h1-0-147" id="h1-0-147" class="i">+		if opts.Prefix != &quot;&quot; &amp;&amp; strings.HasPrefix(attr, fmt.Sprintf(&quot;%s.&quot;, opts.Prefix)) {
+</a><a href="#h1-0-148" id="h1-0-148" class="i">+			attr = attr[len(opts.Prefix)+1:]
+</a><a href="#h1-0-149" id="h1-0-149" class="i">+		}
+</a><a href="#h1-0-150" id="h1-0-150" class="i">+
+</a><a href="#h1-0-151" id="h1-0-151" class="i">+		parser, ok := parsers[attr]
+</a><a href="#h1-0-152" id="h1-0-152" class="i">+		if !ok {
+</a><a href="#h1-0-153" id="h1-0-153" class="i">+			parser = parsers[&quot;&quot;]
+</a><a href="#h1-0-154" id="h1-0-154" class="i">+		}
+</a><a href="#h1-0-155" id="h1-0-155" class="i">+
+</a><a href="#h1-0-156" id="h1-0-156" class="i">+		if err := parser(attr, value, out); err != nil {
+</a><a href="#h1-0-157" id="h1-0-157" class="i">+			return nil, err
+</a><a href="#h1-0-158" id="h1-0-158" class="i">+		}
+</a><a href="#h1-0-159" id="h1-0-159" class="i">+	}
+</a><a href="#h1-0-160" id="h1-0-160" class="i">+
+</a><a href="#h1-0-161" id="h1-0-161" class="i">+	return out, nil
+</a><a href="#h1-0-162" id="h1-0-162" class="i">+}
+</a><b>diff --git a/<a id="h2" href="../file/schemas/service/unistore.proto">schemas/service/unistore.proto</a> b/<a href="../file/schemas/service/unistore.proto">schemas/service/unistore.proto</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -69,6 +69,10 @@ message PutObjectRequest {
+</a>   // that the client computes the checksum of the data in advance of this request.
+   // Its semantics and use or non-use is implementation-defined.
+   string checksum = 4;
+<a href="#h2-0-3" id="h2-0-3" class="i">+  // Attributes is a set of attributes to associate with the object. In general, this parameter
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+  // should be omitted in order to allow the server to automatically populate relevant attributes;
+</a><a href="#h2-0-5" id="h2-0-5" class="i">+  // it exists here for purposes of manual override as required.
+</a><a href="#h2-0-6" id="h2-0-6" class="i">+  common.Attributes attributes = 5;
+</a> }
+ 
+ // PutObjectResponse is the response definition for PutObject.
+</pre>
+</div>
+</body>
+</html>

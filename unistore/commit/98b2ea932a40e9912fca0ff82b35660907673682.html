@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>cmd/unistore-cli, internal/config: RPC options in client configuration and set maximum call send/recv sizes - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/98b2ea932a40e9912fca0ff82b35660907673682">98b2ea932a40e9912fca0ff82b35660907673682</a>
+<b>parent</b> <a href="../commit/eca8c4d38635221b3f9887b53d4c65c262b0661f">eca8c4d38635221b3f9887b53d4c65c262b0661f</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sat  1 Jan 2022 18:48:08 -0800
+
+cmd/unistore-cli, internal/config: RPC options in client configuration and set maximum call send/recv sizes
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">cmd/unistore-cli/client.go</a></td><td> | </td><td class="num">41</td><td><span class="i">++++++++++++++++++++++++</span><span class="d">-----------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">cmd/unistore-cli/service.go</a></td><td> | </td><td class="num">20</td><td><span class="i">++++++++++</span><span class="d">----------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">internal/config/types.go</a></td><td> | </td><td class="num">1</td><td><span class="i">+</span><span class="d"></span></td></tr>
+</table></pre><pre>3 files changed, 35 insertions(+), 27 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/cmd/unistore-cli/client.go">cmd/unistore-cli/client.go</a> b/<a href="../file/cmd/unistore-cli/client.go">cmd/unistore-cli/client.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -17,65 +17,72 @@ import (
+</a> 	&quot;unistore/pkg/client/unistore&quot;
+ )
+ 
+<a href="#h0-0-3" id="h0-0-3" class="d">-// initStoreConfig initializes the application client configuration.
+</a><a href="#h0-0-4" id="h0-0-4" class="d">-func initStoreConfig(path string, store string) (*config.Store, error) {
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+// newClientConfig initializes the application client configuration.
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+func newClientConfig(path string, store string) (*config.Store, *config.RPC, error) {
+</a> 	cfg, err := config.New(path)
+ 	if err != nil {
+<a href="#h0-0-9" id="h0-0-9" class="d">-		return nil, err
+</a><a href="#h0-0-10" id="h0-0-10" class="i">+		return nil, nil, err
+</a> 	}
+ 
+ 	for _, s := range cfg.Client.Stores {
+ 		if s.Name == store {
+<a href="#h0-0-15" id="h0-0-15" class="d">-			return &amp;s, nil
+</a><a href="#h0-0-16" id="h0-0-16" class="i">+			return &amp;s, &amp;cfg.Client.RPC, nil
+</a> 		}
+ 	}
+ 
+<a href="#h0-0-20" id="h0-0-20" class="d">-	return nil, fmt.Errorf(
+</a><a href="#h0-0-21" id="h0-0-21" class="i">+	return nil, nil, fmt.Errorf(
+</a> 		&quot;no such store defined in configuration: path=%s store=%s&quot;,
+ 		path,
+ 		store,
+ 	)
+ }
+ 
+<a href="#h0-0-28" id="h0-0-28" class="d">-// initUnistoreClient initializes a Unistore gRPC client based on the client configuration.
+</a><a href="#h0-0-29" id="h0-0-29" class="d">-func initUnistoreClient(cfg *config.Store) (*unistore.Client, error) {
+</a><a href="#h0-0-30" id="h0-0-30" class="i">+// newUnistoreClient initializes a Unistore gRPC client based on the client configuration.
+</a><a href="#h0-0-31" id="h0-0-31" class="i">+func newUnistoreClient(store *config.Store, rpc *config.RPC) (*unistore.Client, error) {
+</a> 	var cancel context.CancelFunc
+ 	var opts []grpc.DialOption
+ 
+ 	instance := &quot;cli&quot;
+<a href="#h0-0-36" id="h0-0-36" class="d">-	if cfg.Connection.Identity != &quot;&quot; {
+</a><a href="#h0-0-37" id="h0-0-37" class="d">-		instance = cfg.Connection.Identity
+</a><a href="#h0-0-38" id="h0-0-38" class="i">+	if store.Connection.Identity != &quot;&quot; {
+</a><a href="#h0-0-39" id="h0-0-39" class="i">+		instance = store.Connection.Identity
+</a> 	}
+ 	clientID := fmt.Sprintf(
+ 		&quot;unistore-cli/%s (instance:%s; authority:%s)&quot;,
+ 		meta.Version,
+ 		instance,
+<a href="#h0-0-45" id="h0-0-45" class="d">-		cfg.Authority,
+</a><a href="#h0-0-46" id="h0-0-46" class="i">+		store.Authority,
+</a> 	)
+ 
+<a href="#h0-0-49" id="h0-0-49" class="d">-	opts = append(opts, grpc.WithAuthority(cfg.Authority))
+</a><a href="#h0-0-50" id="h0-0-50" class="i">+	opts = append(opts, grpc.WithAuthority(store.Authority))
+</a> 	opts = append(opts, grpc.WithUserAgent(clientID))
+<a href="#h0-0-52" id="h0-0-52" class="d">-	opts = append(opts, grpc.WithUnaryInterceptor(newRequestTimeoutUnaryInterceptor(cfg.Connection.RequestTimeout)))
+</a><a href="#h0-0-53" id="h0-0-53" class="i">+	opts = append(opts, grpc.WithUnaryInterceptor(newRequestTimeoutUnaryInterceptor(store.Connection.RequestTimeout)))
+</a> 
+<a href="#h0-0-55" id="h0-0-55" class="d">-	if tlsCtx := cfg.Connection.TLSContext; tlsCtx != nil {
+</a><a href="#h0-0-56" id="h0-0-56" class="i">+	if rpc.MaxRecvMessageSize &gt; 0 {
+</a><a href="#h0-0-57" id="h0-0-57" class="i">+		opts = append(opts, grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(rpc.MaxRecvMessageSize)))
+</a><a href="#h0-0-58" id="h0-0-58" class="i">+	}
+</a><a href="#h0-0-59" id="h0-0-59" class="i">+	if rpc.MaxSendMessageSize &gt; 0 {
+</a><a href="#h0-0-60" id="h0-0-60" class="i">+		opts = append(opts, grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(rpc.MaxSendMessageSize)))
+</a><a href="#h0-0-61" id="h0-0-61" class="i">+	}
+</a><a href="#h0-0-62" id="h0-0-62" class="i">+
+</a><a href="#h0-0-63" id="h0-0-63" class="i">+	if tlsCtx := store.Connection.TLSContext; tlsCtx != nil {
+</a> 		tlsCfg, err := newTLSConfig(tlsCtx)
+ 		if err != nil {
+ 			return nil, err
+ 		}
+ 
+<a href="#h0-0-69" id="h0-0-69" class="d">-		tlsCfg.ServerName = cfg.Authority
+</a><a href="#h0-0-70" id="h0-0-70" class="i">+		tlsCfg.ServerName = store.Authority
+</a> 		opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(tlsCfg)))
+ 	} else {
+ 		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+ 	}
+ 
+ 	ctx := context.Background()
+<a href="#h0-0-77" id="h0-0-77" class="d">-	if cfg.Connection.ConnectTimeout &gt; 0 {
+</a><a href="#h0-0-78" id="h0-0-78" class="d">-		ctx, cancel = context.WithTimeout(ctx, cfg.Connection.ConnectTimeout)
+</a><a href="#h0-0-79" id="h0-0-79" class="i">+	if store.Connection.ConnectTimeout &gt; 0 {
+</a><a href="#h0-0-80" id="h0-0-80" class="i">+		ctx, cancel = context.WithTimeout(ctx, store.Connection.ConnectTimeout)
+</a> 		defer cancel()
+ 	}
+ 
+<a href="#h0-0-84" id="h0-0-84" class="d">-	return unistore.New(ctx, cfg.Address, opts...)
+</a><a href="#h0-0-85" id="h0-0-85" class="i">+	return unistore.New(ctx, store.Address, opts...)
+</a> }
+ 
+ // newTLSConfig creates a new *tls.Config from the configuration-declared TLS context.
+<b>diff --git a/<a id="h1" href="../file/cmd/unistore-cli/service.go">cmd/unistore-cli/service.go</a> b/<a href="../file/cmd/unistore-cli/service.go">cmd/unistore-cli/service.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -16,12 +16,12 @@ import (
+</a> func runHead(cmd *cobra.Command, args []string) error {
+ 	bucket, _ := cmd.Flags().GetString(&quot;bucket&quot;)
+ 
+<a href="#h1-0-3" id="h1-0-3" class="d">-	store, err := initStoreConfig(flagConfig, flagStore)
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+	store, rpc, err := newClientConfig(flagConfig, flagStore)
+</a> 	if err != nil {
+ 		return err
+ 	}
+ 
+<a href="#h1-0-9" id="h1-0-9" class="d">-	client, err := initUnistoreClient(store)
+</a><a href="#h1-0-10" id="h1-0-10" class="i">+	client, err := newUnistoreClient(store, rpc)
+</a> 	if err != nil {
+ 		return err
+ 	}
+<a href="#h1-1" id="h1-1" class="h">@@ -52,12 +52,12 @@ func runDownload(cmd *cobra.Command, args []string) error {
+</a> 	stream, _ := cmd.Flags().GetBool(&quot;stream&quot;)
+ 	chunkSize, _ := cmd.Flags().GetUint64(&quot;chunk-size&quot;)
+ 
+<a href="#h1-1-3" id="h1-1-3" class="d">-	store, err := initStoreConfig(flagConfig, flagStore)
+</a><a href="#h1-1-4" id="h1-1-4" class="i">+	store, rpc, err := newClientConfig(flagConfig, flagStore)
+</a> 	if err != nil {
+ 		return err
+ 	}
+ 
+<a href="#h1-1-9" id="h1-1-9" class="d">-	client, err := initUnistoreClient(store)
+</a><a href="#h1-1-10" id="h1-1-10" class="i">+	client, err := newUnistoreClient(store, rpc)
+</a> 	if err != nil {
+ 		return err
+ 	}
+<a href="#h1-2" id="h1-2" class="h">@@ -129,12 +129,12 @@ func runUpload(cmd *cobra.Command, args []string) error {
+</a> 	chunkSize, _ := cmd.Flags().GetUint64(&quot;chunk-size&quot;)
+ 	checksum, _ := cmd.Flags().GetString(&quot;checksum&quot;)
+ 
+<a href="#h1-2-3" id="h1-2-3" class="d">-	store, err := initStoreConfig(flagConfig, flagStore)
+</a><a href="#h1-2-4" id="h1-2-4" class="i">+	store, rpc, err := newClientConfig(flagConfig, flagStore)
+</a> 	if err != nil {
+ 		return err
+ 	}
+ 
+<a href="#h1-2-9" id="h1-2-9" class="d">-	client, err := initUnistoreClient(store)
+</a><a href="#h1-2-10" id="h1-2-10" class="i">+	client, err := newUnistoreClient(store, rpc)
+</a> 	if err != nil {
+ 		return err
+ 	}
+<a href="#h1-3" id="h1-3" class="h">@@ -206,12 +206,12 @@ func runUpload(cmd *cobra.Command, args []string) error {
+</a> func runDelete(cmd *cobra.Command, args []string) error {
+ 	bucket, _ := cmd.Flags().GetString(&quot;bucket&quot;)
+ 
+<a href="#h1-3-3" id="h1-3-3" class="d">-	store, err := initStoreConfig(flagConfig, flagStore)
+</a><a href="#h1-3-4" id="h1-3-4" class="i">+	store, rpc, err := newClientConfig(flagConfig, flagStore)
+</a> 	if err != nil {
+ 		return err
+ 	}
+ 
+<a href="#h1-3-9" id="h1-3-9" class="d">-	client, err := initUnistoreClient(store)
+</a><a href="#h1-3-10" id="h1-3-10" class="i">+	client, err := newUnistoreClient(store, rpc)
+</a> 	if err != nil {
+ 		return err
+ 	}
+<a href="#h1-4" id="h1-4" class="h">@@ -245,12 +245,12 @@ func runList(cmd *cobra.Command, args []string) error {
+</a> 		prefix = args[0]
+ 	}
+ 
+<a href="#h1-4-3" id="h1-4-3" class="d">-	store, err := initStoreConfig(flagConfig, flagStore)
+</a><a href="#h1-4-4" id="h1-4-4" class="i">+	store, rpc, err := newClientConfig(flagConfig, flagStore)
+</a> 	if err != nil {
+ 		return err
+ 	}
+ 
+<a href="#h1-4-9" id="h1-4-9" class="d">-	client, err := initUnistoreClient(store)
+</a><a href="#h1-4-10" id="h1-4-10" class="i">+	client, err := newUnistoreClient(store, rpc)
+</a> 	if err != nil {
+ 		return err
+ 	}
+<b>diff --git a/<a id="h2" href="../file/internal/config/types.go">internal/config/types.go</a> b/<a href="../file/internal/config/types.go">internal/config/types.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -138,6 +138,7 @@ type Store struct {
+</a> // Client describes client configuration.
+ type Client struct {
+ 	Stores []Store `yaml:&quot;stores&quot;`
+<a href="#h2-0-3" id="h2-0-3" class="i">+	RPC    RPC     `yaml:&quot;rpc&quot;`
+</a> }
+ 
+ // Metrics describes metrics client configuration.
+</pre>
+</div>
+</body>
+</html>

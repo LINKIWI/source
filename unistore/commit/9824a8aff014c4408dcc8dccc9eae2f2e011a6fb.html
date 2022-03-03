@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/backend: Refactor common io.Reader/io.Writer-based in-flight transformation to common I/O processor backend - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/9824a8aff014c4408dcc8dccc9eae2f2e011a6fb">9824a8aff014c4408dcc8dccc9eae2f2e011a6fb</a>
+<b>parent</b> <a href="../commit/7ce1945b2bee3202202ee53a14bc83a9d775d3e3">7ce1945b2bee3202202ee53a14bc83a9d775d3e3</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Thu 30 Dec 2021 14:26:43 -0800
+
+internal/backend: Refactor common io.Reader/io.Writer-based in-flight transformation to common I/O processor backend
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/backend/buffer.go</a></td><td> | </td><td class="num">146</td><td><span class="i">++</span><span class="d">-----------------------------------------------------------------------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">internal/backend/compression.go</a></td><td> | </td><td class="num">212</td><td><span class="i">+</span><span class="d">------------------------------------------------------------------------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">internal/backend/encrypt.go</a></td><td> | </td><td class="num">231</td><td><span class="i">+</span><span class="d">------------------------------------------------------------------------------</span></td></tr>
+<tr><td class="A">A</td><td><a href="#h3">internal/backend/processor.go</a></td><td> | </td><td class="num">335</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+</table></pre><pre>4 files changed, 339 insertions(+), 585 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/backend/buffer.go">internal/backend/buffer.go</a> b/<a href="../file/internal/backend/buffer.go">internal/backend/buffer.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -1,150 +1,8 @@
+</a> package backend
+ 
+<a href="#h0-0-2" id="h0-0-2" class="d">-import (
+</a><a href="#h0-0-3" id="h0-0-3" class="d">-	&quot;io&quot;
+</a><a href="#h0-0-4" id="h0-0-4" class="d">-
+</a><a href="#h0-0-5" id="h0-0-5" class="d">-	&quot;google.golang.org/protobuf/proto&quot;
+</a><a href="#h0-0-6" id="h0-0-6" class="d">-
+</a><a href="#h0-0-7" id="h0-0-7" class="d">-	&quot;unistore/schemas/common&quot;
+</a><a href="#h0-0-8" id="h0-0-8" class="d">-	&quot;unistore/schemas/service&quot;
+</a><a href="#h0-0-9" id="h0-0-9" class="d">-)
+</a><a href="#h0-0-10" id="h0-0-10" class="d">-
+</a><a href="#h0-0-11" id="h0-0-11" class="d">-// Buffer is a Backend that internally buffers streaming object gets and puts to a desired chunk
+</a><a href="#h0-0-12" id="h0-0-12" class="d">-// size to the wrapped Backend, independent of the payload sizes sent or received by the client.
+</a><a href="#h0-0-13" id="h0-0-13" class="d">-// This is particularly useful for backends that have requirements on minimum and maximum chunk
+</a><a href="#h0-0-14" id="h0-0-14" class="d">-// sizes for streaming I/O.
+</a><a href="#h0-0-15" id="h0-0-15" class="d">-type Buffer struct {
+</a><a href="#h0-0-16" id="h0-0-16" class="d">-	getChunkSize int
+</a><a href="#h0-0-17" id="h0-0-17" class="d">-	putChunkSize int
+</a><a href="#h0-0-18" id="h0-0-18" class="d">-	Backend
+</a><a href="#h0-0-19" id="h0-0-19" class="d">-}
+</a><a href="#h0-0-20" id="h0-0-20" class="d">-
+</a> // NewBuffer creates a Buffer with desired get and put chunk sizes. Chunked reads from the backend
+ // are normalized to at most the get chunk size; chunked writes to the backend are normalized to at
+ // most the put chunk size.
+<a href="#h0-0-24" id="h0-0-24" class="d">-func NewBuffer(getChunkSize int, putChunkSize int, backend Backend) Backend {
+</a><a href="#h0-0-25" id="h0-0-25" class="d">-	return &amp;Buffer{
+</a><a href="#h0-0-26" id="h0-0-26" class="d">-		getChunkSize: getChunkSize,
+</a><a href="#h0-0-27" id="h0-0-27" class="d">-		putChunkSize: putChunkSize,
+</a><a href="#h0-0-28" id="h0-0-28" class="d">-		Backend:      backend,
+</a><a href="#h0-0-29" id="h0-0-29" class="d">-	}
+</a><a href="#h0-0-30" id="h0-0-30" class="d">-}
+</a><a href="#h0-0-31" id="h0-0-31" class="d">-
+</a><a href="#h0-0-32" id="h0-0-32" class="d">-// StreamGetObject transparently replaces the chunk size to the backend while maintaining the
+</a><a href="#h0-0-33" id="h0-0-33" class="d">-// originally requested chunk size for responses to the client.
+</a><a href="#h0-0-34" id="h0-0-34" class="d">-func (b *Buffer) StreamGetObject(request *service.GetObjectStreamRequest) (&lt;-chan *service.GetObjectStreamResponse, error) {
+</a><a href="#h0-0-35" id="h0-0-35" class="d">-	var metadata *common.Metadata
+</a><a href="#h0-0-36" id="h0-0-36" class="d">-
+</a><a href="#h0-0-37" id="h0-0-37" class="d">-	if b.getChunkSize &lt;= 0 {
+</a><a href="#h0-0-38" id="h0-0-38" class="d">-		return b.Backend.StreamGetObject(request)
+</a><a href="#h0-0-39" id="h0-0-39" class="d">-	}
+</a><a href="#h0-0-40" id="h0-0-40" class="d">-
+</a><a href="#h0-0-41" id="h0-0-41" class="d">-
+</a><a href="#h0-0-42" id="h0-0-42" class="d">-	// Clone the inbound request in order to overwrite the chunk size to the desired size.
+</a><a href="#h0-0-43" id="h0-0-43" class="d">-	// The chunk reshaping applies only to the chunk reads done internally by the backend;
+</a><a href="#h0-0-44" id="h0-0-44" class="d">-	// the original chunk size requested by the client is still respected for outbound streams.
+</a><a href="#h0-0-45" id="h0-0-45" class="d">-	proxyRequest := proto.Clone(request).(*service.GetObjectStreamRequest)
+</a><a href="#h0-0-46" id="h0-0-46" class="d">-	proxyRequest.ChunkSize = uint64(b.getChunkSize)
+</a><a href="#h0-0-47" id="h0-0-47" class="d">-
+</a><a href="#h0-0-48" id="h0-0-48" class="d">-	stream, err := b.Backend.StreamGetObject(proxyRequest)
+</a><a href="#h0-0-49" id="h0-0-49" class="d">-	if err != nil {
+</a><a href="#h0-0-50" id="h0-0-50" class="d">-		return nil, err
+</a><a href="#h0-0-51" id="h0-0-51" class="d">-	}
+</a><a href="#h0-0-52" id="h0-0-52" class="d">-
+</a><a href="#h0-0-53" id="h0-0-53" class="d">-	proxy := make(chan *service.GetObjectStreamResponse)
+</a><a href="#h0-0-54" id="h0-0-54" class="d">-	r, w := io.Pipe()
+</a><a href="#h0-0-55" id="h0-0-55" class="d">-
+</a><a href="#h0-0-56" id="h0-0-56" class="d">-	go func() {
+</a><a href="#h0-0-57" id="h0-0-57" class="d">-		for response := range stream {
+</a><a href="#h0-0-58" id="h0-0-58" class="d">-			if metadata == nil {
+</a><a href="#h0-0-59" id="h0-0-59" class="d">-				metadata = response.Response.Metadata
+</a><a href="#h0-0-60" id="h0-0-60" class="d">-			}
+</a><a href="#h0-0-61" id="h0-0-61" class="d">-
+</a><a href="#h0-0-62" id="h0-0-62" class="d">-			if _, err := w.Write(response.Response.Data); err != nil {
+</a><a href="#h0-0-63" id="h0-0-63" class="d">-				break
+</a><a href="#h0-0-64" id="h0-0-64" class="d">-			}
+</a><a href="#h0-0-65" id="h0-0-65" class="d">-		}
+</a><a href="#h0-0-66" id="h0-0-66" class="d">-
+</a><a href="#h0-0-67" id="h0-0-67" class="d">-		w.CloseWithError(io.EOF)
+</a><a href="#h0-0-68" id="h0-0-68" class="d">-	}()
+</a><a href="#h0-0-69" id="h0-0-69" class="d">-
+</a><a href="#h0-0-70" id="h0-0-70" class="d">-	go func() {
+</a><a href="#h0-0-71" id="h0-0-71" class="d">-		var offset int
+</a><a href="#h0-0-72" id="h0-0-72" class="d">-
+</a><a href="#h0-0-73" id="h0-0-73" class="d">-		for {
+</a><a href="#h0-0-74" id="h0-0-74" class="d">-			buf := make([]byte, requestedChunkSize)
+</a><a href="#h0-0-75" id="h0-0-75" class="d">-			n, err := io.ReadFull(r, buf)
+</a><a href="#h0-0-76" id="h0-0-76" class="d">-
+</a><a href="#h0-0-77" id="h0-0-77" class="d">-			if n &gt; 0 {
+</a><a href="#h0-0-78" id="h0-0-78" class="d">-				proxy &lt;- &amp;service.GetObjectStreamResponse{
+</a><a href="#h0-0-79" id="h0-0-79" class="d">-					Response: &amp;service.GetObjectResponse{
+</a><a href="#h0-0-80" id="h0-0-80" class="d">-						Metadata: metadata,
+</a><a href="#h0-0-81" id="h0-0-81" class="d">-						Data:     buf[:n],
+</a><a href="#h0-0-82" id="h0-0-82" class="d">-					},
+</a><a href="#h0-0-83" id="h0-0-83" class="d">-					Range: &amp;common.Range{
+</a><a href="#h0-0-84" id="h0-0-84" class="d">-						Unit:  &quot;bytes&quot;,
+</a><a href="#h0-0-85" id="h0-0-85" class="d">-						Start: uint64(offset),
+</a><a href="#h0-0-86" id="h0-0-86" class="d">-						End:   uint64(offset + n),
+</a><a href="#h0-0-87" id="h0-0-87" class="d">-					},
+</a><a href="#h0-0-88" id="h0-0-88" class="d">-				}
+</a><a href="#h0-0-89" id="h0-0-89" class="d">-
+</a><a href="#h0-0-90" id="h0-0-90" class="d">-				offset += n
+</a><a href="#h0-0-91" id="h0-0-91" class="d">-			}
+</a><a href="#h0-0-92" id="h0-0-92" class="d">-
+</a><a href="#h0-0-93" id="h0-0-93" class="d">-			if err != nil {
+</a><a href="#h0-0-94" id="h0-0-94" class="d">-				break
+</a><a href="#h0-0-95" id="h0-0-95" class="d">-			}
+</a><a href="#h0-0-96" id="h0-0-96" class="d">-		}
+</a><a href="#h0-0-97" id="h0-0-97" class="d">-
+</a><a href="#h0-0-98" id="h0-0-98" class="d">-		close(proxy)
+</a><a href="#h0-0-99" id="h0-0-99" class="d">-	}()
+</a><a href="#h0-0-100" id="h0-0-100" class="d">-
+</a><a href="#h0-0-101" id="h0-0-101" class="d">-	return proxy, nil
+</a><a href="#h0-0-102" id="h0-0-102" class="d">-}
+</a><a href="#h0-0-103" id="h0-0-103" class="d">-
+</a><a href="#h0-0-104" id="h0-0-104" class="d">-// StreamPutObject enforces (with best effort) the desired chunk size for writes to the backend.
+</a><a href="#h0-0-105" id="h0-0-105" class="d">-func (b *Buffer) StreamPutObject(stream chan *service.PutObjectStreamRequest) (*service.PutObjectStreamResponse, error) {
+</a><a href="#h0-0-106" id="h0-0-106" class="d">-	proxy := make(chan *service.PutObjectStreamRequest)
+</a><a href="#h0-0-107" id="h0-0-107" class="d">-	peek := &lt;-stream
+</a><a href="#h0-0-108" id="h0-0-108" class="d">-	r, w := io.Pipe()
+</a><a href="#h0-0-109" id="h0-0-109" class="d">-
+</a><a href="#h0-0-110" id="h0-0-110" class="d">-	go func() {
+</a><a href="#h0-0-111" id="h0-0-111" class="d">-		defer w.CloseWithError(io.EOF)
+</a><a href="#h0-0-112" id="h0-0-112" class="d">-
+</a><a href="#h0-0-113" id="h0-0-113" class="d">-		if _, err := w.Write(peek.Request.Data); err != nil {
+</a><a href="#h0-0-114" id="h0-0-114" class="d">-			return
+</a><a href="#h0-0-115" id="h0-0-115" class="d">-		}
+</a><a href="#h0-0-116" id="h0-0-116" class="d">-
+</a><a href="#h0-0-117" id="h0-0-117" class="d">-		for request := range stream {
+</a><a href="#h0-0-118" id="h0-0-118" class="d">-			if _, err := w.Write(request.Request.Data); err != nil {
+</a><a href="#h0-0-119" id="h0-0-119" class="d">-				return
+</a><a href="#h0-0-120" id="h0-0-120" class="d">-			}
+</a><a href="#h0-0-121" id="h0-0-121" class="d">-		}
+</a><a href="#h0-0-122" id="h0-0-122" class="d">-	}()
+</a><a href="#h0-0-123" id="h0-0-123" class="d">-
+</a><a href="#h0-0-124" id="h0-0-124" class="d">-	go func() {
+</a><a href="#h0-0-125" id="h0-0-125" class="d">-		for {
+</a><a href="#h0-0-126" id="h0-0-126" class="d">-			buf := make([]byte, b.putChunkSize)
+</a><a href="#h0-0-127" id="h0-0-127" class="d">-			n, err := io.ReadFull(r, buf)
+</a><a href="#h0-0-128" id="h0-0-128" class="d">-
+</a><a href="#h0-0-129" id="h0-0-129" class="d">-			if n &gt; 0 {
+</a><a href="#h0-0-130" id="h0-0-130" class="d">-				proxy &lt;- &amp;service.PutObjectStreamRequest{
+</a><a href="#h0-0-131" id="h0-0-131" class="d">-					Request: &amp;service.PutObjectRequest{
+</a><a href="#h0-0-132" id="h0-0-132" class="d">-						Resource: peek.Request.Resource,
+</a><a href="#h0-0-133" id="h0-0-133" class="d">-						Key:      peek.Request.Key,
+</a><a href="#h0-0-134" id="h0-0-134" class="d">-						Data:     buf[:n],
+</a><a href="#h0-0-135" id="h0-0-135" class="d">-						Checksum: peek.Request.Checksum,
+</a><a href="#h0-0-136" id="h0-0-136" class="d">-					},
+</a><a href="#h0-0-137" id="h0-0-137" class="d">-				}
+</a><a href="#h0-0-138" id="h0-0-138" class="d">-			}
+</a><a href="#h0-0-139" id="h0-0-139" class="d">-
+</a><a href="#h0-0-140" id="h0-0-140" class="d">-			if err != nil {
+</a><a href="#h0-0-141" id="h0-0-141" class="d">-				break
+</a><a href="#h0-0-142" id="h0-0-142" class="d">-			}
+</a><a href="#h0-0-143" id="h0-0-143" class="d">-		}
+</a><a href="#h0-0-144" id="h0-0-144" class="d">-
+</a><a href="#h0-0-145" id="h0-0-145" class="d">-		close(proxy)
+</a><a href="#h0-0-146" id="h0-0-146" class="d">-	}()
+</a><a href="#h0-0-147" id="h0-0-147" class="d">-
+</a><a href="#h0-0-148" id="h0-0-148" class="d">-	return b.Backend.StreamPutObject(proxy)
+</a><a href="#h0-0-149" id="h0-0-149" class="i">+func NewBuffer(getChunkSize uint64, putChunkSize uint64, backend Backend) Backend {
+</a><a href="#h0-0-150" id="h0-0-150" class="i">+	return newIOProcessor(nil, nil, getChunkSize, putChunkSize, backend)
+</a> }
+<b>diff --git a/<a id="h1" href="../file/internal/backend/compression.go">internal/backend/compression.go</a> b/<a href="../file/internal/backend/compression.go">internal/backend/compression.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -1,30 +1,17 @@
+</a> package backend
+ 
+ import (
+<a href="#h1-0-3" id="h1-0-3" class="d">-	&quot;bytes&quot;
+</a> 	&quot;compress/gzip&quot;
+ 	&quot;fmt&quot;
+ 	&quot;io&quot;
+<a href="#h1-0-7" id="h1-0-7" class="d">-	&quot;log&quot;
+</a> 	&quot;strings&quot;
+ 
+ 	&quot;github.com/klauspost/compress/s2&quot;
+ 	&quot;github.com/klauspost/compress/zstd&quot;
+<a href="#h1-0-12" id="h1-0-12" class="d">-	&quot;google.golang.org/grpc/codes&quot;
+</a><a href="#h1-0-13" id="h1-0-13" class="d">-	&quot;google.golang.org/grpc/status&quot;
+</a> 
+ 	&quot;unistore/schemas/common&quot;
+<a href="#h1-0-16" id="h1-0-16" class="d">-	&quot;unistore/schemas/service&quot;
+</a> )
+ 
+<a href="#h1-0-19" id="h1-0-19" class="d">-// Compression is a Backend that performs in-flight compression and decompression of get and put
+</a><a href="#h1-0-20" id="h1-0-20" class="d">-// data payloads.
+</a><a href="#h1-0-21" id="h1-0-21" class="d">-type Compression struct {
+</a><a href="#h1-0-22" id="h1-0-22" class="d">-	compressor   func(io.Writer) (io.WriteCloser, error)
+</a><a href="#h1-0-23" id="h1-0-23" class="d">-	decompressor func(io.Reader) (io.ReadCloser, error)
+</a><a href="#h1-0-24" id="h1-0-24" class="d">-	Backend
+</a><a href="#h1-0-25" id="h1-0-25" class="d">-}
+</a><a href="#h1-0-26" id="h1-0-26" class="d">-
+</a> // NewCompression creates a new Compression with the specified algorithm and compression level.
+ func NewCompression(algorithm string, level int, backend Backend) (Backend, error) {
+ 	var parsed common.Compression
+<a href="#h1-1" id="h1-1" class="h">@@ -93,202 +80,5 @@ func NewCompression(algorithm string, level int, backend Backend) (Backend, erro
+</a> 		}
+ 	}
+ 
+<a href="#h1-1-3" id="h1-1-3" class="d">-	return &amp;Compression{
+</a><a href="#h1-1-4" id="h1-1-4" class="d">-		compressor:   compressor,
+</a><a href="#h1-1-5" id="h1-1-5" class="d">-		decompressor: decompressor,
+</a><a href="#h1-1-6" id="h1-1-6" class="d">-		Backend:      backend,
+</a><a href="#h1-1-7" id="h1-1-7" class="d">-	}, nil
+</a><a href="#h1-1-8" id="h1-1-8" class="d">-}
+</a><a href="#h1-1-9" id="h1-1-9" class="d">-
+</a><a href="#h1-1-10" id="h1-1-10" class="d">-// GetObject defers to the underlying backend followed by performing transparent decompression of
+</a><a href="#h1-1-11" id="h1-1-11" class="d">-// the full payload.
+</a><a href="#h1-1-12" id="h1-1-12" class="d">-func (c *Compression) GetObject(request *service.GetObjectRequest) (*service.GetObjectResponse, error) {
+</a><a href="#h1-1-13" id="h1-1-13" class="d">-	resp, err := c.Backend.GetObject(request)
+</a><a href="#h1-1-14" id="h1-1-14" class="d">-	if err != nil {
+</a><a href="#h1-1-15" id="h1-1-15" class="d">-		return nil, err
+</a><a href="#h1-1-16" id="h1-1-16" class="d">-	}
+</a><a href="#h1-1-17" id="h1-1-17" class="d">-
+</a><a href="#h1-1-18" id="h1-1-18" class="d">-	decompressed, err := c.decompressor(bytes.NewReader(resp.Data))
+</a><a href="#h1-1-19" id="h1-1-19" class="d">-	if err != nil {
+</a><a href="#h1-1-20" id="h1-1-20" class="d">-		return nil, status.Error(codes.Internal, err.Error())
+</a><a href="#h1-1-21" id="h1-1-21" class="d">-	}
+</a><a href="#h1-1-22" id="h1-1-22" class="d">-
+</a><a href="#h1-1-23" id="h1-1-23" class="d">-	defer decompressed.Close()
+</a><a href="#h1-1-24" id="h1-1-24" class="d">-
+</a><a href="#h1-1-25" id="h1-1-25" class="d">-	resp.Data, err = io.ReadAll(decompressed)
+</a><a href="#h1-1-26" id="h1-1-26" class="d">-	if err != nil {
+</a><a href="#h1-1-27" id="h1-1-27" class="d">-		return nil, status.Error(codes.Internal, err.Error())
+</a><a href="#h1-1-28" id="h1-1-28" class="d">-	}
+</a><a href="#h1-1-29" id="h1-1-29" class="d">-
+</a><a href="#h1-1-30" id="h1-1-30" class="d">-	return resp, nil
+</a><a href="#h1-1-31" id="h1-1-31" class="d">-}
+</a><a href="#h1-1-32" id="h1-1-32" class="d">-
+</a><a href="#h1-1-33" id="h1-1-33" class="d">-// StreamGetObject is a streaming implementation of GetObject that compresses data chunk-by-chunk.
+</a><a href="#h1-1-34" id="h1-1-34" class="d">-func (c *Compression) StreamGetObject(request *service.GetObjectStreamRequest) (&lt;-chan *service.GetObjectStreamResponse, error) {
+</a><a href="#h1-1-35" id="h1-1-35" class="d">-	var metadata *common.Metadata
+</a><a href="#h1-1-36" id="h1-1-36" class="d">-
+</a><a href="#h1-1-37" id="h1-1-37" class="d">-	proxy := make(chan *service.GetObjectStreamResponse)
+</a><a href="#h1-1-38" id="h1-1-38" class="d">-
+</a><a href="#h1-1-39" id="h1-1-39" class="d">-	stream, err := c.Backend.StreamGetObject(request)
+</a><a href="#h1-1-40" id="h1-1-40" class="d">-	if err != nil {
+</a><a href="#h1-1-41" id="h1-1-41" class="d">-		return nil, err
+</a><a href="#h1-1-42" id="h1-1-42" class="d">-	}
+</a><a href="#h1-1-43" id="h1-1-43" class="d">-
+</a><a href="#h1-1-44" id="h1-1-44" class="d">-	r, w := io.Pipe()
+</a><a href="#h1-1-45" id="h1-1-45" class="d">-
+</a><a href="#h1-1-46" id="h1-1-46" class="d">-	go func() {
+</a><a href="#h1-1-47" id="h1-1-47" class="d">-		for response := range stream {
+</a><a href="#h1-1-48" id="h1-1-48" class="d">-			if metadata == nil {
+</a><a href="#h1-1-49" id="h1-1-49" class="d">-				metadata = response.Response.Metadata
+</a><a href="#h1-1-50" id="h1-1-50" class="d">-			}
+</a><a href="#h1-1-51" id="h1-1-51" class="d">-
+</a><a href="#h1-1-52" id="h1-1-52" class="d">-			if _, err := w.Write(response.Response.Data); err != nil {
+</a><a href="#h1-1-53" id="h1-1-53" class="d">-				log.Printf(&quot;backend: error writing response data chunk: err=%v&quot;, err)
+</a><a href="#h1-1-54" id="h1-1-54" class="d">-				break
+</a><a href="#h1-1-55" id="h1-1-55" class="d">-			}
+</a><a href="#h1-1-56" id="h1-1-56" class="d">-		}
+</a><a href="#h1-1-57" id="h1-1-57" class="d">-
+</a><a href="#h1-1-58" id="h1-1-58" class="d">-		w.CloseWithError(io.EOF)
+</a><a href="#h1-1-59" id="h1-1-59" class="d">-	}()
+</a><a href="#h1-1-60" id="h1-1-60" class="d">-
+</a><a href="#h1-1-61" id="h1-1-61" class="d">-	go func() {
+</a><a href="#h1-1-62" id="h1-1-62" class="d">-		var offset int
+</a><a href="#h1-1-63" id="h1-1-63" class="d">-
+</a><a href="#h1-1-64" id="h1-1-64" class="d">-		decompressed, err := c.decompressor(r)
+</a><a href="#h1-1-65" id="h1-1-65" class="d">-		if err != nil {
+</a><a href="#h1-1-66" id="h1-1-66" class="d">-			log.Printf(&quot;backend: error creating compressor: err=%v&quot;, err)
+</a><a href="#h1-1-67" id="h1-1-67" class="d">-			return
+</a><a href="#h1-1-68" id="h1-1-68" class="d">-		}
+</a><a href="#h1-1-69" id="h1-1-69" class="d">-
+</a><a href="#h1-1-70" id="h1-1-70" class="d">-		defer decompressed.Close()
+</a><a href="#h1-1-71" id="h1-1-71" class="d">-
+</a><a href="#h1-1-72" id="h1-1-72" class="d">-		for {
+</a><a href="#h1-1-73" id="h1-1-73" class="d">-			chunk := make([]byte, request.ChunkSize)
+</a><a href="#h1-1-74" id="h1-1-74" class="d">-			n, err := decompressed.Read(chunk)
+</a><a href="#h1-1-75" id="h1-1-75" class="d">-
+</a><a href="#h1-1-76" id="h1-1-76" class="d">-			if n &gt; 0 {
+</a><a href="#h1-1-77" id="h1-1-77" class="d">-				proxy &lt;- &amp;service.GetObjectStreamResponse{
+</a><a href="#h1-1-78" id="h1-1-78" class="d">-					Response: &amp;service.GetObjectResponse{
+</a><a href="#h1-1-79" id="h1-1-79" class="d">-						Metadata: metadata,
+</a><a href="#h1-1-80" id="h1-1-80" class="d">-						Data:     chunk[:n],
+</a><a href="#h1-1-81" id="h1-1-81" class="d">-					},
+</a><a href="#h1-1-82" id="h1-1-82" class="d">-					Range: &amp;common.Range{
+</a><a href="#h1-1-83" id="h1-1-83" class="d">-						Unit:  &quot;bytes&quot;,
+</a><a href="#h1-1-84" id="h1-1-84" class="d">-						Start: uint64(offset),
+</a><a href="#h1-1-85" id="h1-1-85" class="d">-						End:   uint64(offset + n),
+</a><a href="#h1-1-86" id="h1-1-86" class="d">-					},
+</a><a href="#h1-1-87" id="h1-1-87" class="d">-				}
+</a><a href="#h1-1-88" id="h1-1-88" class="d">-
+</a><a href="#h1-1-89" id="h1-1-89" class="d">-				offset += n
+</a><a href="#h1-1-90" id="h1-1-90" class="d">-			}
+</a><a href="#h1-1-91" id="h1-1-91" class="d">-
+</a><a href="#h1-1-92" id="h1-1-92" class="d">-			if err != nil {
+</a><a href="#h1-1-93" id="h1-1-93" class="d">-				if err != io.EOF {
+</a><a href="#h1-1-94" id="h1-1-94" class="d">-					log.Printf(&quot;backend: unexpected error reading decompressed chunk: err=%v&quot;, err)
+</a><a href="#h1-1-95" id="h1-1-95" class="d">-				}
+</a><a href="#h1-1-96" id="h1-1-96" class="d">-				break
+</a><a href="#h1-1-97" id="h1-1-97" class="d">-			}
+</a><a href="#h1-1-98" id="h1-1-98" class="d">-		}
+</a><a href="#h1-1-99" id="h1-1-99" class="d">-
+</a><a href="#h1-1-100" id="h1-1-100" class="d">-		close(proxy)
+</a><a href="#h1-1-101" id="h1-1-101" class="d">-	}()
+</a><a href="#h1-1-102" id="h1-1-102" class="d">-
+</a><a href="#h1-1-103" id="h1-1-103" class="d">-	return proxy, nil
+</a><a href="#h1-1-104" id="h1-1-104" class="d">-}
+</a><a href="#h1-1-105" id="h1-1-105" class="d">-
+</a><a href="#h1-1-106" id="h1-1-106" class="d">-// PutObject transparently compresses the full data payload followed by replacing the data in the
+</a><a href="#h1-1-107" id="h1-1-107" class="d">-// outbound request to the underlying backend.
+</a><a href="#h1-1-108" id="h1-1-108" class="d">-func (c *Compression) PutObject(request *service.PutObjectRequest) (*service.PutObjectResponse, error) {
+</a><a href="#h1-1-109" id="h1-1-109" class="d">-	errs := make(chan error, 2)
+</a><a href="#h1-1-110" id="h1-1-110" class="d">-	compressedReader, compressedWriter := io.Pipe()
+</a><a href="#h1-1-111" id="h1-1-111" class="d">-
+</a><a href="#h1-1-112" id="h1-1-112" class="d">-	plaintext, err := c.compressor(compressedWriter)
+</a><a href="#h1-1-113" id="h1-1-113" class="d">-	if err != nil {
+</a><a href="#h1-1-114" id="h1-1-114" class="d">-		return nil, status.Error(codes.Internal, err.Error())
+</a><a href="#h1-1-115" id="h1-1-115" class="d">-	}
+</a><a href="#h1-1-116" id="h1-1-116" class="d">-
+</a><a href="#h1-1-117" id="h1-1-117" class="d">-	go func() {
+</a><a href="#h1-1-118" id="h1-1-118" class="d">-		_, err := plaintext.Write(request.Data)
+</a><a href="#h1-1-119" id="h1-1-119" class="d">-		errs &lt;- err
+</a><a href="#h1-1-120" id="h1-1-120" class="d">-
+</a><a href="#h1-1-121" id="h1-1-121" class="d">-		plaintext.Close()
+</a><a href="#h1-1-122" id="h1-1-122" class="d">-		compressedWriter.CloseWithError(io.EOF)
+</a><a href="#h1-1-123" id="h1-1-123" class="d">-	}()
+</a><a href="#h1-1-124" id="h1-1-124" class="d">-
+</a><a href="#h1-1-125" id="h1-1-125" class="d">-	go func() {
+</a><a href="#h1-1-126" id="h1-1-126" class="d">-		request.Data, err = io.ReadAll(compressedReader)
+</a><a href="#h1-1-127" id="h1-1-127" class="d">-		errs &lt;- err
+</a><a href="#h1-1-128" id="h1-1-128" class="d">-	}()
+</a><a href="#h1-1-129" id="h1-1-129" class="d">-
+</a><a href="#h1-1-130" id="h1-1-130" class="d">-	for i := 0; i &lt; 2; i++ {
+</a><a href="#h1-1-131" id="h1-1-131" class="d">-		if err := &lt;-errs; err != nil {
+</a><a href="#h1-1-132" id="h1-1-132" class="d">-			return nil, status.Error(codes.Internal, err.Error())
+</a><a href="#h1-1-133" id="h1-1-133" class="d">-		}
+</a><a href="#h1-1-134" id="h1-1-134" class="d">-	}
+</a><a href="#h1-1-135" id="h1-1-135" class="d">-
+</a><a href="#h1-1-136" id="h1-1-136" class="d">-	return c.Backend.PutObject(request)
+</a><a href="#h1-1-137" id="h1-1-137" class="d">-}
+</a><a href="#h1-1-138" id="h1-1-138" class="d">-
+</a><a href="#h1-1-139" id="h1-1-139" class="d">-// StreamPutObject is a streaming implementation of PutObject that compresses data chunk-by-chunk.
+</a><a href="#h1-1-140" id="h1-1-140" class="d">-func (c *Compression) StreamPutObject(stream chan *service.PutObjectStreamRequest) (*service.PutObjectStreamResponse, error) {
+</a><a href="#h1-1-141" id="h1-1-141" class="d">-	peek := &lt;-stream
+</a><a href="#h1-1-142" id="h1-1-142" class="d">-	proxy := make(chan *service.PutObjectStreamRequest)
+</a><a href="#h1-1-143" id="h1-1-143" class="d">-
+</a><a href="#h1-1-144" id="h1-1-144" class="d">-	if peek == nil {
+</a><a href="#h1-1-145" id="h1-1-145" class="d">-		return nil, status.Error(codes.Internal, &quot;backend: error reading first chunk from stream&quot;)
+</a><a href="#h1-1-146" id="h1-1-146" class="d">-	}
+</a><a href="#h1-1-147" id="h1-1-147" class="d">-
+</a><a href="#h1-1-148" id="h1-1-148" class="d">-	if peek.Range != nil {
+</a><a href="#h1-1-149" id="h1-1-149" class="d">-		return nil, status.Error(
+</a><a href="#h1-1-150" id="h1-1-150" class="d">-			codes.InvalidArgument,
+</a><a href="#h1-1-151" id="h1-1-151" class="d">-			&quot;backend: range specifications are not supported for compressed streaming puts&quot;,
+</a><a href="#h1-1-152" id="h1-1-152" class="d">-		)
+</a><a href="#h1-1-153" id="h1-1-153" class="d">-	}
+</a><a href="#h1-1-154" id="h1-1-154" class="d">-
+</a><a href="#h1-1-155" id="h1-1-155" class="d">-	compressedReader, compressedWriter := io.Pipe()
+</a><a href="#h1-1-156" id="h1-1-156" class="d">-
+</a><a href="#h1-1-157" id="h1-1-157" class="d">-	go func() {
+</a><a href="#h1-1-158" id="h1-1-158" class="d">-		for {
+</a><a href="#h1-1-159" id="h1-1-159" class="d">-			chunk := make([]byte, 1024)
+</a><a href="#h1-1-160" id="h1-1-160" class="d">-			n, err := compressedReader.Read(chunk)
+</a><a href="#h1-1-161" id="h1-1-161" class="d">-
+</a><a href="#h1-1-162" id="h1-1-162" class="d">-			if n &gt; 0 {
+</a><a href="#h1-1-163" id="h1-1-163" class="d">-				proxy &lt;- &amp;service.PutObjectStreamRequest{
+</a><a href="#h1-1-164" id="h1-1-164" class="d">-					Request: &amp;service.PutObjectRequest{
+</a><a href="#h1-1-165" id="h1-1-165" class="d">-						Resource: peek.Request.Resource,
+</a><a href="#h1-1-166" id="h1-1-166" class="d">-						Key:      peek.Request.Key,
+</a><a href="#h1-1-167" id="h1-1-167" class="d">-						Data:     chunk[:n],
+</a><a href="#h1-1-168" id="h1-1-168" class="d">-					},
+</a><a href="#h1-1-169" id="h1-1-169" class="d">-				}
+</a><a href="#h1-1-170" id="h1-1-170" class="d">-			}
+</a><a href="#h1-1-171" id="h1-1-171" class="d">-
+</a><a href="#h1-1-172" id="h1-1-172" class="d">-			if err != nil {
+</a><a href="#h1-1-173" id="h1-1-173" class="d">-				if err != io.EOF {
+</a><a href="#h1-1-174" id="h1-1-174" class="d">-					log.Printf(&quot;backend: unexpected error reading compressed chunk: err=%v&quot;, err)
+</a><a href="#h1-1-175" id="h1-1-175" class="d">-				}
+</a><a href="#h1-1-176" id="h1-1-176" class="d">-				break
+</a><a href="#h1-1-177" id="h1-1-177" class="d">-			}
+</a><a href="#h1-1-178" id="h1-1-178" class="d">-		}
+</a><a href="#h1-1-179" id="h1-1-179" class="d">-
+</a><a href="#h1-1-180" id="h1-1-180" class="d">-		close(proxy)
+</a><a href="#h1-1-181" id="h1-1-181" class="d">-	}()
+</a><a href="#h1-1-182" id="h1-1-182" class="d">-
+</a><a href="#h1-1-183" id="h1-1-183" class="d">-	go func() {
+</a><a href="#h1-1-184" id="h1-1-184" class="d">-		plaintext, err := c.compressor(compressedWriter)
+</a><a href="#h1-1-185" id="h1-1-185" class="d">-		if err != nil {
+</a><a href="#h1-1-186" id="h1-1-186" class="d">-			log.Printf(&quot;backend: error creating compressor: err=%v&quot;, err)
+</a><a href="#h1-1-187" id="h1-1-187" class="d">-			return
+</a><a href="#h1-1-188" id="h1-1-188" class="d">-		}
+</a><a href="#h1-1-189" id="h1-1-189" class="d">-
+</a><a href="#h1-1-190" id="h1-1-190" class="d">-		plaintext.Write(peek.Request.Data)
+</a><a href="#h1-1-191" id="h1-1-191" class="d">-
+</a><a href="#h1-1-192" id="h1-1-192" class="d">-		for request := range stream {
+</a><a href="#h1-1-193" id="h1-1-193" class="d">-			plaintext.Write(request.Request.Data)
+</a><a href="#h1-1-194" id="h1-1-194" class="d">-		}
+</a><a href="#h1-1-195" id="h1-1-195" class="d">-
+</a><a href="#h1-1-196" id="h1-1-196" class="d">-		plaintext.Close()
+</a><a href="#h1-1-197" id="h1-1-197" class="d">-		compressedWriter.CloseWithError(io.EOF)
+</a><a href="#h1-1-198" id="h1-1-198" class="d">-	}()
+</a><a href="#h1-1-199" id="h1-1-199" class="d">-
+</a><a href="#h1-1-200" id="h1-1-200" class="d">-	return c.Backend.StreamPutObject(proxy)
+</a><a href="#h1-1-201" id="h1-1-201" class="i">+	return newIOProcessor(decompressor, compressor, 0, 0, backend), nil
+</a> }
+<b>diff --git a/<a id="h2" href="../file/internal/backend/encrypt.go">internal/backend/encrypt.go</a> b/<a href="../file/internal/backend/encrypt.go">internal/backend/encrypt.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -1,37 +1,15 @@
+</a> package backend
+ 
+ import (
+<a href="#h2-0-3" id="h2-0-3" class="d">-	&quot;bufio&quot;
+</a><a href="#h2-0-4" id="h2-0-4" class="d">-	&quot;bytes&quot;
+</a> 	&quot;fmt&quot;
+ 	&quot;io&quot;
+<a href="#h2-0-7" id="h2-0-7" class="d">-	&quot;log&quot;
+</a> 	&quot;strings&quot;
+ 
+ 	&quot;filippo.io/age&quot;
+<a href="#h2-0-11" id="h2-0-11" class="d">-	&quot;google.golang.org/grpc/codes&quot;
+</a><a href="#h2-0-12" id="h2-0-12" class="d">-	&quot;google.golang.org/grpc/status&quot;
+</a> 
+ 	&quot;unistore/schemas/common&quot;
+<a href="#h2-0-15" id="h2-0-15" class="d">-	&quot;unistore/schemas/service&quot;
+</a> )
+ 
+<a href="#h2-0-18" id="h2-0-18" class="d">-const (
+</a><a href="#h2-0-19" id="h2-0-19" class="d">-	// streamingEncryptChunkSize is the read chunk size for buffering encrypted data during
+</a><a href="#h2-0-20" id="h2-0-20" class="d">-	// streaming put requests. Each chunk translates to one dispatched chunked put request to
+</a><a href="#h2-0-21" id="h2-0-21" class="d">-	// the underlying backend. Note that the encryption procedure usually causes a mismatch
+</a><a href="#h2-0-22" id="h2-0-22" class="d">-	// between the number of stream put requests initiated by the client and the number of
+</a><a href="#h2-0-23" id="h2-0-23" class="d">-	// stream put requests actually dispatched to the backend.
+</a><a href="#h2-0-24" id="h2-0-24" class="d">-	streamingEncryptChunkSize = 5 * 1024 * 1024 // 5 MB
+</a><a href="#h2-0-25" id="h2-0-25" class="d">-)
+</a><a href="#h2-0-26" id="h2-0-26" class="d">-
+</a><a href="#h2-0-27" id="h2-0-27" class="d">-// Encrypt is a Backend that offers efficient and transparent in-flight encryption and decryption.
+</a><a href="#h2-0-28" id="h2-0-28" class="d">-type Encrypt struct {
+</a><a href="#h2-0-29" id="h2-0-29" class="d">-	encryptor func(io.Writer) (io.WriteCloser, error)
+</a><a href="#h2-0-30" id="h2-0-30" class="d">-	decryptor func(io.Reader) (io.ReadCloser, error)
+</a><a href="#h2-0-31" id="h2-0-31" class="d">-	Backend
+</a><a href="#h2-0-32" id="h2-0-32" class="d">-}
+</a><a href="#h2-0-33" id="h2-0-33" class="d">-
+</a> // NewEncrypt creates a new Encrypt with the specified private and public keys for decryption and
+ // encryption, respectively.
+ func NewEncrypt(mechanism string, privateKey string, publicKey string, backend Backend) (Backend, error) {
+<a href="#h2-1" id="h2-1" class="h">@@ -70,212 +48,5 @@ func NewEncrypt(mechanism string, privateKey string, publicKey string, backend B
+</a> 		}
+ 	}
+ 
+<a href="#h2-1-3" id="h2-1-3" class="d">-	return &amp;Encrypt{
+</a><a href="#h2-1-4" id="h2-1-4" class="d">-		encryptor: encryptor,
+</a><a href="#h2-1-5" id="h2-1-5" class="d">-		decryptor: decryptor,
+</a><a href="#h2-1-6" id="h2-1-6" class="d">-		Backend:   backend,
+</a><a href="#h2-1-7" id="h2-1-7" class="d">-	}, nil
+</a><a href="#h2-1-8" id="h2-1-8" class="d">-}
+</a><a href="#h2-1-9" id="h2-1-9" class="d">-
+</a><a href="#h2-1-10" id="h2-1-10" class="d">-// GetObject buffers the entire object data from the backend in memory, decrypts the entire payload,
+</a><a href="#h2-1-11" id="h2-1-11" class="d">-// and replaces the payload contents in the response to the client.
+</a><a href="#h2-1-12" id="h2-1-12" class="d">-func (e *Encrypt) GetObject(request *service.GetObjectRequest) (*service.GetObjectResponse, error) {
+</a><a href="#h2-1-13" id="h2-1-13" class="d">-	resp, err := e.Backend.GetObject(request)
+</a><a href="#h2-1-14" id="h2-1-14" class="d">-	if err != nil {
+</a><a href="#h2-1-15" id="h2-1-15" class="d">-		return nil, err
+</a><a href="#h2-1-16" id="h2-1-16" class="d">-	}
+</a><a href="#h2-1-17" id="h2-1-17" class="d">-
+</a><a href="#h2-1-18" id="h2-1-18" class="d">-	plaintext, err := e.decryptor(bytes.NewReader(resp.Data))
+</a><a href="#h2-1-19" id="h2-1-19" class="d">-	if err != nil {
+</a><a href="#h2-1-20" id="h2-1-20" class="d">-		return nil, status.Error(codes.Internal, err.Error())
+</a><a href="#h2-1-21" id="h2-1-21" class="d">-	}
+</a><a href="#h2-1-22" id="h2-1-22" class="d">-
+</a><a href="#h2-1-23" id="h2-1-23" class="d">-	decrypted, err := io.ReadAll(plaintext)
+</a><a href="#h2-1-24" id="h2-1-24" class="d">-	if err != nil {
+</a><a href="#h2-1-25" id="h2-1-25" class="d">-		return nil, status.Error(codes.Internal, err.Error())
+</a><a href="#h2-1-26" id="h2-1-26" class="d">-	}
+</a><a href="#h2-1-27" id="h2-1-27" class="d">-
+</a><a href="#h2-1-28" id="h2-1-28" class="d">-	resp.Data = decrypted
+</a><a href="#h2-1-29" id="h2-1-29" class="d">-
+</a><a href="#h2-1-30" id="h2-1-30" class="d">-	return resp, nil
+</a><a href="#h2-1-31" id="h2-1-31" class="d">-}
+</a><a href="#h2-1-32" id="h2-1-32" class="d">-
+</a><a href="#h2-1-33" id="h2-1-33" class="d">-// StreamGetObject is a streaming decryption implementation. First, it calls the underlying backend
+</a><a href="#h2-1-34" id="h2-1-34" class="d">-// to retrieve an object chunk stream, followed by asynchronously consuming its contents, passing
+</a><a href="#h2-1-35" id="h2-1-35" class="d">-// it through the decryption engine, and finally repackaging the contents for response back to the
+</a><a href="#h2-1-36" id="h2-1-36" class="d">-// client. Note that the client-requested chunk size is preserved in both the read from the backend
+</a><a href="#h2-1-37" id="h2-1-37" class="d">-// and the chunking of decrypted data back to the client.
+</a><a href="#h2-1-38" id="h2-1-38" class="d">-func (e *Encrypt) StreamGetObject(request *service.GetObjectStreamRequest) (&lt;-chan *service.GetObjectStreamResponse, error) {
+</a><a href="#h2-1-39" id="h2-1-39" class="d">-	var offset int
+</a><a href="#h2-1-40" id="h2-1-40" class="d">-	var metadata *common.Metadata
+</a><a href="#h2-1-41" id="h2-1-41" class="d">-
+</a><a href="#h2-1-42" id="h2-1-42" class="d">-	proxy := make(chan *service.GetObjectStreamResponse)
+</a><a href="#h2-1-43" id="h2-1-43" class="d">-
+</a><a href="#h2-1-44" id="h2-1-44" class="d">-	stream, err := e.Backend.StreamGetObject(request)
+</a><a href="#h2-1-45" id="h2-1-45" class="d">-	if err != nil {
+</a><a href="#h2-1-46" id="h2-1-46" class="d">-		return nil, err
+</a><a href="#h2-1-47" id="h2-1-47" class="d">-	}
+</a><a href="#h2-1-48" id="h2-1-48" class="d">-
+</a><a href="#h2-1-49" id="h2-1-49" class="d">-	r, w := io.Pipe()
+</a><a href="#h2-1-50" id="h2-1-50" class="d">-
+</a><a href="#h2-1-51" id="h2-1-51" class="d">-	go func() {
+</a><a href="#h2-1-52" id="h2-1-52" class="d">-		for response := range stream {
+</a><a href="#h2-1-53" id="h2-1-53" class="d">-			// Capture the first available metadata payload to mirror in the decrypted
+</a><a href="#h2-1-54" id="h2-1-54" class="d">-			// response.
+</a><a href="#h2-1-55" id="h2-1-55" class="d">-			if metadata == nil {
+</a><a href="#h2-1-56" id="h2-1-56" class="d">-				metadata = response.Response.Metadata
+</a><a href="#h2-1-57" id="h2-1-57" class="d">-			}
+</a><a href="#h2-1-58" id="h2-1-58" class="d">-
+</a><a href="#h2-1-59" id="h2-1-59" class="d">-			// Simply relay the response data to the pipe for asynchronous consumption
+</a><a href="#h2-1-60" id="h2-1-60" class="d">-			// by the decryption routine.
+</a><a href="#h2-1-61" id="h2-1-61" class="d">-			if _, err := w.Write(response.Response.Data); err != nil {
+</a><a href="#h2-1-62" id="h2-1-62" class="d">-				log.Printf(&quot;backend: error writing response data chunk: err=%v&quot;, err)
+</a><a href="#h2-1-63" id="h2-1-63" class="d">-			}
+</a><a href="#h2-1-64" id="h2-1-64" class="d">-		}
+</a><a href="#h2-1-65" id="h2-1-65" class="d">-
+</a><a href="#h2-1-66" id="h2-1-66" class="d">-		// The stream has concluded gracefully; close the writer to signal to the client
+</a><a href="#h2-1-67" id="h2-1-67" class="d">-		// pipe that control should be transferred to the reader.
+</a><a href="#h2-1-68" id="h2-1-68" class="d">-		w.CloseWithError(io.EOF)
+</a><a href="#h2-1-69" id="h2-1-69" class="d">-	}()
+</a><a href="#h2-1-70" id="h2-1-70" class="d">-
+</a><a href="#h2-1-71" id="h2-1-71" class="d">-	go func() {
+</a><a href="#h2-1-72" id="h2-1-72" class="d">-		plaintext, err := e.decryptor(r)
+</a><a href="#h2-1-73" id="h2-1-73" class="d">-		if err != nil {
+</a><a href="#h2-1-74" id="h2-1-74" class="d">-			log.Printf(&quot;backend: error creating decryption engine: err=%v&quot;, err)
+</a><a href="#h2-1-75" id="h2-1-75" class="d">-			return
+</a><a href="#h2-1-76" id="h2-1-76" class="d">-		}
+</a><a href="#h2-1-77" id="h2-1-77" class="d">-
+</a><a href="#h2-1-78" id="h2-1-78" class="d">-		for {
+</a><a href="#h2-1-79" id="h2-1-79" class="d">-			chunk := make([]byte, request.ChunkSize)
+</a><a href="#h2-1-80" id="h2-1-80" class="d">-			n, err := plaintext.Read(chunk)
+</a><a href="#h2-1-81" id="h2-1-81" class="d">-			if err != nil {
+</a><a href="#h2-1-82" id="h2-1-82" class="d">-				if err != io.EOF {
+</a><a href="#h2-1-83" id="h2-1-83" class="d">-					log.Printf(&quot;backend: unexpected error reading decrypted chunk: err=%v&quot;, err)
+</a><a href="#h2-1-84" id="h2-1-84" class="d">-				}
+</a><a href="#h2-1-85" id="h2-1-85" class="d">-				break
+</a><a href="#h2-1-86" id="h2-1-86" class="d">-			}
+</a><a href="#h2-1-87" id="h2-1-87" class="d">-
+</a><a href="#h2-1-88" id="h2-1-88" class="d">-			proxy &lt;- &amp;service.GetObjectStreamResponse{
+</a><a href="#h2-1-89" id="h2-1-89" class="d">-				Response: &amp;service.GetObjectResponse{
+</a><a href="#h2-1-90" id="h2-1-90" class="d">-					Metadata: metadata,
+</a><a href="#h2-1-91" id="h2-1-91" class="d">-					Data:     chunk[:n],
+</a><a href="#h2-1-92" id="h2-1-92" class="d">-				},
+</a><a href="#h2-1-93" id="h2-1-93" class="d">-				Range: &amp;common.Range{
+</a><a href="#h2-1-94" id="h2-1-94" class="d">-					Unit:  &quot;bytes&quot;,
+</a><a href="#h2-1-95" id="h2-1-95" class="d">-					Start: uint64(offset),
+</a><a href="#h2-1-96" id="h2-1-96" class="d">-					End:   uint64(offset + n),
+</a><a href="#h2-1-97" id="h2-1-97" class="d">-				},
+</a><a href="#h2-1-98" id="h2-1-98" class="d">-			}
+</a><a href="#h2-1-99" id="h2-1-99" class="d">-
+</a><a href="#h2-1-100" id="h2-1-100" class="d">-			offset += n
+</a><a href="#h2-1-101" id="h2-1-101" class="d">-		}
+</a><a href="#h2-1-102" id="h2-1-102" class="d">-
+</a><a href="#h2-1-103" id="h2-1-103" class="d">-		// At this point, the decryption reader has signaled completion of the I/O pipe from
+</a><a href="#h2-1-104" id="h2-1-104" class="d">-		// the data source. There&#39;s nothing more to send to the client, so close the stream.
+</a><a href="#h2-1-105" id="h2-1-105" class="d">-		close(proxy)
+</a><a href="#h2-1-106" id="h2-1-106" class="d">-	}()
+</a><a href="#h2-1-107" id="h2-1-107" class="d">-
+</a><a href="#h2-1-108" id="h2-1-108" class="d">-	return proxy, nil
+</a><a href="#h2-1-109" id="h2-1-109" class="d">-}
+</a><a href="#h2-1-110" id="h2-1-110" class="d">-
+</a><a href="#h2-1-111" id="h2-1-111" class="d">-// PutObject encrypts the entire payload already buffered in memory (via the RPC layer), followed
+</a><a href="#h2-1-112" id="h2-1-112" class="d">-// by replacing the data payload in the put request to the backend.
+</a><a href="#h2-1-113" id="h2-1-113" class="d">-func (e *Encrypt) PutObject(request *service.PutObjectRequest) (*service.PutObjectResponse, error) {
+</a><a href="#h2-1-114" id="h2-1-114" class="d">-	var encrypted bytes.Buffer
+</a><a href="#h2-1-115" id="h2-1-115" class="d">-
+</a><a href="#h2-1-116" id="h2-1-116" class="d">-	plaintext, err := e.encryptor(&amp;encrypted)
+</a><a href="#h2-1-117" id="h2-1-117" class="d">-	if err != nil {
+</a><a href="#h2-1-118" id="h2-1-118" class="d">-		return nil, status.Error(codes.Internal, err.Error())
+</a><a href="#h2-1-119" id="h2-1-119" class="d">-	}
+</a><a href="#h2-1-120" id="h2-1-120" class="d">-
+</a><a href="#h2-1-121" id="h2-1-121" class="d">-	if _, err := plaintext.Write(request.Data); err != nil {
+</a><a href="#h2-1-122" id="h2-1-122" class="d">-		return nil, status.Error(codes.Internal, err.Error())
+</a><a href="#h2-1-123" id="h2-1-123" class="d">-	}
+</a><a href="#h2-1-124" id="h2-1-124" class="d">-
+</a><a href="#h2-1-125" id="h2-1-125" class="d">-	if err := plaintext.Close(); err != nil {
+</a><a href="#h2-1-126" id="h2-1-126" class="d">-		return nil, status.Error(codes.Internal, err.Error())
+</a><a href="#h2-1-127" id="h2-1-127" class="d">-	}
+</a><a href="#h2-1-128" id="h2-1-128" class="d">-
+</a><a href="#h2-1-129" id="h2-1-129" class="d">-	request.Data = encrypted.Bytes()
+</a><a href="#h2-1-130" id="h2-1-130" class="d">-
+</a><a href="#h2-1-131" id="h2-1-131" class="d">-	return e.Backend.PutObject(request)
+</a><a href="#h2-1-132" id="h2-1-132" class="d">-}
+</a><a href="#h2-1-133" id="h2-1-133" class="d">-
+</a><a href="#h2-1-134" id="h2-1-134" class="d">-// StreamPutObject is a streaming encryption implementation. It consumes the request payloads from
+</a><a href="#h2-1-135" id="h2-1-135" class="d">-// the original stream, performs chunk-by-chunk encryption on each received chunk, and sends a
+</a><a href="#h2-1-136" id="h2-1-136" class="d">-// modified payload containing the encrypted blob through to the backend layer for storage.
+</a><a href="#h2-1-137" id="h2-1-137" class="d">-func (e *Encrypt) StreamPutObject(stream chan *service.PutObjectStreamRequest) (*service.PutObjectStreamResponse, error) {
+</a><a href="#h2-1-138" id="h2-1-138" class="d">-	// The first element in the stream needs to be peeked in order to ascertain the desired
+</a><a href="#h2-1-139" id="h2-1-139" class="d">-	// resource metadata.
+</a><a href="#h2-1-140" id="h2-1-140" class="d">-	peek := &lt;-stream
+</a><a href="#h2-1-141" id="h2-1-141" class="d">-	proxy := make(chan *service.PutObjectStreamRequest)
+</a><a href="#h2-1-142" id="h2-1-142" class="d">-
+</a><a href="#h2-1-143" id="h2-1-143" class="d">-	if peek.Range != nil {
+</a><a href="#h2-1-144" id="h2-1-144" class="d">-		return nil, status.Error(
+</a><a href="#h2-1-145" id="h2-1-145" class="d">-			codes.InvalidArgument,
+</a><a href="#h2-1-146" id="h2-1-146" class="d">-			&quot;backend: range specifications are not supported for encrypted streaming puts&quot;,
+</a><a href="#h2-1-147" id="h2-1-147" class="d">-		)
+</a><a href="#h2-1-148" id="h2-1-148" class="d">-	}
+</a><a href="#h2-1-149" id="h2-1-149" class="d">-
+</a><a href="#h2-1-150" id="h2-1-150" class="d">-	r, w := io.Pipe()
+</a><a href="#h2-1-151" id="h2-1-151" class="d">-
+</a><a href="#h2-1-152" id="h2-1-152" class="d">-	// Wrap the pipe writer in a buffered writer in order to reduce the number of individual
+</a><a href="#h2-1-153" id="h2-1-153" class="d">-	// reads (and thus backend put requests) that need to be invoked on the opposite end of the
+</a><a href="#h2-1-154" id="h2-1-154" class="d">-	// pipe. Note that this requires explicitly flushing the buffer after no additional writes
+</a><a href="#h2-1-155" id="h2-1-155" class="d">-	// are expected.
+</a><a href="#h2-1-156" id="h2-1-156" class="d">-	wb := bufio.NewWriter(w)
+</a><a href="#h2-1-157" id="h2-1-157" class="d">-
+</a><a href="#h2-1-158" id="h2-1-158" class="d">-	go func() {
+</a><a href="#h2-1-159" id="h2-1-159" class="d">-		for {
+</a><a href="#h2-1-160" id="h2-1-160" class="d">-			chunk := make([]byte, streamingEncryptChunkSize)
+</a><a href="#h2-1-161" id="h2-1-161" class="d">-			n, err := r.Read(chunk)
+</a><a href="#h2-1-162" id="h2-1-162" class="d">-			if err != nil {
+</a><a href="#h2-1-163" id="h2-1-163" class="d">-				if err != io.EOF {
+</a><a href="#h2-1-164" id="h2-1-164" class="d">-					log.Printf(&quot;backend: unexpected error reading encrypted chunk: err=%v&quot;, err)
+</a><a href="#h2-1-165" id="h2-1-165" class="d">-				}
+</a><a href="#h2-1-166" id="h2-1-166" class="d">-				break
+</a><a href="#h2-1-167" id="h2-1-167" class="d">-			}
+</a><a href="#h2-1-168" id="h2-1-168" class="d">-
+</a><a href="#h2-1-169" id="h2-1-169" class="d">-			proxy &lt;- &amp;service.PutObjectStreamRequest{
+</a><a href="#h2-1-170" id="h2-1-170" class="d">-				Request: &amp;service.PutObjectRequest{
+</a><a href="#h2-1-171" id="h2-1-171" class="d">-					Resource: peek.Request.Resource,
+</a><a href="#h2-1-172" id="h2-1-172" class="d">-					Key:      peek.Request.Key,
+</a><a href="#h2-1-173" id="h2-1-173" class="d">-					Data:     chunk[:n],
+</a><a href="#h2-1-174" id="h2-1-174" class="d">-				},
+</a><a href="#h2-1-175" id="h2-1-175" class="d">-			}
+</a><a href="#h2-1-176" id="h2-1-176" class="d">-		}
+</a><a href="#h2-1-177" id="h2-1-177" class="d">-
+</a><a href="#h2-1-178" id="h2-1-178" class="d">-		close(proxy)
+</a><a href="#h2-1-179" id="h2-1-179" class="d">-	}()
+</a><a href="#h2-1-180" id="h2-1-180" class="d">-
+</a><a href="#h2-1-181" id="h2-1-181" class="d">-	go func() {
+</a><a href="#h2-1-182" id="h2-1-182" class="d">-		plaintext, err := e.encryptor(wb)
+</a><a href="#h2-1-183" id="h2-1-183" class="d">-		if err != nil {
+</a><a href="#h2-1-184" id="h2-1-184" class="d">-			log.Printf(&quot;backend: error creating encryption engine: err=%v&quot;, err)
+</a><a href="#h2-1-185" id="h2-1-185" class="d">-			return
+</a><a href="#h2-1-186" id="h2-1-186" class="d">-		}
+</a><a href="#h2-1-187" id="h2-1-187" class="d">-
+</a><a href="#h2-1-188" id="h2-1-188" class="d">-		if _, err := plaintext.Write(peek.Request.Data); err != nil {
+</a><a href="#h2-1-189" id="h2-1-189" class="d">-			log.Printf(&quot;backend: error writing request data chunk: err=%v&quot;, err)
+</a><a href="#h2-1-190" id="h2-1-190" class="d">-			return
+</a><a href="#h2-1-191" id="h2-1-191" class="d">-		}
+</a><a href="#h2-1-192" id="h2-1-192" class="d">-
+</a><a href="#h2-1-193" id="h2-1-193" class="d">-		for request := range stream {
+</a><a href="#h2-1-194" id="h2-1-194" class="d">-			if _, err := plaintext.Write(request.Request.Data); err != nil {
+</a><a href="#h2-1-195" id="h2-1-195" class="d">-				log.Printf(&quot;backend: error writing request data chunk: err=%v&quot;, err)
+</a><a href="#h2-1-196" id="h2-1-196" class="d">-				return
+</a><a href="#h2-1-197" id="h2-1-197" class="d">-			}
+</a><a href="#h2-1-198" id="h2-1-198" class="d">-		}
+</a><a href="#h2-1-199" id="h2-1-199" class="d">-
+</a><a href="#h2-1-200" id="h2-1-200" class="d">-		// At this point, the encryption has completed and there are no remaining bytes to
+</a><a href="#h2-1-201" id="h2-1-201" class="d">-		// write to the encrypted writer. Close the plaintext writer (so that the encryption
+</a><a href="#h2-1-202" id="h2-1-202" class="d">-		// procedure can be gracefully terminated), flush any remaining bytes from the
+</a><a href="#h2-1-203" id="h2-1-203" class="d">-		// buffered writer, and signal to the pipe reader via io.EOF that no additional
+</a><a href="#h2-1-204" id="h2-1-204" class="d">-		// writes are to be expected.
+</a><a href="#h2-1-205" id="h2-1-205" class="d">-		plaintext.Close()
+</a><a href="#h2-1-206" id="h2-1-206" class="d">-		wb.Flush()
+</a><a href="#h2-1-207" id="h2-1-207" class="d">-		w.CloseWithError(io.EOF)
+</a><a href="#h2-1-208" id="h2-1-208" class="d">-	}()
+</a><a href="#h2-1-209" id="h2-1-209" class="d">-
+</a><a href="#h2-1-210" id="h2-1-210" class="d">-	return e.Backend.StreamPutObject(proxy)
+</a><a href="#h2-1-211" id="h2-1-211" class="i">+	return newIOProcessor(decryptor, encryptor, 0, 0, backend), nil
+</a> }
+<b>diff --git a/<a id="h3" href="../file/internal/backend/processor.go">internal/backend/processor.go</a> b/<a href="../file/internal/backend/processor.go">internal/backend/processor.go</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -0,0 +1,335 @@
+</a><a href="#h3-0-0" id="h3-0-0" class="i">+package backend
+</a><a href="#h3-0-1" id="h3-0-1" class="i">+
+</a><a href="#h3-0-2" id="h3-0-2" class="i">+import (
+</a><a href="#h3-0-3" id="h3-0-3" class="i">+	&quot;bufio&quot;
+</a><a href="#h3-0-4" id="h3-0-4" class="i">+	&quot;bytes&quot;
+</a><a href="#h3-0-5" id="h3-0-5" class="i">+	&quot;io&quot;
+</a><a href="#h3-0-6" id="h3-0-6" class="i">+	&quot;log&quot;
+</a><a href="#h3-0-7" id="h3-0-7" class="i">+
+</a><a href="#h3-0-8" id="h3-0-8" class="i">+	&quot;google.golang.org/grpc/codes&quot;
+</a><a href="#h3-0-9" id="h3-0-9" class="i">+	&quot;google.golang.org/grpc/status&quot;
+</a><a href="#h3-0-10" id="h3-0-10" class="i">+	&quot;google.golang.org/protobuf/proto&quot;
+</a><a href="#h3-0-11" id="h3-0-11" class="i">+
+</a><a href="#h3-0-12" id="h3-0-12" class="i">+	&quot;unistore/internal/util&quot;
+</a><a href="#h3-0-13" id="h3-0-13" class="i">+	&quot;unistore/schemas/common&quot;
+</a><a href="#h3-0-14" id="h3-0-14" class="i">+	&quot;unistore/schemas/service&quot;
+</a><a href="#h3-0-15" id="h3-0-15" class="i">+)
+</a><a href="#h3-0-16" id="h3-0-16" class="i">+
+</a><a href="#h3-0-17" id="h3-0-17" class="i">+var (
+</a><a href="#h3-0-18" id="h3-0-18" class="i">+	// defaultStreamingWriteChunkSize is the default chunk size used for streaming puts to the
+</a><a href="#h3-0-19" id="h3-0-19" class="i">+	// backend. An explicit chunk size is required since the volume of put chunks to the
+</a><a href="#h3-0-20" id="h3-0-20" class="i">+	// backend may be mismatched relative to the input if there is a non-unity size
+</a><a href="#h3-0-21" id="h3-0-21" class="i">+	// amplification factor.
+</a><a href="#h3-0-22" id="h3-0-22" class="i">+	defaultStreamingWriteChunkSize = uint64(5 * 1024 * 1024) // 5 MB
+</a><a href="#h3-0-23" id="h3-0-23" class="i">+)
+</a><a href="#h3-0-24" id="h3-0-24" class="i">+
+</a><a href="#h3-0-25" id="h3-0-25" class="i">+// readerFactory is a type alias for a function that creates an io.ReadCloser from an io.Reader.
+</a><a href="#h3-0-26" id="h3-0-26" class="i">+type readerFactory func(io.Reader) (io.ReadCloser, error)
+</a><a href="#h3-0-27" id="h3-0-27" class="i">+
+</a><a href="#h3-0-28" id="h3-0-28" class="i">+// writerFactory is a type alias for a function that creates an io.WriteCloser from an io.Writer.
+</a><a href="#h3-0-29" id="h3-0-29" class="i">+type writerFactory func(io.Writer) (io.WriteCloser, error)
+</a><a href="#h3-0-30" id="h3-0-30" class="i">+
+</a><a href="#h3-0-31" id="h3-0-31" class="i">+// ioProcessor is a wrapper over a Backend that performs in-flight mutation of data streams using
+</a><a href="#h3-0-32" id="h3-0-32" class="i">+// the provided io.Reader and io.Writer factories. In particular, reads (gets and streaming gets)
+</a><a href="#h3-0-33" id="h3-0-33" class="i">+// proxy their data through the provided io.Reader factory; writes (puts and streaming puts) proxy
+</a><a href="#h3-0-34" id="h3-0-34" class="i">+// their data through the provided io.Writer factory.
+</a><a href="#h3-0-35" id="h3-0-35" class="i">+//
+</a><a href="#h3-0-36" id="h3-0-36" class="i">+// The io.Reader factory accepts an io.Reader for original input, and provides an io.Reader from
+</a><a href="#h3-0-37" id="h3-0-37" class="i">+// which the transformed data stream can be read.
+</a><a href="#h3-0-38" id="h3-0-38" class="i">+// The io.Writer factory accepts an io.Writer into which the transformed output is written, and
+</a><a href="#h3-0-39" id="h3-0-39" class="i">+// provides an io.Writer into which the original data should be written.
+</a><a href="#h3-0-40" id="h3-0-40" class="i">+//
+</a><a href="#h3-0-41" id="h3-0-41" class="i">+// The streaming read and write chunk sizes are used to specify a desired chunk size for reads and
+</a><a href="#h3-0-42" id="h3-0-42" class="i">+// writes from and to the proxied io.Reader and io.Writer, respectively. When 0, the streaming read
+</a><a href="#h3-0-43" id="h3-0-43" class="i">+// routine retains the original chunk size specified in the request, and the streaming write routine
+</a><a href="#h3-0-44" id="h3-0-44" class="i">+// uses a default chunk size.
+</a><a href="#h3-0-45" id="h3-0-45" class="i">+type ioProcessor struct {
+</a><a href="#h3-0-46" id="h3-0-46" class="i">+	reader                  func(io.Reader) (io.ReadCloser, error)
+</a><a href="#h3-0-47" id="h3-0-47" class="i">+	writer                  func(io.Writer) (io.WriteCloser, error)
+</a><a href="#h3-0-48" id="h3-0-48" class="i">+	streamingReadChunkSize  uint64
+</a><a href="#h3-0-49" id="h3-0-49" class="i">+	streamingWriteChunkSize uint64
+</a><a href="#h3-0-50" id="h3-0-50" class="i">+	Backend
+</a><a href="#h3-0-51" id="h3-0-51" class="i">+}
+</a><a href="#h3-0-52" id="h3-0-52" class="i">+
+</a><a href="#h3-0-53" id="h3-0-53" class="i">+// newIOProcessor creates a new ioProcessor.
+</a><a href="#h3-0-54" id="h3-0-54" class="i">+func newIOProcessor(
+</a><a href="#h3-0-55" id="h3-0-55" class="i">+	reader readerFactory,
+</a><a href="#h3-0-56" id="h3-0-56" class="i">+	writer writerFactory,
+</a><a href="#h3-0-57" id="h3-0-57" class="i">+	streamingReadChunkSize uint64,
+</a><a href="#h3-0-58" id="h3-0-58" class="i">+	streamingWriteChunkSize uint64,
+</a><a href="#h3-0-59" id="h3-0-59" class="i">+	backend Backend,
+</a><a href="#h3-0-60" id="h3-0-60" class="i">+) Backend {
+</a><a href="#h3-0-61" id="h3-0-61" class="i">+	if reader == nil {
+</a><a href="#h3-0-62" id="h3-0-62" class="i">+		reader = func(raw io.Reader) (io.ReadCloser, error) {
+</a><a href="#h3-0-63" id="h3-0-63" class="i">+			return io.NopCloser(raw), nil
+</a><a href="#h3-0-64" id="h3-0-64" class="i">+		}
+</a><a href="#h3-0-65" id="h3-0-65" class="i">+	}
+</a><a href="#h3-0-66" id="h3-0-66" class="i">+
+</a><a href="#h3-0-67" id="h3-0-67" class="i">+	if writer == nil {
+</a><a href="#h3-0-68" id="h3-0-68" class="i">+		writer = func(raw io.Writer) (io.WriteCloser, error) {
+</a><a href="#h3-0-69" id="h3-0-69" class="i">+			return util.NopWriteCloser(raw), nil
+</a><a href="#h3-0-70" id="h3-0-70" class="i">+		}
+</a><a href="#h3-0-71" id="h3-0-71" class="i">+	}
+</a><a href="#h3-0-72" id="h3-0-72" class="i">+
+</a><a href="#h3-0-73" id="h3-0-73" class="i">+	if streamingWriteChunkSize == 0 {
+</a><a href="#h3-0-74" id="h3-0-74" class="i">+		streamingWriteChunkSize = defaultStreamingWriteChunkSize
+</a><a href="#h3-0-75" id="h3-0-75" class="i">+	}
+</a><a href="#h3-0-76" id="h3-0-76" class="i">+
+</a><a href="#h3-0-77" id="h3-0-77" class="i">+	return &amp;ioProcessor{
+</a><a href="#h3-0-78" id="h3-0-78" class="i">+		reader:                  reader,
+</a><a href="#h3-0-79" id="h3-0-79" class="i">+		writer:                  writer,
+</a><a href="#h3-0-80" id="h3-0-80" class="i">+		streamingReadChunkSize:  streamingReadChunkSize,
+</a><a href="#h3-0-81" id="h3-0-81" class="i">+		streamingWriteChunkSize: streamingWriteChunkSize,
+</a><a href="#h3-0-82" id="h3-0-82" class="i">+		Backend:                 backend,
+</a><a href="#h3-0-83" id="h3-0-83" class="i">+	}
+</a><a href="#h3-0-84" id="h3-0-84" class="i">+}
+</a><a href="#h3-0-85" id="h3-0-85" class="i">+
+</a><a href="#h3-0-86" id="h3-0-86" class="i">+// GetObject defers to the underlying backend followed by performing transparent transformation of
+</a><a href="#h3-0-87" id="h3-0-87" class="i">+// the full payload.
+</a><a href="#h3-0-88" id="h3-0-88" class="i">+func (p *ioProcessor) GetObject(request *service.GetObjectRequest) (*service.GetObjectResponse, error) {
+</a><a href="#h3-0-89" id="h3-0-89" class="i">+	resp, err := p.Backend.GetObject(request)
+</a><a href="#h3-0-90" id="h3-0-90" class="i">+	if err != nil {
+</a><a href="#h3-0-91" id="h3-0-91" class="i">+		return nil, err
+</a><a href="#h3-0-92" id="h3-0-92" class="i">+	}
+</a><a href="#h3-0-93" id="h3-0-93" class="i">+
+</a><a href="#h3-0-94" id="h3-0-94" class="i">+	proxyReader, err := p.reader(bytes.NewReader(resp.Data))
+</a><a href="#h3-0-95" id="h3-0-95" class="i">+	if err != nil {
+</a><a href="#h3-0-96" id="h3-0-96" class="i">+		return nil, status.Error(codes.Internal, err.Error())
+</a><a href="#h3-0-97" id="h3-0-97" class="i">+	}
+</a><a href="#h3-0-98" id="h3-0-98" class="i">+
+</a><a href="#h3-0-99" id="h3-0-99" class="i">+	defer proxyReader.Close()
+</a><a href="#h3-0-100" id="h3-0-100" class="i">+
+</a><a href="#h3-0-101" id="h3-0-101" class="i">+	resp.Data, err = io.ReadAll(proxyReader)
+</a><a href="#h3-0-102" id="h3-0-102" class="i">+	if err != nil {
+</a><a href="#h3-0-103" id="h3-0-103" class="i">+		return nil, status.Error(codes.Internal, err.Error())
+</a><a href="#h3-0-104" id="h3-0-104" class="i">+	}
+</a><a href="#h3-0-105" id="h3-0-105" class="i">+
+</a><a href="#h3-0-106" id="h3-0-106" class="i">+	return resp, nil
+</a><a href="#h3-0-107" id="h3-0-107" class="i">+}
+</a><a href="#h3-0-108" id="h3-0-108" class="i">+
+</a><a href="#h3-0-109" id="h3-0-109" class="i">+// StreamGetObject is a streaming implementation of GetObject that transforms data chunk-by-chunk.
+</a><a href="#h3-0-110" id="h3-0-110" class="i">+func (p *ioProcessor) StreamGetObject(request *service.GetObjectStreamRequest) (&lt;-chan *service.GetObjectStreamResponse, error) {
+</a><a href="#h3-0-111" id="h3-0-111" class="i">+	var metadata *common.Metadata
+</a><a href="#h3-0-112" id="h3-0-112" class="i">+
+</a><a href="#h3-0-113" id="h3-0-113" class="i">+	proxyRequest := request
+</a><a href="#h3-0-114" id="h3-0-114" class="i">+	if p.streamingReadChunkSize &gt; 0 {
+</a><a href="#h3-0-115" id="h3-0-115" class="i">+		// Clone the inbound request in order to overwrite the chunk size to the desired
+</a><a href="#h3-0-116" id="h3-0-116" class="i">+		// streaming read chunk size. The request-level chunk reshaping applies only to the
+</a><a href="#h3-0-117" id="h3-0-117" class="i">+		// chunk reads done internally by the backend; the original chunk size requested by
+</a><a href="#h3-0-118" id="h3-0-118" class="i">+		// the client is still respected for outbound stream responses.
+</a><a href="#h3-0-119" id="h3-0-119" class="i">+		proxyRequest = proto.Clone(request).(*service.GetObjectStreamRequest)
+</a><a href="#h3-0-120" id="h3-0-120" class="i">+		proxyRequest.ChunkSize = p.streamingReadChunkSize
+</a><a href="#h3-0-121" id="h3-0-121" class="i">+	}
+</a><a href="#h3-0-122" id="h3-0-122" class="i">+
+</a><a href="#h3-0-123" id="h3-0-123" class="i">+	stream, err := p.Backend.StreamGetObject(proxyRequest)
+</a><a href="#h3-0-124" id="h3-0-124" class="i">+	if err != nil {
+</a><a href="#h3-0-125" id="h3-0-125" class="i">+		return nil, err
+</a><a href="#h3-0-126" id="h3-0-126" class="i">+	}
+</a><a href="#h3-0-127" id="h3-0-127" class="i">+
+</a><a href="#h3-0-128" id="h3-0-128" class="i">+	proxyResponse := make(chan *service.GetObjectStreamResponse)
+</a><a href="#h3-0-129" id="h3-0-129" class="i">+	r, w := io.Pipe()
+</a><a href="#h3-0-130" id="h3-0-130" class="i">+
+</a><a href="#h3-0-131" id="h3-0-131" class="i">+	go func() {
+</a><a href="#h3-0-132" id="h3-0-132" class="i">+		for response := range stream {
+</a><a href="#h3-0-133" id="h3-0-133" class="i">+			// Capture the first available metadata payload to mirror in the underlying
+</a><a href="#h3-0-134" id="h3-0-134" class="i">+			// response.
+</a><a href="#h3-0-135" id="h3-0-135" class="i">+			if metadata == nil {
+</a><a href="#h3-0-136" id="h3-0-136" class="i">+				metadata = response.Response.Metadata
+</a><a href="#h3-0-137" id="h3-0-137" class="i">+			}
+</a><a href="#h3-0-138" id="h3-0-138" class="i">+
+</a><a href="#h3-0-139" id="h3-0-139" class="i">+			// Simply relay the response data to the pipe for asynchronous consumption
+</a><a href="#h3-0-140" id="h3-0-140" class="i">+			// by the reader routine.
+</a><a href="#h3-0-141" id="h3-0-141" class="i">+			if _, err := w.Write(response.Response.Data); err != nil {
+</a><a href="#h3-0-142" id="h3-0-142" class="i">+				log.Printf(&quot;backend: error writing response data chunk: err=%v&quot;, err)
+</a><a href="#h3-0-143" id="h3-0-143" class="i">+				break
+</a><a href="#h3-0-144" id="h3-0-144" class="i">+			}
+</a><a href="#h3-0-145" id="h3-0-145" class="i">+		}
+</a><a href="#h3-0-146" id="h3-0-146" class="i">+
+</a><a href="#h3-0-147" id="h3-0-147" class="i">+		// The stream has concluded gracefully; close the writer to signal to the client
+</a><a href="#h3-0-148" id="h3-0-148" class="i">+		// pipe that control should be transferred to the reader.
+</a><a href="#h3-0-149" id="h3-0-149" class="i">+		w.Close()
+</a><a href="#h3-0-150" id="h3-0-150" class="i">+	}()
+</a><a href="#h3-0-151" id="h3-0-151" class="i">+
+</a><a href="#h3-0-152" id="h3-0-152" class="i">+	go func() {
+</a><a href="#h3-0-153" id="h3-0-153" class="i">+		var offset int
+</a><a href="#h3-0-154" id="h3-0-154" class="i">+
+</a><a href="#h3-0-155" id="h3-0-155" class="i">+		proxyReader, err := p.reader(r)
+</a><a href="#h3-0-156" id="h3-0-156" class="i">+		if err != nil {
+</a><a href="#h3-0-157" id="h3-0-157" class="i">+			log.Printf(&quot;backend: error creating streaming reader: err=%v&quot;, err)
+</a><a href="#h3-0-158" id="h3-0-158" class="i">+			return
+</a><a href="#h3-0-159" id="h3-0-159" class="i">+		}
+</a><a href="#h3-0-160" id="h3-0-160" class="i">+
+</a><a href="#h3-0-161" id="h3-0-161" class="i">+		defer proxyReader.Close()
+</a><a href="#h3-0-162" id="h3-0-162" class="i">+
+</a><a href="#h3-0-163" id="h3-0-163" class="i">+		for {
+</a><a href="#h3-0-164" id="h3-0-164" class="i">+			chunk := make([]byte, request.ChunkSize)
+</a><a href="#h3-0-165" id="h3-0-165" class="i">+			n, err := io.ReadFull(proxyReader, chunk)
+</a><a href="#h3-0-166" id="h3-0-166" class="i">+
+</a><a href="#h3-0-167" id="h3-0-167" class="i">+			if n &gt; 0 {
+</a><a href="#h3-0-168" id="h3-0-168" class="i">+				proxyResponse &lt;- &amp;service.GetObjectStreamResponse{
+</a><a href="#h3-0-169" id="h3-0-169" class="i">+					Response: &amp;service.GetObjectResponse{
+</a><a href="#h3-0-170" id="h3-0-170" class="i">+						Metadata: metadata,
+</a><a href="#h3-0-171" id="h3-0-171" class="i">+						Data:     chunk[:n],
+</a><a href="#h3-0-172" id="h3-0-172" class="i">+					},
+</a><a href="#h3-0-173" id="h3-0-173" class="i">+					Range: &amp;common.Range{
+</a><a href="#h3-0-174" id="h3-0-174" class="i">+						Unit:  &quot;bytes&quot;,
+</a><a href="#h3-0-175" id="h3-0-175" class="i">+						Start: uint64(offset),
+</a><a href="#h3-0-176" id="h3-0-176" class="i">+						End:   uint64(offset + n),
+</a><a href="#h3-0-177" id="h3-0-177" class="i">+						// Due to the streaming nature of the operation, the
+</a><a href="#h3-0-178" id="h3-0-178" class="i">+						// total size is not known in advance.
+</a><a href="#h3-0-179" id="h3-0-179" class="i">+					},
+</a><a href="#h3-0-180" id="h3-0-180" class="i">+				}
+</a><a href="#h3-0-181" id="h3-0-181" class="i">+
+</a><a href="#h3-0-182" id="h3-0-182" class="i">+				offset += n
+</a><a href="#h3-0-183" id="h3-0-183" class="i">+			}
+</a><a href="#h3-0-184" id="h3-0-184" class="i">+
+</a><a href="#h3-0-185" id="h3-0-185" class="i">+			if err != nil {
+</a><a href="#h3-0-186" id="h3-0-186" class="i">+				if err != io.EOF &amp;&amp; err != io.ErrUnexpectedEOF {
+</a><a href="#h3-0-187" id="h3-0-187" class="i">+					log.Printf(
+</a><a href="#h3-0-188" id="h3-0-188" class="i">+						&quot;backend: unexpected error reading chunk: err=%v&quot;,
+</a><a href="#h3-0-189" id="h3-0-189" class="i">+						err,
+</a><a href="#h3-0-190" id="h3-0-190" class="i">+					)
+</a><a href="#h3-0-191" id="h3-0-191" class="i">+				}
+</a><a href="#h3-0-192" id="h3-0-192" class="i">+				break
+</a><a href="#h3-0-193" id="h3-0-193" class="i">+			}
+</a><a href="#h3-0-194" id="h3-0-194" class="i">+		}
+</a><a href="#h3-0-195" id="h3-0-195" class="i">+
+</a><a href="#h3-0-196" id="h3-0-196" class="i">+		close(proxyResponse)
+</a><a href="#h3-0-197" id="h3-0-197" class="i">+	}()
+</a><a href="#h3-0-198" id="h3-0-198" class="i">+
+</a><a href="#h3-0-199" id="h3-0-199" class="i">+	return proxyResponse, nil
+</a><a href="#h3-0-200" id="h3-0-200" class="i">+}
+</a><a href="#h3-0-201" id="h3-0-201" class="i">+
+</a><a href="#h3-0-202" id="h3-0-202" class="i">+// PutObject transparently transforms the full data payload followed by replacing the data in the
+</a><a href="#h3-0-203" id="h3-0-203" class="i">+// outbound request to the underlying backend.
+</a><a href="#h3-0-204" id="h3-0-204" class="i">+func (p *ioProcessor) PutObject(request *service.PutObjectRequest) (*service.PutObjectResponse, error) {
+</a><a href="#h3-0-205" id="h3-0-205" class="i">+	errs := make(chan error, 2)
+</a><a href="#h3-0-206" id="h3-0-206" class="i">+	r, w := io.Pipe()
+</a><a href="#h3-0-207" id="h3-0-207" class="i">+
+</a><a href="#h3-0-208" id="h3-0-208" class="i">+	go func() {
+</a><a href="#h3-0-209" id="h3-0-209" class="i">+		defer w.Close()
+</a><a href="#h3-0-210" id="h3-0-210" class="i">+
+</a><a href="#h3-0-211" id="h3-0-211" class="i">+		proxyWriter, err := p.writer(w)
+</a><a href="#h3-0-212" id="h3-0-212" class="i">+		if err != nil {
+</a><a href="#h3-0-213" id="h3-0-213" class="i">+			errs &lt;- err
+</a><a href="#h3-0-214" id="h3-0-214" class="i">+			return
+</a><a href="#h3-0-215" id="h3-0-215" class="i">+		}
+</a><a href="#h3-0-216" id="h3-0-216" class="i">+
+</a><a href="#h3-0-217" id="h3-0-217" class="i">+		defer proxyWriter.Close()
+</a><a href="#h3-0-218" id="h3-0-218" class="i">+
+</a><a href="#h3-0-219" id="h3-0-219" class="i">+		if _, err = proxyWriter.Write(request.Data); err != nil {
+</a><a href="#h3-0-220" id="h3-0-220" class="i">+			errs &lt;- err
+</a><a href="#h3-0-221" id="h3-0-221" class="i">+			return
+</a><a href="#h3-0-222" id="h3-0-222" class="i">+		}
+</a><a href="#h3-0-223" id="h3-0-223" class="i">+
+</a><a href="#h3-0-224" id="h3-0-224" class="i">+		errs &lt;- nil
+</a><a href="#h3-0-225" id="h3-0-225" class="i">+	}()
+</a><a href="#h3-0-226" id="h3-0-226" class="i">+
+</a><a href="#h3-0-227" id="h3-0-227" class="i">+	go func() {
+</a><a href="#h3-0-228" id="h3-0-228" class="i">+		transformed, err := io.ReadAll(r)
+</a><a href="#h3-0-229" id="h3-0-229" class="i">+		if err != nil {
+</a><a href="#h3-0-230" id="h3-0-230" class="i">+			errs &lt;- err
+</a><a href="#h3-0-231" id="h3-0-231" class="i">+			return
+</a><a href="#h3-0-232" id="h3-0-232" class="i">+		}
+</a><a href="#h3-0-233" id="h3-0-233" class="i">+
+</a><a href="#h3-0-234" id="h3-0-234" class="i">+		request.Data = transformed
+</a><a href="#h3-0-235" id="h3-0-235" class="i">+		errs &lt;- nil
+</a><a href="#h3-0-236" id="h3-0-236" class="i">+	}()
+</a><a href="#h3-0-237" id="h3-0-237" class="i">+
+</a><a href="#h3-0-238" id="h3-0-238" class="i">+	for i := 0; i &lt; 2; i++ {
+</a><a href="#h3-0-239" id="h3-0-239" class="i">+		if err := &lt;-errs; err != nil {
+</a><a href="#h3-0-240" id="h3-0-240" class="i">+			return nil, status.Error(codes.Internal, err.Error())
+</a><a href="#h3-0-241" id="h3-0-241" class="i">+		}
+</a><a href="#h3-0-242" id="h3-0-242" class="i">+	}
+</a><a href="#h3-0-243" id="h3-0-243" class="i">+
+</a><a href="#h3-0-244" id="h3-0-244" class="i">+	return p.Backend.PutObject(request)
+</a><a href="#h3-0-245" id="h3-0-245" class="i">+}
+</a><a href="#h3-0-246" id="h3-0-246" class="i">+
+</a><a href="#h3-0-247" id="h3-0-247" class="i">+// StreamPutObject is a streaming implementation of PutObject that transforms data chunk-by-chunk.
+</a><a href="#h3-0-248" id="h3-0-248" class="i">+func (p *ioProcessor) StreamPutObject(stream chan *service.PutObjectStreamRequest) (*service.PutObjectStreamResponse, error) {
+</a><a href="#h3-0-249" id="h3-0-249" class="i">+	peek := &lt;-stream
+</a><a href="#h3-0-250" id="h3-0-250" class="i">+	proxyRequest := make(chan *service.PutObjectStreamRequest)
+</a><a href="#h3-0-251" id="h3-0-251" class="i">+
+</a><a href="#h3-0-252" id="h3-0-252" class="i">+	if peek == nil {
+</a><a href="#h3-0-253" id="h3-0-253" class="i">+		return nil, status.Error(codes.Internal, &quot;backend: error reading first chunk from stream&quot;)
+</a><a href="#h3-0-254" id="h3-0-254" class="i">+	}
+</a><a href="#h3-0-255" id="h3-0-255" class="i">+
+</a><a href="#h3-0-256" id="h3-0-256" class="i">+	if peek.Range != nil {
+</a><a href="#h3-0-257" id="h3-0-257" class="i">+		return nil, status.Errorf(
+</a><a href="#h3-0-258" id="h3-0-258" class="i">+			codes.InvalidArgument,
+</a><a href="#h3-0-259" id="h3-0-259" class="i">+			&quot;backend: range specifications are not supported for streaming puts: range=%v&quot;,
+</a><a href="#h3-0-260" id="h3-0-260" class="i">+			peek.Range,
+</a><a href="#h3-0-261" id="h3-0-261" class="i">+		)
+</a><a href="#h3-0-262" id="h3-0-262" class="i">+	}
+</a><a href="#h3-0-263" id="h3-0-263" class="i">+
+</a><a href="#h3-0-264" id="h3-0-264" class="i">+	r, w := io.Pipe()
+</a><a href="#h3-0-265" id="h3-0-265" class="i">+
+</a><a href="#h3-0-266" id="h3-0-266" class="i">+	// Wrap the pipe writer in a buffered writer in order to reduce the number of individual
+</a><a href="#h3-0-267" id="h3-0-267" class="i">+	// reads (and thus backend put requests) that need to be invoked on the opposite end of the
+</a><a href="#h3-0-268" id="h3-0-268" class="i">+	// pipe. Note that this requires explicitly flushing the buffer after no additional writes
+</a><a href="#h3-0-269" id="h3-0-269" class="i">+	// are expected.
+</a><a href="#h3-0-270" id="h3-0-270" class="i">+	wb := bufio.NewWriter(w)
+</a><a href="#h3-0-271" id="h3-0-271" class="i">+
+</a><a href="#h3-0-272" id="h3-0-272" class="i">+	go func() {
+</a><a href="#h3-0-273" id="h3-0-273" class="i">+		for {
+</a><a href="#h3-0-274" id="h3-0-274" class="i">+			chunk := make([]byte, p.streamingWriteChunkSize)
+</a><a href="#h3-0-275" id="h3-0-275" class="i">+			n, err := io.ReadFull(r, chunk)
+</a><a href="#h3-0-276" id="h3-0-276" class="i">+
+</a><a href="#h3-0-277" id="h3-0-277" class="i">+			if n &gt; 0 {
+</a><a href="#h3-0-278" id="h3-0-278" class="i">+				proxyRequest &lt;- &amp;service.PutObjectStreamRequest{
+</a><a href="#h3-0-279" id="h3-0-279" class="i">+					Request: &amp;service.PutObjectRequest{
+</a><a href="#h3-0-280" id="h3-0-280" class="i">+						Resource: peek.Request.Resource,
+</a><a href="#h3-0-281" id="h3-0-281" class="i">+						Key:      peek.Request.Key,
+</a><a href="#h3-0-282" id="h3-0-282" class="i">+						Data:     chunk[:n],
+</a><a href="#h3-0-283" id="h3-0-283" class="i">+						Checksum: peek.Request.Checksum,
+</a><a href="#h3-0-284" id="h3-0-284" class="i">+					},
+</a><a href="#h3-0-285" id="h3-0-285" class="i">+				}
+</a><a href="#h3-0-286" id="h3-0-286" class="i">+			}
+</a><a href="#h3-0-287" id="h3-0-287" class="i">+
+</a><a href="#h3-0-288" id="h3-0-288" class="i">+			if err != nil {
+</a><a href="#h3-0-289" id="h3-0-289" class="i">+				if err != io.EOF &amp;&amp; err != io.ErrUnexpectedEOF {
+</a><a href="#h3-0-290" id="h3-0-290" class="i">+					log.Printf(
+</a><a href="#h3-0-291" id="h3-0-291" class="i">+						&quot;backend: unexpected error reading chunk: err=%v&quot;,
+</a><a href="#h3-0-292" id="h3-0-292" class="i">+						err,
+</a><a href="#h3-0-293" id="h3-0-293" class="i">+					)
+</a><a href="#h3-0-294" id="h3-0-294" class="i">+				}
+</a><a href="#h3-0-295" id="h3-0-295" class="i">+				break
+</a><a href="#h3-0-296" id="h3-0-296" class="i">+			}
+</a><a href="#h3-0-297" id="h3-0-297" class="i">+		}
+</a><a href="#h3-0-298" id="h3-0-298" class="i">+
+</a><a href="#h3-0-299" id="h3-0-299" class="i">+		close(proxyRequest)
+</a><a href="#h3-0-300" id="h3-0-300" class="i">+	}()
+</a><a href="#h3-0-301" id="h3-0-301" class="i">+
+</a><a href="#h3-0-302" id="h3-0-302" class="i">+	go func() {
+</a><a href="#h3-0-303" id="h3-0-303" class="i">+		defer func() {
+</a><a href="#h3-0-304" id="h3-0-304" class="i">+			// At this point, the streaming put has completed and there are no remaining
+</a><a href="#h3-0-305" id="h3-0-305" class="i">+			// bytes to write to the output writer. Flush any remaining bytes from the
+</a><a href="#h3-0-306" id="h3-0-306" class="i">+			// buffered writer and signal to the pipe reader via io.EOF that no
+</a><a href="#h3-0-307" id="h3-0-307" class="i">+			// additional writes are to be expected.
+</a><a href="#h3-0-308" id="h3-0-308" class="i">+			wb.Flush()
+</a><a href="#h3-0-309" id="h3-0-309" class="i">+			w.Close()
+</a><a href="#h3-0-310" id="h3-0-310" class="i">+		}()
+</a><a href="#h3-0-311" id="h3-0-311" class="i">+
+</a><a href="#h3-0-312" id="h3-0-312" class="i">+		proxyWriter, err := p.writer(wb)
+</a><a href="#h3-0-313" id="h3-0-313" class="i">+		if err != nil {
+</a><a href="#h3-0-314" id="h3-0-314" class="i">+			log.Printf(&quot;backend: error creating streaming writer: err=%v&quot;, err)
+</a><a href="#h3-0-315" id="h3-0-315" class="i">+			return
+</a><a href="#h3-0-316" id="h3-0-316" class="i">+		}
+</a><a href="#h3-0-317" id="h3-0-317" class="i">+
+</a><a href="#h3-0-318" id="h3-0-318" class="i">+		defer proxyWriter.Close()
+</a><a href="#h3-0-319" id="h3-0-319" class="i">+
+</a><a href="#h3-0-320" id="h3-0-320" class="i">+		if _, err := proxyWriter.Write(peek.Request.Data); err != nil {
+</a><a href="#h3-0-321" id="h3-0-321" class="i">+			log.Printf(&quot;backend: error writing request data chunk: err=%v&quot;, err)
+</a><a href="#h3-0-322" id="h3-0-322" class="i">+			return
+</a><a href="#h3-0-323" id="h3-0-323" class="i">+		}
+</a><a href="#h3-0-324" id="h3-0-324" class="i">+
+</a><a href="#h3-0-325" id="h3-0-325" class="i">+		for request := range stream {
+</a><a href="#h3-0-326" id="h3-0-326" class="i">+			if _, err := proxyWriter.Write(request.Request.Data); err != nil {
+</a><a href="#h3-0-327" id="h3-0-327" class="i">+				log.Printf(&quot;backend: error writing request data chunk: err=%v&quot;, err)
+</a><a href="#h3-0-328" id="h3-0-328" class="i">+				return
+</a><a href="#h3-0-329" id="h3-0-329" class="i">+			}
+</a><a href="#h3-0-330" id="h3-0-330" class="i">+		}
+</a><a href="#h3-0-331" id="h3-0-331" class="i">+	}()
+</a><a href="#h3-0-332" id="h3-0-332" class="i">+
+</a><a href="#h3-0-333" id="h3-0-333" class="i">+	return p.Backend.StreamPutObject(proxyRequest)
+</a><a href="#h3-0-334" id="h3-0-334" class="i">+}
+</a></pre>
+</div>
+</body>
+</html>

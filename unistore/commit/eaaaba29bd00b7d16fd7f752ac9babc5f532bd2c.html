@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>cmd/unistore-cli: Delete command for DeleteObject RPC - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/eaaaba29bd00b7d16fd7f752ac9babc5f532bd2c">eaaaba29bd00b7d16fd7f752ac9babc5f532bd2c</a>
+<b>parent</b> <a href="../commit/bead50a001df27623b0672e131b440432d28a68c">bead50a001df27623b0672e131b440432d28a68c</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Fri 31 Dec 2021 19:13:48 -0800
+
+cmd/unistore-cli: Delete command for DeleteObject RPC
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">cmd/unistore-cli/main.go</a></td><td> | </td><td class="num">26</td><td><span class="i">+++++++++++++++++++</span><span class="d">-------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">cmd/unistore-cli/service.go</a></td><td> | </td><td class="num">50</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">------</span></td></tr>
+</table></pre><pre>2 files changed, 63 insertions(+), 13 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/cmd/unistore-cli/main.go">cmd/unistore-cli/main.go</a> b/<a href="../file/cmd/unistore-cli/main.go">cmd/unistore-cli/main.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -17,10 +17,9 @@ var (
+</a> 
+ var (
+ 	rootCmd = &amp;cobra.Command{
+<a href="#h0-0-3" id="h0-0-3" class="d">-		Use:   &quot;uni&quot;,
+</a><a href="#h0-0-4" id="h0-0-4" class="d">-		Short: &quot;Command line client for Unistore&quot;,
+</a><a href="#h0-0-5" id="h0-0-5" class="d">-		Long: &quot;Command line interfaces for create, read, update, and deletion of\n&quot; +
+</a><a href="#h0-0-6" id="h0-0-6" class="d">-			&quot;objects in a remote Unistore gRPC server&quot;,
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+		Use:     &quot;uni&quot;,
+</a><a href="#h0-0-8" id="h0-0-8" class="i">+		Short:   &quot;Command line client for Unistore&quot;,
+</a><a href="#h0-0-9" id="h0-0-9" class="i">+		Long:    &quot;Command line interfaces for create, read, update, and deletion of objects in a remote Unistore gRPC server&quot;,
+</a> 		Version: meta.Version,
+ 	}
+ 	headCmd = &amp;cobra.Command{
+<a href="#h0-1" id="h0-1" class="h">@@ -29,7 +28,7 @@ var (
+</a> 		Long:    &quot;Retrieve metadata for an object by key.\nStructured data is printed to standard output.&quot;,
+ 		Version: rootCmd.Version,
+ 		Args:    cobra.ExactArgs(1),
+<a href="#h0-1-3" id="h0-1-3" class="d">-		RunE:    head,
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+		RunE:    runHead,
+</a> 	}
+ 	downloadCmd = &amp;cobra.Command{
+ 		Use:     &quot;download &lt;key&gt;&quot;,
+<a href="#h0-2" id="h0-2" class="h">@@ -39,7 +38,7 @@ var (
+</a> 			&quot;Object data is written to standard output, while verbose logs (when enabled) are written to standard error.&quot;,
+ 		Version: rootCmd.Version,
+ 		Args:    cobra.ExactArgs(1),
+<a href="#h0-2-3" id="h0-2-3" class="d">-		RunE:    download,
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+		RunE:    runDownload,
+</a> 	}
+ 	uploadCmd = &amp;cobra.Command{
+ 		Use:     &quot;upload &lt;key&gt;&quot;,
+<a href="#h0-3" id="h0-3" class="h">@@ -49,7 +48,16 @@ var (
+</a> 			&quot;Object data is read from standard input. Verbose logs (when enabled) are written to standard error.&quot;,
+ 		Version: rootCmd.Version,
+ 		Args:    cobra.ExactArgs(1),
+<a href="#h0-3-3" id="h0-3-3" class="d">-		RunE:    upload,
+</a><a href="#h0-3-4" id="h0-3-4" class="i">+		RunE:    runUpload,
+</a><a href="#h0-3-5" id="h0-3-5" class="i">+	}
+</a><a href="#h0-3-6" id="h0-3-6" class="i">+	deleteCmd = &amp;cobra.Command{
+</a><a href="#h0-3-7" id="h0-3-7" class="i">+		Use:     &quot;delete &lt;key&gt;&quot;,
+</a><a href="#h0-3-8" id="h0-3-8" class="i">+		Aliases: []string{&quot;del&quot;, &quot;rm&quot;},
+</a><a href="#h0-3-9" id="h0-3-9" class="i">+		Short:   &quot;Delete an object&quot;,
+</a><a href="#h0-3-10" id="h0-3-10" class="i">+		Long:    &quot;Delete an object by key.\nThe response status is printed to standard output.&quot;,
+</a><a href="#h0-3-11" id="h0-3-11" class="i">+		Version: rootCmd.Version,
+</a><a href="#h0-3-12" id="h0-3-12" class="i">+		Args:    cobra.ExactArgs(1),
+</a><a href="#h0-3-13" id="h0-3-13" class="i">+		RunE:    runDelete,
+</a> 	}
+ )
+ 
+<a href="#h0-4" id="h0-4" class="h">@@ -75,6 +83,10 @@ func init() {
+</a> 	uploadCmd.Flags().StringP(&quot;checksum&quot;, &quot;k&quot;, &quot;&quot;, &quot;object contents checksum (only for unary RPC)&quot;)
+ 	uploadCmd.MarkFlagRequired(&quot;bucket&quot;)
+ 	rootCmd.AddCommand(uploadCmd)
+<a href="#h0-4-3" id="h0-4-3" class="i">+
+</a><a href="#h0-4-4" id="h0-4-4" class="i">+	deleteCmd.Flags().StringP(&quot;bucket&quot;, &quot;b&quot;, &quot;&quot;, &quot;bucket name&quot;)
+</a><a href="#h0-4-5" id="h0-4-5" class="i">+	deleteCmd.MarkFlagRequired(&quot;bucket&quot;)
+</a><a href="#h0-4-6" id="h0-4-6" class="i">+	rootCmd.AddCommand(deleteCmd)
+</a> }
+ 
+ func main() {
+<b>diff --git a/<a id="h1" href="../file/cmd/unistore-cli/service.go">cmd/unistore-cli/service.go</a> b/<a href="../file/cmd/unistore-cli/service.go">cmd/unistore-cli/service.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -12,8 +12,8 @@ import (
+</a> 	&quot;unistore/schemas/service&quot;
+ )
+ 
+<a href="#h1-0-3" id="h1-0-3" class="d">-// head is a command line interface for the HeadObject RPC.
+</a><a href="#h1-0-4" id="h1-0-4" class="d">-func head(cmd *cobra.Command, args []string) error {
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+// runHead is a command line interface for the HeadObject RPC.
+</a><a href="#h1-0-6" id="h1-0-6" class="i">+func runHead(cmd *cobra.Command, args []string) error {
+</a> 	var cancel context.CancelFunc
+ 
+ 	bucket, _ := cmd.Flags().GetString(&quot;bucket&quot;)
+<a href="#h1-1" id="h1-1" class="h">@@ -50,8 +50,8 @@ func head(cmd *cobra.Command, args []string) error {
+</a> 	return renderResponse(flagFormat, os.Stdout, response)
+ }
+ 
+<a href="#h1-1-3" id="h1-1-3" class="d">-// download is a command line interface for the GetObject and StreamGetObject RPCs.
+</a><a href="#h1-1-4" id="h1-1-4" class="d">-func download(cmd *cobra.Command, args []string) error {
+</a><a href="#h1-1-5" id="h1-1-5" class="i">+// runDownload is a command line interface for the GetObject and StreamGetObject RPCs.
+</a><a href="#h1-1-6" id="h1-1-6" class="i">+func runDownload(cmd *cobra.Command, args []string) error {
+</a> 	var cancel context.CancelFunc
+ 
+ 	bucket, _ := cmd.Flags().GetString(&quot;bucket&quot;)
+<a href="#h1-2" id="h1-2" class="h">@@ -127,8 +127,8 @@ func download(cmd *cobra.Command, args []string) error {
+</a> 	return nil
+ }
+ 
+<a href="#h1-2-3" id="h1-2-3" class="d">-// upload is a command line interface for the PutObject and StreamPutObject RPCs.
+</a><a href="#h1-2-4" id="h1-2-4" class="d">-func upload(cmd *cobra.Command, args []string) error {
+</a><a href="#h1-2-5" id="h1-2-5" class="i">+// runUpload is a command line interface for the PutObject and StreamPutObject RPCs.
+</a><a href="#h1-2-6" id="h1-2-6" class="i">+func runUpload(cmd *cobra.Command, args []string) error {
+</a> 	var cancel context.CancelFunc
+ 
+ 	bucket, _ := cmd.Flags().GetString(&quot;bucket&quot;)
+<a href="#h1-3" id="h1-3" class="h">@@ -211,3 +211,41 @@ func upload(cmd *cobra.Command, args []string) error {
+</a> 
+ 	return renderResponse(flagFormat, os.Stdout, response)
+ }
+<a href="#h1-3-3" id="h1-3-3" class="i">+
+</a><a href="#h1-3-4" id="h1-3-4" class="i">+// runDelete is a command line interface for the DeleteObject RPC.
+</a><a href="#h1-3-5" id="h1-3-5" class="i">+func runDelete(cmd *cobra.Command, args []string) error {
+</a><a href="#h1-3-6" id="h1-3-6" class="i">+	var cancel context.CancelFunc
+</a><a href="#h1-3-7" id="h1-3-7" class="i">+
+</a><a href="#h1-3-8" id="h1-3-8" class="i">+	bucket, _ := cmd.Flags().GetString(&quot;bucket&quot;)
+</a><a href="#h1-3-9" id="h1-3-9" class="i">+
+</a><a href="#h1-3-10" id="h1-3-10" class="i">+	store, err := initStoreConfig(flagConfig, flagStore)
+</a><a href="#h1-3-11" id="h1-3-11" class="i">+	if err != nil {
+</a><a href="#h1-3-12" id="h1-3-12" class="i">+		return err
+</a><a href="#h1-3-13" id="h1-3-13" class="i">+	}
+</a><a href="#h1-3-14" id="h1-3-14" class="i">+
+</a><a href="#h1-3-15" id="h1-3-15" class="i">+	client, err := initUnistoreClient(store)
+</a><a href="#h1-3-16" id="h1-3-16" class="i">+	if err != nil {
+</a><a href="#h1-3-17" id="h1-3-17" class="i">+		return err
+</a><a href="#h1-3-18" id="h1-3-18" class="i">+	}
+</a><a href="#h1-3-19" id="h1-3-19" class="i">+
+</a><a href="#h1-3-20" id="h1-3-20" class="i">+	ctx := context.Background()
+</a><a href="#h1-3-21" id="h1-3-21" class="i">+	if store.Connection.RequestTimeout &gt; 0 {
+</a><a href="#h1-3-22" id="h1-3-22" class="i">+		ctx, cancel = context.WithTimeout(ctx, store.Connection.RequestTimeout)
+</a><a href="#h1-3-23" id="h1-3-23" class="i">+		defer cancel()
+</a><a href="#h1-3-24" id="h1-3-24" class="i">+	}
+</a><a href="#h1-3-25" id="h1-3-25" class="i">+
+</a><a href="#h1-3-26" id="h1-3-26" class="i">+	request := &amp;service.DeleteObjectRequest{
+</a><a href="#h1-3-27" id="h1-3-27" class="i">+		Resource: &amp;common.Resource{
+</a><a href="#h1-3-28" id="h1-3-28" class="i">+			Backend: common.Backend(common.Backend_value[strings.ToUpper(store.Backend)]),
+</a><a href="#h1-3-29" id="h1-3-29" class="i">+			Bucket:  bucket,
+</a><a href="#h1-3-30" id="h1-3-30" class="i">+		},
+</a><a href="#h1-3-31" id="h1-3-31" class="i">+		Key: args[0],
+</a><a href="#h1-3-32" id="h1-3-32" class="i">+	}
+</a><a href="#h1-3-33" id="h1-3-33" class="i">+
+</a><a href="#h1-3-34" id="h1-3-34" class="i">+	response, err := client.DeleteObject(ctx, request)
+</a><a href="#h1-3-35" id="h1-3-35" class="i">+	if err != nil {
+</a><a href="#h1-3-36" id="h1-3-36" class="i">+		return err
+</a><a href="#h1-3-37" id="h1-3-37" class="i">+	}
+</a><a href="#h1-3-38" id="h1-3-38" class="i">+
+</a><a href="#h1-3-39" id="h1-3-39" class="i">+	return renderResponse(flagFormat, os.Stdout, response)
+</a><a href="#h1-3-40" id="h1-3-40" class="i">+}
+</a></pre>
+</div>
+</body>
+</html>

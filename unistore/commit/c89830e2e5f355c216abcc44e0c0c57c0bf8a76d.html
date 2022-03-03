@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>cmd/unistore-cli: Separate private method for human renderer of each Protobuf message type - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a>
+<b>parent</b> <a href="../commit/6ea6bc383068dcde1d4b3da084e12a2da5c60d87">6ea6bc383068dcde1d4b3da084e12a2da5c60d87</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sat  8 Jan 2022 13:27:44 -0800
+
+cmd/unistore-cli: Separate private method for human renderer of each Protobuf message type
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">cmd/unistore-cli/render.go</a></td><td> | </td><td class="num">99</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">-----------------------------------</span></td></tr>
+</table></pre><pre>1 file changed, 55 insertions(+), 44 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/cmd/unistore-cli/render.go">cmd/unistore-cli/render.go</a> b/<a href="../file/cmd/unistore-cli/render.go">cmd/unistore-cli/render.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -153,54 +153,65 @@ type humanRenderer struct {
+</a> func (h *humanRenderer) proto(message proto.Message) error {
+ 	switch m := message.(type) {
+ 	case *service.ListObjectsResponse:
+<a href="#h0-0-3" id="h0-0-3" class="d">-		// Sort the objects alphabetically by key name, while grouping directories at the
+</a><a href="#h0-0-4" id="h0-0-4" class="d">-		// beginning of the list.
+</a><a href="#h0-0-5" id="h0-0-5" class="d">-		sort.Slice(m.Objects, func(i int, j int) bool {
+</a><a href="#h0-0-6" id="h0-0-6" class="d">-			l := m.Objects[i]
+</a><a href="#h0-0-7" id="h0-0-7" class="d">-			r := m.Objects[j]
+</a><a href="#h0-0-8" id="h0-0-8" class="d">-
+</a><a href="#h0-0-9" id="h0-0-9" class="d">-			if l.Metadata.ObjectType == common.Object_DIRECTORY &amp;&amp;
+</a><a href="#h0-0-10" id="h0-0-10" class="d">-				r.Metadata.ObjectType == common.Object_DIRECTORY {
+</a><a href="#h0-0-11" id="h0-0-11" class="d">-				// Both objects are directories; sort alphabetically
+</a><a href="#h0-0-12" id="h0-0-12" class="d">-				return l.Metadata.Key &lt; r.Metadata.Key
+</a><a href="#h0-0-13" id="h0-0-13" class="d">-			} else if l.Metadata.ObjectType == common.Object_DIRECTORY {
+</a><a href="#h0-0-14" id="h0-0-14" class="d">-				// The left object is a directory; always prefer it
+</a><a href="#h0-0-15" id="h0-0-15" class="d">-				return true
+</a><a href="#h0-0-16" id="h0-0-16" class="d">-			} else if l.Metadata.ObjectType == common.Object_DIRECTORY {
+</a><a href="#h0-0-17" id="h0-0-17" class="d">-				// The right object is a directory; always prefer it
+</a><a href="#h0-0-18" id="h0-0-18" class="d">-				return false
+</a><a href="#h0-0-19" id="h0-0-19" class="d">-			} else {
+</a><a href="#h0-0-20" id="h0-0-20" class="d">-				// Both objects are non-directories; sort alphabetically
+</a><a href="#h0-0-21" id="h0-0-21" class="d">-				return l.Metadata.Key &lt; r.Metadata.Key
+</a><a href="#h0-0-22" id="h0-0-22" class="i">+		return h.protoListObjectsResponse(m)
+</a><a href="#h0-0-23" id="h0-0-23" class="i">+	default:
+</a><a href="#h0-0-24" id="h0-0-24" class="i">+		return errUnsupportedMessage
+</a><a href="#h0-0-25" id="h0-0-25" class="i">+	}
+</a><a href="#h0-0-26" id="h0-0-26" class="i">+}
+</a><a href="#h0-0-27" id="h0-0-27" class="i">+
+</a><a href="#h0-0-28" id="h0-0-28" class="i">+// protoListObjectsResponse renders a service.ListObjectsResponse.
+</a><a href="#h0-0-29" id="h0-0-29" class="i">+func (h *humanRenderer) protoListObjectsResponse(response *service.ListObjectsResponse) error {
+</a><a href="#h0-0-30" id="h0-0-30" class="i">+	// Sort the objects alphabetically by key name, while grouping directories at the
+</a><a href="#h0-0-31" id="h0-0-31" class="i">+	// beginning of the list.
+</a><a href="#h0-0-32" id="h0-0-32" class="i">+	sort.Slice(response.Objects, func(i int, j int) bool {
+</a><a href="#h0-0-33" id="h0-0-33" class="i">+		l := response.Objects[i]
+</a><a href="#h0-0-34" id="h0-0-34" class="i">+		r := response.Objects[j]
+</a><a href="#h0-0-35" id="h0-0-35" class="i">+
+</a><a href="#h0-0-36" id="h0-0-36" class="i">+		if l.Metadata.ObjectType == common.Object_DIRECTORY &amp;&amp;
+</a><a href="#h0-0-37" id="h0-0-37" class="i">+			r.Metadata.ObjectType == common.Object_DIRECTORY {
+</a><a href="#h0-0-38" id="h0-0-38" class="i">+			// Both objects are directories; sort alphabetically
+</a><a href="#h0-0-39" id="h0-0-39" class="i">+			return l.Metadata.Key &lt; r.Metadata.Key
+</a><a href="#h0-0-40" id="h0-0-40" class="i">+		} else if l.Metadata.ObjectType == common.Object_DIRECTORY {
+</a><a href="#h0-0-41" id="h0-0-41" class="i">+			// The left object is a directory; always prefer it
+</a><a href="#h0-0-42" id="h0-0-42" class="i">+			return true
+</a><a href="#h0-0-43" id="h0-0-43" class="i">+		} else if l.Metadata.ObjectType == common.Object_DIRECTORY {
+</a><a href="#h0-0-44" id="h0-0-44" class="i">+			// The right object is a directory; always prefer it
+</a><a href="#h0-0-45" id="h0-0-45" class="i">+			return false
+</a><a href="#h0-0-46" id="h0-0-46" class="i">+		} else {
+</a><a href="#h0-0-47" id="h0-0-47" class="i">+			// Both objects are non-directories; sort alphabetically
+</a><a href="#h0-0-48" id="h0-0-48" class="i">+			return l.Metadata.Key &lt; r.Metadata.Key
+</a><a href="#h0-0-49" id="h0-0-49" class="i">+		}
+</a><a href="#h0-0-50" id="h0-0-50" class="i">+	})
+</a><a href="#h0-0-51" id="h0-0-51" class="i">+
+</a><a href="#h0-0-52" id="h0-0-52" class="i">+	for _, object := range response.Objects {
+</a><a href="#h0-0-53" id="h0-0-53" class="i">+		switch object.Metadata.ObjectType {
+</a><a href="#h0-0-54" id="h0-0-54" class="i">+		case common.Object_DIRECTORY:
+</a><a href="#h0-0-55" id="h0-0-55" class="i">+			_, err := fmt.Fprintf(
+</a><a href="#h0-0-56" id="h0-0-56" class="i">+				h.output,
+</a><a href="#h0-0-57" id="h0-0-57" class="i">+				&quot;%v\t%s\t%s\n&quot;,
+</a><a href="#h0-0-58" id="h0-0-58" class="i">+				object.Metadata.ModifiedTime.AsTime().Format(time.RFC3339),
+</a><a href="#h0-0-59" id="h0-0-59" class="i">+				&quot;-&quot;,
+</a><a href="#h0-0-60" id="h0-0-60" class="i">+				fmt.Sprintf(&quot;%s/&quot;, object.Metadata.Key),
+</a><a href="#h0-0-61" id="h0-0-61" class="i">+			)
+</a><a href="#h0-0-62" id="h0-0-62" class="i">+			if err != nil {
+</a><a href="#h0-0-63" id="h0-0-63" class="i">+				return err
+</a> 			}
+<a href="#h0-0-65" id="h0-0-65" class="d">-		})
+</a><a href="#h0-0-66" id="h0-0-66" class="d">-
+</a><a href="#h0-0-67" id="h0-0-67" class="d">-		for _, object := range m.Objects {
+</a><a href="#h0-0-68" id="h0-0-68" class="d">-			switch object.Metadata.ObjectType {
+</a><a href="#h0-0-69" id="h0-0-69" class="d">-			case common.Object_DIRECTORY:
+</a><a href="#h0-0-70" id="h0-0-70" class="d">-				fmt.Fprintf(
+</a><a href="#h0-0-71" id="h0-0-71" class="d">-					h.output,
+</a><a href="#h0-0-72" id="h0-0-72" class="d">-					&quot;%v\t%s\t%s\n&quot;,
+</a><a href="#h0-0-73" id="h0-0-73" class="d">-					object.Metadata.ModifiedTime.AsTime().Format(time.RFC3339),
+</a><a href="#h0-0-74" id="h0-0-74" class="d">-					&quot;-&quot;,
+</a><a href="#h0-0-75" id="h0-0-75" class="d">-					fmt.Sprintf(&quot;%s/&quot;, object.Metadata.Key),
+</a><a href="#h0-0-76" id="h0-0-76" class="d">-				)
+</a><a href="#h0-0-77" id="h0-0-77" class="d">-			case common.Object_REGULAR:
+</a><a href="#h0-0-78" id="h0-0-78" class="d">-				fmt.Fprintf(
+</a><a href="#h0-0-79" id="h0-0-79" class="d">-					h.output,
+</a><a href="#h0-0-80" id="h0-0-80" class="d">-					&quot;%v\t%s\t%s\n&quot;,
+</a><a href="#h0-0-81" id="h0-0-81" class="d">-					object.Metadata.ModifiedTime.AsTime().Format(time.RFC3339),
+</a><a href="#h0-0-82" id="h0-0-82" class="d">-					humanize.Bytes(object.Metadata.Size),
+</a><a href="#h0-0-83" id="h0-0-83" class="d">-					object.Metadata.Key,
+</a><a href="#h0-0-84" id="h0-0-84" class="d">-				)
+</a><a href="#h0-0-85" id="h0-0-85" class="i">+
+</a><a href="#h0-0-86" id="h0-0-86" class="i">+		case common.Object_REGULAR:
+</a><a href="#h0-0-87" id="h0-0-87" class="i">+			_, err := fmt.Fprintf(
+</a><a href="#h0-0-88" id="h0-0-88" class="i">+				h.output,
+</a><a href="#h0-0-89" id="h0-0-89" class="i">+				&quot;%v\t%s\t%s\n&quot;,
+</a><a href="#h0-0-90" id="h0-0-90" class="i">+				object.Metadata.ModifiedTime.AsTime().Format(time.RFC3339),
+</a><a href="#h0-0-91" id="h0-0-91" class="i">+				humanize.Bytes(object.Metadata.Size),
+</a><a href="#h0-0-92" id="h0-0-92" class="i">+				object.Metadata.Key,
+</a><a href="#h0-0-93" id="h0-0-93" class="i">+			)
+</a><a href="#h0-0-94" id="h0-0-94" class="i">+			if err != nil {
+</a><a href="#h0-0-95" id="h0-0-95" class="i">+				return err
+</a> 			}
+ 		}
+<a href="#h0-0-98" id="h0-0-98" class="d">-
+</a><a href="#h0-0-99" id="h0-0-99" class="d">-		return nil
+</a><a href="#h0-0-100" id="h0-0-100" class="d">-
+</a><a href="#h0-0-101" id="h0-0-101" class="d">-	default:
+</a><a href="#h0-0-102" id="h0-0-102" class="d">-		return errUnsupportedMessage
+</a> 	}
+<a href="#h0-0-104" id="h0-0-104" class="i">+
+</a><a href="#h0-0-105" id="h0-0-105" class="i">+	return nil
+</a> }
+ 
+ // any errors with errUnsupportedMessage.
+</pre>
+</div>
+</body>
+</html>

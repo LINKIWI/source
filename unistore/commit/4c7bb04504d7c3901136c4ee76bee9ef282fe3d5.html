@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/backend: Forbid use of Dispatch.ALL_SYNC for streaming puts due to incompatible semantics - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/4c7bb04504d7c3901136c4ee76bee9ef282fe3d5">4c7bb04504d7c3901136c4ee76bee9ef282fe3d5</a>
+<b>parent</b> <a href="../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sun  9 Jan 2022 19:54:46 -0800
+
+internal/backend: Forbid use of Dispatch.ALL_SYNC for streaming puts due to incompatible semantics
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/backend/composite.go</a></td><td> | </td><td class="num">58</td><td><span class="i">++++++++++++++++++++++++++++++</span><span class="d">----------------------------</span></td></tr>
+</table></pre><pre>1 file changed, 30 insertions(+), 28 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/backend/composite.go">internal/backend/composite.go</a> b/<a href="../file/internal/backend/composite.go">internal/backend/composite.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -2,12 +2,12 @@ package backend
+</a> 
+ import (
+ 	&quot;context&quot;
+<a href="#h0-0-3" id="h0-0-3" class="d">-	&quot;errors&quot;
+</a> 	&quot;fmt&quot;
+ 	&quot;math/rand&quot;
+ 	&quot;strings&quot;
+<a href="#h0-0-7" id="h0-0-7" class="d">-	&quot;sync&quot;
+</a> 
+<a href="#h0-0-9" id="h0-0-9" class="i">+	&quot;google.golang.org/grpc/codes&quot;
+</a><a href="#h0-0-10" id="h0-0-10" class="i">+	&quot;google.golang.org/grpc/status&quot;
+</a> 	&quot;google.golang.org/protobuf/proto&quot;
+ 
+ 	&quot;unistore/schemas/common&quot;
+<a href="#h0-1" id="h0-1" class="h">@@ -15,12 +15,6 @@ import (
+</a> 	&quot;unistore/schemas/service&quot;
+ )
+ 
+<a href="#h0-1-3" id="h0-1-3" class="d">-var (
+</a><a href="#h0-1-4" id="h0-1-4" class="d">-	// errUnsupportedDispatch is returned when a method attempts to use an unsupported or
+</a><a href="#h0-1-5" id="h0-1-5" class="d">-	// unimplemented dispatch policy.
+</a><a href="#h0-1-6" id="h0-1-6" class="d">-	errUnsupportedDispatch = errors.New(&quot;backend: unsupported dispatch policy for method&quot;)
+</a><a href="#h0-1-7" id="h0-1-7" class="d">-)
+</a><a href="#h0-1-8" id="h0-1-8" class="d">-
+</a> // Composite is a Backend that abstracts over one or more children backends with configurable
+ // dispatch policies partitioned along read and write RPCs. It is useful for high-availability
+ // deployments where data redundancy and/or online failover is required.
+<a href="#h0-2" id="h0-2" class="h">@@ -123,7 +117,12 @@ func (c *Composite) StreamGetObject(ctx context.Context, request *service.GetObj
+</a> 		return responseProxy, errsProxy
+ 
+ 	default:
+<a href="#h0-2-3" id="h0-2-3" class="d">-		errsProxy &lt;- errUnsupportedDispatch
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+		errsProxy &lt;- status.Errorf(
+</a><a href="#h0-2-5" id="h0-2-5" class="i">+			codes.Unimplemented,
+</a><a href="#h0-2-6" id="h0-2-6" class="i">+			&quot;backend: unsupported dispatch policy for streaming get: policy=%v&quot;,
+</a><a href="#h0-2-7" id="h0-2-7" class="i">+			c.readDispatch,
+</a><a href="#h0-2-8" id="h0-2-8" class="i">+		)
+</a><a href="#h0-2-9" id="h0-2-9" class="i">+
+</a> 		return nil, errsProxy
+ 	}
+ }
+<a href="#h0-3" id="h0-3" class="h">@@ -144,36 +143,35 @@ func (c *Composite) PutObject(ctx context.Context, request *service.PutObjectReq
+</a> 
+ // StreamPutObject invokes StreamPutObject in one or more composed backends.
+ func (c *Composite) StreamPutObject(ctx context.Context, stream chan *service.PutObjectStreamRequest) (*service.PutObjectStreamResponse, error) {
+<a href="#h0-3-3" id="h0-3-3" class="d">-	// Duplicate the inbound request to separate channels, one per backend. Also set up a wait
+</a><a href="#h0-3-4" id="h0-3-4" class="d">-	// group for each backend, to indicate that writes to that backend&#39;s channel have completed.
+</a><a href="#h0-3-5" id="h0-3-5" class="i">+	// Synchronous dispatch is inherently incompatible with streaming writes. Semantically, one
+</a><a href="#h0-3-6" id="h0-3-6" class="i">+	// would expect for an ALL_SYNC policy to complete the full stream of writes to the nth
+</a><a href="#h0-3-7" id="h0-3-7" class="i">+	// backend, followed by repeating the same sequence of writes to subsequent (n + 1)th
+</a><a href="#h0-3-8" id="h0-3-8" class="i">+	// backends. However, this is impossible to accomplish unless the server buffered the full
+</a><a href="#h0-3-9" id="h0-3-9" class="i">+	// sequence of chunks from the entire stream in memory, which defeats the purpose of a
+</a><a href="#h0-3-10" id="h0-3-10" class="i">+	// streaming API and runs counter to its coroutine-oriented architecture. Thus, simply
+</a><a href="#h0-3-11" id="h0-3-11" class="i">+	// reject this dispatch policy altogether.
+</a><a href="#h0-3-12" id="h0-3-12" class="i">+	if c.writeDispatch == common.Dispatch_ALL_SYNC {
+</a><a href="#h0-3-13" id="h0-3-13" class="i">+		return nil, status.Error(
+</a><a href="#h0-3-14" id="h0-3-14" class="i">+			codes.Unimplemented,
+</a><a href="#h0-3-15" id="h0-3-15" class="i">+			&quot;backend: ALL_SYNC dispatch policy is not supported for streaming puts&quot;,
+</a><a href="#h0-3-16" id="h0-3-16" class="i">+		)
+</a><a href="#h0-3-17" id="h0-3-17" class="i">+	}
+</a><a href="#h0-3-18" id="h0-3-18" class="i">+
+</a><a href="#h0-3-19" id="h0-3-19" class="i">+	// Duplicate the inbound request to separate channels, one per backend.
+</a> 	proxy := make(map[Backend]chan *service.PutObjectStreamRequest)
+<a href="#h0-3-21" id="h0-3-21" class="d">-	done := make(map[Backend]*sync.WaitGroup)
+</a> 	for _, backend := range c.backends {
+ 		proxy[backend] = make(chan *service.PutObjectStreamRequest)
+<a href="#h0-3-24" id="h0-3-24" class="d">-		done[backend] = &amp;sync.WaitGroup{}
+</a> 	}
+ 
+ 	go func() {
+ 		for request := range stream {
+ 			for _, backend := range c.backends {
+<a href="#h0-3-30" id="h0-3-30" class="d">-				done[backend].Add(1)
+</a><a href="#h0-3-31" id="h0-3-31" class="d">-
+</a><a href="#h0-3-32" id="h0-3-32" class="d">-				// The channel insertion needs to be done asynchronously in order to
+</a><a href="#h0-3-33" id="h0-3-33" class="d">-				// not block on multiple backends at the same time. The consumption
+</a><a href="#h0-3-34" id="h0-3-34" class="d">-				// may be blocked either due to the selected write dispatch policy
+</a><a href="#h0-3-35" id="h0-3-35" class="d">-				// or simply because of differences in backpressure.
+</a><a href="#h0-3-36" id="h0-3-36" class="d">-				go func(backend Backend, request *service.PutObjectStreamRequest) {
+</a><a href="#h0-3-37" id="h0-3-37" class="d">-					proxy[backend] &lt;- proto.Clone(request).(*service.PutObjectStreamRequest)
+</a><a href="#h0-3-38" id="h0-3-38" class="d">-					done[backend].Done()
+</a><a href="#h0-3-39" id="h0-3-39" class="d">-				}(backend, request)
+</a><a href="#h0-3-40" id="h0-3-40" class="i">+				proxy[backend] &lt;- proto.Clone(request).(*service.PutObjectStreamRequest)
+</a> 			}
+ 		}
+ 
+ 		for _, backend := range c.backends {
+<a href="#h0-3-45" id="h0-3-45" class="d">-			go func(backend Backend) {
+</a><a href="#h0-3-46" id="h0-3-46" class="d">-				done[backend].Wait()
+</a><a href="#h0-3-47" id="h0-3-47" class="d">-				close(proxy[backend])
+</a><a href="#h0-3-48" id="h0-3-48" class="d">-			}(backend)
+</a><a href="#h0-3-49" id="h0-3-49" class="i">+			close(proxy[backend])
+</a> 		}
+ 	}()
+ 
+<a href="#h0-4" id="h0-4" class="h">@@ -265,7 +263,11 @@ func (c *Composite) dispatch(policy common.Dispatch, rpc func(backend Backend) (
+</a> 	case common.Dispatch_ALL_ASYNC:
+ 		return c.dispatchAllAsync(rpc)
+ 	default:
+<a href="#h0-4-3" id="h0-4-3" class="d">-		return nil, errUnsupportedDispatch
+</a><a href="#h0-4-4" id="h0-4-4" class="i">+		return nil, status.Errorf(
+</a><a href="#h0-4-5" id="h0-4-5" class="i">+			codes.Unimplemented,
+</a><a href="#h0-4-6" id="h0-4-6" class="i">+			&quot;backend: unsupported dispatch policy for method: policy=%v&quot;,
+</a><a href="#h0-4-7" id="h0-4-7" class="i">+			policy,
+</a><a href="#h0-4-8" id="h0-4-8" class="i">+		)
+</a> 	}
+ }
+ 
+</pre>
+</div>
+</body>
+</html>

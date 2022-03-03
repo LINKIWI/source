@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/backend: Explicitly return invalid argument status for reads on non-regular files on disk - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/354b1147d9f569aa204c721036e32248c5ca822d">354b1147d9f569aa204c721036e32248c5ca822d</a>
+<b>parent</b> <a href="../commit/5bac41b2817d20987d4dccd7757a20a2281c6680">5bac41b2817d20987d4dccd7757a20a2281c6680</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Thu 20 Jan 2022 22:23:14 -0800
+
+internal/backend: Explicitly return invalid argument status for reads on non-regular files on disk
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/backend/disk.go</a></td><td> | </td><td class="num">21</td><td><span class="i">+++++++++++++++++++++</span><span class="d"></span></td></tr>
+</table></pre><pre>1 file changed, 21 insertions(+), 0 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/backend/disk.go">internal/backend/disk.go</a> b/<a href="../file/internal/backend/disk.go">internal/backend/disk.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -114,6 +114,15 @@ func (d *Disk) GetObject(ctx context.Context, request *service.GetObjectRequest)
+</a> 
+ 	defer file.Close()
+ 
+<a href="#h0-0-3" id="h0-0-3" class="i">+	if !stat.Mode.IsRegular() {
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+		return nil, status.Errorf(
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+			codes.InvalidArgument,
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+			&quot;backend: cannot serve non-regular file: file=%s mode=%v&quot;,
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+			stat.Path,
+</a><a href="#h0-0-8" id="h0-0-8" class="i">+			stat.Mode,
+</a><a href="#h0-0-9" id="h0-0-9" class="i">+		)
+</a><a href="#h0-0-10" id="h0-0-10" class="i">+	}
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+
+</a> 	data, err := io.ReadAll(file)
+ 	if err != nil {
+ 		return nil, d.createError(err)
+<a href="#h0-1" id="h0-1" class="h">@@ -160,11 +169,23 @@ func (d *Disk) StreamGetObject(ctx context.Context, request *service.GetObjectSt
+</a> 		return nil, errs
+ 	}
+ 
+<a href="#h0-1-3" id="h0-1-3" class="i">+	if !stat.Mode.IsRegular() {
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+		file.Close()
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+		errs &lt;- status.Errorf(
+</a><a href="#h0-1-6" id="h0-1-6" class="i">+			codes.InvalidArgument,
+</a><a href="#h0-1-7" id="h0-1-7" class="i">+			&quot;backend: cannot serve non-regular file: file=%s mode=%v&quot;,
+</a><a href="#h0-1-8" id="h0-1-8" class="i">+			stat.Path,
+</a><a href="#h0-1-9" id="h0-1-9" class="i">+			stat.Mode,
+</a><a href="#h0-1-10" id="h0-1-10" class="i">+		)
+</a><a href="#h0-1-11" id="h0-1-11" class="i">+		return nil, errs
+</a><a href="#h0-1-12" id="h0-1-12" class="i">+	}
+</a><a href="#h0-1-13" id="h0-1-13" class="i">+
+</a> 	attributes, err := schemas.UnmarshalAttributes(
+ 		stat.Attributes,
+ 		&amp;schemas.AttributesEncodingOptions{Prefix: &quot;user&quot;},
+ 	)
+ 	if err != nil {
+<a href="#h0-1-19" id="h0-1-19" class="i">+		file.Close()
+</a> 		errs &lt;- d.createError(err)
+ 		return nil, errs
+ 	}
+</pre>
+</div>
+</body>
+</html>

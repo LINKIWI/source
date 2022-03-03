@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>pkg/client/b2: API convenience functions and parsers - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/deb2a66de488abf462c6ddd4a4cec21bc88f870b">deb2a66de488abf462c6ddd4a4cec21bc88f870b</a>
+<b>parent</b> <a href="../commit/d6c111b2d1868f4a183421139bed83919e2f9fc4">d6c111b2d1868f4a183421139bed83919e2f9fc4</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Mon 27 Dec 2021 13:23:49 -0800
+
+pkg/client/b2: API convenience functions and parsers
+
+<b>Diffstat:</b>
+<table><tr><td class="A">A</td><td><a href="#h0">pkg/client/b2/api.go</a></td><td> | </td><td class="num">166</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+</table></pre><pre>1 file changed, 166 insertions(+), 0 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/pkg/client/b2/api.go">pkg/client/b2/api.go</a> b/<a href="../file/pkg/client/b2/api.go">pkg/client/b2/api.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -0,0 +1,166 @@
+</a><a href="#h0-0-0" id="h0-0-0" class="i">+package b2
+</a><a href="#h0-0-1" id="h0-0-1" class="i">+
+</a><a href="#h0-0-2" id="h0-0-2" class="i">+import (
+</a><a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;encoding/json&quot;
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+	&quot;fmt&quot;
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+	&quot;net/http&quot;
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+	&quot;net/url&quot;
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+	&quot;reflect&quot;
+</a><a href="#h0-0-8" id="h0-0-8" class="i">+	&quot;strings&quot;
+</a><a href="#h0-0-9" id="h0-0-9" class="i">+	&quot;time&quot;
+</a><a href="#h0-0-10" id="h0-0-10" class="i">+)
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+
+</a><a href="#h0-0-12" id="h0-0-12" class="i">+// Status is a structured error status returned by the B2 API in the response body.
+</a><a href="#h0-0-13" id="h0-0-13" class="i">+// Reference: https://www.backblaze.com/b2/docs/calling.html#error_handling
+</a><a href="#h0-0-14" id="h0-0-14" class="i">+type Status struct {
+</a><a href="#h0-0-15" id="h0-0-15" class="i">+	Status  int    `json:&quot;status&quot;`
+</a><a href="#h0-0-16" id="h0-0-16" class="i">+	Code    string `json:&quot;code&quot;`
+</a><a href="#h0-0-17" id="h0-0-17" class="i">+	Message string `json:&quot;message&quot;`
+</a><a href="#h0-0-18" id="h0-0-18" class="i">+}
+</a><a href="#h0-0-19" id="h0-0-19" class="i">+
+</a><a href="#h0-0-20" id="h0-0-20" class="i">+// Error implements the error interface by providing a string representation of the status.
+</a><a href="#h0-0-21" id="h0-0-21" class="i">+func (s *Status) Error() string {
+</a><a href="#h0-0-22" id="h0-0-22" class="i">+	return fmt.Sprintf(&quot;HTTP %d: %s (code %s)&quot;, s.Status, s.Message, s.Code)
+</a><a href="#h0-0-23" id="h0-0-23" class="i">+}
+</a><a href="#h0-0-24" id="h0-0-24" class="i">+
+</a><a href="#h0-0-25" id="h0-0-25" class="i">+// statusFromError creates a Status from a vanilla error.
+</a><a href="#h0-0-26" id="h0-0-26" class="i">+func statusFromError(err error) *Status {
+</a><a href="#h0-0-27" id="h0-0-27" class="i">+	if status, ok := err.(*Status); ok {
+</a><a href="#h0-0-28" id="h0-0-28" class="i">+		return status
+</a><a href="#h0-0-29" id="h0-0-29" class="i">+	}
+</a><a href="#h0-0-30" id="h0-0-30" class="i">+
+</a><a href="#h0-0-31" id="h0-0-31" class="i">+	return &amp;Status{
+</a><a href="#h0-0-32" id="h0-0-32" class="i">+		Status:  http.StatusInternalServerError,
+</a><a href="#h0-0-33" id="h0-0-33" class="i">+		Code:    &quot;unknown&quot;,
+</a><a href="#h0-0-34" id="h0-0-34" class="i">+		Message: err.Error(),
+</a><a href="#h0-0-35" id="h0-0-35" class="i">+	}
+</a><a href="#h0-0-36" id="h0-0-36" class="i">+}
+</a><a href="#h0-0-37" id="h0-0-37" class="i">+
+</a><a href="#h0-0-38" id="h0-0-38" class="i">+// URL wraps a *url.URL while implementing json.Unmarshaler in order to allow parsing a JSON string
+</a><a href="#h0-0-39" id="h0-0-39" class="i">+// field directly into a URL.
+</a><a href="#h0-0-40" id="h0-0-40" class="i">+type URL struct {
+</a><a href="#h0-0-41" id="h0-0-41" class="i">+	*url.URL
+</a><a href="#h0-0-42" id="h0-0-42" class="i">+}
+</a><a href="#h0-0-43" id="h0-0-43" class="i">+
+</a><a href="#h0-0-44" id="h0-0-44" class="i">+// UnmarshalJSON attempts to parse the data as a JSON string, followed by parsing it as a URL.
+</a><a href="#h0-0-45" id="h0-0-45" class="i">+func (u *URL) UnmarshalJSON(data []byte) error {
+</a><a href="#h0-0-46" id="h0-0-46" class="i">+	var err error
+</a><a href="#h0-0-47" id="h0-0-47" class="i">+	var raw string
+</a><a href="#h0-0-48" id="h0-0-48" class="i">+
+</a><a href="#h0-0-49" id="h0-0-49" class="i">+	// First parse the raw data as a string (the expected source type for a *url.URL).
+</a><a href="#h0-0-50" id="h0-0-50" class="i">+	if err := json.Unmarshal(data, &amp;raw); err != nil {
+</a><a href="#h0-0-51" id="h0-0-51" class="i">+		return err
+</a><a href="#h0-0-52" id="h0-0-52" class="i">+	}
+</a><a href="#h0-0-53" id="h0-0-53" class="i">+
+</a><a href="#h0-0-54" id="h0-0-54" class="i">+	u.URL, err = url.Parse(raw)
+</a><a href="#h0-0-55" id="h0-0-55" class="i">+
+</a><a href="#h0-0-56" id="h0-0-56" class="i">+	return err
+</a><a href="#h0-0-57" id="h0-0-57" class="i">+}
+</a><a href="#h0-0-58" id="h0-0-58" class="i">+
+</a><a href="#h0-0-59" id="h0-0-59" class="i">+// UnixTimestamp wraps a time.Time while implementing json.Unmarshaler in order to allow parsing a
+</a><a href="#h0-0-60" id="h0-0-60" class="i">+// JSON number as a timestamp (in milliseconds).
+</a><a href="#h0-0-61" id="h0-0-61" class="i">+type UnixTimestamp struct {
+</a><a href="#h0-0-62" id="h0-0-62" class="i">+	time.Time
+</a><a href="#h0-0-63" id="h0-0-63" class="i">+}
+</a><a href="#h0-0-64" id="h0-0-64" class="i">+
+</a><a href="#h0-0-65" id="h0-0-65" class="i">+// UnmarshalJSON attempts to parse the data as an integer, followed by parsing it as a Unix
+</a><a href="#h0-0-66" id="h0-0-66" class="i">+// timestamp in millisecond units.
+</a><a href="#h0-0-67" id="h0-0-67" class="i">+func (u *UnixTimestamp) UnmarshalJSON(data []byte) error {
+</a><a href="#h0-0-68" id="h0-0-68" class="i">+	var raw int64
+</a><a href="#h0-0-69" id="h0-0-69" class="i">+
+</a><a href="#h0-0-70" id="h0-0-70" class="i">+	if err := json.Unmarshal(data, &amp;raw); err != nil {
+</a><a href="#h0-0-71" id="h0-0-71" class="i">+		return err
+</a><a href="#h0-0-72" id="h0-0-72" class="i">+	}
+</a><a href="#h0-0-73" id="h0-0-73" class="i">+
+</a><a href="#h0-0-74" id="h0-0-74" class="i">+	// Convert milliseconds to nanoseconds
+</a><a href="#h0-0-75" id="h0-0-75" class="i">+	u.Time = time.Unix(0, raw*1000*1000)
+</a><a href="#h0-0-76" id="h0-0-76" class="i">+
+</a><a href="#h0-0-77" id="h0-0-77" class="i">+	return nil
+</a><a href="#h0-0-78" id="h0-0-78" class="i">+}
+</a><a href="#h0-0-79" id="h0-0-79" class="i">+
+</a><a href="#h0-0-80" id="h0-0-80" class="i">+// marshalHeaders marshals a struct into a http.Header based on the &quot;header&quot; field tags in the
+</a><a href="#h0-0-81" id="h0-0-81" class="i">+// struct definition. This is useful for serializing a struct declaration into a set of headers
+</a><a href="#h0-0-82" id="h0-0-82" class="i">+// available for use in an outgoing http.Request.
+</a><a href="#h0-0-83" id="h0-0-83" class="i">+//
+</a><a href="#h0-0-84" id="h0-0-84" class="i">+// The supported tag format is as follows:
+</a><a href="#h0-0-85" id="h0-0-85" class="i">+//
+</a><a href="#h0-0-86" id="h0-0-86" class="i">+//     &lt;header key&gt;[,[encode]]
+</a><a href="#h0-0-87" id="h0-0-87" class="i">+//
+</a><a href="#h0-0-88" id="h0-0-88" class="i">+// &lt;header key&gt; is a required string literal with the desired header key for the entry; the field
+</a><a href="#h0-0-89" id="h0-0-89" class="i">+// value is used as the corresponding header value. Note that this implementation uses add semantics
+</a><a href="#h0-0-90" id="h0-0-90" class="i">+// for headers; if the same header key is defined multiple times in the struct, it will appear
+</a><a href="#h0-0-91" id="h0-0-91" class="i">+// multiple times in the serialized http.Header.
+</a><a href="#h0-0-92" id="h0-0-92" class="i">+//
+</a><a href="#h0-0-93" id="h0-0-93" class="i">+// Following the mandatory header key is an optional comma which delimits the header key and any
+</a><a href="#h0-0-94" id="h0-0-94" class="i">+// optional boolean toggles. To use all default behaviors, the comma can be elided.
+</a><a href="#h0-0-95" id="h0-0-95" class="i">+//
+</a><a href="#h0-0-96" id="h0-0-96" class="i">+// encode is an optional keyword that instructs the serializer to URL-encode the associated header
+</a><a href="#h0-0-97" id="h0-0-97" class="i">+// value in the serialized header.
+</a><a href="#h0-0-98" id="h0-0-98" class="i">+//
+</a><a href="#h0-0-99" id="h0-0-99" class="i">+// For example, the following struct definition:
+</a><a href="#h0-0-100" id="h0-0-100" class="i">+//
+</a><a href="#h0-0-101" id="h0-0-101" class="i">+//     type Foo struct {
+</a><a href="#h0-0-102" id="h0-0-102" class="i">+//             Bar string `header:&quot;X-Bar,encode&quot;`
+</a><a href="#h0-0-103" id="h0-0-103" class="i">+//	       Baz int    `header:&quot;X-Baz&quot;`
+</a><a href="#h0-0-104" id="h0-0-104" class="i">+//             Qux int
+</a><a href="#h0-0-105" id="h0-0-105" class="i">+//     }
+</a><a href="#h0-0-106" id="h0-0-106" class="i">+//     foo := &amp;Foo{Bar: &quot;hello/world&quot;, Baz: 4}
+</a><a href="#h0-0-107" id="h0-0-107" class="i">+//
+</a><a href="#h0-0-108" id="h0-0-108" class="i">+// Would be serialized as the following headers:
+</a><a href="#h0-0-109" id="h0-0-109" class="i">+//
+</a><a href="#h0-0-110" id="h0-0-110" class="i">+//     X-Bar: hello%2Fworld
+</a><a href="#h0-0-111" id="h0-0-111" class="i">+//     X-Baz: 4
+</a><a href="#h0-0-112" id="h0-0-112" class="i">+func marshalHeaders(request interface{}) (http.Header, error) {
+</a><a href="#h0-0-113" id="h0-0-113" class="i">+	h := make(http.Header)
+</a><a href="#h0-0-114" id="h0-0-114" class="i">+
+</a><a href="#h0-0-115" id="h0-0-115" class="i">+	t := reflect.TypeOf(request)
+</a><a href="#h0-0-116" id="h0-0-116" class="i">+	if t.Kind() == reflect.Ptr {
+</a><a href="#h0-0-117" id="h0-0-117" class="i">+		t = t.Elem()
+</a><a href="#h0-0-118" id="h0-0-118" class="i">+	}
+</a><a href="#h0-0-119" id="h0-0-119" class="i">+	if t.Kind() != reflect.Struct {
+</a><a href="#h0-0-120" id="h0-0-120" class="i">+		return nil, fmt.Errorf(&quot;b2: request interface{} is not a struct: kind=%v&quot;, t.Kind())
+</a><a href="#h0-0-121" id="h0-0-121" class="i">+	}
+</a><a href="#h0-0-122" id="h0-0-122" class="i">+
+</a><a href="#h0-0-123" id="h0-0-123" class="i">+	v := reflect.ValueOf(request)
+</a><a href="#h0-0-124" id="h0-0-124" class="i">+	if v.Kind() == reflect.Ptr {
+</a><a href="#h0-0-125" id="h0-0-125" class="i">+		v = v.Elem()
+</a><a href="#h0-0-126" id="h0-0-126" class="i">+	}
+</a><a href="#h0-0-127" id="h0-0-127" class="i">+
+</a><a href="#h0-0-128" id="h0-0-128" class="i">+	for i := 0; i &lt; t.NumField(); i++ {
+</a><a href="#h0-0-129" id="h0-0-129" class="i">+		field := t.Field(i)
+</a><a href="#h0-0-130" id="h0-0-130" class="i">+
+</a><a href="#h0-0-131" id="h0-0-131" class="i">+		raw, ok := field.Tag.Lookup(&quot;header&quot;)
+</a><a href="#h0-0-132" id="h0-0-132" class="i">+		if !ok {
+</a><a href="#h0-0-133" id="h0-0-133" class="i">+			continue
+</a><a href="#h0-0-134" id="h0-0-134" class="i">+		}
+</a><a href="#h0-0-135" id="h0-0-135" class="i">+
+</a><a href="#h0-0-136" id="h0-0-136" class="i">+		value := fmt.Sprintf(&quot;%v&quot;, v.Field(i).Interface())
+</a><a href="#h0-0-137" id="h0-0-137" class="i">+		if value == &quot;&quot; {
+</a><a href="#h0-0-138" id="h0-0-138" class="i">+			continue
+</a><a href="#h0-0-139" id="h0-0-139" class="i">+		}
+</a><a href="#h0-0-140" id="h0-0-140" class="i">+
+</a><a href="#h0-0-141" id="h0-0-141" class="i">+		spec := strings.Split(raw, &quot;,&quot;)
+</a><a href="#h0-0-142" id="h0-0-142" class="i">+		if len(spec) == 0 {
+</a><a href="#h0-0-143" id="h0-0-143" class="i">+			return nil, fmt.Errorf(&quot;b2: header specification provided with no data&quot;)
+</a><a href="#h0-0-144" id="h0-0-144" class="i">+		} else if len(spec) == 1 &amp;&amp; spec[0] == &quot;&quot; {
+</a><a href="#h0-0-145" id="h0-0-145" class="i">+			return nil, fmt.Errorf(&quot;b2: header specification missing header key&quot;)
+</a><a href="#h0-0-146" id="h0-0-146" class="i">+		}
+</a><a href="#h0-0-147" id="h0-0-147" class="i">+
+</a><a href="#h0-0-148" id="h0-0-148" class="i">+		// Marshal options are specified as keywords following the header key, which is the
+</a><a href="#h0-0-149" id="h0-0-149" class="i">+		// first component in the comma-delimited specification.
+</a><a href="#h0-0-150" id="h0-0-150" class="i">+		opts := make(map[string]bool)
+</a><a href="#h0-0-151" id="h0-0-151" class="i">+		if len(spec) &gt; 1 {
+</a><a href="#h0-0-152" id="h0-0-152" class="i">+			for i := 1; i &lt; len(spec); i++ {
+</a><a href="#h0-0-153" id="h0-0-153" class="i">+				opts[spec[i]] = true
+</a><a href="#h0-0-154" id="h0-0-154" class="i">+			}
+</a><a href="#h0-0-155" id="h0-0-155" class="i">+		}
+</a><a href="#h0-0-156" id="h0-0-156" class="i">+
+</a><a href="#h0-0-157" id="h0-0-157" class="i">+		if _, ok := opts[&quot;encode&quot;]; ok {
+</a><a href="#h0-0-158" id="h0-0-158" class="i">+			value = url.QueryEscape(value)
+</a><a href="#h0-0-159" id="h0-0-159" class="i">+		}
+</a><a href="#h0-0-160" id="h0-0-160" class="i">+
+</a><a href="#h0-0-161" id="h0-0-161" class="i">+		h.Add(spec[0], value)
+</a><a href="#h0-0-162" id="h0-0-162" class="i">+	}
+</a><a href="#h0-0-163" id="h0-0-163" class="i">+
+</a><a href="#h0-0-164" id="h0-0-164" class="i">+	return h, nil
+</a><a href="#h0-0-165" id="h0-0-165" class="i">+}
+</a></pre>
+</div>
+</body>
+</html>

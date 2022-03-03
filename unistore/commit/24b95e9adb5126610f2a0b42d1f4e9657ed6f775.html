@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>schemas: Create dedicated request/response types for streaming RPCs - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/24b95e9adb5126610f2a0b42d1f4e9657ed6f775">24b95e9adb5126610f2a0b42d1f4e9657ed6f775</a>
+<b>parent</b> <a href="../commit/02fa7952f8dbf4443c5e788b138236e931804685">02fa7952f8dbf4443c5e788b138236e931804685</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sun 26 Dec 2021 13:18:44 -0800
+
+schemas: Create dedicated request/response types for streaming RPCs
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">schemas/common/object.proto</a></td><td> | </td><td class="num">7</td><td><span class="i">+++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">schemas/service/unistore.proto</a></td><td> | </td><td class="num">28</td><td><span class="i">+++++++++++++++++++++</span><span class="d">-------</span></td></tr>
+</table></pre><pre>2 files changed, 28 insertions(+), 7 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/schemas/common/object.proto">schemas/common/object.proto</a> b/<a href="../file/schemas/common/object.proto">schemas/common/object.proto</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -6,6 +6,13 @@ option go_package = &quot;unistore/schemas/common&quot;;
+</a> 
+ import &quot;google/protobuf/timestamp.proto&quot;;
+ 
+<a href="#h0-0-3" id="h0-0-3" class="i">+message Range {
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+  string unit = 1;
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+  uint64 start = 2;
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+  uint64 end = 3;
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+  uint64 total = 4;
+</a><a href="#h0-0-8" id="h0-0-8" class="i">+}
+</a><a href="#h0-0-9" id="h0-0-9" class="i">+
+</a> message Metadata {
+   string id = 1;
+   string key = 2;
+<b>diff --git a/<a id="h1" href="../file/schemas/service/unistore.proto">schemas/service/unistore.proto</a> b/<a href="../file/schemas/service/unistore.proto">schemas/service/unistore.proto</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -17,13 +17,8 @@ message HeadObjectResponse {
+</a> }
+ 
+ message GetObjectRequest {
+<a href="#h1-0-3" id="h1-0-3" class="d">-  message Range {
+</a><a href="#h1-0-4" id="h1-0-4" class="d">-    uint64 start = 1;
+</a><a href="#h1-0-5" id="h1-0-5" class="d">-    uint64 end = 2;
+</a><a href="#h1-0-6" id="h1-0-6" class="d">-  }
+</a>   common.Resource resource = 1;
+   string key = 2;
+<a href="#h1-0-9" id="h1-0-9" class="d">-  Range range = 3;
+</a> }
+ 
+ message GetObjectResponse {
+<a href="#h1-1" id="h1-1" class="h">@@ -31,6 +26,16 @@ message GetObjectResponse {
+</a>   bytes data = 2;
+ }
+ 
+<a href="#h1-1-3" id="h1-1-3" class="i">+message GetObjectStreamRequest {
+</a><a href="#h1-1-4" id="h1-1-4" class="i">+  GetObjectRequest request = 1;
+</a><a href="#h1-1-5" id="h1-1-5" class="i">+  uint64 chunk_size = 2;
+</a><a href="#h1-1-6" id="h1-1-6" class="i">+}
+</a><a href="#h1-1-7" id="h1-1-7" class="i">+
+</a><a href="#h1-1-8" id="h1-1-8" class="i">+message GetObjectStreamResponse {
+</a><a href="#h1-1-9" id="h1-1-9" class="i">+  GetObjectResponse response = 1;
+</a><a href="#h1-1-10" id="h1-1-10" class="i">+  common.Range range = 2;
+</a><a href="#h1-1-11" id="h1-1-11" class="i">+}
+</a><a href="#h1-1-12" id="h1-1-12" class="i">+
+</a> message PutObjectRequest {
+   common.Resource resource = 1;
+   string key = 2;
+<a href="#h1-2" id="h1-2" class="h">@@ -42,6 +47,15 @@ message PutObjectResponse {
+</a>   uint64 size = 1;
+ }
+ 
+<a href="#h1-2-3" id="h1-2-3" class="i">+message PutObjectStreamRequest {
+</a><a href="#h1-2-4" id="h1-2-4" class="i">+  PutObjectRequest request = 1;
+</a><a href="#h1-2-5" id="h1-2-5" class="i">+  common.Range range = 2;
+</a><a href="#h1-2-6" id="h1-2-6" class="i">+}
+</a><a href="#h1-2-7" id="h1-2-7" class="i">+
+</a><a href="#h1-2-8" id="h1-2-8" class="i">+message PutObjectStreamResponse {
+</a><a href="#h1-2-9" id="h1-2-9" class="i">+  PutObjectResponse response = 1;
+</a><a href="#h1-2-10" id="h1-2-10" class="i">+}
+</a><a href="#h1-2-11" id="h1-2-11" class="i">+
+</a> message DeleteObjectRequest {
+   common.Resource resource = 1;
+   string key = 2;
+<a href="#h1-3" id="h1-3" class="h">@@ -61,9 +75,9 @@ message ListObjectsResponse {
+</a> service Unistore {
+   rpc HeadObject(HeadObjectRequest) returns (HeadObjectResponse);
+   rpc GetObject(GetObjectRequest) returns (GetObjectResponse);
+<a href="#h1-3-3" id="h1-3-3" class="d">-  rpc StreamGetObject(GetObjectRequest) returns (stream GetObjectResponse);
+</a><a href="#h1-3-4" id="h1-3-4" class="i">+  rpc StreamGetObject(GetObjectStreamRequest) returns (stream GetObjectStreamResponse);
+</a>   rpc PutObject(PutObjectRequest) returns (PutObjectResponse);
+<a href="#h1-3-6" id="h1-3-6" class="d">-  rpc StreamPutObject(stream PutObjectRequest) returns (PutObjectResponse);
+</a><a href="#h1-3-7" id="h1-3-7" class="i">+  rpc StreamPutObject(stream PutObjectStreamRequest) returns (PutObjectStreamResponse);
+</a>   rpc DeleteObject(DeleteObjectRequest) returns (DeleteObjectResponse);
+   rpc ListObjects(ListObjectsRequest) returns (ListObjectsResponse);
+ }
+</pre>
+</div>
+</body>
+</html>

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>cmd/unistore-cli: Human renderer for server info RPC - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a>
+<b>parent</b> <a href="../commit/ba7a9a5052400b95c5928b3a683860bdc74a489d">ba7a9a5052400b95c5928b3a683860bdc74a489d</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sat  8 Jan 2022 13:38:07 -0800
+
+cmd/unistore-cli: Human renderer for server info RPC
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">cmd/unistore-cli/render.go</a></td><td> | </td><td class="num">53</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+</table></pre><pre>1 file changed, 53 insertions(+), 0 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/cmd/unistore-cli/render.go">cmd/unistore-cli/render.go</a> b/<a href="../file/cmd/unistore-cli/render.go">cmd/unistore-cli/render.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -152,6 +152,8 @@ type humanRenderer struct {
+</a> // proto renders a human-readable representation of supported Protobuf messages.
+ func (h *humanRenderer) proto(message proto.Message) error {
+ 	switch m := message.(type) {
+<a href="#h0-0-3" id="h0-0-3" class="i">+	case *service.InfoResponse:
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+		return h.protoInfoResponse(m)
+</a> 	case *service.ListObjectsResponse:
+ 		return h.protoListObjectsResponse(m)
+ 	default:
+<a href="#h0-1" id="h0-1" class="h">@@ -159,6 +161,57 @@ func (h *humanRenderer) proto(message proto.Message) error {
+</a> 	}
+ }
+ 
+<a href="#h0-1-3" id="h0-1-3" class="i">+// protoInfoResponse renders a service.InfoResponse.
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+func (h *humanRenderer) protoInfoResponse(response *service.InfoResponse) error {
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+	var renderNode func(node *common.Node) []string
+</a><a href="#h0-1-6" id="h0-1-6" class="i">+
+</a><a href="#h0-1-7" id="h0-1-7" class="i">+	renderNode = func(node *common.Node) []string {
+</a><a href="#h0-1-8" id="h0-1-8" class="i">+		var out []string
+</a><a href="#h0-1-9" id="h0-1-9" class="i">+
+</a><a href="#h0-1-10" id="h0-1-10" class="i">+		childrenConstants := make(map[string]string)
+</a><a href="#h0-1-11" id="h0-1-11" class="i">+		childrenNodes := make(map[string]*common.Node)
+</a><a href="#h0-1-12" id="h0-1-12" class="i">+
+</a><a href="#h0-1-13" id="h0-1-13" class="i">+		for param, value := range node.Children {
+</a><a href="#h0-1-14" id="h0-1-14" class="i">+			switch c := value.Child.(type) {
+</a><a href="#h0-1-15" id="h0-1-15" class="i">+			case *common.Node_Value_Value:
+</a><a href="#h0-1-16" id="h0-1-16" class="i">+				childrenConstants[param] = c.Value
+</a><a href="#h0-1-17" id="h0-1-17" class="i">+			case *common.Node_Value_Node:
+</a><a href="#h0-1-18" id="h0-1-18" class="i">+				childrenNodes[param] = c.Node
+</a><a href="#h0-1-19" id="h0-1-19" class="i">+			}
+</a><a href="#h0-1-20" id="h0-1-20" class="i">+		}
+</a><a href="#h0-1-21" id="h0-1-21" class="i">+
+</a><a href="#h0-1-22" id="h0-1-22" class="i">+		if len(childrenConstants) &gt; 0 {
+</a><a href="#h0-1-23" id="h0-1-23" class="i">+			var params []string
+</a><a href="#h0-1-24" id="h0-1-24" class="i">+			for param, value := range childrenConstants {
+</a><a href="#h0-1-25" id="h0-1-25" class="i">+				params = append(params, fmt.Sprintf(&quot;%s: %s&quot;, param, value))
+</a><a href="#h0-1-26" id="h0-1-26" class="i">+			}
+</a><a href="#h0-1-27" id="h0-1-27" class="i">+
+</a><a href="#h0-1-28" id="h0-1-28" class="i">+			out = append(out, fmt.Sprintf(&quot;%s [%s]&quot;, node.Name, strings.Join(params, &quot;, &quot;)))
+</a><a href="#h0-1-29" id="h0-1-29" class="i">+		} else {
+</a><a href="#h0-1-30" id="h0-1-30" class="i">+			out = append(out, node.Name)
+</a><a href="#h0-1-31" id="h0-1-31" class="i">+		}
+</a><a href="#h0-1-32" id="h0-1-32" class="i">+
+</a><a href="#h0-1-33" id="h0-1-33" class="i">+		for _, n := range childrenNodes {
+</a><a href="#h0-1-34" id="h0-1-34" class="i">+			for _, line := range renderNode(n) {
+</a><a href="#h0-1-35" id="h0-1-35" class="i">+				out = append(out, fmt.Sprintf(&quot;%s%s&quot;, defaultIndent, line))
+</a><a href="#h0-1-36" id="h0-1-36" class="i">+			}
+</a><a href="#h0-1-37" id="h0-1-37" class="i">+		}
+</a><a href="#h0-1-38" id="h0-1-38" class="i">+
+</a><a href="#h0-1-39" id="h0-1-39" class="i">+		return out
+</a><a href="#h0-1-40" id="h0-1-40" class="i">+	}
+</a><a href="#h0-1-41" id="h0-1-41" class="i">+
+</a><a href="#h0-1-42" id="h0-1-42" class="i">+	fmt.Fprintln(h.output, &quot;server version:&quot;)
+</a><a href="#h0-1-43" id="h0-1-43" class="i">+	fmt.Fprintf(h.output, &quot;%sunistore/%s\n\n&quot;, defaultIndent, response.Version)
+</a><a href="#h0-1-44" id="h0-1-44" class="i">+	fmt.Fprintln(h.output, &quot;server listener:&quot;)
+</a><a href="#h0-1-45" id="h0-1-45" class="i">+	fmt.Fprintf(h.output, &quot;%s%s\n\n&quot;, defaultIndent, response.Address)
+</a><a href="#h0-1-46" id="h0-1-46" class="i">+	fmt.Fprintln(h.output, &quot;server backend composition tree:&quot;)
+</a><a href="#h0-1-47" id="h0-1-47" class="i">+	for _, line := range renderNode(response.Backend) {
+</a><a href="#h0-1-48" id="h0-1-48" class="i">+		fmt.Fprintf(h.output, &quot;%s%s\n&quot;, defaultIndent, line)
+</a><a href="#h0-1-49" id="h0-1-49" class="i">+	}
+</a><a href="#h0-1-50" id="h0-1-50" class="i">+
+</a><a href="#h0-1-51" id="h0-1-51" class="i">+	return nil
+</a><a href="#h0-1-52" id="h0-1-52" class="i">+}
+</a><a href="#h0-1-53" id="h0-1-53" class="i">+
+</a> // protoListObjectsResponse renders a service.ListObjectsResponse.
+ func (h *humanRenderer) protoListObjectsResponse(response *service.ListObjectsResponse) error {
+ 	// Sort the objects alphabetically by key name, while grouping directories at the
+</pre>
+</div>
+</body>
+</html>

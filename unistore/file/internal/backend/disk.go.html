@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>disk.go - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../../../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../../../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../../../log">Log</a> | <a href="../../../files">Files</a> | <a href="../../../refs">Refs</a> | <a href="../../../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<p>internal/backend/<strong>disk.go</strong> (18658B) (<a href="../../../raw/internal/backend/disk.go">raw</a>) (<a href="../../../blame/internal/backend/disk.go">blame</a>)</p><hr/>
+<pre id="blob">
+<a href="#l1" class="line" id="l1">      1</a> package backend
+<a href="#l2" class="line" id="l2">      2</a> 
+<a href="#l3" class="line" id="l3">      3</a> import (
+<a href="#l4" class="line" id="l4">      4</a> 	&quot;bufio&quot;
+<a href="#l5" class="line" id="l5">      5</a> 	&quot;bytes&quot;
+<a href="#l6" class="line" id="l6">      6</a> 	&quot;context&quot;
+<a href="#l7" class="line" id="l7">      7</a> 	&quot;errors&quot;
+<a href="#l8" class="line" id="l8">      8</a> 	&quot;fmt&quot;
+<a href="#l9" class="line" id="l9">      9</a> 	&quot;io&quot;
+<a href="#l10" class="line" id="l10">     10</a> 	&quot;os&quot;
+<a href="#l11" class="line" id="l11">     11</a> 	&quot;path/filepath&quot;
+<a href="#l12" class="line" id="l12">     12</a> 	&quot;strings&quot;
+<a href="#l13" class="line" id="l13">     13</a> 	&quot;syscall&quot;
+<a href="#l14" class="line" id="l14">     14</a> 
+<a href="#l15" class="line" id="l15">     15</a> 	&quot;go.uber.org/zap&quot;
+<a href="#l16" class="line" id="l16">     16</a> 	&quot;google.golang.org/grpc/codes&quot;
+<a href="#l17" class="line" id="l17">     17</a> 	&quot;google.golang.org/grpc/status&quot;
+<a href="#l18" class="line" id="l18">     18</a> 	&quot;google.golang.org/protobuf/types/known/timestamppb&quot;
+<a href="#l19" class="line" id="l19">     19</a> 
+<a href="#l20" class="line" id="l20">     20</a> 	&quot;unistore/internal/config&quot;
+<a href="#l21" class="line" id="l21">     21</a> 	&quot;unistore/internal/schemas&quot;
+<a href="#l22" class="line" id="l22">     22</a> 	&quot;unistore/pkg/client/disk&quot;
+<a href="#l23" class="line" id="l23">     23</a> 	&quot;unistore/schemas/common&quot;
+<a href="#l24" class="line" id="l24">     24</a> 	&quot;unistore/schemas/service&quot;
+<a href="#l25" class="line" id="l25">     25</a> )
+<a href="#l26" class="line" id="l26">     26</a> 
+<a href="#l27" class="line" id="l27">     27</a> // Disk is a Backend that implements an object storage server on top of a local filesystem.
+<a href="#l28" class="line" id="l28">     28</a> type Disk struct {
+<a href="#l29" class="line" id="l29">     29</a> 	cfg    *config.Disk
+<a href="#l30" class="line" id="l30">     30</a> 	client *disk.Client
+<a href="#l31" class="line" id="l31">     31</a> }
+<a href="#l32" class="line" id="l32">     32</a> 
+<a href="#l33" class="line" id="l33">     33</a> // NewDisk creates a new Disk backend.
+<a href="#l34" class="line" id="l34">     34</a> func NewDisk(cfg *config.Disk) (Backend, error) {
+<a href="#l35" class="line" id="l35">     35</a> 	client, err := disk.New(cfg.Root)
+<a href="#l36" class="line" id="l36">     36</a> 	if err != nil {
+<a href="#l37" class="line" id="l37">     37</a> 		return nil, err
+<a href="#l38" class="line" id="l38">     38</a> 	}
+<a href="#l39" class="line" id="l39">     39</a> 
+<a href="#l40" class="line" id="l40">     40</a> 	d := &amp;Disk{
+<a href="#l41" class="line" id="l41">     41</a> 		cfg:    cfg,
+<a href="#l42" class="line" id="l42">     42</a> 		client: client,
+<a href="#l43" class="line" id="l43">     43</a> 	}
+<a href="#l44" class="line" id="l44">     44</a> 
+<a href="#l45" class="line" id="l45">     45</a> 	return newInstrumentation(&quot;disk&quot;, d), nil
+<a href="#l46" class="line" id="l46">     46</a> }
+<a href="#l47" class="line" id="l47">     47</a> 
+<a href="#l48" class="line" id="l48">     48</a> // HeadBucket stats the requested bucket directory.
+<a href="#l49" class="line" id="l49">     49</a> func (d *Disk) HeadBucket(ctx context.Context, request *service.HeadBucketRequest) (*service.HeadBucketResponse, error) {
+<a href="#l50" class="line" id="l50">     50</a> 	stat, err := d.client.StatFile(request.Resource.Bucket)
+<a href="#l51" class="line" id="l51">     51</a> 	if err != nil {
+<a href="#l52" class="line" id="l52">     52</a> 		return nil, d.createError(err)
+<a href="#l53" class="line" id="l53">     53</a> 	}
+<a href="#l54" class="line" id="l54">     54</a> 
+<a href="#l55" class="line" id="l55">     55</a> 	return &amp;service.HeadBucketResponse{
+<a href="#l56" class="line" id="l56">     56</a> 		Bucket: &amp;common.Bucket{
+<a href="#l57" class="line" id="l57">     57</a> 			Id:        stat.BaseName,
+<a href="#l58" class="line" id="l58">     58</a> 			Name:      stat.BaseName,
+<a href="#l59" class="line" id="l59">     59</a> 			Timestamp: timestamppb.New(stat.ModifiedTime),
+<a href="#l60" class="line" id="l60">     60</a> 			Tags:      stat.Attributes,
+<a href="#l61" class="line" id="l61">     61</a> 		},
+<a href="#l62" class="line" id="l62">     62</a> 	}, nil
+<a href="#l63" class="line" id="l63">     63</a> }
+<a href="#l64" class="line" id="l64">     64</a> 
+<a href="#l65" class="line" id="l65">     65</a> // HeadObject stats the requested file.
+<a href="#l66" class="line" id="l66">     66</a> func (d *Disk) HeadObject(ctx context.Context, request *service.HeadObjectRequest) (*service.HeadObjectResponse, error) {
+<a href="#l67" class="line" id="l67">     67</a> 	var objectType common.Object
+<a href="#l68" class="line" id="l68">     68</a> 
+<a href="#l69" class="line" id="l69">     69</a> 	target, err := newFileTarget(d.client, request.Resource.Bucket, request.Key)
+<a href="#l70" class="line" id="l70">     70</a> 	if err != nil {
+<a href="#l71" class="line" id="l71">     71</a> 		return nil, status.Error(codes.PermissionDenied, err.Error())
+<a href="#l72" class="line" id="l72">     72</a> 	}
+<a href="#l73" class="line" id="l73">     73</a> 
+<a href="#l74" class="line" id="l74">     74</a> 	stat, err := d.client.StatFile(target.resolve())
+<a href="#l75" class="line" id="l75">     75</a> 	if err != nil {
+<a href="#l76" class="line" id="l76">     76</a> 		return nil, d.createError(err)
+<a href="#l77" class="line" id="l77">     77</a> 	}
+<a href="#l78" class="line" id="l78">     78</a> 
+<a href="#l79" class="line" id="l79">     79</a> 	attributes, err := schemas.UnmarshalAttributes(
+<a href="#l80" class="line" id="l80">     80</a> 		stat.Attributes,
+<a href="#l81" class="line" id="l81">     81</a> 		&amp;schemas.AttributesEncodingOptions{Prefix: &quot;user&quot;},
+<a href="#l82" class="line" id="l82">     82</a> 	)
+<a href="#l83" class="line" id="l83">     83</a> 	if err != nil {
+<a href="#l84" class="line" id="l84">     84</a> 		return nil, d.createError(err)
+<a href="#l85" class="line" id="l85">     85</a> 	}
+<a href="#l86" class="line" id="l86">     86</a> 
+<a href="#l87" class="line" id="l87">     87</a> 	if stat.Mode.IsRegular() {
+<a href="#l88" class="line" id="l88">     88</a> 		objectType = common.Object_REGULAR
+<a href="#l89" class="line" id="l89">     89</a> 	} else if stat.Mode.IsDir() {
+<a href="#l90" class="line" id="l90">     90</a> 		objectType = common.Object_DIRECTORY
+<a href="#l91" class="line" id="l91">     91</a> 	}
+<a href="#l92" class="line" id="l92">     92</a> 
+<a href="#l93" class="line" id="l93">     93</a> 	return &amp;service.HeadObjectResponse{
+<a href="#l94" class="line" id="l94">     94</a> 		Metadata: &amp;common.Metadata{
+<a href="#l95" class="line" id="l95">     95</a> 			Id:           stat.BaseName,
+<a href="#l96" class="line" id="l96">     96</a> 			Key:          target.key,
+<a href="#l97" class="line" id="l97">     97</a> 			Size:         stat.Size,
+<a href="#l98" class="line" id="l98">     98</a> 			ObjectType:   objectType,
+<a href="#l99" class="line" id="l99">     99</a> 			ModifiedTime: timestamppb.New(stat.ModifiedTime),
+<a href="#l100" class="line" id="l100">    100</a> 			Attributes:   attributes,
+<a href="#l101" class="line" id="l101">    101</a> 		},
+<a href="#l102" class="line" id="l102">    102</a> 	}, nil
+<a href="#l103" class="line" id="l103">    103</a> }
+<a href="#l104" class="line" id="l104">    104</a> 
+<a href="#l105" class="line" id="l105">    105</a> // GetObject opens a file handle for the requested file followed by reading its contents in full.
+<a href="#l106" class="line" id="l106">    106</a> func (d *Disk) GetObject(ctx context.Context, request *service.GetObjectRequest) (*service.GetObjectResponse, error) {
+<a href="#l107" class="line" id="l107">    107</a> 	target, err := newFileTarget(d.client, request.Resource.Bucket, request.Key)
+<a href="#l108" class="line" id="l108">    108</a> 	if err != nil {
+<a href="#l109" class="line" id="l109">    109</a> 		return nil, status.Error(codes.PermissionDenied, err.Error())
+<a href="#l110" class="line" id="l110">    110</a> 	}
+<a href="#l111" class="line" id="l111">    111</a> 
+<a href="#l112" class="line" id="l112">    112</a> 	file, stat, err := d.client.ReadFile(target.resolve())
+<a href="#l113" class="line" id="l113">    113</a> 	if err != nil {
+<a href="#l114" class="line" id="l114">    114</a> 		return nil, d.createError(err)
+<a href="#l115" class="line" id="l115">    115</a> 	}
+<a href="#l116" class="line" id="l116">    116</a> 
+<a href="#l117" class="line" id="l117">    117</a> 	defer file.Close()
+<a href="#l118" class="line" id="l118">    118</a> 
+<a href="#l119" class="line" id="l119">    119</a> 	if !stat.Mode.IsRegular() {
+<a href="#l120" class="line" id="l120">    120</a> 		return nil, status.Errorf(
+<a href="#l121" class="line" id="l121">    121</a> 			codes.InvalidArgument,
+<a href="#l122" class="line" id="l122">    122</a> 			&quot;backend: cannot serve non-regular file: file=%s mode=%v&quot;,
+<a href="#l123" class="line" id="l123">    123</a> 			stat.Path,
+<a href="#l124" class="line" id="l124">    124</a> 			stat.Mode,
+<a href="#l125" class="line" id="l125">    125</a> 		)
+<a href="#l126" class="line" id="l126">    126</a> 	}
+<a href="#l127" class="line" id="l127">    127</a> 
+<a href="#l128" class="line" id="l128">    128</a> 	n := stat.Size
+<a href="#l129" class="line" id="l129">    129</a> 
+<a href="#l130" class="line" id="l130">    130</a> 	if request.Range != nil {
+<a href="#l131" class="line" id="l131">    131</a> 		if request.Range.Unit != &quot;bytes&quot; {
+<a href="#l132" class="line" id="l132">    132</a> 			return nil, status.Errorf(
+<a href="#l133" class="line" id="l133">    133</a> 				codes.InvalidArgument,
+<a href="#l134" class="line" id="l134">    134</a> 				&quot;backend: unsupported range unit: unit=%s&quot;,
+<a href="#l135" class="line" id="l135">    135</a> 				request.Range.Unit,
+<a href="#l136" class="line" id="l136">    136</a> 			)
+<a href="#l137" class="line" id="l137">    137</a> 		} else if request.Range.End &gt; 0 &amp;&amp; request.Range.End &lt;= request.Range.Start {
+<a href="#l138" class="line" id="l138">    138</a> 			return nil, status.Errorf(
+<a href="#l139" class="line" id="l139">    139</a> 				codes.OutOfRange,
+<a href="#l140" class="line" id="l140">    140</a> 				&quot;backend: invalid range specification: start=%d end=%d&quot;,
+<a href="#l141" class="line" id="l141">    141</a> 				request.Range.Start,
+<a href="#l142" class="line" id="l142">    142</a> 				request.Range.End,
+<a href="#l143" class="line" id="l143">    143</a> 			)
+<a href="#l144" class="line" id="l144">    144</a> 		} else if request.Range.Start &gt;= stat.Size {
+<a href="#l145" class="line" id="l145">    145</a> 			return nil, status.Errorf(
+<a href="#l146" class="line" id="l146">    146</a> 				codes.OutOfRange,
+<a href="#l147" class="line" id="l147">    147</a> 				&quot;backend: range start index is beyond file boundary: start=%d size=%d&quot;,
+<a href="#l148" class="line" id="l148">    148</a> 				request.Range.Start,
+<a href="#l149" class="line" id="l149">    149</a> 				stat.Size,
+<a href="#l150" class="line" id="l150">    150</a> 			)
+<a href="#l151" class="line" id="l151">    151</a> 		}
+<a href="#l152" class="line" id="l152">    152</a> 
+<a href="#l153" class="line" id="l153">    153</a> 		if _, err := file.Seek(int64(request.Range.Start), io.SeekStart); err != nil {
+<a href="#l154" class="line" id="l154">    154</a> 			return nil, d.createError(err)
+<a href="#l155" class="line" id="l155">    155</a> 		}
+<a href="#l156" class="line" id="l156">    156</a> 
+<a href="#l157" class="line" id="l157">    157</a> 		// Read only the number of bytes requested by the range specification, up to the
+<a href="#l158" class="line" id="l158">    158</a> 		// end of the file. A zero end index implicitly reads to the end of the file.
+<a href="#l159" class="line" id="l159">    159</a> 		end := request.Range.End
+<a href="#l160" class="line" id="l160">    160</a> 		if end == 0 || end &gt; stat.Size {
+<a href="#l161" class="line" id="l161">    161</a> 			end = stat.Size
+<a href="#l162" class="line" id="l162">    162</a> 		}
+<a href="#l163" class="line" id="l163">    163</a> 		n = end - request.Range.Start
+<a href="#l164" class="line" id="l164">    164</a> 	}
+<a href="#l165" class="line" id="l165">    165</a> 
+<a href="#l166" class="line" id="l166">    166</a> 	data := make([]byte, n)
+<a href="#l167" class="line" id="l167">    167</a> 	if _, err := io.ReadFull(file, data); err != nil {
+<a href="#l168" class="line" id="l168">    168</a> 		return nil, d.createError(err)
+<a href="#l169" class="line" id="l169">    169</a> 	}
+<a href="#l170" class="line" id="l170">    170</a> 
+<a href="#l171" class="line" id="l171">    171</a> 	attributes, err := schemas.UnmarshalAttributes(
+<a href="#l172" class="line" id="l172">    172</a> 		stat.Attributes,
+<a href="#l173" class="line" id="l173">    173</a> 		&amp;schemas.AttributesEncodingOptions{Prefix: &quot;user&quot;},
+<a href="#l174" class="line" id="l174">    174</a> 	)
+<a href="#l175" class="line" id="l175">    175</a> 	if err != nil {
+<a href="#l176" class="line" id="l176">    176</a> 		return nil, d.createError(err)
+<a href="#l177" class="line" id="l177">    177</a> 	}
+<a href="#l178" class="line" id="l178">    178</a> 
+<a href="#l179" class="line" id="l179">    179</a> 	return &amp;service.GetObjectResponse{
+<a href="#l180" class="line" id="l180">    180</a> 		Data: data,
+<a href="#l181" class="line" id="l181">    181</a> 		Metadata: &amp;common.Metadata{
+<a href="#l182" class="line" id="l182">    182</a> 			Id:           stat.BaseName,
+<a href="#l183" class="line" id="l183">    183</a> 			Key:          target.key,
+<a href="#l184" class="line" id="l184">    184</a> 			Size:         stat.Size,
+<a href="#l185" class="line" id="l185">    185</a> 			ObjectType:   common.Object_REGULAR,
+<a href="#l186" class="line" id="l186">    186</a> 			ModifiedTime: timestamppb.New(stat.ModifiedTime),
+<a href="#l187" class="line" id="l187">    187</a> 			Attributes:   attributes,
+<a href="#l188" class="line" id="l188">    188</a> 		},
+<a href="#l189" class="line" id="l189">    189</a> 	}, nil
+<a href="#l190" class="line" id="l190">    190</a> }
+<a href="#l191" class="line" id="l191">    191</a> 
+<a href="#l192" class="line" id="l192">    192</a> // StreamGetObject reads the requested file in chunks, each of which is packaged as a single
+<a href="#l193" class="line" id="l193">    193</a> // response instance over the return channel.
+<a href="#l194" class="line" id="l194">    194</a> func (d *Disk) StreamGetObject(ctx context.Context, request *service.GetObjectStreamRequest) (&lt;-chan *service.GetObjectStreamResponse, chan error) {
+<a href="#l195" class="line" id="l195">    195</a> 	stream := make(chan *service.GetObjectStreamResponse)
+<a href="#l196" class="line" id="l196">    196</a> 	errs := make(chan error, 1)
+<a href="#l197" class="line" id="l197">    197</a> 
+<a href="#l198" class="line" id="l198">    198</a> 	if request.ChunkSize == 0 {
+<a href="#l199" class="line" id="l199">    199</a> 		errs &lt;- status.Error(
+<a href="#l200" class="line" id="l200">    200</a> 			codes.InvalidArgument,
+<a href="#l201" class="line" id="l201">    201</a> 			&quot;backend: disk streaming get chunk size must be greater than zero&quot;,
+<a href="#l202" class="line" id="l202">    202</a> 		)
+<a href="#l203" class="line" id="l203">    203</a> 		return nil, errs
+<a href="#l204" class="line" id="l204">    204</a> 	}
+<a href="#l205" class="line" id="l205">    205</a> 
+<a href="#l206" class="line" id="l206">    206</a> 	target, err := newFileTarget(d.client, request.Request.Resource.Bucket, request.Request.Key)
+<a href="#l207" class="line" id="l207">    207</a> 	if err != nil {
+<a href="#l208" class="line" id="l208">    208</a> 		errs &lt;- status.Error(codes.PermissionDenied, err.Error())
+<a href="#l209" class="line" id="l209">    209</a> 		return nil, errs
+<a href="#l210" class="line" id="l210">    210</a> 	}
+<a href="#l211" class="line" id="l211">    211</a> 
+<a href="#l212" class="line" id="l212">    212</a> 	file, stat, err := d.client.ReadFile(target.resolve())
+<a href="#l213" class="line" id="l213">    213</a> 	if err != nil {
+<a href="#l214" class="line" id="l214">    214</a> 		errs &lt;- d.createError(err)
+<a href="#l215" class="line" id="l215">    215</a> 		return nil, errs
+<a href="#l216" class="line" id="l216">    216</a> 	}
+<a href="#l217" class="line" id="l217">    217</a> 
+<a href="#l218" class="line" id="l218">    218</a> 	if !stat.Mode.IsRegular() {
+<a href="#l219" class="line" id="l219">    219</a> 		file.Close()
+<a href="#l220" class="line" id="l220">    220</a> 		errs &lt;- status.Errorf(
+<a href="#l221" class="line" id="l221">    221</a> 			codes.InvalidArgument,
+<a href="#l222" class="line" id="l222">    222</a> 			&quot;backend: cannot serve non-regular file: file=%s mode=%v&quot;,
+<a href="#l223" class="line" id="l223">    223</a> 			stat.Path,
+<a href="#l224" class="line" id="l224">    224</a> 			stat.Mode,
+<a href="#l225" class="line" id="l225">    225</a> 		)
+<a href="#l226" class="line" id="l226">    226</a> 		return nil, errs
+<a href="#l227" class="line" id="l227">    227</a> 	}
+<a href="#l228" class="line" id="l228">    228</a> 
+<a href="#l229" class="line" id="l229">    229</a> 	attributes, err := schemas.UnmarshalAttributes(
+<a href="#l230" class="line" id="l230">    230</a> 		stat.Attributes,
+<a href="#l231" class="line" id="l231">    231</a> 		&amp;schemas.AttributesEncodingOptions{Prefix: &quot;user&quot;},
+<a href="#l232" class="line" id="l232">    232</a> 	)
+<a href="#l233" class="line" id="l233">    233</a> 	if err != nil {
+<a href="#l234" class="line" id="l234">    234</a> 		file.Close()
+<a href="#l235" class="line" id="l235">    235</a> 		errs &lt;- d.createError(err)
+<a href="#l236" class="line" id="l236">    236</a> 		return nil, errs
+<a href="#l237" class="line" id="l237">    237</a> 	}
+<a href="#l238" class="line" id="l238">    238</a> 
+<a href="#l239" class="line" id="l239">    239</a> 	if request.Request.Range != nil {
+<a href="#l240" class="line" id="l240">    240</a> 		if request.Request.Range.Unit != &quot;bytes&quot; {
+<a href="#l241" class="line" id="l241">    241</a> 			file.Close()
+<a href="#l242" class="line" id="l242">    242</a> 			errs &lt;- status.Errorf(
+<a href="#l243" class="line" id="l243">    243</a> 				codes.InvalidArgument,
+<a href="#l244" class="line" id="l244">    244</a> 				&quot;backend: unsupported range unit: unit=%s&quot;,
+<a href="#l245" class="line" id="l245">    245</a> 				request.Request.Range.Unit,
+<a href="#l246" class="line" id="l246">    246</a> 			)
+<a href="#l247" class="line" id="l247">    247</a> 			return nil, errs
+<a href="#l248" class="line" id="l248">    248</a> 		} else if request.Request.Range.End &gt; 0 &amp;&amp; request.Request.Range.End &lt;= request.Request.Range.Start {
+<a href="#l249" class="line" id="l249">    249</a> 			file.Close()
+<a href="#l250" class="line" id="l250">    250</a> 			errs &lt;- status.Errorf(
+<a href="#l251" class="line" id="l251">    251</a> 				codes.OutOfRange,
+<a href="#l252" class="line" id="l252">    252</a> 				&quot;backend: invalid range specification: start=%d end=%d&quot;,
+<a href="#l253" class="line" id="l253">    253</a> 				request.Request.Range.Start,
+<a href="#l254" class="line" id="l254">    254</a> 				request.Request.Range.End,
+<a href="#l255" class="line" id="l255">    255</a> 			)
+<a href="#l256" class="line" id="l256">    256</a> 			return nil, errs
+<a href="#l257" class="line" id="l257">    257</a> 		} else if request.Request.Range.Start &gt;= stat.Size {
+<a href="#l258" class="line" id="l258">    258</a> 			file.Close()
+<a href="#l259" class="line" id="l259">    259</a> 			errs &lt;- status.Errorf(
+<a href="#l260" class="line" id="l260">    260</a> 				codes.OutOfRange,
+<a href="#l261" class="line" id="l261">    261</a> 				&quot;backend: range start index is beyond file boundary: start=%d size=%d&quot;,
+<a href="#l262" class="line" id="l262">    262</a> 				request.Request.Range.Start,
+<a href="#l263" class="line" id="l263">    263</a> 				stat.Size,
+<a href="#l264" class="line" id="l264">    264</a> 			)
+<a href="#l265" class="line" id="l265">    265</a> 			return nil, errs
+<a href="#l266" class="line" id="l266">    266</a> 		}
+<a href="#l267" class="line" id="l267">    267</a> 	}
+<a href="#l268" class="line" id="l268">    268</a> 
+<a href="#l269" class="line" id="l269">    269</a> 	go func() {
+<a href="#l270" class="line" id="l270">    270</a> 		defer file.Close()
+<a href="#l271" class="line" id="l271">    271</a> 
+<a href="#l272" class="line" id="l272">    272</a> 		offset := uint64(0)
+<a href="#l273" class="line" id="l273">    273</a> 		end := stat.Size
+<a href="#l274" class="line" id="l274">    274</a> 		total := stat.Size
+<a href="#l275" class="line" id="l275">    275</a> 
+<a href="#l276" class="line" id="l276">    276</a> 		if request.Request.Range != nil {
+<a href="#l277" class="line" id="l277">    277</a> 			offset = request.Request.Range.Start
+<a href="#l278" class="line" id="l278">    278</a> 			end = request.Request.Range.End
+<a href="#l279" class="line" id="l279">    279</a> 			if end == 0 || end &gt; stat.Size {
+<a href="#l280" class="line" id="l280">    280</a> 				end = stat.Size
+<a href="#l281" class="line" id="l281">    281</a> 			}
+<a href="#l282" class="line" id="l282">    282</a> 			total = end - request.Request.Range.Start
+<a href="#l283" class="line" id="l283">    283</a> 
+<a href="#l284" class="line" id="l284">    284</a> 			if _, err := file.Seek(int64(offset), io.SeekStart); err != nil {
+<a href="#l285" class="line" id="l285">    285</a> 				errs &lt;- d.createError(err)
+<a href="#l286" class="line" id="l286">    286</a> 				return
+<a href="#l287" class="line" id="l287">    287</a> 			}
+<a href="#l288" class="line" id="l288">    288</a> 		}
+<a href="#l289" class="line" id="l289">    289</a> 
+<a href="#l290" class="line" id="l290">    290</a> 		// Wrap the file with a buffered reader in order to normalize the number of actual
+<a href="#l291" class="line" id="l291">    291</a> 		// underlying read(2) syscalls on the file descriptor, regardless of the chunk size
+<a href="#l292" class="line" id="l292">    292</a> 		// requested by the client.
+<a href="#l293" class="line" id="l293">    293</a> 		reader := bufio.NewReader(file)
+<a href="#l294" class="line" id="l294">    294</a> 		metadata := &amp;common.Metadata{
+<a href="#l295" class="line" id="l295">    295</a> 			Id:           stat.BaseName,
+<a href="#l296" class="line" id="l296">    296</a> 			Key:          target.key,
+<a href="#l297" class="line" id="l297">    297</a> 			Size:         stat.Size,
+<a href="#l298" class="line" id="l298">    298</a> 			ObjectType:   common.Object_REGULAR,
+<a href="#l299" class="line" id="l299">    299</a> 			ModifiedTime: timestamppb.New(stat.ModifiedTime),
+<a href="#l300" class="line" id="l300">    300</a> 			Attributes:   attributes,
+<a href="#l301" class="line" id="l301">    301</a> 		}
+<a href="#l302" class="line" id="l302">    302</a> 
+<a href="#l303" class="line" id="l303">    303</a> 		for {
+<a href="#l304" class="line" id="l304">    304</a> 			n := request.ChunkSize
+<a href="#l305" class="line" id="l305">    305</a> 			if n &gt; end-offset {
+<a href="#l306" class="line" id="l306">    306</a> 				n = end - offset
+<a href="#l307" class="line" id="l307">    307</a> 			}
+<a href="#l308" class="line" id="l308">    308</a> 
+<a href="#l309" class="line" id="l309">    309</a> 			chunk := make([]byte, n)
+<a href="#l310" class="line" id="l310">    310</a> 
+<a href="#l311" class="line" id="l311">    311</a> 			if _, err := io.ReadFull(reader, chunk); err != nil {
+<a href="#l312" class="line" id="l312">    312</a> 				errs &lt;- d.createError(err)
+<a href="#l313" class="line" id="l313">    313</a> 				break
+<a href="#l314" class="line" id="l314">    314</a> 			}
+<a href="#l315" class="line" id="l315">    315</a> 
+<a href="#l316" class="line" id="l316">    316</a> 			response := &amp;service.GetObjectStreamResponse{
+<a href="#l317" class="line" id="l317">    317</a> 				Response: &amp;service.GetObjectResponse{
+<a href="#l318" class="line" id="l318">    318</a> 					Metadata: metadata,
+<a href="#l319" class="line" id="l319">    319</a> 					Data:     chunk,
+<a href="#l320" class="line" id="l320">    320</a> 				},
+<a href="#l321" class="line" id="l321">    321</a> 				Range: &amp;common.Range{
+<a href="#l322" class="line" id="l322">    322</a> 					Unit:  &quot;bytes&quot;,
+<a href="#l323" class="line" id="l323">    323</a> 					Start: offset,
+<a href="#l324" class="line" id="l324">    324</a> 					End:   offset + n,
+<a href="#l325" class="line" id="l325">    325</a> 					Total: total,
+<a href="#l326" class="line" id="l326">    326</a> 				},
+<a href="#l327" class="line" id="l327">    327</a> 			}
+<a href="#l328" class="line" id="l328">    328</a> 
+<a href="#l329" class="line" id="l329">    329</a> 			stream &lt;- response
+<a href="#l330" class="line" id="l330">    330</a> 			offset += n
+<a href="#l331" class="line" id="l331">    331</a> 
+<a href="#l332" class="line" id="l332">    332</a> 			if offset &gt;= end {
+<a href="#l333" class="line" id="l333">    333</a> 				break
+<a href="#l334" class="line" id="l334">    334</a> 			}
+<a href="#l335" class="line" id="l335">    335</a> 		}
+<a href="#l336" class="line" id="l336">    336</a> 
+<a href="#l337" class="line" id="l337">    337</a> 		close(stream)
+<a href="#l338" class="line" id="l338">    338</a> 	}()
+<a href="#l339" class="line" id="l339">    339</a> 
+<a href="#l340" class="line" id="l340">    340</a> 	return stream, errs
+<a href="#l341" class="line" id="l341">    341</a> }
+<a href="#l342" class="line" id="l342">    342</a> 
+<a href="#l343" class="line" id="l343">    343</a> // PutObject opens a file handle at the requested path followed by writing the request data payload
+<a href="#l344" class="line" id="l344">    344</a> // to the file in full.
+<a href="#l345" class="line" id="l345">    345</a> func (d *Disk) PutObject(ctx context.Context, request *service.PutObjectRequest) (*service.PutObjectResponse, error) {
+<a href="#l346" class="line" id="l346">    346</a> 	target, err := newFileTarget(d.client, request.Resource.Bucket, request.Key)
+<a href="#l347" class="line" id="l347">    347</a> 	if err != nil {
+<a href="#l348" class="line" id="l348">    348</a> 		return nil, status.Error(codes.PermissionDenied, err.Error())
+<a href="#l349" class="line" id="l349">    349</a> 	}
+<a href="#l350" class="line" id="l350">    350</a> 
+<a href="#l351" class="line" id="l351">    351</a> 	if err := d.client.CreateDirectory(target.parent()); err != nil {
+<a href="#l352" class="line" id="l352">    352</a> 		return nil, d.createError(err)
+<a href="#l353" class="line" id="l353">    353</a> 	}
+<a href="#l354" class="line" id="l354">    354</a> 
+<a href="#l355" class="line" id="l355">    355</a> 	w, err := d.client.WriteFile(target.resolve())
+<a href="#l356" class="line" id="l356">    356</a> 	if err != nil {
+<a href="#l357" class="line" id="l357">    357</a> 		return nil, d.createError(err)
+<a href="#l358" class="line" id="l358">    358</a> 	}
+<a href="#l359" class="line" id="l359">    359</a> 
+<a href="#l360" class="line" id="l360">    360</a> 	if _, err := io.Copy(w, bytes.NewReader(request.Data)); err != nil {
+<a href="#l361" class="line" id="l361">    361</a> 		w.Close()
+<a href="#l362" class="line" id="l362">    362</a> 		return nil, d.createError(err)
+<a href="#l363" class="line" id="l363">    363</a> 	}
+<a href="#l364" class="line" id="l364">    364</a> 
+<a href="#l365" class="line" id="l365">    365</a> 	w.Close()
+<a href="#l366" class="line" id="l366">    366</a> 
+<a href="#l367" class="line" id="l367">    367</a> 	attributes, err := schemas.MarshalAttributes(
+<a href="#l368" class="line" id="l368">    368</a> 		request.Attributes,
+<a href="#l369" class="line" id="l369">    369</a> 		&amp;schemas.AttributesEncodingOptions{Prefix: &quot;user&quot;},
+<a href="#l370" class="line" id="l370">    370</a> 	)
+<a href="#l371" class="line" id="l371">    371</a> 	if err != nil {
+<a href="#l372" class="line" id="l372">    372</a> 		return nil, d.createError(err)
+<a href="#l373" class="line" id="l373">    373</a> 	}
+<a href="#l374" class="line" id="l374">    374</a> 
+<a href="#l375" class="line" id="l375">    375</a> 	if err := d.client.WriteAttributes(target.resolve(), attributes); err != nil {
+<a href="#l376" class="line" id="l376">    376</a> 		return nil, d.createError(err)
+<a href="#l377" class="line" id="l377">    377</a> 	}
+<a href="#l378" class="line" id="l378">    378</a> 
+<a href="#l379" class="line" id="l379">    379</a> 	stat, err := d.client.StatFile(target.resolve())
+<a href="#l380" class="line" id="l380">    380</a> 	if err != nil {
+<a href="#l381" class="line" id="l381">    381</a> 		return nil, d.createError(err)
+<a href="#l382" class="line" id="l382">    382</a> 	}
+<a href="#l383" class="line" id="l383">    383</a> 
+<a href="#l384" class="line" id="l384">    384</a> 	return &amp;service.PutObjectResponse{
+<a href="#l385" class="line" id="l385">    385</a> 		Metadata: &amp;common.Metadata{
+<a href="#l386" class="line" id="l386">    386</a> 			Id:           stat.BaseName,
+<a href="#l387" class="line" id="l387">    387</a> 			Key:          target.key,
+<a href="#l388" class="line" id="l388">    388</a> 			Size:         stat.Size,
+<a href="#l389" class="line" id="l389">    389</a> 			ObjectType:   common.Object_REGULAR,
+<a href="#l390" class="line" id="l390">    390</a> 			ModifiedTime: timestamppb.New(stat.ModifiedTime),
+<a href="#l391" class="line" id="l391">    391</a> 			Attributes:   request.Attributes,
+<a href="#l392" class="line" id="l392">    392</a> 		},
+<a href="#l393" class="line" id="l393">    393</a> 	}, nil
+<a href="#l394" class="line" id="l394">    394</a> }
+<a href="#l395" class="line" id="l395">    395</a> 
+<a href="#l396" class="line" id="l396">    396</a> // StreamPutObject writes the request file in chunks, where each request over the request channel
+<a href="#l397" class="line" id="l397">    397</a> // specifies a single chunk of data.
+<a href="#l398" class="line" id="l398">    398</a> func (d *Disk) StreamPutObject(ctx context.Context, stream chan *service.PutObjectStreamRequest) (*service.PutObjectStreamResponse, error) {
+<a href="#l399" class="line" id="l399">    399</a> 	var err error
+<a href="#l400" class="line" id="l400">    400</a> 	var target *fileTarget
+<a href="#l401" class="line" id="l401">    401</a> 	var file disk.WriteSeekCloser
+<a href="#l402" class="line" id="l402">    402</a> 	var request *service.PutObjectStreamRequest
+<a href="#l403" class="line" id="l403">    403</a> 
+<a href="#l404" class="line" id="l404">    404</a> 	for request = range stream {
+<a href="#l405" class="line" id="l405">    405</a> 		// Initialize the file descriptor for only the first request in the channel
+<a href="#l406" class="line" id="l406">    406</a> 		if file == nil {
+<a href="#l407" class="line" id="l407">    407</a> 			target, err = newFileTarget(d.client, request.Request.Resource.Bucket, request.Request.Key)
+<a href="#l408" class="line" id="l408">    408</a> 			if err != nil {
+<a href="#l409" class="line" id="l409">    409</a> 				return nil, status.Error(codes.PermissionDenied, err.Error())
+<a href="#l410" class="line" id="l410">    410</a> 			}
+<a href="#l411" class="line" id="l411">    411</a> 
+<a href="#l412" class="line" id="l412">    412</a> 			if err := d.client.CreateDirectory(target.parent()); err != nil {
+<a href="#l413" class="line" id="l413">    413</a> 				return nil, d.createError(err)
+<a href="#l414" class="line" id="l414">    414</a> 			}
+<a href="#l415" class="line" id="l415">    415</a> 
+<a href="#l416" class="line" id="l416">    416</a> 			file, err = d.client.WriteFile(target.resolve())
+<a href="#l417" class="line" id="l417">    417</a> 			if err != nil {
+<a href="#l418" class="line" id="l418">    418</a> 				return nil, d.createError(err)
+<a href="#l419" class="line" id="l419">    419</a> 			}
+<a href="#l420" class="line" id="l420">    420</a> 
+<a href="#l421" class="line" id="l421">    421</a> 			defer file.Close()
+<a href="#l422" class="line" id="l422">    422</a> 		}
+<a href="#l423" class="line" id="l423">    423</a> 
+<a href="#l424" class="line" id="l424">    424</a> 		if request.Range != nil &amp;&amp; request.Range.Start &gt; 0 &amp;&amp; request.Range.End &gt; request.Range.Start {
+<a href="#l425" class="line" id="l425">    425</a> 			if uint64(len(request.Request.Data)) != request.Range.End-request.Range.Start {
+<a href="#l426" class="line" id="l426">    426</a> 				return nil, status.Error(
+<a href="#l427" class="line" id="l427">    427</a> 					codes.InvalidArgument,
+<a href="#l428" class="line" id="l428">    428</a> 					&quot;backend: write payload size is inconsistent with range specification&quot;,
+<a href="#l429" class="line" id="l429">    429</a> 				)
+<a href="#l430" class="line" id="l430">    430</a> 			}
+<a href="#l431" class="line" id="l431">    431</a> 
+<a href="#l432" class="line" id="l432">    432</a> 			if _, err := file.Seek(int64(request.Range.Start), io.SeekStart); err != nil {
+<a href="#l433" class="line" id="l433">    433</a> 				return nil, status.Error(codes.OutOfRange, err.Error())
+<a href="#l434" class="line" id="l434">    434</a> 			}
+<a href="#l435" class="line" id="l435">    435</a> 		}
+<a href="#l436" class="line" id="l436">    436</a> 
+<a href="#l437" class="line" id="l437">    437</a> 		if _, err := file.Write(request.Request.Data); err != nil {
+<a href="#l438" class="line" id="l438">    438</a> 			return nil, d.createError(err)
+<a href="#l439" class="line" id="l439">    439</a> 		}
+<a href="#l440" class="line" id="l440">    440</a> 	}
+<a href="#l441" class="line" id="l441">    441</a> 
+<a href="#l442" class="line" id="l442">    442</a> 	// Use attributes from the latest (most recent) request from the stream.
+<a href="#l443" class="line" id="l443">    443</a> 	attributes, err := schemas.MarshalAttributes(
+<a href="#l444" class="line" id="l444">    444</a> 		request.Request.Attributes,
+<a href="#l445" class="line" id="l445">    445</a> 		&amp;schemas.AttributesEncodingOptions{Prefix: &quot;user&quot;},
+<a href="#l446" class="line" id="l446">    446</a> 	)
+<a href="#l447" class="line" id="l447">    447</a> 	if err != nil {
+<a href="#l448" class="line" id="l448">    448</a> 		return nil, d.createError(err)
+<a href="#l449" class="line" id="l449">    449</a> 	}
+<a href="#l450" class="line" id="l450">    450</a> 
+<a href="#l451" class="line" id="l451">    451</a> 	if err := d.client.WriteAttributes(target.resolve(), attributes); err != nil {
+<a href="#l452" class="line" id="l452">    452</a> 		return nil, d.createError(err)
+<a href="#l453" class="line" id="l453">    453</a> 	}
+<a href="#l454" class="line" id="l454">    454</a> 
+<a href="#l455" class="line" id="l455">    455</a> 	stat, err := d.client.StatFile(target.resolve())
+<a href="#l456" class="line" id="l456">    456</a> 	if err != nil {
+<a href="#l457" class="line" id="l457">    457</a> 		return nil, d.createError(err)
+<a href="#l458" class="line" id="l458">    458</a> 	}
+<a href="#l459" class="line" id="l459">    459</a> 
+<a href="#l460" class="line" id="l460">    460</a> 	return &amp;service.PutObjectStreamResponse{
+<a href="#l461" class="line" id="l461">    461</a> 		Response: &amp;service.PutObjectResponse{
+<a href="#l462" class="line" id="l462">    462</a> 			Metadata: &amp;common.Metadata{
+<a href="#l463" class="line" id="l463">    463</a> 				Id:           stat.BaseName,
+<a href="#l464" class="line" id="l464">    464</a> 				Key:          target.key,
+<a href="#l465" class="line" id="l465">    465</a> 				Size:         stat.Size,
+<a href="#l466" class="line" id="l466">    466</a> 				ObjectType:   common.Object_REGULAR,
+<a href="#l467" class="line" id="l467">    467</a> 				ModifiedTime: timestamppb.New(stat.ModifiedTime),
+<a href="#l468" class="line" id="l468">    468</a> 				Attributes:   request.Request.Attributes,
+<a href="#l469" class="line" id="l469">    469</a> 			},
+<a href="#l470" class="line" id="l470">    470</a> 		},
+<a href="#l471" class="line" id="l471">    471</a> 	}, nil
+<a href="#l472" class="line" id="l472">    472</a> }
+<a href="#l473" class="line" id="l473">    473</a> 
+<a href="#l474" class="line" id="l474">    474</a> // DeleteObject deletes the requested file.
+<a href="#l475" class="line" id="l475">    475</a> func (d *Disk) DeleteObject(ctx context.Context, request *service.DeleteObjectRequest) (*service.DeleteObjectResponse, error) {
+<a href="#l476" class="line" id="l476">    476</a> 	target, err := newFileTarget(d.client, request.Resource.Bucket, request.Key)
+<a href="#l477" class="line" id="l477">    477</a> 	if err != nil {
+<a href="#l478" class="line" id="l478">    478</a> 		return nil, status.Error(codes.PermissionDenied, err.Error())
+<a href="#l479" class="line" id="l479">    479</a> 	}
+<a href="#l480" class="line" id="l480">    480</a> 
+<a href="#l481" class="line" id="l481">    481</a> 	stat, err := d.client.StatFile(target.resolve())
+<a href="#l482" class="line" id="l482">    482</a> 	if err != nil {
+<a href="#l483" class="line" id="l483">    483</a> 		return nil, d.createError(err)
+<a href="#l484" class="line" id="l484">    484</a> 	}
+<a href="#l485" class="line" id="l485">    485</a> 
+<a href="#l486" class="line" id="l486">    486</a> 	if !request.Recursive || stat.Mode.IsRegular() {
+<a href="#l487" class="line" id="l487">    487</a> 		if err := d.client.DeleteFile(target.resolve()); err != nil {
+<a href="#l488" class="line" id="l488">    488</a> 			return nil, d.createError(err)
+<a href="#l489" class="line" id="l489">    489</a> 		}
+<a href="#l490" class="line" id="l490">    490</a> 
+<a href="#l491" class="line" id="l491">    491</a> 		return &amp;service.DeleteObjectResponse{Deleted: 1}, nil
+<a href="#l492" class="line" id="l492">    492</a> 	}
+<a href="#l493" class="line" id="l493">    493</a> 
+<a href="#l494" class="line" id="l494">    494</a> 	// Recursive semantics apply only to directory object types.
+<a href="#l495" class="line" id="l495">    495</a> 
+<a href="#l496" class="line" id="l496">    496</a> 	files, err := d.client.ListFiles(target.resolve(), true)
+<a href="#l497" class="line" id="l497">    497</a> 	if err != nil {
+<a href="#l498" class="line" id="l498">    498</a> 		return nil, d.createError(err)
+<a href="#l499" class="line" id="l499">    499</a> 	}
+<a href="#l500" class="line" id="l500">    500</a> 
+<a href="#l501" class="line" id="l501">    501</a> 	for _, file := range files {
+<a href="#l502" class="line" id="l502">    502</a> 		if err := d.client.DeleteFile(file.Path); err != nil {
+<a href="#l503" class="line" id="l503">    503</a> 			return nil, d.createError(err)
+<a href="#l504" class="line" id="l504">    504</a> 		}
+<a href="#l505" class="line" id="l505">    505</a> 	}
+<a href="#l506" class="line" id="l506">    506</a> 
+<a href="#l507" class="line" id="l507">    507</a> 	return &amp;service.DeleteObjectResponse{Deleted: int32(len(files))}, nil
+<a href="#l508" class="line" id="l508">    508</a> }
+<a href="#l509" class="line" id="l509">    509</a> 
+<a href="#l510" class="line" id="l510">    510</a> // ListBuckets lists all bucket directories.
+<a href="#l511" class="line" id="l511">    511</a> func (d *Disk) ListBuckets(ctx context.Context, request *service.ListBucketsRequest) (*service.ListBucketsResponse, error) {
+<a href="#l512" class="line" id="l512">    512</a> 	var buckets []*service.HeadBucketResponse
+<a href="#l513" class="line" id="l513">    513</a> 
+<a href="#l514" class="line" id="l514">    514</a> 	files, err := d.client.ListFiles(&quot;&quot;, false)
+<a href="#l515" class="line" id="l515">    515</a> 	if err != nil {
+<a href="#l516" class="line" id="l516">    516</a> 		return nil, d.createError(err)
+<a href="#l517" class="line" id="l517">    517</a> 	}
+<a href="#l518" class="line" id="l518">    518</a> 
+<a href="#l519" class="line" id="l519">    519</a> 	for _, file := range files {
+<a href="#l520" class="line" id="l520">    520</a> 		if file.Mode.IsDir() {
+<a href="#l521" class="line" id="l521">    521</a> 			head := &amp;service.HeadBucketResponse{
+<a href="#l522" class="line" id="l522">    522</a> 				Bucket: &amp;common.Bucket{
+<a href="#l523" class="line" id="l523">    523</a> 					Id:        file.BaseName,
+<a href="#l524" class="line" id="l524">    524</a> 					Name:      file.BaseName,
+<a href="#l525" class="line" id="l525">    525</a> 					Timestamp: timestamppb.New(file.ModifiedTime),
+<a href="#l526" class="line" id="l526">    526</a> 					Tags:      file.Attributes,
+<a href="#l527" class="line" id="l527">    527</a> 				},
+<a href="#l528" class="line" id="l528">    528</a> 			}
+<a href="#l529" class="line" id="l529">    529</a> 
+<a href="#l530" class="line" id="l530">    530</a> 			buckets = append(buckets, head)
+<a href="#l531" class="line" id="l531">    531</a> 		}
+<a href="#l532" class="line" id="l532">    532</a> 	}
+<a href="#l533" class="line" id="l533">    533</a> 
+<a href="#l534" class="line" id="l534">    534</a> 	return &amp;service.ListBucketsResponse{Buckets: buckets}, nil
+<a href="#l535" class="line" id="l535">    535</a> }
+<a href="#l536" class="line" id="l536">    536</a> 
+<a href="#l537" class="line" id="l537">    537</a> // ListObjects lists files matching the requested prefix.
+<a href="#l538" class="line" id="l538">    538</a> func (d *Disk) ListObjects(ctx context.Context, request *service.ListObjectsRequest) (*service.ListObjectsResponse, error) {
+<a href="#l539" class="line" id="l539">    539</a> 	var objects []*service.HeadObjectResponse
+<a href="#l540" class="line" id="l540">    540</a> 
+<a href="#l541" class="line" id="l541">    541</a> 	target, err := newFileTarget(d.client, request.Resource.Bucket, request.Prefix)
+<a href="#l542" class="line" id="l542">    542</a> 	if err != nil {
+<a href="#l543" class="line" id="l543">    543</a> 		return nil, status.Error(codes.PermissionDenied, err.Error())
+<a href="#l544" class="line" id="l544">    544</a> 	}
+<a href="#l545" class="line" id="l545">    545</a> 
+<a href="#l546" class="line" id="l546">    546</a> 	files, err := d.client.ListFiles(target.parent(), request.Recursive)
+<a href="#l547" class="line" id="l547">    547</a> 	if err != nil {
+<a href="#l548" class="line" id="l548">    548</a> 		return nil, d.createError(err)
+<a href="#l549" class="line" id="l549">    549</a> 	}
+<a href="#l550" class="line" id="l550">    550</a> 
+<a href="#l551" class="line" id="l551">    551</a> 	for _, file := range files {
+<a href="#l552" class="line" id="l552">    552</a> 		var objectType common.Object
+<a href="#l553" class="line" id="l553">    553</a> 
+<a href="#l554" class="line" id="l554">    554</a> 		// Exclude the bucket name in the file path key for purposes of prefix evaluation
+<a href="#l555" class="line" id="l555">    555</a> 		key := filepath.Join(strings.Split(file.Path, string(os.PathSeparator))[1:]...)
+<a href="#l556" class="line" id="l556">    556</a> 
+<a href="#l557" class="line" id="l557">    557</a> 		if target.key != &quot;.&quot; &amp;&amp; !strings.HasPrefix(key, target.key) {
+<a href="#l558" class="line" id="l558">    558</a> 			continue
+<a href="#l559" class="line" id="l559">    559</a> 		}
+<a href="#l560" class="line" id="l560">    560</a> 
+<a href="#l561" class="line" id="l561">    561</a> 		attributes, err := schemas.UnmarshalAttributes(
+<a href="#l562" class="line" id="l562">    562</a> 			file.Attributes,
+<a href="#l563" class="line" id="l563">    563</a> 			&amp;schemas.AttributesEncodingOptions{Prefix: &quot;user&quot;},
+<a href="#l564" class="line" id="l564">    564</a> 		)
+<a href="#l565" class="line" id="l565">    565</a> 		if err != nil {
+<a href="#l566" class="line" id="l566">    566</a> 			return nil, d.createError(err)
+<a href="#l567" class="line" id="l567">    567</a> 		}
+<a href="#l568" class="line" id="l568">    568</a> 
+<a href="#l569" class="line" id="l569">    569</a> 		if file.Mode.IsRegular() {
+<a href="#l570" class="line" id="l570">    570</a> 			objectType = common.Object_REGULAR
+<a href="#l571" class="line" id="l571">    571</a> 		} else if file.Mode.IsDir() {
+<a href="#l572" class="line" id="l572">    572</a> 			objectType = common.Object_DIRECTORY
+<a href="#l573" class="line" id="l573">    573</a> 		}
+<a href="#l574" class="line" id="l574">    574</a> 
+<a href="#l575" class="line" id="l575">    575</a> 		head := &amp;service.HeadObjectResponse{
+<a href="#l576" class="line" id="l576">    576</a> 			Metadata: &amp;common.Metadata{
+<a href="#l577" class="line" id="l577">    577</a> 				Id:           file.BaseName,
+<a href="#l578" class="line" id="l578">    578</a> 				Key:          key,
+<a href="#l579" class="line" id="l579">    579</a> 				Size:         file.Size,
+<a href="#l580" class="line" id="l580">    580</a> 				ObjectType:   objectType,
+<a href="#l581" class="line" id="l581">    581</a> 				ModifiedTime: timestamppb.New(file.ModifiedTime),
+<a href="#l582" class="line" id="l582">    582</a> 				Attributes:   attributes,
+<a href="#l583" class="line" id="l583">    583</a> 			},
+<a href="#l584" class="line" id="l584">    584</a> 		}
+<a href="#l585" class="line" id="l585">    585</a> 
+<a href="#l586" class="line" id="l586">    586</a> 		objects = append(objects, head)
+<a href="#l587" class="line" id="l587">    587</a> 	}
+<a href="#l588" class="line" id="l588">    588</a> 
+<a href="#l589" class="line" id="l589">    589</a> 	return &amp;service.ListObjectsResponse{Objects: objects}, nil
+<a href="#l590" class="line" id="l590">    590</a> }
+<a href="#l591" class="line" id="l591">    591</a> 
+<a href="#l592" class="line" id="l592">    592</a> // Descriptor returns a structured Protobuf-defined descriptor of this backend.
+<a href="#l593" class="line" id="l593">    593</a> func (d *Disk) Descriptor() *common.Node {
+<a href="#l594" class="line" id="l594">    594</a> 	return &amp;common.Node{
+<a href="#l595" class="line" id="l595">    595</a> 		Name: &quot;disk&quot;,
+<a href="#l596" class="line" id="l596">    596</a> 		Children: map[string]*common.Node_Value{
+<a href="#l597" class="line" id="l597">    597</a> 			&quot;root&quot;: {Child: &amp;common.Node_Value_Value{Value: d.cfg.Root}},
+<a href="#l598" class="line" id="l598">    598</a> 		},
+<a href="#l599" class="line" id="l599">    599</a> 	}
+<a href="#l600" class="line" id="l600">    600</a> }
+<a href="#l601" class="line" id="l601">    601</a> 
+<a href="#l602" class="line" id="l602">    602</a> // String returns a human-consumable representation of this backend.
+<a href="#l603" class="line" id="l603">    603</a> func (d *Disk) String() string {
+<a href="#l604" class="line" id="l604">    604</a> 	return schemas.MarshalDescriptor(d.Descriptor())
+<a href="#l605" class="line" id="l605">    605</a> }
+<a href="#l606" class="line" id="l606">    606</a> 
+<a href="#l607" class="line" id="l607">    607</a> // createError creates a semantically accurate gRPC status for errored filesystem operations.
+<a href="#l608" class="line" id="l608">    608</a> func (d *Disk) createError(err error) error {
+<a href="#l609" class="line" id="l609">    609</a> 	switch {
+<a href="#l610" class="line" id="l610">    610</a> 	case os.IsNotExist(err):
+<a href="#l611" class="line" id="l611">    611</a> 		return status.Error(codes.NotFound, err.Error())
+<a href="#l612" class="line" id="l612">    612</a> 	case os.IsPermission(err):
+<a href="#l613" class="line" id="l613">    613</a> 		return status.Error(codes.PermissionDenied, err.Error())
+<a href="#l614" class="line" id="l614">    614</a> 	case os.IsTimeout(err):
+<a href="#l615" class="line" id="l615">    615</a> 		return status.Error(codes.DeadlineExceeded, err.Error())
+<a href="#l616" class="line" id="l616">    616</a> 	case errors.Is(err, os.ErrInvalid):
+<a href="#l617" class="line" id="l617">    617</a> 		return status.Error(codes.InvalidArgument, err.Error())
+<a href="#l618" class="line" id="l618">    618</a> 	case errors.Is(err, syscall.ENOTEMPTY):
+<a href="#l619" class="line" id="l619">    619</a> 		return status.Error(codes.FailedPrecondition, err.Error())
+<a href="#l620" class="line" id="l620">    620</a> 	default:
+<a href="#l621" class="line" id="l621">    621</a> 		return status.Error(codes.Unknown, err.Error())
+<a href="#l622" class="line" id="l622">    622</a> 	}
+<a href="#l623" class="line" id="l623">    623</a> }
+<a href="#l624" class="line" id="l624">    624</a> 
+<a href="#l625" class="line" id="l625">    625</a> // fileTarget is an abstraction over a file target on disk, as constructed from a bucket name and
+<a href="#l626" class="line" id="l626">    626</a> // file key.
+<a href="#l627" class="line" id="l627">    627</a> type fileTarget struct {
+<a href="#l628" class="line" id="l628">    628</a> 	client *disk.Client
+<a href="#l629" class="line" id="l629">    629</a> 	bucket string
+<a href="#l630" class="line" id="l630">    630</a> 	key    string
+<a href="#l631" class="line" id="l631">    631</a> }
+<a href="#l632" class="line" id="l632">    632</a> 
+<a href="#l633" class="line" id="l633">    633</a> // newFileTarget creates a new file target while validating the desired path.
+<a href="#l634" class="line" id="l634">    634</a> func newFileTarget(client *disk.Client, bucket string, key string) (*fileTarget, error) {
+<a href="#l635" class="line" id="l635">    635</a> 	zap.L().Debug(
+<a href="#l636" class="line" id="l636">    636</a> 		&quot;creating disk file target&quot;,
+<a href="#l637" class="line" id="l637">    637</a> 		zap.String(&quot;bucket&quot;, bucket),
+<a href="#l638" class="line" id="l638">    638</a> 		zap.String(&quot;key&quot;, key),
+<a href="#l639" class="line" id="l639">    639</a> 	)
+<a href="#l640" class="line" id="l640">    640</a> 
+<a href="#l641" class="line" id="l641">    641</a> 	if strings.Contains(bucket, string(os.PathSeparator)) {
+<a href="#l642" class="line" id="l642">    642</a> 		return nil, fmt.Errorf(&quot;bucket name contains illegal characters: bucket=%s&quot;, bucket)
+<a href="#l643" class="line" id="l643">    643</a> 	}
+<a href="#l644" class="line" id="l644">    644</a> 
+<a href="#l645" class="line" id="l645">    645</a> 	canonicalKey := filepath.Clean(key)
+<a href="#l646" class="line" id="l646">    646</a> 	resolved := filepath.Join(bucket, canonicalKey)
+<a href="#l647" class="line" id="l647">    647</a> 
+<a href="#l648" class="line" id="l648">    648</a> 	// Require the resolved path to start with the bucket after a pass through filepath.Clean.
+<a href="#l649" class="line" id="l649">    649</a> 	// Since at this point it is known that the bucket does not contain nested directories, this
+<a href="#l650" class="line" id="l650">    650</a> 	// thwarts potential directory traversal attacks by enforcing that the requested key does
+<a href="#l651" class="line" id="l651">    651</a> 	// not resolve to be outside the allowed file tree.
+<a href="#l652" class="line" id="l652">    652</a> 	if canonicalKey != &quot;.&quot; &amp;&amp; !strings.HasPrefix(resolved, fmt.Sprintf(&quot;%s%c&quot;, bucket, os.PathSeparator)) {
+<a href="#l653" class="line" id="l653">    653</a> 		return nil, fmt.Errorf(&quot;resolved file path is invalid: key=%s&quot;, key)
+<a href="#l654" class="line" id="l654">    654</a> 	}
+<a href="#l655" class="line" id="l655">    655</a> 
+<a href="#l656" class="line" id="l656">    656</a> 	return &amp;fileTarget{
+<a href="#l657" class="line" id="l657">    657</a> 		client: client,
+<a href="#l658" class="line" id="l658">    658</a> 		bucket: bucket,
+<a href="#l659" class="line" id="l659">    659</a> 		key:    canonicalKey,
+<a href="#l660" class="line" id="l660">    660</a> 	}, nil
+<a href="#l661" class="line" id="l661">    661</a> }
+<a href="#l662" class="line" id="l662">    662</a> 
+<a href="#l663" class="line" id="l663">    663</a> // resolve resolves the file path targeted by the supplied bucket and key.
+<a href="#l664" class="line" id="l664">    664</a> func (f *fileTarget) resolve() string {
+<a href="#l665" class="line" id="l665">    665</a> 	return filepath.Join(f.bucket, f.key)
+<a href="#l666" class="line" id="l666">    666</a> }
+<a href="#l667" class="line" id="l667">    667</a> 
+<a href="#l668" class="line" id="l668">    668</a> // parent returns the parent directory of the target. If the target is itself a directory, the
+<a href="#l669" class="line" id="l669">    669</a> // return value is the same as that of resolve. If the target is a file or file prefix, the nearest
+<a href="#l670" class="line" id="l670">    670</a> // path ancestor is returned.
+<a href="#l671" class="line" id="l671">    671</a> func (f *fileTarget) parent() string {
+<a href="#l672" class="line" id="l672">    672</a> 	resolved := f.resolve()
+<a href="#l673" class="line" id="l673">    673</a> 
+<a href="#l674" class="line" id="l674">    674</a> 	// The requested path may itself already be a directory, in which case the parsed dirname
+<a href="#l675" class="line" id="l675">    675</a> 	// should be discarded.
+<a href="#l676" class="line" id="l676">    676</a> 	p := filepath.Dir(resolved)
+<a href="#l677" class="line" id="l677">    677</a> 	stat, err := f.client.StatFile(resolved)
+<a href="#l678" class="line" id="l678">    678</a> 	if p == &quot;.&quot; || (err == nil &amp;&amp; stat.Mode.IsDir()) {
+<a href="#l679" class="line" id="l679">    679</a> 		p = resolved
+<a href="#l680" class="line" id="l680">    680</a> 	}
+<a href="#l681" class="line" id="l681">    681</a> 
+<a href="#l682" class="line" id="l682">    682</a> 	return p
+<a href="#l683" class="line" id="l683">    683</a> }
+</pre>
+</div>
+</body>
+</html>

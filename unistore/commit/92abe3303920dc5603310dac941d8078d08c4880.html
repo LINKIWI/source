@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/backend: fileTarget abstraction for path resolution; return file key without bucket prefix - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/92abe3303920dc5603310dac941d8078d08c4880">92abe3303920dc5603310dac941d8078d08c4880</a>
+<b>parent</b> <a href="../commit/76fc09e7837ef36cf77f42585b3c113cd414f55d">76fc09e7837ef36cf77f42585b3c113cd414f55d</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Mon  3 Jan 2022 20:27:18 -0800
+
+internal/backend: fileTarget abstraction for path resolution; return file key without bucket prefix
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/backend/disk.go</a></td><td> | </td><td class="num">133</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">--------------------------------</span></td></tr>
+</table></pre><pre>1 file changed, 79 insertions(+), 54 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/backend/disk.go">internal/backend/disk.go</a> b/<a href="../file/internal/backend/disk.go">internal/backend/disk.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -43,12 +43,12 @@ func NewDisk(cfg *config.Disk) (Backend, error) {
+</a> func (d *Disk) HeadObject(ctx context.Context, request *service.HeadObjectRequest) (*service.HeadObjectResponse, error) {
+ 	var objectType common.Object
+ 
+<a href="#h0-0-3" id="h0-0-3" class="d">-	target, err := d.resolveFileTarget(request.Resource.Bucket, request.Key)
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+	target, err := newFileTarget(d.client, request.Resource.Bucket, request.Key)
+</a> 	if err != nil {
+ 		return nil, status.Error(codes.PermissionDenied, err.Error())
+ 	}
+ 
+<a href="#h0-0-9" id="h0-0-9" class="d">-	stat, err := d.client.StatFile(target)
+</a><a href="#h0-0-10" id="h0-0-10" class="i">+	stat, err := d.client.StatFile(target.resolve())
+</a> 	if err != nil {
+ 		return nil, d.createError(err)
+ 	}
+<a href="#h0-1" id="h0-1" class="h">@@ -62,7 +62,7 @@ func (d *Disk) HeadObject(ctx context.Context, request *service.HeadObjectReques
+</a> 	return &amp;service.HeadObjectResponse{
+ 		Metadata: &amp;common.Metadata{
+ 			Id:           stat.BaseName,
+<a href="#h0-1-3" id="h0-1-3" class="d">-			Key:          stat.Path,
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+			Key:          target.key,
+</a> 			Size:         stat.Size,
+ 			ObjectType:   objectType,
+ 			ModifiedTime: timestamppb.New(stat.ModifiedTime),
+<a href="#h0-2" id="h0-2" class="h">@@ -72,12 +72,12 @@ func (d *Disk) HeadObject(ctx context.Context, request *service.HeadObjectReques
+</a> 
+ // GetObject opens a file handle for the requested file followed by reading its contents in full.
+ func (d *Disk) GetObject(ctx context.Context, request *service.GetObjectRequest) (*service.GetObjectResponse, error) {
+<a href="#h0-2-3" id="h0-2-3" class="d">-	target, err := d.resolveFileTarget(request.Resource.Bucket, request.Key)
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+	target, err := newFileTarget(d.client, request.Resource.Bucket, request.Key)
+</a> 	if err != nil {
+ 		return nil, status.Error(codes.PermissionDenied, err.Error())
+ 	}
+ 
+<a href="#h0-2-9" id="h0-2-9" class="d">-	file, stat, err := d.client.ReadFile(target)
+</a><a href="#h0-2-10" id="h0-2-10" class="i">+	file, stat, err := d.client.ReadFile(target.resolve())
+</a> 	if err != nil {
+ 		return nil, d.createError(err)
+ 	}
+<a href="#h0-3" id="h0-3" class="h">@@ -93,7 +93,7 @@ func (d *Disk) GetObject(ctx context.Context, request *service.GetObjectRequest)
+</a> 		Data: data,
+ 		Metadata: &amp;common.Metadata{
+ 			Id:           stat.BaseName,
+<a href="#h0-3-3" id="h0-3-3" class="d">-			Key:          stat.Path,
+</a><a href="#h0-3-4" id="h0-3-4" class="i">+			Key:          target.key,
+</a> 			Size:         stat.Size,
+ 			ObjectType:   common.Object_REGULAR,
+ 			ModifiedTime: timestamppb.New(stat.ModifiedTime),
+<a href="#h0-4" id="h0-4" class="h">@@ -108,13 +108,13 @@ func (d *Disk) StreamGetObject(ctx context.Context, request *service.GetObjectSt
+</a> 
+ 	errs := make(chan error, 1)
+ 
+<a href="#h0-4-3" id="h0-4-3" class="d">-	target, err := d.resolveFileTarget(request.Request.Resource.Bucket, request.Request.Key)
+</a><a href="#h0-4-4" id="h0-4-4" class="i">+	target, err := newFileTarget(d.client, request.Request.Resource.Bucket, request.Request.Key)
+</a> 	if err != nil {
+ 		errs &lt;- status.Error(codes.PermissionDenied, err.Error())
+ 		return nil, errs
+ 	}
+ 
+<a href="#h0-4-10" id="h0-4-10" class="d">-	file, stat, err := d.client.ReadFile(target)
+</a><a href="#h0-4-11" id="h0-4-11" class="i">+	file, stat, err := d.client.ReadFile(target.resolve())
+</a> 	if err != nil {
+ 		errs &lt;- d.createError(err)
+ 		return nil, errs
+<a href="#h0-5" id="h0-5" class="h">@@ -129,7 +129,7 @@ func (d *Disk) StreamGetObject(ctx context.Context, request *service.GetObjectSt
+</a> 		reader := bufio.NewReader(file)
+ 		metadata := &amp;common.Metadata{
+ 			Id:           stat.BaseName,
+<a href="#h0-5-3" id="h0-5-3" class="d">-			Key:          stat.Path,
+</a><a href="#h0-5-4" id="h0-5-4" class="i">+			Key:          target.key,
+</a> 			Size:         stat.Size,
+ 			ObjectType:   common.Object_REGULAR,
+ 			ModifiedTime: timestamppb.New(stat.ModifiedTime),
+<a href="#h0-6" id="h0-6" class="h">@@ -179,16 +179,16 @@ func (d *Disk) StreamGetObject(ctx context.Context, request *service.GetObjectSt
+</a> // PutObject opens a file handle at the requested path followed by writing the request data payload
+ // to the file in full.
+ func (d *Disk) PutObject(ctx context.Context, request *service.PutObjectRequest) (*service.PutObjectResponse, error) {
+<a href="#h0-6-3" id="h0-6-3" class="d">-	target, err := d.resolveFileTarget(request.Resource.Bucket, request.Key)
+</a><a href="#h0-6-4" id="h0-6-4" class="i">+	target, err := newFileTarget(d.client, request.Resource.Bucket, request.Key)
+</a> 	if err != nil {
+ 		return nil, status.Error(codes.PermissionDenied, err.Error())
+ 	}
+ 
+<a href="#h0-6-9" id="h0-6-9" class="d">-	if err := d.client.CreateDirectory(filepath.Dir(target)); err != nil {
+</a><a href="#h0-6-10" id="h0-6-10" class="i">+	if err := d.client.CreateDirectory(target.parent()); err != nil {
+</a> 		return nil, d.createError(err)
+ 	}
+ 
+<a href="#h0-6-14" id="h0-6-14" class="d">-	w, err := d.client.WriteFile(target)
+</a><a href="#h0-6-15" id="h0-6-15" class="i">+	w, err := d.client.WriteFile(target.resolve())
+</a> 	if err != nil {
+ 		return nil, d.createError(err)
+ 	}
+<a href="#h0-7" id="h0-7" class="h">@@ -199,7 +199,7 @@ func (d *Disk) PutObject(ctx context.Context, request *service.PutObjectRequest)
+</a> 		return nil, d.createError(err)
+ 	}
+ 
+<a href="#h0-7-3" id="h0-7-3" class="d">-	stat, err := d.client.StatFile(target)
+</a><a href="#h0-7-4" id="h0-7-4" class="i">+	stat, err := d.client.StatFile(target.resolve())
+</a> 	if err != nil {
+ 		return nil, d.createError(err)
+ 	}
+<a href="#h0-8" id="h0-8" class="h">@@ -207,7 +207,7 @@ func (d *Disk) PutObject(ctx context.Context, request *service.PutObjectRequest)
+</a> 	return &amp;service.PutObjectResponse{
+ 		Metadata: &amp;common.Metadata{
+ 			Id:           stat.BaseName,
+<a href="#h0-8-3" id="h0-8-3" class="d">-			Key:          stat.Path,
+</a><a href="#h0-8-4" id="h0-8-4" class="i">+			Key:          target.key,
+</a> 			Size:         stat.Size,
+ 			ObjectType:   common.Object_REGULAR,
+ 			ModifiedTime: timestamppb.New(stat.ModifiedTime),
+<a href="#h0-9" id="h0-9" class="h">@@ -219,22 +219,22 @@ func (d *Disk) PutObject(ctx context.Context, request *service.PutObjectRequest)
+</a> // specifies a single chunk of data.
+ func (d *Disk) StreamPutObject(ctx context.Context, stream chan *service.PutObjectStreamRequest) (*service.PutObjectStreamResponse, error) {
+ 	var err error
+<a href="#h0-9-3" id="h0-9-3" class="d">-	var target string
+</a><a href="#h0-9-4" id="h0-9-4" class="i">+	var target *fileTarget
+</a> 	var file disk.WriteSeekCloser
+ 
+ 	for request := range stream {
+ 		// Initialize the file descriptor for only the first request in the channel
+ 		if file == nil {
+<a href="#h0-9-10" id="h0-9-10" class="d">-			target, err = d.resolveFileTarget(request.Request.Resource.Bucket, request.Request.Key)
+</a><a href="#h0-9-11" id="h0-9-11" class="i">+			target, err = newFileTarget(d.client, request.Request.Resource.Bucket, request.Request.Key)
+</a> 			if err != nil {
+ 				return nil, status.Error(codes.PermissionDenied, err.Error())
+ 			}
+ 
+<a href="#h0-9-16" id="h0-9-16" class="d">-			if err := d.client.CreateDirectory(filepath.Dir(target)); err != nil {
+</a><a href="#h0-9-17" id="h0-9-17" class="i">+			if err := d.client.CreateDirectory(target.parent()); err != nil {
+</a> 				return nil, d.createError(err)
+ 			}
+ 
+<a href="#h0-9-21" id="h0-9-21" class="d">-			file, err = d.client.WriteFile(target)
+</a><a href="#h0-9-22" id="h0-9-22" class="i">+			file, err = d.client.WriteFile(target.resolve())
+</a> 			if err != nil {
+ 				return nil, d.createError(err)
+ 			}
+<a href="#h0-10" id="h0-10" class="h">@@ -260,7 +260,7 @@ func (d *Disk) StreamPutObject(ctx context.Context, stream chan *service.PutObje
+</a> 		}
+ 	}
+ 
+<a href="#h0-10-3" id="h0-10-3" class="d">-	stat, err := d.client.StatFile(target)
+</a><a href="#h0-10-4" id="h0-10-4" class="i">+	stat, err := d.client.StatFile(target.resolve())
+</a> 	if err != nil {
+ 		return nil, d.createError(err)
+ 	}
+<a href="#h0-11" id="h0-11" class="h">@@ -269,7 +269,7 @@ func (d *Disk) StreamPutObject(ctx context.Context, stream chan *service.PutObje
+</a> 		Response: &amp;service.PutObjectResponse{
+ 			Metadata: &amp;common.Metadata{
+ 				Id:           stat.BaseName,
+<a href="#h0-11-3" id="h0-11-3" class="d">-				Key:          stat.Path,
+</a><a href="#h0-11-4" id="h0-11-4" class="i">+				Key:          target.key,
+</a> 				Size:         stat.Size,
+ 				ObjectType:   common.Object_REGULAR,
+ 				ModifiedTime: timestamppb.New(stat.ModifiedTime),
+<a href="#h0-12" id="h0-12" class="h">@@ -280,12 +280,12 @@ func (d *Disk) StreamPutObject(ctx context.Context, stream chan *service.PutObje
+</a> 
+ // DeleteObject deletes the requested file.
+ func (d *Disk) DeleteObject(ctx context.Context, request *service.DeleteObjectRequest) (*service.DeleteObjectResponse, error) {
+<a href="#h0-12-3" id="h0-12-3" class="d">-	target, err := d.resolveFileTarget(request.Resource.Bucket, request.Key)
+</a><a href="#h0-12-4" id="h0-12-4" class="i">+	target, err := newFileTarget(d.client, request.Resource.Bucket, request.Key)
+</a> 	if err != nil {
+ 		return nil, status.Error(codes.PermissionDenied, err.Error())
+ 	}
+ 
+<a href="#h0-12-9" id="h0-12-9" class="d">-	if err := d.client.DeleteFile(target); err != nil {
+</a><a href="#h0-12-10" id="h0-12-10" class="i">+	if err := d.client.DeleteFile(target.resolve()); err != nil {
+</a> 		return nil, d.createError(err)
+ 	}
+ 
+<a href="#h0-13" id="h0-13" class="h">@@ -296,20 +296,12 @@ func (d *Disk) DeleteObject(ctx context.Context, request *service.DeleteObjectRe
+</a> func (d *Disk) ListObjects(ctx context.Context, request *service.ListObjectsRequest) (*service.ListObjectsResponse, error) {
+ 	var objects []*service.HeadObjectResponse
+ 
+<a href="#h0-13-3" id="h0-13-3" class="d">-	target, err := d.resolveFileTarget(request.Resource.Bucket, request.Prefix)
+</a><a href="#h0-13-4" id="h0-13-4" class="i">+	target, err := newFileTarget(d.client, request.Resource.Bucket, request.Prefix)
+</a> 	if err != nil {
+ 		return nil, status.Error(codes.PermissionDenied, err.Error())
+ 	}
+ 
+<a href="#h0-13-9" id="h0-13-9" class="d">-	// The requested path may itself already be a directory, in which case the parsed dirname
+</a><a href="#h0-13-10" id="h0-13-10" class="d">-	// should be discarded.
+</a><a href="#h0-13-11" id="h0-13-11" class="d">-	parent := filepath.Dir(target)
+</a><a href="#h0-13-12" id="h0-13-12" class="d">-	stat, err := d.client.StatFile(target)
+</a><a href="#h0-13-13" id="h0-13-13" class="d">-	if parent == &quot;.&quot; || (err == nil &amp;&amp; stat.Mode.IsDir()) {
+</a><a href="#h0-13-14" id="h0-13-14" class="d">-		parent = target
+</a><a href="#h0-13-15" id="h0-13-15" class="d">-	}
+</a><a href="#h0-13-16" id="h0-13-16" class="d">-
+</a><a href="#h0-13-17" id="h0-13-17" class="d">-	files, err := d.client.ListFiles(parent, request.Recursive)
+</a><a href="#h0-13-18" id="h0-13-18" class="i">+	files, err := d.client.ListFiles(target.parent(), request.Recursive)
+</a> 	if err != nil {
+ 		return nil, d.createError(err)
+ 	}
+<a href="#h0-14" id="h0-14" class="h">@@ -319,9 +311,8 @@ func (d *Disk) ListObjects(ctx context.Context, request *service.ListObjectsRequ
+</a> 
+ 		// Exclude the bucket name in the file path key for purposes of prefix evaluation
+ 		key := filepath.Join(strings.Split(file.Path, string(os.PathSeparator))[1:]...)
+<a href="#h0-14-3" id="h0-14-3" class="d">-		prefix := filepath.Clean(request.Prefix)
+</a> 
+<a href="#h0-14-5" id="h0-14-5" class="d">-		if prefix != &quot;.&quot; &amp;&amp; !strings.HasPrefix(key, prefix) {
+</a><a href="#h0-14-6" id="h0-14-6" class="i">+		if target.key != &quot;.&quot; &amp;&amp; !strings.HasPrefix(key, target.key) {
+</a> 			continue
+ 		}
+ 
+<a href="#h0-15" id="h0-15" class="h">@@ -334,7 +325,7 @@ func (d *Disk) ListObjects(ctx context.Context, request *service.ListObjectsRequ
+</a> 		head := &amp;service.HeadObjectResponse{
+ 			Metadata: &amp;common.Metadata{
+ 				Id:           file.BaseName,
+<a href="#h0-15-3" id="h0-15-3" class="d">-				Key:          file.Path,
+</a><a href="#h0-15-4" id="h0-15-4" class="i">+				Key:          key,
+</a> 				Size:         file.Size,
+ 				ObjectType:   objectType,
+ 				ModifiedTime: timestamppb.New(file.ModifiedTime),
+<a href="#h0-16" id="h0-16" class="h">@@ -352,36 +343,70 @@ func (d *Disk) String() string {
+</a> 	return fmt.Sprintf(&quot;Disk(root: %s)&quot;, d.cfg.Root)
+ }
+ 
+<a href="#h0-16-3" id="h0-16-3" class="d">-// resolveFileTarget resolves the relative path to a file given a bucket and key name. It returns
+</a><a href="#h0-16-4" id="h0-16-4" class="d">-// errors for malformed inputs or inputs suspected of attempting a directory traversal attack.
+</a><a href="#h0-16-5" id="h0-16-5" class="d">-func (d *Disk) resolveFileTarget(bucket string, key string) (string, error) {
+</a><a href="#h0-16-6" id="h0-16-6" class="i">+// createError creates a semantically accurate gRPC status for errored filesystem operations.
+</a><a href="#h0-16-7" id="h0-16-7" class="i">+func (d *Disk) createError(err error) error {
+</a><a href="#h0-16-8" id="h0-16-8" class="i">+	switch {
+</a><a href="#h0-16-9" id="h0-16-9" class="i">+	case os.IsNotExist(err):
+</a><a href="#h0-16-10" id="h0-16-10" class="i">+		return status.Error(codes.NotFound, err.Error())
+</a><a href="#h0-16-11" id="h0-16-11" class="i">+	case os.IsPermission(err):
+</a><a href="#h0-16-12" id="h0-16-12" class="i">+		return status.Error(codes.PermissionDenied, err.Error())
+</a><a href="#h0-16-13" id="h0-16-13" class="i">+	case os.IsTimeout(err):
+</a><a href="#h0-16-14" id="h0-16-14" class="i">+		return status.Error(codes.DeadlineExceeded, err.Error())
+</a><a href="#h0-16-15" id="h0-16-15" class="i">+	default:
+</a><a href="#h0-16-16" id="h0-16-16" class="i">+		return status.Error(codes.Unknown, err.Error())
+</a><a href="#h0-16-17" id="h0-16-17" class="i">+	}
+</a><a href="#h0-16-18" id="h0-16-18" class="i">+}
+</a><a href="#h0-16-19" id="h0-16-19" class="i">+
+</a><a href="#h0-16-20" id="h0-16-20" class="i">+// fileTarget is an abstraction over a file target on disk, as constructed from a bucket name and
+</a><a href="#h0-16-21" id="h0-16-21" class="i">+// file key.
+</a><a href="#h0-16-22" id="h0-16-22" class="i">+type fileTarget struct {
+</a><a href="#h0-16-23" id="h0-16-23" class="i">+	client *disk.Client
+</a><a href="#h0-16-24" id="h0-16-24" class="i">+	bucket string
+</a><a href="#h0-16-25" id="h0-16-25" class="i">+	key    string
+</a><a href="#h0-16-26" id="h0-16-26" class="i">+}
+</a><a href="#h0-16-27" id="h0-16-27" class="i">+
+</a><a href="#h0-16-28" id="h0-16-28" class="i">+// newFileTarget creates a new file target while validating the desired path.
+</a><a href="#h0-16-29" id="h0-16-29" class="i">+func newFileTarget(client *disk.Client, bucket string, key string) (*fileTarget, error) {
+</a> 	if strings.Contains(bucket, string(os.PathSeparator)) {
+<a href="#h0-16-31" id="h0-16-31" class="d">-		return &quot;&quot;, fmt.Errorf(&quot;bucket name contains illegal characters: bucket=%s&quot;, bucket)
+</a><a href="#h0-16-32" id="h0-16-32" class="i">+		return nil, fmt.Errorf(&quot;bucket name contains illegal characters: bucket=%s&quot;, bucket)
+</a> 	}
+ 
+<a href="#h0-16-35" id="h0-16-35" class="d">-	target := filepath.Join(bucket, filepath.Clean(key))
+</a><a href="#h0-16-36" id="h0-16-36" class="i">+	canonicalKey := filepath.Clean(key)
+</a><a href="#h0-16-37" id="h0-16-37" class="i">+	resolved := filepath.Join(bucket, canonicalKey)
+</a> 
+ 	// Require the resolved path to start with the bucket after a pass through filepath.Clean.
+ 	// Since at this point it is known that the bucket does not contain nested directories, this
+ 	// thwarts potential directory traversal attacks by enforcing that the requested key does
+ 	// not resolve to be outside the allowed file tree.
+<a href="#h0-16-43" id="h0-16-43" class="d">-	if key != &quot;&quot; &amp;&amp; !strings.HasPrefix(target, fmt.Sprintf(&quot;%s%c&quot;, bucket, os.PathSeparator)) {
+</a><a href="#h0-16-44" id="h0-16-44" class="d">-		return &quot;&quot;, fmt.Errorf(&quot;resolved file path is invalid: key=%s&quot;, key)
+</a><a href="#h0-16-45" id="h0-16-45" class="i">+	if key != &quot;&quot; &amp;&amp; !strings.HasPrefix(resolved, fmt.Sprintf(&quot;%s%c&quot;, bucket, os.PathSeparator)) {
+</a><a href="#h0-16-46" id="h0-16-46" class="i">+		return nil, fmt.Errorf(&quot;resolved file path is invalid: key=%s&quot;, key)
+</a> 	}
+ 
+<a href="#h0-16-49" id="h0-16-49" class="d">-	return target, nil
+</a><a href="#h0-16-50" id="h0-16-50" class="i">+	return &amp;fileTarget{
+</a><a href="#h0-16-51" id="h0-16-51" class="i">+		client: client,
+</a><a href="#h0-16-52" id="h0-16-52" class="i">+		bucket: bucket,
+</a><a href="#h0-16-53" id="h0-16-53" class="i">+		key:    canonicalKey,
+</a><a href="#h0-16-54" id="h0-16-54" class="i">+	}, nil
+</a> }
+ 
+<a href="#h0-16-57" id="h0-16-57" class="d">-// createError creates a semantically accurate gRPC status for errored filesystem operations.
+</a><a href="#h0-16-58" id="h0-16-58" class="d">-func (d *Disk) createError(err error) error {
+</a><a href="#h0-16-59" id="h0-16-59" class="d">-	switch {
+</a><a href="#h0-16-60" id="h0-16-60" class="d">-	case os.IsNotExist(err):
+</a><a href="#h0-16-61" id="h0-16-61" class="d">-		return status.Error(codes.NotFound, err.Error())
+</a><a href="#h0-16-62" id="h0-16-62" class="d">-	case os.IsPermission(err):
+</a><a href="#h0-16-63" id="h0-16-63" class="d">-		return status.Error(codes.PermissionDenied, err.Error())
+</a><a href="#h0-16-64" id="h0-16-64" class="d">-	case os.IsTimeout(err):
+</a><a href="#h0-16-65" id="h0-16-65" class="d">-		return status.Error(codes.DeadlineExceeded, err.Error())
+</a><a href="#h0-16-66" id="h0-16-66" class="d">-	default:
+</a><a href="#h0-16-67" id="h0-16-67" class="d">-		return status.Error(codes.Unknown, err.Error())
+</a><a href="#h0-16-68" id="h0-16-68" class="i">+// resolve resolves the file path targeted by the supplied bucket and key.
+</a><a href="#h0-16-69" id="h0-16-69" class="i">+func (f *fileTarget) resolve() string {
+</a><a href="#h0-16-70" id="h0-16-70" class="i">+	return filepath.Join(f.bucket, f.key)
+</a><a href="#h0-16-71" id="h0-16-71" class="i">+}
+</a><a href="#h0-16-72" id="h0-16-72" class="i">+
+</a><a href="#h0-16-73" id="h0-16-73" class="i">+// parent returns the parent directory of the target. If the target is itself a directory, the
+</a><a href="#h0-16-74" id="h0-16-74" class="i">+// return value is the same as that of resolve. If the target is a file or file prefix, the nearest
+</a><a href="#h0-16-75" id="h0-16-75" class="i">+// path ancestor is returned.
+</a><a href="#h0-16-76" id="h0-16-76" class="i">+func (f *fileTarget) parent() string {
+</a><a href="#h0-16-77" id="h0-16-77" class="i">+	resolved := f.resolve()
+</a><a href="#h0-16-78" id="h0-16-78" class="i">+
+</a><a href="#h0-16-79" id="h0-16-79" class="i">+	// The requested path may itself already be a directory, in which case the parsed dirname
+</a><a href="#h0-16-80" id="h0-16-80" class="i">+	// should be discarded.
+</a><a href="#h0-16-81" id="h0-16-81" class="i">+	p := filepath.Dir(resolved)
+</a><a href="#h0-16-82" id="h0-16-82" class="i">+	stat, err := f.client.StatFile(resolved)
+</a><a href="#h0-16-83" id="h0-16-83" class="i">+	if p == &quot;.&quot; || (err == nil &amp;&amp; stat.Mode.IsDir()) {
+</a><a href="#h0-16-84" id="h0-16-84" class="i">+		p = resolved
+</a> 	}
+<a href="#h0-16-86" id="h0-16-86" class="i">+
+</a><a href="#h0-16-87" id="h0-16-87" class="i">+	return p
+</a> }
+</pre>
+</div>
+</body>
+</html>

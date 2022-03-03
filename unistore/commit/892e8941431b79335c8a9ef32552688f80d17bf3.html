@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>cmd/unistore-cli: Write proto request to terminal in verbose mode - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/892e8941431b79335c8a9ef32552688f80d17bf3">892e8941431b79335c8a9ef32552688f80d17bf3</a>
+<b>parent</b> <a href="../commit/ff6c815a2f91cc8421ccb5ac82390e778c5cb133">ff6c815a2f91cc8421ccb5ac82390e778c5cb133</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Fri 31 Dec 2021 19:24:17 -0800
+
+cmd/unistore-cli: Write proto request to terminal in verbose mode
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">cmd/unistore-cli/main.go</a></td><td> | </td><td class="num">2</td><td><span class="i">+</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">cmd/unistore-cli/service.go</a></td><td> | </td><td class="num">31</td><td><span class="i">+++++++++++++++++++++++++++++</span><span class="d">--</span></td></tr>
+</table></pre><pre>2 files changed, 30 insertions(+), 3 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/cmd/unistore-cli/main.go">cmd/unistore-cli/main.go</a> b/<a href="../file/cmd/unistore-cli/main.go">cmd/unistore-cli/main.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -45,7 +45,7 @@ var (
+</a> 		Aliases: []string{&quot;up&quot;},
+ 		Short:   &quot;Upload an object&quot;,
+ 		Long: &quot;Upload an object with the specified key, either in its entirety via a unary call or in chunks via a streaming request.\n&quot; +
+<a href="#h0-0-3" id="h0-0-3" class="d">-			&quot;Object data is read from standard input. Verbose logs (when enabled) are written to standard error.&quot;,
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+			&quot;Object data is read from standard input. Verbose logs (when enabled) are written to standard output.&quot;,
+</a> 		Version: rootCmd.Version,
+ 		Args:    cobra.ExactArgs(1),
+ 		RunE:    runUpload,
+<b>diff --git a/<a id="h1" href="../file/cmd/unistore-cli/service.go">cmd/unistore-cli/service.go</a> b/<a href="../file/cmd/unistore-cli/service.go">cmd/unistore-cli/service.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -17,6 +17,7 @@ func runHead(cmd *cobra.Command, args []string) error {
+</a> 	var cancel context.CancelFunc
+ 
+ 	bucket, _ := cmd.Flags().GetString(&quot;bucket&quot;)
+<a href="#h1-0-3" id="h1-0-3" class="i">+	verbose, _ := cmd.Flags().GetBool(&quot;verbose&quot;)
+</a> 
+ 	store, err := initStoreConfig(flagConfig, flagStore)
+ 	if err != nil {
+<a href="#h1-1" id="h1-1" class="h">@@ -42,6 +43,10 @@ func runHead(cmd *cobra.Command, args []string) error {
+</a> 		Key: args[0],
+ 	}
+ 
+<a href="#h1-1-3" id="h1-1-3" class="i">+	if verbose {
+</a><a href="#h1-1-4" id="h1-1-4" class="i">+		renderResponse(flagFormat, os.Stdout, request)
+</a><a href="#h1-1-5" id="h1-1-5" class="i">+	}
+</a><a href="#h1-1-6" id="h1-1-6" class="i">+
+</a> 	response, err := client.HeadObject(ctx, request)
+ 	if err != nil {
+ 		return err
+<a href="#h1-2" id="h1-2" class="h">@@ -84,6 +89,10 @@ func runDownload(cmd *cobra.Command, args []string) error {
+</a> 	}
+ 
+ 	if !stream {
+<a href="#h1-2-3" id="h1-2-3" class="i">+		if verbose {
+</a><a href="#h1-2-4" id="h1-2-4" class="i">+			renderResponse(flagFormat, os.Stderr, get)
+</a><a href="#h1-2-5" id="h1-2-5" class="i">+		}
+</a><a href="#h1-2-6" id="h1-2-6" class="i">+
+</a> 		response, err := client.GetObject(ctx, get)
+ 		if err != nil {
+ 			return err
+<a href="#h1-3" id="h1-3" class="h">@@ -102,6 +111,10 @@ func runDownload(cmd *cobra.Command, args []string) error {
+</a> 		ChunkSize: chunkSize,
+ 	}
+ 
+<a href="#h1-3-3" id="h1-3-3" class="i">+	if verbose {
+</a><a href="#h1-3-4" id="h1-3-4" class="i">+		renderResponse(flagFormat, os.Stderr, request)
+</a><a href="#h1-3-5" id="h1-3-5" class="i">+	}
+</a><a href="#h1-3-6" id="h1-3-6" class="i">+
+</a> 	response, err := client.StreamGetObject(ctx, request)
+ 	if err != nil {
+ 		return err
+<a href="#h1-4" id="h1-4" class="h">@@ -170,12 +183,16 @@ func runUpload(cmd *cobra.Command, args []string) error {
+</a> 
+ 		put.Data = data
+ 
+<a href="#h1-4-3" id="h1-4-3" class="i">+		if verbose {
+</a><a href="#h1-4-4" id="h1-4-4" class="i">+			renderResponse(flagFormat, os.Stdout, put)
+</a><a href="#h1-4-5" id="h1-4-5" class="i">+		}
+</a><a href="#h1-4-6" id="h1-4-6" class="i">+
+</a> 		response, err := client.PutObject(ctx, put)
+ 		if err != nil {
+ 			return err
+ 		}
+ 
+<a href="#h1-4-12" id="h1-4-12" class="d">-		return renderResponse(flagFormat, os.Stderr, response)
+</a><a href="#h1-4-13" id="h1-4-13" class="i">+		return renderResponse(flagFormat, os.Stdout, response)
+</a> 	}
+ 
+ 	request, err := client.StreamPutObject(ctx)
+<a href="#h1-5" id="h1-5" class="h">@@ -196,7 +213,7 @@ func runUpload(cmd *cobra.Command, args []string) error {
+</a> 		message.Request.Data = chunk[:n]
+ 
+ 		if verbose {
+<a href="#h1-5-3" id="h1-5-3" class="d">-			renderResponse(flagFormat, os.Stderr, message)
+</a><a href="#h1-5-4" id="h1-5-4" class="i">+			renderResponse(flagFormat, os.Stdout, message)
+</a> 		}
+ 
+ 		if err := request.Send(message); err != nil {
+<a href="#h1-6" id="h1-6" class="h">@@ -217,6 +234,7 @@ func runDelete(cmd *cobra.Command, args []string) error {
+</a> 	var cancel context.CancelFunc
+ 
+ 	bucket, _ := cmd.Flags().GetString(&quot;bucket&quot;)
+<a href="#h1-6-3" id="h1-6-3" class="i">+	verbose, _ := cmd.Flags().GetBool(&quot;verbose&quot;)
+</a> 
+ 	store, err := initStoreConfig(flagConfig, flagStore)
+ 	if err != nil {
+<a href="#h1-7" id="h1-7" class="h">@@ -242,6 +260,10 @@ func runDelete(cmd *cobra.Command, args []string) error {
+</a> 		Key: args[0],
+ 	}
+ 
+<a href="#h1-7-3" id="h1-7-3" class="i">+	if verbose {
+</a><a href="#h1-7-4" id="h1-7-4" class="i">+		renderResponse(flagFormat, os.Stdout, request)
+</a><a href="#h1-7-5" id="h1-7-5" class="i">+	}
+</a><a href="#h1-7-6" id="h1-7-6" class="i">+
+</a> 	response, err := client.DeleteObject(ctx, request)
+ 	if err != nil {
+ 		return err
+<a href="#h1-8" id="h1-8" class="h">@@ -255,6 +277,7 @@ func runList(cmd *cobra.Command, args []string) error {
+</a> 	var cancel context.CancelFunc
+ 
+ 	bucket, _ := cmd.Flags().GetString(&quot;bucket&quot;)
+<a href="#h1-8-3" id="h1-8-3" class="i">+	verbose, _ := cmd.Flags().GetBool(&quot;verbose&quot;)
+</a> 
+ 	prefix := &quot;&quot;
+ 	if len(args) &gt; 0 {
+<a href="#h1-9" id="h1-9" class="h">@@ -285,6 +308,10 @@ func runList(cmd *cobra.Command, args []string) error {
+</a> 		Prefix: prefix,
+ 	}
+ 
+<a href="#h1-9-3" id="h1-9-3" class="i">+	if verbose {
+</a><a href="#h1-9-4" id="h1-9-4" class="i">+		renderResponse(flagFormat, os.Stdout, request)
+</a><a href="#h1-9-5" id="h1-9-5" class="i">+	}
+</a><a href="#h1-9-6" id="h1-9-6" class="i">+
+</a> 	response, err := client.ListObjects(ctx, request)
+ 	if err != nil {
+ 		return err
+</pre>
+</div>
+</body>
+</html>

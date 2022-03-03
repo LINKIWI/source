@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/backend: Implement fmt.Stringer on all backends - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/937d79d3075b14ebd2687df03acad3488181dda2">937d79d3075b14ebd2687df03acad3488181dda2</a>
+<b>parent</b> <a href="../commit/ac2a29421a4156e127f635f3521fa63ae961e8d9">ac2a29421a4156e127f635f3521fa63ae961e8d9</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sat  1 Jan 2022 20:45:07 -0800
+
+internal/backend: Implement fmt.Stringer on all backends
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/backend/alias.go</a></td><td> | </td><td class="num">7</td><td><span class="i">+++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">internal/backend/b2.go</a></td><td> | </td><td class="num">5</td><td><span class="i">+++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">internal/backend/buffer.go</a></td><td> | </td><td class="num">22</td><td><span class="i">+++++++++++++++++++++</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">internal/backend/checksum.go</a></td><td> | </td><td class="num">5</td><td><span class="i">+++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h4">internal/backend/compression.go</a></td><td> | </td><td class="num">22</td><td><span class="i">++++++++++++++++++++</span><span class="d">--</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h5">internal/backend/disk.go</a></td><td> | </td><td class="num">11</td><td><span class="i">++++++++++</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h6">internal/backend/encrypt.go</a></td><td> | </td><td class="num">16</td><td><span class="i">++++++++++++++</span><span class="d">--</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h7">internal/backend/mux.go</a></td><td> | </td><td class="num">14</td><td><span class="i">++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h8">internal/backend/permission.go</a></td><td> | </td><td class="num">7</td><td><span class="i">+++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h9">internal/backend/threshold.go</a></td><td> | </td><td class="num">7</td><td><span class="i">+++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h10">internal/backend/types.go</a></td><td> | </td><td class="num">4</td><td><span class="i">++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h11">internal/backend/unistore.go</a></td><td> | </td><td class="num">21</td><td><span class="i">++++++++++++++</span><span class="d">-------</span></td></tr>
+</table></pre><pre>12 files changed, 128 insertions(+), 13 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/backend/alias.go">internal/backend/alias.go</a> b/<a href="../file/internal/backend/alias.go">internal/backend/alias.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -1,6 +1,8 @@
+</a> package backend
+ 
+ import (
+<a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;fmt&quot;
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+
+</a> 	&quot;unistore/internal/config&quot;
+ 	&quot;unistore/schemas/service&quot;
+ )
+<a href="#h0-1" id="h0-1" class="h">@@ -113,3 +115,8 @@ func (a *Alias) ListObjects(request *service.ListObjectsRequest) (*service.ListO
+</a> 
+ 	return a.Backend.ListObjects(request)
+ }
+<a href="#h0-1-3" id="h0-1-3" class="i">+
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+// String returns a human-consumable representation of this backend.
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+func (a *Alias) String() string {
+</a><a href="#h0-1-6" id="h0-1-6" class="i">+	return fmt.Sprintf(&quot;Alias(backend: %s)&quot;, a.Backend)
+</a><a href="#h0-1-7" id="h0-1-7" class="i">+}
+</a><b>diff --git a/<a id="h1" href="../file/internal/backend/b2.go">internal/backend/b2.go</a> b/<a href="../file/internal/backend/b2.go">internal/backend/b2.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -596,6 +596,11 @@ func (b *B2) ListObjects(request *service.ListObjectsRequest) (*service.ListObje
+</a> 	return &amp;service.ListObjectsResponse{Objects: objects}, nil
+ }
+ 
+<a href="#h1-0-3" id="h1-0-3" class="i">+// String returns a human-consumable representation of this backend.
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+func (b *B2) String() string {
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+	return fmt.Sprintf(&quot;B2(url: %s)&quot;, b2.APIV2BaseURL)
+</a><a href="#h1-0-6" id="h1-0-6" class="i">+}
+</a><a href="#h1-0-7" id="h1-0-7" class="i">+
+</a> // authorizeAccount invokes the B2 account authorization API to obtain a short-lived authorization
+ // token for subsequent API calls. Authentication state is cached local to the backend instance and
+ // refreshed at a regular interval.
+<b>diff --git a/<a id="h2" href="../file/internal/backend/buffer.go">internal/backend/buffer.go</a> b/<a href="../file/internal/backend/buffer.go">internal/backend/buffer.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -1,10 +1,16 @@
+</a> package backend
+ 
+<a href="#h2-0-2" id="h2-0-2" class="i">+import (
+</a><a href="#h2-0-3" id="h2-0-3" class="i">+	&quot;fmt&quot;
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+)
+</a><a href="#h2-0-5" id="h2-0-5" class="i">+
+</a> // Buffer is a Backend that internally buffers streaming object gets and puts to a desired chunk
+ // size to the wrapped Backend, independent of the payload sizes sent or received by the client.
+ // This is particularly useful for backends that have requirements on minimum and maximum chunk
+ // sizes for streaming I/O.
+ type Buffer struct {
+<a href="#h2-0-11" id="h2-0-11" class="i">+	getChunkSize uint64
+</a><a href="#h2-0-12" id="h2-0-12" class="i">+	putChunkSize uint64
+</a> 	Backend
+ }
+ 
+<a href="#h2-1" id="h2-1" class="h">@@ -12,5 +18,19 @@ type Buffer struct {
+</a> // are normalized to at most the get chunk size; chunked writes to the backend are normalized to at
+ // most the put chunk size.
+ func NewBuffer(getChunkSize uint64, putChunkSize uint64, backend Backend) Backend {
+<a href="#h2-1-3" id="h2-1-3" class="d">-	return &amp;Buffer{newIOProcessor(nil, nil, getChunkSize, putChunkSize, backend)}
+</a><a href="#h2-1-4" id="h2-1-4" class="i">+	return &amp;Buffer{
+</a><a href="#h2-1-5" id="h2-1-5" class="i">+		getChunkSize: getChunkSize,
+</a><a href="#h2-1-6" id="h2-1-6" class="i">+		putChunkSize: putChunkSize,
+</a><a href="#h2-1-7" id="h2-1-7" class="i">+		Backend:      newIOProcessor(nil, nil, getChunkSize, putChunkSize, backend),
+</a><a href="#h2-1-8" id="h2-1-8" class="i">+	}
+</a><a href="#h2-1-9" id="h2-1-9" class="i">+}
+</a><a href="#h2-1-10" id="h2-1-10" class="i">+
+</a><a href="#h2-1-11" id="h2-1-11" class="i">+// String returns a human-consumable representation of this backend.
+</a><a href="#h2-1-12" id="h2-1-12" class="i">+func (b *Buffer) String() string {
+</a><a href="#h2-1-13" id="h2-1-13" class="i">+	return fmt.Sprintf(
+</a><a href="#h2-1-14" id="h2-1-14" class="i">+		&quot;Buffer(get_chunk_size: %d, put_chunk_size: %d, backend: %s)&quot;,
+</a><a href="#h2-1-15" id="h2-1-15" class="i">+		b.getChunkSize,
+</a><a href="#h2-1-16" id="h2-1-16" class="i">+		b.putChunkSize,
+</a><a href="#h2-1-17" id="h2-1-17" class="i">+		b.Backend,
+</a><a href="#h2-1-18" id="h2-1-18" class="i">+	)
+</a> }
+<b>diff --git a/<a id="h3" href="../file/internal/backend/checksum.go">internal/backend/checksum.go</a> b/<a href="../file/internal/backend/checksum.go">internal/backend/checksum.go</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -115,6 +115,11 @@ func (c *Checksum) StreamPutObject(stream chan *service.PutObjectStreamRequest) 
+</a> 	return c.Backend.StreamPutObject(proxy)
+ }
+ 
+<a href="#h3-0-3" id="h3-0-3" class="i">+// String returns a human-consumable representation of this backend.
+</a><a href="#h3-0-4" id="h3-0-4" class="i">+func (c *Checksum) String() string {
+</a><a href="#h3-0-5" id="h3-0-5" class="i">+	return fmt.Sprintf(&quot;Checksum(algorithm: %s, backend: %s)&quot;, c.algorithm, c.Backend)
+</a><a href="#h3-0-6" id="h3-0-6" class="i">+}
+</a><a href="#h3-0-7" id="h3-0-7" class="i">+
+</a> // checksum computes a checksum for the provided data slice.
+ func (c *Checksum) checksum(data []byte) string {
+ 	var h hash.Hash
+<b>diff --git a/<a id="h4" href="../file/internal/backend/compression.go">internal/backend/compression.go</a> b/<a href="../file/internal/backend/compression.go">internal/backend/compression.go</a></b>
+<a href="#h4-0" id="h4-0" class="h">@@ -16,6 +16,8 @@ import (
+</a> // Compression is a Backend that performs in-flight compression and decompression of get and put
+ // data payloads.
+ type Compression struct {
+<a href="#h4-0-3" id="h4-0-3" class="i">+	algorithm common.Compression
+</a><a href="#h4-0-4" id="h4-0-4" class="i">+	level     int
+</a> 	Backend
+ }
+ 
+<a href="#h4-1" id="h4-1" class="h">@@ -24,7 +26,9 @@ func NewCompression(algorithm string, level int, backend Backend) Backend {
+</a> 	var compressor func(io.Writer) (io.WriteCloser, error)
+ 	var decompressor func(io.Reader) (io.ReadCloser, error)
+ 
+<a href="#h4-1-3" id="h4-1-3" class="d">-	switch common.Compression(common.Compression_value[strings.ToUpper(algorithm)]) {
+</a><a href="#h4-1-4" id="h4-1-4" class="i">+	parsed := common.Compression(common.Compression_value[strings.ToUpper(algorithm)])
+</a><a href="#h4-1-5" id="h4-1-5" class="i">+
+</a><a href="#h4-1-6" id="h4-1-6" class="i">+	switch parsed {
+</a> 	case common.Compression_GZIP:
+ 		compressor = func(raw io.Writer) (io.WriteCloser, error) {
+ 			if level == 0 {
+<a href="#h4-2" id="h4-2" class="h">@@ -88,5 +92,19 @@ func NewCompression(algorithm string, level int, backend Backend) Backend {
+</a> 		}
+ 	}
+ 
+<a href="#h4-2-3" id="h4-2-3" class="d">-	return &amp;Compression{newIOProcessor(decompressor, compressor, 0, 0, backend)}
+</a><a href="#h4-2-4" id="h4-2-4" class="i">+	return &amp;Compression{
+</a><a href="#h4-2-5" id="h4-2-5" class="i">+		algorithm: parsed,
+</a><a href="#h4-2-6" id="h4-2-6" class="i">+		level:     level,
+</a><a href="#h4-2-7" id="h4-2-7" class="i">+		Backend:   newIOProcessor(decompressor, compressor, 0, 0, backend),
+</a><a href="#h4-2-8" id="h4-2-8" class="i">+	}
+</a><a href="#h4-2-9" id="h4-2-9" class="i">+}
+</a><a href="#h4-2-10" id="h4-2-10" class="i">+
+</a><a href="#h4-2-11" id="h4-2-11" class="i">+// String returns a human-consumable representation of this backend.
+</a><a href="#h4-2-12" id="h4-2-12" class="i">+func (c *Compression) String() string {
+</a><a href="#h4-2-13" id="h4-2-13" class="i">+	return fmt.Sprintf(
+</a><a href="#h4-2-14" id="h4-2-14" class="i">+		&quot;Compression(algorithm: %s, level: %d, backend: %s)&quot;,
+</a><a href="#h4-2-15" id="h4-2-15" class="i">+		c.algorithm,
+</a><a href="#h4-2-16" id="h4-2-16" class="i">+		c.level,
+</a><a href="#h4-2-17" id="h4-2-17" class="i">+		c.Backend,
+</a><a href="#h4-2-18" id="h4-2-18" class="i">+	)
+</a> }
+<b>diff --git a/<a id="h5" href="../file/internal/backend/disk.go">internal/backend/disk.go</a> b/<a href="../file/internal/backend/disk.go">internal/backend/disk.go</a></b>
+<a href="#h5-0" id="h5-0" class="h">@@ -21,6 +21,7 @@ import (
+</a> 
+ // Disk is a Backend that implements an object storage server on top of a local filesystem.
+ type Disk struct {
+<a href="#h5-0-3" id="h5-0-3" class="i">+	cfg    *config.Disk
+</a> 	client *disk.Client
+ }
+ 
+<a href="#h5-1" id="h5-1" class="h">@@ -31,7 +32,10 @@ func NewDisk(cfg *config.Disk) (Backend, error) {
+</a> 		return nil, err
+ 	}
+ 
+<a href="#h5-1-3" id="h5-1-3" class="d">-	return &amp;Disk{client}, nil
+</a><a href="#h5-1-4" id="h5-1-4" class="i">+	return &amp;Disk{
+</a><a href="#h5-1-5" id="h5-1-5" class="i">+		cfg:    cfg,
+</a><a href="#h5-1-6" id="h5-1-6" class="i">+		client: client,
+</a><a href="#h5-1-7" id="h5-1-7" class="i">+	}, nil
+</a> }
+ 
+ // HeadObject stats the requested file.
+<a href="#h5-2" id="h5-2" class="h">@@ -315,6 +319,11 @@ func (d *Disk) ListObjects(request *service.ListObjectsRequest) (*service.ListOb
+</a> 	return &amp;service.ListObjectsResponse{Objects: objects}, nil
+ }
+ 
+<a href="#h5-2-3" id="h5-2-3" class="i">+// String returns a human-consumable representation of this backend.
+</a><a href="#h5-2-4" id="h5-2-4" class="i">+func (d *Disk) String() string {
+</a><a href="#h5-2-5" id="h5-2-5" class="i">+	return fmt.Sprintf(&quot;Disk(root: %s)&quot;, d.cfg.Root)
+</a><a href="#h5-2-6" id="h5-2-6" class="i">+}
+</a><a href="#h5-2-7" id="h5-2-7" class="i">+
+</a> // resolveFileTarget resolves the relative path to a file given a bucket and key name. It returns
+ // errors for malformed inputs or inputs suspected of attempting a directory traversal attack.
+ func (d *Disk) resolveFileTarget(bucket string, key string) (string, error) {
+<b>diff --git a/<a id="h6" href="../file/internal/backend/encrypt.go">internal/backend/encrypt.go</a> b/<a href="../file/internal/backend/encrypt.go">internal/backend/encrypt.go</a></b>
+<a href="#h6-0" id="h6-0" class="h">@@ -1,6 +1,7 @@
+</a> package backend
+ 
+ import (
+<a href="#h6-0-3" id="h6-0-3" class="i">+	&quot;fmt&quot;
+</a> 	&quot;io&quot;
+ 	&quot;strings&quot;
+ 
+<a href="#h6-1" id="h6-1" class="h">@@ -12,6 +13,7 @@ import (
+</a> 
+ // Encrypt is a Backend that offers efficient and transparent in-flight encryption and decryption.
+ type Encrypt struct {
+<a href="#h6-1-3" id="h6-1-3" class="i">+	mechanism common.Encryption
+</a> 	Backend
+ }
+ 
+<a href="#h6-2" id="h6-2" class="h">@@ -21,7 +23,9 @@ func NewEncrypt(mechanism string, privateKey string, publicKey string, backend B
+</a> 	var encryptor func(io.Writer) (io.WriteCloser, error)
+ 	var decryptor func(io.Reader) (io.ReadCloser, error)
+ 
+<a href="#h6-2-3" id="h6-2-3" class="d">-	switch common.Encryption(common.Encryption_value[strings.ToUpper(mechanism)]) {
+</a><a href="#h6-2-4" id="h6-2-4" class="i">+	parsed := common.Encryption(common.Encryption_value[strings.ToUpper(mechanism)])
+</a><a href="#h6-2-5" id="h6-2-5" class="i">+
+</a><a href="#h6-2-6" id="h6-2-6" class="i">+	switch parsed {
+</a> 	case common.Encryption_AGE:
+ 		encryptor = func(raw io.Writer) (io.WriteCloser, error) {
+ 			recipient, err := age.ParseX25519Recipient(publicKey)
+<a href="#h6-3" id="h6-3" class="h">@@ -54,5 +58,13 @@ func NewEncrypt(mechanism string, privateKey string, publicKey string, backend B
+</a> 		}
+ 	}
+ 
+<a href="#h6-3-3" id="h6-3-3" class="d">-	return &amp;Encrypt{newIOProcessor(decryptor, encryptor, 0, 0, backend)}
+</a><a href="#h6-3-4" id="h6-3-4" class="i">+	return &amp;Encrypt{
+</a><a href="#h6-3-5" id="h6-3-5" class="i">+		mechanism: parsed,
+</a><a href="#h6-3-6" id="h6-3-6" class="i">+		Backend:   newIOProcessor(decryptor, encryptor, 0, 0, backend),
+</a><a href="#h6-3-7" id="h6-3-7" class="i">+	}
+</a><a href="#h6-3-8" id="h6-3-8" class="i">+}
+</a><a href="#h6-3-9" id="h6-3-9" class="i">+
+</a><a href="#h6-3-10" id="h6-3-10" class="i">+// String returns a human-consumable representation of this backend.
+</a><a href="#h6-3-11" id="h6-3-11" class="i">+func (e *Encrypt) String() string {
+</a><a href="#h6-3-12" id="h6-3-12" class="i">+	return fmt.Sprintf(&quot;Encrypt(mechanism: %s, backend: %s)&quot;, e.mechanism, e.Backend)
+</a> }
+<b>diff --git a/<a id="h7" href="../file/internal/backend/mux.go">internal/backend/mux.go</a> b/<a href="../file/internal/backend/mux.go">internal/backend/mux.go</a></b>
+<a href="#h7-0" id="h7-0" class="h">@@ -1,6 +1,9 @@
+</a> package backend
+ 
+ import (
+<a href="#h7-0-3" id="h7-0-3" class="i">+	&quot;fmt&quot;
+</a><a href="#h7-0-4" id="h7-0-4" class="i">+	&quot;strings&quot;
+</a><a href="#h7-0-5" id="h7-0-5" class="i">+
+</a> 	&quot;google.golang.org/grpc/codes&quot;
+ 	&quot;google.golang.org/grpc/status&quot;
+ 
+<a href="#h7-1" id="h7-1" class="h">@@ -129,3 +132,14 @@ func (m *Mux) ListObjects(request *service.ListObjectsRequest) (*service.ListObj
+</a> 
+ 	return backend.ListObjects(request)
+ }
+<a href="#h7-1-3" id="h7-1-3" class="i">+
+</a><a href="#h7-1-4" id="h7-1-4" class="i">+// String returns a human-consumable representation of this backend.
+</a><a href="#h7-1-5" id="h7-1-5" class="i">+func (m *Mux) String() string {
+</a><a href="#h7-1-6" id="h7-1-6" class="i">+	var args []string
+</a><a href="#h7-1-7" id="h7-1-7" class="i">+
+</a><a href="#h7-1-8" id="h7-1-8" class="i">+	for id, backend := range m.backends {
+</a><a href="#h7-1-9" id="h7-1-9" class="i">+		args = append(args, fmt.Sprintf(&quot;%s: %s&quot;, id, backend))
+</a><a href="#h7-1-10" id="h7-1-10" class="i">+	}
+</a><a href="#h7-1-11" id="h7-1-11" class="i">+
+</a><a href="#h7-1-12" id="h7-1-12" class="i">+	return fmt.Sprintf(&quot;Mux(%s)&quot;, strings.Join(args, &quot;, &quot;))
+</a><a href="#h7-1-13" id="h7-1-13" class="i">+}
+</a><b>diff --git a/<a id="h8" href="../file/internal/backend/permission.go">internal/backend/permission.go</a> b/<a href="../file/internal/backend/permission.go">internal/backend/permission.go</a></b>
+<a href="#h8-0" id="h8-0" class="h">@@ -1,6 +1,8 @@
+</a> package backend
+ 
+ import (
+<a href="#h8-0-3" id="h8-0-3" class="i">+	&quot;fmt&quot;
+</a><a href="#h8-0-4" id="h8-0-4" class="i">+
+</a> 	&quot;go.uber.org/zap&quot;
+ 	&quot;google.golang.org/grpc/codes&quot;
+ 	&quot;google.golang.org/grpc/status&quot;
+<a href="#h8-1" id="h8-1" class="h">@@ -171,3 +173,8 @@ func (p *Permission) ListObjects(request *service.ListObjectsRequest) (*service.
+</a> 
+ 	return p.Backend.ListObjects(request)
+ }
+<a href="#h8-1-3" id="h8-1-3" class="i">+
+</a><a href="#h8-1-4" id="h8-1-4" class="i">+// String returns a human-consumable representation of this backend.
+</a><a href="#h8-1-5" id="h8-1-5" class="i">+func (p *Permission) String() string {
+</a><a href="#h8-1-6" id="h8-1-6" class="i">+	return fmt.Sprintf(&quot;Permission(backend: %s)&quot;, p.Backend)
+</a><a href="#h8-1-7" id="h8-1-7" class="i">+}
+</a><b>diff --git a/<a id="h9" href="../file/internal/backend/threshold.go">internal/backend/threshold.go</a> b/<a href="../file/internal/backend/threshold.go">internal/backend/threshold.go</a></b>
+<a href="#h9-0" id="h9-0" class="h">@@ -1,6 +1,8 @@
+</a> package backend
+ 
+ import (
+<a href="#h9-0-3" id="h9-0-3" class="i">+	&quot;fmt&quot;
+</a><a href="#h9-0-4" id="h9-0-4" class="i">+
+</a> 	&quot;unistore/schemas/service&quot;
+ )
+ 
+<a href="#h9-1" id="h9-1" class="h">@@ -86,3 +88,8 @@ func (t *Threshold) StreamPutObject(stream chan *service.PutObjectStreamRequest)
+</a> 
+ 	return t.Backend.StreamPutObject(proxy)
+ }
+<a href="#h9-1-3" id="h9-1-3" class="i">+
+</a><a href="#h9-1-4" id="h9-1-4" class="i">+// String returns a human-consumable representation of this backend.
+</a><a href="#h9-1-5" id="h9-1-5" class="i">+func (t *Threshold) String() string {
+</a><a href="#h9-1-6" id="h9-1-6" class="i">+	return fmt.Sprintf(&quot;Threshold(threshold: %d, backend: %s)&quot;, t.threshold, t.Backend)
+</a><a href="#h9-1-7" id="h9-1-7" class="i">+}
+</a><b>diff --git a/<a id="h10" href="../file/internal/backend/types.go">internal/backend/types.go</a> b/<a href="../file/internal/backend/types.go">internal/backend/types.go</a></b>
+<a href="#h10-0" id="h10-0" class="h">@@ -1,11 +1,15 @@
+</a> package backend
+ 
+ import (
+<a href="#h10-0-3" id="h10-0-3" class="i">+	&quot;fmt&quot;
+</a><a href="#h10-0-4" id="h10-0-4" class="i">+
+</a> 	&quot;unistore/schemas/service&quot;
+ )
+ 
+ // Backend describes an object storage implementation.
+ type Backend interface {
+<a href="#h10-0-10" id="h10-0-10" class="i">+	fmt.Stringer
+</a><a href="#h10-0-11" id="h10-0-11" class="i">+
+</a> 	// HeadObject retrieves metadata about an object.
+ 	HeadObject(request *service.HeadObjectRequest) (*service.HeadObjectResponse, error)
+ 
+<b>diff --git a/<a id="h11" href="../file/internal/backend/unistore.go">internal/backend/unistore.go</a> b/<a href="../file/internal/backend/unistore.go">internal/backend/unistore.go</a></b>
+<a href="#h11-0" id="h11-0" class="h">@@ -19,6 +19,7 @@ import (
+</a> 
+ // Unistore is a Backend that proxies to another Unistore server. Delightfully meta!
+ type Unistore struct {
+<a href="#h11-0-3" id="h11-0-3" class="i">+	address    string
+</a> 	backend    common.Backend
+ 	connection config.Connection
+ 	client     *unistore.Client
+<a href="#h11-1" id="h11-1" class="h">@@ -66,6 +67,7 @@ func NewUnistore(cfg *config.Unistore) (Backend, error) {
+</a> 	}
+ 
+ 	return &amp;Unistore{
+<a href="#h11-1-3" id="h11-1-3" class="i">+		address:    cfg.Address,
+</a> 		backend:    common.Backend(bid),
+ 		connection: cfg.Connection,
+ 		client:     client,
+<a href="#h11-2" id="h11-2" class="h">@@ -73,7 +75,7 @@ func NewUnistore(cfg *config.Unistore) (Backend, error) {
+</a> }
+ 
+ // HeadObject invokes the gRPC HeadObject RPC.
+<a href="#h11-2-3" id="h11-2-3" class="d">-func (u Unistore) HeadObject(request *service.HeadObjectRequest) (*service.HeadObjectResponse, error) {
+</a><a href="#h11-2-4" id="h11-2-4" class="i">+func (u *Unistore) HeadObject(request *service.HeadObjectRequest) (*service.HeadObjectResponse, error) {
+</a> 	var cancel context.CancelFunc
+ 
+ 	ctx := context.Background()
+<a href="#h11-3" id="h11-3" class="h">@@ -88,7 +90,7 @@ func (u Unistore) HeadObject(request *service.HeadObjectRequest) (*service.HeadO
+</a> }
+ 
+ // GetObject invokes the gRPC GetObject RPC.
+<a href="#h11-3-3" id="h11-3-3" class="d">-func (u Unistore) GetObject(request *service.GetObjectRequest) (*service.GetObjectResponse, error) {
+</a><a href="#h11-3-4" id="h11-3-4" class="i">+func (u *Unistore) GetObject(request *service.GetObjectRequest) (*service.GetObjectResponse, error) {
+</a> 	var cancel context.CancelFunc
+ 
+ 	ctx := context.Background()
+<a href="#h11-4" id="h11-4" class="h">@@ -103,7 +105,7 @@ func (u Unistore) GetObject(request *service.GetObjectRequest) (*service.GetObje
+</a> }
+ 
+ // StreamGetObject invokes the gRPC StreamGetObject RPC and adapts the response stream to a channel.
+<a href="#h11-4-3" id="h11-4-3" class="d">-func (u Unistore) StreamGetObject(request *service.GetObjectStreamRequest) (&lt;-chan *service.GetObjectStreamResponse, error) {
+</a><a href="#h11-4-4" id="h11-4-4" class="i">+func (u *Unistore) StreamGetObject(request *service.GetObjectStreamRequest) (&lt;-chan *service.GetObjectStreamResponse, error) {
+</a> 	responses := make(chan *service.GetObjectStreamResponse)
+ 
+ 	request.Request.Resource.Backend = u.backend
+<a href="#h11-5" id="h11-5" class="h">@@ -133,7 +135,7 @@ func (u Unistore) StreamGetObject(request *service.GetObjectStreamRequest) (&lt;-ch
+</a> }
+ 
+ // PutObject invokes the gRPC PutObject RPC.
+<a href="#h11-5-3" id="h11-5-3" class="d">-func (u Unistore) PutObject(request *service.PutObjectRequest) (*service.PutObjectResponse, error) {
+</a><a href="#h11-5-4" id="h11-5-4" class="i">+func (u *Unistore) PutObject(request *service.PutObjectRequest) (*service.PutObjectResponse, error) {
+</a> 	var cancel context.CancelFunc
+ 
+ 	ctx := context.Background()
+<a href="#h11-6" id="h11-6" class="h">@@ -148,7 +150,7 @@ func (u Unistore) PutObject(request *service.PutObjectRequest) (*service.PutObje
+</a> }
+ 
+ // StreamPutObject invokes the gRPC StreamPutObject RPC and adapts the request stream to a channel.
+<a href="#h11-6-3" id="h11-6-3" class="d">-func (u Unistore) StreamPutObject(stream chan *service.PutObjectStreamRequest) (*service.PutObjectStreamResponse, error) {
+</a><a href="#h11-6-4" id="h11-6-4" class="i">+func (u *Unistore) StreamPutObject(stream chan *service.PutObjectStreamRequest) (*service.PutObjectStreamResponse, error) {
+</a> 	c, err := u.client.StreamPutObject(context.Background())
+ 	if err != nil {
+ 		return nil, err
+<a href="#h11-7" id="h11-7" class="h">@@ -166,7 +168,7 @@ func (u Unistore) StreamPutObject(stream chan *service.PutObjectStreamRequest) (
+</a> }
+ 
+ // DeleteObject invokes the gRPC DeleteObject RPC.
+<a href="#h11-7-3" id="h11-7-3" class="d">-func (u Unistore) DeleteObject(request *service.DeleteObjectRequest) (*service.DeleteObjectResponse, error) {
+</a><a href="#h11-7-4" id="h11-7-4" class="i">+func (u *Unistore) DeleteObject(request *service.DeleteObjectRequest) (*service.DeleteObjectResponse, error) {
+</a> 	var cancel context.CancelFunc
+ 
+ 	ctx := context.Background()
+<a href="#h11-8" id="h11-8" class="h">@@ -181,7 +183,7 @@ func (u Unistore) DeleteObject(request *service.DeleteObjectRequest) (*service.D
+</a> }
+ 
+ // ListObjects invokes the gRPC ListObjects RPC.
+<a href="#h11-8-3" id="h11-8-3" class="d">-func (u Unistore) ListObjects(request *service.ListObjectsRequest) (*service.ListObjectsResponse, error) {
+</a><a href="#h11-8-4" id="h11-8-4" class="i">+func (u *Unistore) ListObjects(request *service.ListObjectsRequest) (*service.ListObjectsResponse, error) {
+</a> 	var cancel context.CancelFunc
+ 
+ 	ctx := context.Background()
+<a href="#h11-9" id="h11-9" class="h">@@ -194,3 +196,8 @@ func (u Unistore) ListObjects(request *service.ListObjectsRequest) (*service.Lis
+</a> 
+ 	return u.client.ListObjects(ctx, request)
+ }
+<a href="#h11-9-3" id="h11-9-3" class="i">+
+</a><a href="#h11-9-4" id="h11-9-4" class="i">+// String returns a human-consumable representation of this backend.
+</a><a href="#h11-9-5" id="h11-9-5" class="i">+func (u *Unistore) String() string {
+</a><a href="#h11-9-6" id="h11-9-6" class="i">+	return fmt.Sprintf(&quot;Unistore(address: %s, backend: %s)&quot;, u.address, u.backend)
+</a><a href="#h11-9-7" id="h11-9-7" class="i">+}
+</a></pre>
+</div>
+</body>
+</html>

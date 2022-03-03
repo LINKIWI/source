@@ -1,0 +1,178 @@
+syntax = "proto3";
+
+package schemas.service;
+
+option go_package = "lib.kevinlin.info/schemas/unistore/service";
+
+import "schemas/common/backend.proto";
+import "schemas/common/bucket.proto";
+import "schemas/common/object.proto";
+
+// HeadBucketRequest is the request definition for HeadBucket.
+message HeadBucketRequest {
+  // Resource is the resource targeted by this request.
+  common.Resource resource = 1;
+}
+
+// HeadBucketResponse is the request definition for HeadBucket.
+message HeadBucketResponse {
+  // Bucket is the retrieved bucket metadata.
+  common.Bucket bucket = 1;
+}
+
+// HeadObjectRequest is the request definition for HeadObject.
+message HeadObjectRequest {
+  // Resource is the resource targeted by this request.
+  common.Resource resource = 1;
+  // Key is the object key.
+  string key = 2;
+}
+
+// HeadObjectResponse is the response definition for HeadObject.
+message HeadObjectResponse {
+  // Metadata is the retrieved object metadata.
+  common.Metadata metadata = 1;
+}
+
+// GetObjectRequest is the request definition for GetObject.
+message GetObjectRequest {
+  // Resource is the resource targeted by this request.
+  common.Resource resource = 1;
+  // Key is the object key.
+  string key = 2;
+  // Range optionally describes the bounds for a partial data range to retrieve.
+  common.Range range = 3;
+}
+
+// GetObjectResponse is the response definition for GetObject.
+message GetObjectResponse {
+  // Metadata is the object metadata.
+  common.Metadata metadata = 1;
+  // Data is a binary blob containing the full contents of the object.
+  bytes data = 2;
+}
+
+// GetObjectStreamRequest is the request definition for StreamGetObject.
+message GetObjectStreamRequest {
+  // Request is a GetObjectRequest that describes parameters for the get.
+  GetObjectRequest request = 1;
+  // Chunk size is the chunk size, in bytes, to request of the server for object data. The server is
+  // expected to stream back zero or more messages, each containing a data payload that is no larger
+  // than this chunk size. While the server should make a best effort attempt to fulfill the
+  // exact requested chunk size for each stream message, such is implementation-defined behavior.
+  uint64 chunk_size = 2;
+}
+
+// GetObjectStreamResponse is the response definition for StreamGetObject.
+message GetObjectStreamResponse {
+  // Response is a GetObjectResponse that describes the response for a single chunk.
+  // It is expected that static metadata will be repeated with every stream response.
+  GetObjectResponse response = 1;
+  // Range describes the data range associated with the returned chunk.
+  common.Range range = 2;
+}
+
+// PutObjectRequest is the request definition for PutObject.
+message PutObjectRequest {
+  // Resource is the resource targeted by this request.
+  common.Resource resource = 1;
+  // Key is the object key.
+  string key = 2;
+  // Data is a binary blob containing the full contents of the object to write.
+  bytes data = 3;
+  // Checksum is the checksum of the binary data payload. When non-empty, it is generally expected
+  // that the client computes the checksum of the data in advance of this request.
+  // Its semantics and use or non-use is implementation-defined.
+  string checksum = 4;
+  // Attributes is a set of attributes to associate with the object. In general, this parameter
+  // should be omitted in order to allow the server to automatically populate relevant attributes;
+  // it exists here for purposes of manual override as required.
+  common.Attributes attributes = 5;
+}
+
+// PutObjectResponse is the response definition for PutObject.
+message PutObjectResponse {
+  // Metadata is the object metadata, retrieved after the write has been committed.
+  common.Metadata metadata = 1;
+}
+
+// PutObjectStreamRequest is the request definition for StreamPutObject.
+message PutObjectStreamRequest {
+  // Request is a PutObjectRequest that describes the request for a single chunk.
+  // It is expected that the client repeat the same static metadata for every request.
+  PutObjectRequest request = 1;
+  // Range is describes the data range associated with the request chunk.
+  common.Range range = 2;
+}
+
+// PutObjectStreamResponse is the response definition for StreamPutObject.
+message PutObjectStreamResponse {
+  PutObjectResponse response = 1;
+}
+
+// DeleteObjectRequest is the request definition for DeleteObject.
+message DeleteObjectRequest {
+  // Resource is the resource targeted by this request.
+  common.Resource resource = 1;
+  // Key is the object key.
+  string key = 2;
+  // Recursive controls whether to delete all objects recursively on keys with path delimiters.
+  bool recursive = 3;
+}
+
+// DeleteObjectResponse is the response definition for DeleteObject.
+message DeleteObjectResponse {
+  // Deleted is the number of objects that were successfully deleted.
+  int32 deleted = 1;
+}
+
+// ListBucketsRequest is the request definition for ListBuckets.
+message ListBucketsRequest {
+  // Resource is the resource targeted by this request.
+  common.Resource resource = 1;
+}
+
+// ListBucketsResponse is the response definition for ListBuckets.
+message ListBucketsResponse {
+  // Buckets is a list of HeadBucketResponses, one for each bucket.
+  repeated HeadBucketResponse buckets = 1;
+}
+
+// ListObjectsRequest is the request definition for ListObjects.
+message ListObjectsRequest {
+  // Resource is the resource targeted by this request.
+  common.Resource resource = 1;
+  // Prefix is the key prefix with which objects should be filtered.
+  string prefix = 2;
+  // Recursive controls whether to perform the listing recursively on keys with path delimiters.
+  bool recursive = 3;
+}
+
+// ListObjectsResponse is the response definition for ListObjects.
+message ListObjectsResponse {
+  // Objects is a list of HeadObjectResponses, one for each matched object.
+  repeated HeadObjectResponse objects = 1;
+}
+
+// Unistore provides the main Unistore object storage service.
+service Unistore {
+  // HeadBucket obtains metadata about a bucket.
+  rpc HeadBucket(HeadBucketRequest) returns (HeadBucketResponse);
+  // HeadObject obtains metadata about an object.
+  rpc HeadObject(HeadObjectRequest) returns (HeadObjectResponse);
+  // GetObject obtains the full contents of an object.
+  rpc GetObject(GetObjectRequest) returns (GetObjectResponse);
+  // StreamGetObject is a streaming/chunked alternative to GetObject for large objects.
+  rpc StreamGetObject(GetObjectStreamRequest) returns (stream GetObjectStreamResponse);
+  // PutObject writes the full contents of an object.
+  rpc PutObject(PutObjectRequest) returns (PutObjectResponse);
+  // StreamPutObject is a streaming/chunked alternative to PutObject for large objects or objects
+  // with indeterminate total sizes.
+  rpc StreamPutObject(stream PutObjectStreamRequest) returns (PutObjectStreamResponse);
+  // DeleteObject deletes an object.
+  rpc DeleteObject(DeleteObjectRequest) returns (DeleteObjectResponse);
+  // ListBuckets lists buckets.
+  rpc ListBuckets(ListBucketsRequest) returns (ListBucketsResponse);
+  // ListObjects lists objects matching a key prefix criterion.
+  rpc ListObjects(ListObjectsRequest) returns (ListObjectsResponse);
+}

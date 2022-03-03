@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/backend: Apply instrumentation wrapper in constructor of backends that perform any I/O - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/f4a0c7e65cce709efe2ba443cf7a4ac33d842e60">f4a0c7e65cce709efe2ba443cf7a4ac33d842e60</a>
+<b>parent</b> <a href="../commit/cab397f700dcaeb5280505d6848bb9b419dd7206">cab397f700dcaeb5280505d6848bb9b419dd7206</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Thu  6 Jan 2022 22:31:28 -0800
+
+internal/backend: Apply instrumentation wrapper in constructor of backends that perform any I/O
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/backend/b2.go</a></td><td> | </td><td class="num">6</td><td><span class="i">++++</span><span class="d">--</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">internal/backend/compression.go</a></td><td> | </td><td class="num">4</td><td><span class="i">+++</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">internal/backend/encrypt.go</a></td><td> | </td><td class="num">4</td><td><span class="i">+++</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">internal/backend/mux.go</a></td><td> | </td><td class="num">2</td><td><span class="i">+</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h4">internal/backend/unistore.go</a></td><td> | </td><td class="num">6</td><td><span class="i">++++</span><span class="d">--</span></td></tr>
+</table></pre><pre>5 files changed, 15 insertions(+), 7 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/backend/b2.go">internal/backend/b2.go</a> b/<a href="../file/internal/backend/b2.go">internal/backend/b2.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -87,12 +87,14 @@ func NewB2(cfg *config.B2) (Backend, error) {
+</a> 		return nil, err
+ 	}
+ 
+<a href="#h0-0-3" id="h0-0-3" class="d">-	return &amp;B2{
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+	b := &amp;B2{
+</a> 		client:           client,
+ 		applicationKeyID: cfg.ApplicationKeyID,
+ 		applicationKey:   cfg.ApplicationKey,
+ 		auth:             new(authenticationState),
+<a href="#h0-0-9" id="h0-0-9" class="d">-	}, nil
+</a><a href="#h0-0-10" id="h0-0-10" class="i">+	}
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+
+</a><a href="#h0-0-12" id="h0-0-12" class="i">+	return newInstrumentation(&quot;b2&quot;, b), nil
+</a> }
+ 
+ // HeadObject locates the requested file ID followed by listing its metadata.
+<b>diff --git a/<a id="h1" href="../file/internal/backend/compression.go">internal/backend/compression.go</a> b/<a href="../file/internal/backend/compression.go">internal/backend/compression.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -92,11 +92,13 @@ func NewCompression(algorithm string, level int, backend Backend) Backend {
+</a> 		}
+ 	}
+ 
+<a href="#h1-0-3" id="h1-0-3" class="d">-	return &amp;Compression{
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+	c := &amp;Compression{
+</a> 		algorithm: parsed,
+ 		level:     level,
+ 		Backend:   newIOProcessor(decompressor, compressor, 0, 0, backend),
+ 	}
+<a href="#h1-0-9" id="h1-0-9" class="i">+
+</a><a href="#h1-0-10" id="h1-0-10" class="i">+	return newInstrumentation(&quot;compression&quot;, c)
+</a> }
+ 
+ // String returns a human-consumable representation of this backend.
+<b>diff --git a/<a id="h2" href="../file/internal/backend/encrypt.go">internal/backend/encrypt.go</a> b/<a href="../file/internal/backend/encrypt.go">internal/backend/encrypt.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -58,10 +58,12 @@ func NewEncrypt(mechanism string, privateKey string, publicKey string, backend B
+</a> 		}
+ 	}
+ 
+<a href="#h2-0-3" id="h2-0-3" class="d">-	return &amp;Encrypt{
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+	e := &amp;Encrypt{
+</a> 		mechanism: parsed,
+ 		Backend:   newIOProcessor(decryptor, encryptor, 0, 0, backend),
+ 	}
+<a href="#h2-0-8" id="h2-0-8" class="i">+
+</a><a href="#h2-0-9" id="h2-0-9" class="i">+	return newInstrumentation(&quot;encrypt&quot;, e)
+</a> }
+ 
+ // String returns a human-consumable representation of this backend.
+<b>diff --git a/<a id="h3" href="../file/internal/backend/mux.go">internal/backend/mux.go</a> b/<a href="../file/internal/backend/mux.go">internal/backend/mux.go</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -19,7 +19,7 @@ type Mux struct {
+</a> 
+ // NewMux creates a Mux from a backend implementation map.
+ func NewMux(backends map[common.Backend]Backend) Backend {
+<a href="#h3-0-3" id="h3-0-3" class="d">-	return &amp;Mux{backends}
+</a><a href="#h3-0-4" id="h3-0-4" class="i">+	return newInstrumentation(&quot;mux&quot;, &amp;Mux{backends})
+</a> }
+ 
+ // HeadObject demuxes HeadObject.
+<b>diff --git a/<a id="h4" href="../file/internal/backend/unistore.go">internal/backend/unistore.go</a> b/<a href="../file/internal/backend/unistore.go">internal/backend/unistore.go</a></b>
+<a href="#h4-0" id="h4-0" class="h">@@ -65,12 +65,14 @@ func NewUnistore(cfg *config.Unistore) (Backend, error) {
+</a> 		)
+ 	}
+ 
+<a href="#h4-0-3" id="h4-0-3" class="d">-	return &amp;Unistore{
+</a><a href="#h4-0-4" id="h4-0-4" class="i">+	u := &amp;Unistore{
+</a> 		address:    cfg.Address,
+ 		backend:    common.Backend(bid),
+ 		connection: cfg.Connection,
+ 		client:     client,
+<a href="#h4-0-9" id="h4-0-9" class="d">-	}, nil
+</a><a href="#h4-0-10" id="h4-0-10" class="i">+	}
+</a><a href="#h4-0-11" id="h4-0-11" class="i">+
+</a><a href="#h4-0-12" id="h4-0-12" class="i">+	return newInstrumentation(&quot;unistore&quot;, u), nil
+</a> }
+ 
+ // HeadObject invokes the gRPC HeadObject RPC.
+</pre>
+</div>
+</body>
+</html>

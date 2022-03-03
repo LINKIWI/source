@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/backend: Respect range specification in B2 backend - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/13bb2fed7125e58e54c6fb1b2fcf4780bedfe54a">13bb2fed7125e58e54c6fb1b2fcf4780bedfe54a</a>
+<b>parent</b> <a href="../commit/8e6cc80fb0264edccdc6a8598ebe51cecb535d3f">8e6cc80fb0264edccdc6a8598ebe51cecb535d3f</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sat 22 Jan 2022 12:49:33 -0800
+
+internal/backend: Respect range specification in B2 backend
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/backend/b2.go</a></td><td> | </td><td class="num">43</td><td><span class="i">++++++++++++++++++++++++++++++++++++++</span><span class="d">-----</span></td></tr>
+</table></pre><pre>1 file changed, 38 insertions(+), 5 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/backend/b2.go">internal/backend/b2.go</a> b/<a href="../file/internal/backend/b2.go">internal/backend/b2.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -247,6 +247,20 @@ func (b *B2) GetObject(ctx context.Context, request *service.GetObjectRequest) (
+</a> 		File:          request.Key,
+ 	}
+ 
+<a href="#h0-0-3" id="h0-0-3" class="i">+	if request.Range != nil {
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+		dfReq.Range = b2.Range{
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+			Unit:  request.Range.Unit,
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+			Start: int(request.Range.Start),
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+		}
+</a><a href="#h0-0-8" id="h0-0-8" class="i">+
+</a><a href="#h0-0-9" id="h0-0-9" class="i">+		if request.Range.End &gt; 0 {
+</a><a href="#h0-0-10" id="h0-0-10" class="i">+			// Note that the B2 API considers the range end index to be inclusive, while
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+			// the Unistore API considers the end index to be exclusive. Normalize this
+</a><a href="#h0-0-12" id="h0-0-12" class="i">+			// behavior by subtracting 1 from the desired end index for compatibility.
+</a><a href="#h0-0-13" id="h0-0-13" class="i">+			dfReq.Range.End = int(request.Range.End) - 1
+</a><a href="#h0-0-14" id="h0-0-14" class="i">+		}
+</a><a href="#h0-0-15" id="h0-0-15" class="i">+	}
+</a><a href="#h0-0-16" id="h0-0-16" class="i">+
+</a> 	dfResp, err := b.client.DownloadFileByName(ctx, dfReq)
+ 	if err != nil {
+ 		return nil, b.createError(err)
+<a href="#h0-1" id="h0-1" class="h">@@ -293,9 +307,22 @@ func (b *B2) StreamGetObject(ctx context.Context, request *service.GetObjectStre
+</a> 	}
+ 
+ 	go func() {
+<a href="#h0-1-3" id="h0-1-3" class="d">-		var offset int
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+		var offset uint64
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+
+</a><a href="#h0-1-6" id="h0-1-6" class="i">+		if request.Request.Range != nil {
+</a><a href="#h0-1-7" id="h0-1-7" class="i">+			offset = request.Request.Range.Start
+</a><a href="#h0-1-8" id="h0-1-8" class="i">+		}
+</a> 
+ 		for {
+<a href="#h0-1-11" id="h0-1-11" class="i">+			// Read the requested chunk size, but only up to the end index specified by
+</a><a href="#h0-1-12" id="h0-1-12" class="i">+			// the range, when available.
+</a><a href="#h0-1-13" id="h0-1-13" class="i">+			end := offset + request.ChunkSize
+</a><a href="#h0-1-14" id="h0-1-14" class="i">+			if request.Request.Range != nil &amp;&amp;
+</a><a href="#h0-1-15" id="h0-1-15" class="i">+				request.Request.Range.End &gt; 0 &amp;&amp;
+</a><a href="#h0-1-16" id="h0-1-16" class="i">+				end &gt; request.Request.Range.End {
+</a><a href="#h0-1-17" id="h0-1-17" class="i">+				end = request.Request.Range.End
+</a><a href="#h0-1-18" id="h0-1-18" class="i">+			}
+</a><a href="#h0-1-19" id="h0-1-19" class="i">+
+</a> 			dfReq := &amp;b2.DownloadFileByNameRequest{
+ 				Authorization: auth.authorizationToken,
+ 				DownloadURL:   auth.downloadURL,
+<a href="#h0-2" id="h0-2" class="h">@@ -307,8 +334,8 @@ func (b *B2) StreamGetObject(ctx context.Context, request *service.GetObjectStre
+</a> 				// end index semantics.
+ 				Range: b2.Range{
+ 					Unit:  &quot;bytes&quot;,
+<a href="#h0-2-3" id="h0-2-3" class="d">-					Start: offset,
+</a><a href="#h0-2-4" id="h0-2-4" class="d">-					End:   offset + int(request.ChunkSize) - 1,
+</a><a href="#h0-2-5" id="h0-2-5" class="i">+					Start: int(offset),
+</a><a href="#h0-2-6" id="h0-2-6" class="i">+					End:   int(end) - 1,
+</a> 				},
+ 			}
+ 
+<a href="#h0-3" id="h0-3" class="h">@@ -355,9 +382,15 @@ func (b *B2) StreamGetObject(ctx context.Context, request *service.GetObjectStre
+</a> 				},
+ 			}
+ 
+<a href="#h0-3-3" id="h0-3-3" class="d">-			offset += dfResp.Range.End - dfResp.Range.Start + 1
+</a><a href="#h0-3-4" id="h0-3-4" class="i">+			offset += uint64(dfResp.Range.End - dfResp.Range.Start + 1)
+</a><a href="#h0-3-5" id="h0-3-5" class="i">+
+</a><a href="#h0-3-6" id="h0-3-6" class="i">+			if offset &gt;= uint64(dfResp.Range.Total) {
+</a><a href="#h0-3-7" id="h0-3-7" class="i">+				break
+</a><a href="#h0-3-8" id="h0-3-8" class="i">+			}
+</a> 
+<a href="#h0-3-10" id="h0-3-10" class="d">-			if offset &gt;= dfResp.Range.Total {
+</a><a href="#h0-3-11" id="h0-3-11" class="i">+			if request.Request.Range != nil &amp;&amp;
+</a><a href="#h0-3-12" id="h0-3-12" class="i">+				request.Request.Range.End &gt; 0 &amp;&amp;
+</a><a href="#h0-3-13" id="h0-3-13" class="i">+				offset &gt;= request.Request.Range.End {
+</a> 				break
+ 			}
+ 		}
+</pre>
+</div>
+</body>
+</html>

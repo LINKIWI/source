@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/backend, schemas/common: Differentiate regular and directory object types - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/19d6d4445ef7a30682eb2d48501fbdd1b65b6eee">19d6d4445ef7a30682eb2d48501fbdd1b65b6eee</a>
+<b>parent</b> <a href="../commit/124769e2f7d3ef9678915a9636a6bbd3667fd81f">124769e2f7d3ef9678915a9636a6bbd3667fd81f</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sun  2 Jan 2022 13:44:13 -0800
+
+internal/backend, schemas/common: Differentiate regular and directory object types
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/backend/b2.go</a></td><td> | </td><td class="num">6</td><td><span class="i">++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">internal/backend/disk.go</a></td><td> | </td><td class="num">9</td><td><span class="i">+++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">schemas/common/backend.proto</a></td><td> | </td><td class="num">4</td><td><span class="i">++</span><span class="d">--</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">schemas/common/object.proto</a></td><td> | </td><td class="num">23</td><td><span class="i">++++++++++++++++++++</span><span class="d">---</span></td></tr>
+</table></pre><pre>4 files changed, 37 insertions(+), 5 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/backend/b2.go">internal/backend/b2.go</a> b/<a href="../file/internal/backend/b2.go">internal/backend/b2.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -588,11 +588,17 @@ func (b *B2) ListObjects(request *service.ListObjectsRequest) (*service.ListObje
+</a> 	objects := make([]*service.HeadObjectResponse, len(lfResp.Files))
+ 
+ 	for i, file := range lfResp.Files {
+<a href="#h0-0-3" id="h0-0-3" class="i">+		objectType := common.Object_REGULAR
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+		if file.ContentType == &quot;&quot; &amp;&amp; file.ContentLength == 0 {
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+			objectType = common.Object_DIRECTORY
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+		}
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+
+</a> 		objects[i] = &amp;service.HeadObjectResponse{
+ 			Metadata: &amp;common.Metadata{
+ 				Id:           file.FileID,
+ 				Key:          file.FileName,
+ 				Size:         uint64(file.ContentLength),
+<a href="#h0-0-13" id="h0-0-13" class="i">+				ObjectType:   objectType,
+</a> 				MimeType:     file.ContentType,
+ 				ModifiedTime: timestamppb.New(file.UploadTimestamp.Time),
+ 				Checksum:     file.ContentSHA1,
+<b>diff --git a/<a id="h1" href="../file/internal/backend/disk.go">internal/backend/disk.go</a> b/<a href="../file/internal/backend/disk.go">internal/backend/disk.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -296,6 +296,8 @@ func (d *Disk) ListObjects(request *service.ListObjectsRequest) (*service.ListOb
+</a> 	}
+ 
+ 	for _, file := range files {
+<a href="#h1-0-3" id="h1-0-3" class="i">+		var objectType common.Object
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+
+</a> 		// Exclude the bucket name in the file path key for purposes of prefix evaluation
+ 		key := filepath.Join(strings.Split(file.Path, string(os.PathSeparator))[1:]...)
+ 		prefix := filepath.Clean(request.Prefix)
+<a href="#h1-1" id="h1-1" class="h">@@ -304,11 +306,18 @@ func (d *Disk) ListObjects(request *service.ListObjectsRequest) (*service.ListOb
+</a> 			continue
+ 		}
+ 
+<a href="#h1-1-3" id="h1-1-3" class="i">+		if file.Mode.IsRegular() {
+</a><a href="#h1-1-4" id="h1-1-4" class="i">+			objectType = common.Object_REGULAR
+</a><a href="#h1-1-5" id="h1-1-5" class="i">+		} else if file.Mode.IsDir() {
+</a><a href="#h1-1-6" id="h1-1-6" class="i">+			objectType = common.Object_DIRECTORY
+</a><a href="#h1-1-7" id="h1-1-7" class="i">+		}
+</a><a href="#h1-1-8" id="h1-1-8" class="i">+
+</a> 		head := &amp;service.HeadObjectResponse{
+ 			Metadata: &amp;common.Metadata{
+ 				Id:           file.BaseName,
+ 				Key:          file.Path,
+ 				Size:         file.Size,
+<a href="#h1-1-14" id="h1-1-14" class="i">+				ObjectType:   objectType,
+</a> 				ModifiedTime: timestamppb.New(file.ModifiedTime),
+ 			},
+ 		}
+<b>diff --git a/<a id="h2" href="../file/schemas/common/backend.proto">schemas/common/backend.proto</a> b/<a href="../file/schemas/common/backend.proto">schemas/common/backend.proto</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -6,8 +6,8 @@ option go_package = &quot;unistore/schemas/common&quot;;
+</a> 
+ // Backend enumerates known storage backend implementations.
+ enum Backend {
+<a href="#h2-0-3" id="h2-0-3" class="d">-  // Unknown is the empty backend.
+</a><a href="#h2-0-4" id="h2-0-4" class="d">-  UNKNOWN = 0;
+</a><a href="#h2-0-5" id="h2-0-5" class="i">+  // Default is the default empty backend.
+</a><a href="#h2-0-6" id="h2-0-6" class="i">+  DEFAULT = 0;
+</a>   // Disk is a storage backend built on top of a local filesystem.
+   DISK = 1;
+   // Unistore allows use of another Unistore server as a storage backend.
+<b>diff --git a/<a id="h3" href="../file/schemas/common/object.proto">schemas/common/object.proto</a> b/<a href="../file/schemas/common/object.proto">schemas/common/object.proto</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -6,6 +6,21 @@ option go_package = &quot;unistore/schemas/common&quot;;
+</a> 
+ import &quot;google/protobuf/timestamp.proto&quot;;
+ 
+<a href="#h3-0-3" id="h3-0-3" class="i">+// Object enumerates known object types.
+</a><a href="#h3-0-4" id="h3-0-4" class="i">+// Note that the storage backend implementation ascribes semantics to each of these fields, and a
+</a><a href="#h3-0-5" id="h3-0-5" class="i">+// particular object type designation may simply be a convenience annotation rather than an inherent
+</a><a href="#h3-0-6" id="h3-0-6" class="i">+// property of the underlying object in storage.
+</a><a href="#h3-0-7" id="h3-0-7" class="i">+enum Object {
+</a><a href="#h3-0-8" id="h3-0-8" class="i">+  // Unknown is used when the object type is unknown or when the backend does not differentiate
+</a><a href="#h3-0-9" id="h3-0-9" class="i">+  // different types of objects.
+</a><a href="#h3-0-10" id="h3-0-10" class="i">+  UNKNOWN = 0;
+</a><a href="#h3-0-11" id="h3-0-11" class="i">+  // Regular is an analog for a regular file.
+</a><a href="#h3-0-12" id="h3-0-12" class="i">+  REGULAR = 1;
+</a><a href="#h3-0-13" id="h3-0-13" class="i">+  // Directory is an analog for a directory. Unistore standardizes on the use of &quot;/&quot; as the
+</a><a href="#h3-0-14" id="h3-0-14" class="i">+  // canonical delimiter for directories.
+</a><a href="#h3-0-15" id="h3-0-15" class="i">+  DIRECTORY = 2;
+</a><a href="#h3-0-16" id="h3-0-16" class="i">+}
+</a><a href="#h3-0-17" id="h3-0-17" class="i">+
+</a> // Range describes a contiguous range of data.
+ message Range {
+   // Unit is the unit name for the start and end indices, for examples, &quot;bytes&quot;.
+<a href="#h3-1" id="h3-1" class="h">@@ -30,10 +45,12 @@ message Metadata {
+</a>   string key = 2;
+   // Size is the total size of the object contents, in bytes.
+   uint64 size = 3;
+<a href="#h3-1-3" id="h3-1-3" class="i">+  // Object type is the file type of the object.
+</a><a href="#h3-1-4" id="h3-1-4" class="i">+  Object object_type = 4;
+</a>   // MIME type is the string MIME type of the object, if known.
+<a href="#h3-1-6" id="h3-1-6" class="d">-  string mime_type = 4;
+</a><a href="#h3-1-7" id="h3-1-7" class="i">+  string mime_type = 5;
+</a>   // Modified time is a timestamp describing the last time the object was modified.
+<a href="#h3-1-9" id="h3-1-9" class="d">-  google.protobuf.Timestamp modified_time = 5;
+</a><a href="#h3-1-10" id="h3-1-10" class="i">+  google.protobuf.Timestamp modified_time = 6;
+</a>   // Checksum is the object&#39;s checksum, in a backend-defined format.
+<a href="#h3-1-12" id="h3-1-12" class="d">-  string checksum = 6;
+</a><a href="#h3-1-13" id="h3-1-13" class="i">+  string checksum = 7;
+</a> }
+</pre>
+</div>
+</body>
+</html>

@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/backend: Simplify compression middleware by removing compressorFactory indirection - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/659306a1d50e71270b9952727e7019131a89d2a6">659306a1d50e71270b9952727e7019131a89d2a6</a>
+<b>parent</b> <a href="../commit/c14e9886230674139bbf34d8dbca56b2a91f1dc1">c14e9886230674139bbf34d8dbca56b2a91f1dc1</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Thu 30 Dec 2021 11:23:15 -0800
+
+internal/backend: Simplify compression middleware by removing compressorFactory indirection
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/backend/compression.go</a></td><td> | </td><td class="num">44</td><td><span class="i">++++++++++++++++++++</span><span class="d">------------------------</span></td></tr>
+</table></pre><pre>1 file changed, 20 insertions(+), 24 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/backend/compression.go">internal/backend/compression.go</a> b/<a href="../file/internal/backend/compression.go">internal/backend/compression.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -15,23 +15,19 @@ import (
+</a> 	&quot;unistore/schemas/service&quot;
+ )
+ 
+<a href="#h0-0-3" id="h0-0-3" class="d">-// compressorFactory packages factories for both a reader (decompressor) and writer (compressor).
+</a><a href="#h0-0-4" id="h0-0-4" class="d">-type compressorFactory struct {
+</a><a href="#h0-0-5" id="h0-0-5" class="d">-	writer func(io.Writer) (io.WriteCloser, error)
+</a><a href="#h0-0-6" id="h0-0-6" class="d">-	reader func(io.Reader) (io.ReadCloser, error)
+</a><a href="#h0-0-7" id="h0-0-7" class="d">-}
+</a><a href="#h0-0-8" id="h0-0-8" class="d">-
+</a> // Compression is a Backend that performs in-flight compression and decompression of get and put
+ // data payloads.
+ type Compression struct {
+<a href="#h0-0-12" id="h0-0-12" class="d">-	compressor compressorFactory
+</a><a href="#h0-0-13" id="h0-0-13" class="i">+	compressor   func(io.Writer) (io.WriteCloser, error)
+</a><a href="#h0-0-14" id="h0-0-14" class="i">+	decompressor func(io.Reader) (io.ReadCloser, error)
+</a> 	Backend
+ }
+ 
+ // NewCompression creates a new Compression with the specified algorithm and compression level.
+ func NewCompression(algorithm string, level int, backend Backend) (Backend, error) {
+<a href="#h0-0-20" id="h0-0-20" class="d">-	var compressor compressorFactory
+</a> 	var parsed common.Compression
+<a href="#h0-0-22" id="h0-0-22" class="i">+	var compressor func(io.Writer) (io.WriteCloser, error)
+</a><a href="#h0-0-23" id="h0-0-23" class="i">+	var decompressor func(io.Reader) (io.ReadCloser, error)
+</a> 
+ 	if c, ok := common.Compression_value[strings.ToUpper(algorithm)]; ok {
+ 		parsed = common.Compression(c)
+<a href="#h0-1" id="h0-1" class="h">@@ -41,23 +37,23 @@ func NewCompression(algorithm string, level int, backend Backend) (Backend, erro
+</a> 
+ 	switch parsed {
+ 	case common.Compression_GZIP:
+<a href="#h0-1-3" id="h0-1-3" class="d">-		compressor = compressorFactory{
+</a><a href="#h0-1-4" id="h0-1-4" class="d">-			writer: func(raw io.Writer) (io.WriteCloser, error) {
+</a><a href="#h0-1-5" id="h0-1-5" class="d">-				if level == 0 {
+</a><a href="#h0-1-6" id="h0-1-6" class="d">-					level = gzip.DefaultCompression
+</a><a href="#h0-1-7" id="h0-1-7" class="d">-				}
+</a><a href="#h0-1-8" id="h0-1-8" class="i">+		compressor = func(raw io.Writer) (io.WriteCloser, error) {
+</a><a href="#h0-1-9" id="h0-1-9" class="i">+			if level == 0 {
+</a><a href="#h0-1-10" id="h0-1-10" class="i">+				level = gzip.DefaultCompression
+</a><a href="#h0-1-11" id="h0-1-11" class="i">+			}
+</a><a href="#h0-1-12" id="h0-1-12" class="i">+
+</a><a href="#h0-1-13" id="h0-1-13" class="i">+			return gzip.NewWriterLevel(raw, level)
+</a><a href="#h0-1-14" id="h0-1-14" class="i">+		}
+</a> 
+<a href="#h0-1-16" id="h0-1-16" class="d">-				return gzip.NewWriterLevel(raw, level)
+</a><a href="#h0-1-17" id="h0-1-17" class="d">-			},
+</a><a href="#h0-1-18" id="h0-1-18" class="d">-			reader: func(raw io.Reader) (io.ReadCloser, error) {
+</a><a href="#h0-1-19" id="h0-1-19" class="d">-				return gzip.NewReader(raw)
+</a><a href="#h0-1-20" id="h0-1-20" class="d">-			},
+</a><a href="#h0-1-21" id="h0-1-21" class="i">+		decompressor = func(raw io.Reader) (io.ReadCloser, error) {
+</a><a href="#h0-1-22" id="h0-1-22" class="i">+			return gzip.NewReader(raw)
+</a> 		}
+ 	}
+ 
+ 	return &amp;Compression{
+<a href="#h0-1-27" id="h0-1-27" class="d">-		compressor: compressor,
+</a><a href="#h0-1-28" id="h0-1-28" class="d">-		Backend:    backend,
+</a><a href="#h0-1-29" id="h0-1-29" class="i">+		compressor:   compressor,
+</a><a href="#h0-1-30" id="h0-1-30" class="i">+		decompressor: decompressor,
+</a><a href="#h0-1-31" id="h0-1-31" class="i">+		Backend:      backend,
+</a> 	}, nil
+ }
+ 
+<a href="#h0-2" id="h0-2" class="h">@@ -69,7 +65,7 @@ func (c *Compression) GetObject(request *service.GetObjectRequest) (*service.Get
+</a> 		return nil, err
+ 	}
+ 
+<a href="#h0-2-3" id="h0-2-3" class="d">-	decompressed, err := c.compressor.reader(bytes.NewReader(resp.Data))
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+	decompressed, err := c.decompressor(bytes.NewReader(resp.Data))
+</a> 	if err != nil {
+ 		return nil, status.Error(codes.Internal, err.Error())
+ 	}
+<a href="#h0-3" id="h0-3" class="h">@@ -115,7 +111,7 @@ func (c *Compression) StreamGetObject(request *service.GetObjectStreamRequest) (
+</a> 	go func() {
+ 		var offset int
+ 
+<a href="#h0-3-3" id="h0-3-3" class="d">-		decompressed, err := c.compressor.reader(r)
+</a><a href="#h0-3-4" id="h0-3-4" class="i">+		decompressed, err := c.decompressor(r)
+</a> 		if err != nil {
+ 			log.Printf(&quot;backend: error creating compressor: err=%v&quot;, err)
+ 			return
+<a href="#h0-4" id="h0-4" class="h">@@ -163,7 +159,7 @@ func (c *Compression) PutObject(request *service.PutObjectRequest) (*service.Put
+</a> 	errs := make(chan error, 2)
+ 	compressedReader, compressedWriter := io.Pipe()
+ 
+<a href="#h0-4-3" id="h0-4-3" class="d">-	plaintext, err := c.compressor.writer(compressedWriter)
+</a><a href="#h0-4-4" id="h0-4-4" class="i">+	plaintext, err := c.compressor(compressedWriter)
+</a> 	if err != nil {
+ 		return nil, status.Error(codes.Internal, err.Error())
+ 	}
+<a href="#h0-5" id="h0-5" class="h">@@ -235,7 +231,7 @@ func (c *Compression) StreamPutObject(stream chan *service.PutObjectStreamReques
+</a> 	}()
+ 
+ 	go func() {
+<a href="#h0-5-3" id="h0-5-3" class="d">-		plaintext, err := c.compressor.writer(compressedWriter)
+</a><a href="#h0-5-4" id="h0-5-4" class="i">+		plaintext, err := c.compressor(compressedWriter)
+</a> 		if err != nil {
+ 			log.Printf(&quot;backend: error creating compressor: err=%v&quot;, err)
+ 			return
+</pre>
+</div>
+</body>
+</html>

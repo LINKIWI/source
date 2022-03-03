@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>render.go - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../../../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../../../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../../../log">Log</a> | <a href="../../../files">Files</a> | <a href="../../../refs">Refs</a> | <a href="../../../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<p>cmd/unistore-cli/<strong>render.go</strong> (8281B) (<a href="../../../raw/cmd/unistore-cli/render.go">raw</a>) (<a href="../../../file/cmd/unistore-cli/render.go">file</a>)</p><hr/>
+<table id="blob">
+<tr>
+<td><a href="../../../commit/6cf9e636c8eb0b09381d35619a44380d899140dc">6cf9e636c8eb0b09381d35619a44380d899140dc</a></td><td>[Fri 31 Dec 2021 18:14:01 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l1" class="line" id="l1">      1</a> package main</pre></td></tr>
+<tr>
+<td><a href="../../../commit/6cf9e636c8eb0b09381d35619a44380d899140dc">6cf9e636c8eb0b09381d35619a44380d899140dc</a></td><td>[Fri 31 Dec 2021 18:14:01 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l2" class="line" id="l2">      2</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/6cf9e636c8eb0b09381d35619a44380d899140dc">6cf9e636c8eb0b09381d35619a44380d899140dc</a></td><td>[Fri 31 Dec 2021 18:14:01 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l3" class="line" id="l3">      3</a> import (</pre></td></tr>
+<tr>
+<td><a href="../../../commit/6cf9e636c8eb0b09381d35619a44380d899140dc">6cf9e636c8eb0b09381d35619a44380d899140dc</a></td><td>[Fri 31 Dec 2021 18:14:01 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l4" class="line" id="l4">      4</a> 	&quot;encoding/json&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l5" class="line" id="l5">      5</a> 	&quot;errors&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/6cf9e636c8eb0b09381d35619a44380d899140dc">6cf9e636c8eb0b09381d35619a44380d899140dc</a></td><td>[Fri 31 Dec 2021 18:14:01 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l6" class="line" id="l6">      6</a> 	&quot;fmt&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/6cf9e636c8eb0b09381d35619a44380d899140dc">6cf9e636c8eb0b09381d35619a44380d899140dc</a></td><td>[Fri 31 Dec 2021 18:14:01 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l7" class="line" id="l7">      7</a> 	&quot;io&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/71c814bd038605f9c1e94148beb759c745ef5650">71c814bd038605f9c1e94148beb759c745ef5650</a></td><td>[Sat  8 Jan 2022 12:18:03 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l8" class="line" id="l8">      8</a> 	&quot;sort&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/be3fd4b201e55024e119b811a03be3eb8df63365">be3fd4b201e55024e119b811a03be3eb8df63365</a></td><td>[Sat  1 Jan 2022 19:16:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l9" class="line" id="l9">      9</a> 	&quot;strings&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/71c814bd038605f9c1e94148beb759c745ef5650">71c814bd038605f9c1e94148beb759c745ef5650</a></td><td>[Sat  8 Jan 2022 12:18:03 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l10" class="line" id="l10">     10</a> 	&quot;time&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/6cf9e636c8eb0b09381d35619a44380d899140dc">6cf9e636c8eb0b09381d35619a44380d899140dc</a></td><td>[Fri 31 Dec 2021 18:14:01 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l11" class="line" id="l11">     11</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/71c814bd038605f9c1e94148beb759c745ef5650">71c814bd038605f9c1e94148beb759c745ef5650</a></td><td>[Sat  8 Jan 2022 12:18:03 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l12" class="line" id="l12">     12</a> 	&quot;github.com/dustin/go-humanize&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/6cf9e636c8eb0b09381d35619a44380d899140dc">6cf9e636c8eb0b09381d35619a44380d899140dc</a></td><td>[Fri 31 Dec 2021 18:14:01 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l13" class="line" id="l13">     13</a> 	&quot;google.golang.org/protobuf/encoding/prototext&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/6cf9e636c8eb0b09381d35619a44380d899140dc">6cf9e636c8eb0b09381d35619a44380d899140dc</a></td><td>[Fri 31 Dec 2021 18:14:01 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l14" class="line" id="l14">     14</a> 	&quot;google.golang.org/protobuf/proto&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/be3fd4b201e55024e119b811a03be3eb8df63365">be3fd4b201e55024e119b811a03be3eb8df63365</a></td><td>[Sat  1 Jan 2022 19:16:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l15" class="line" id="l15">     15</a> 	&quot;gopkg.in/yaml.v3&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/71c814bd038605f9c1e94148beb759c745ef5650">71c814bd038605f9c1e94148beb759c745ef5650</a></td><td>[Sat  8 Jan 2022 12:18:03 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l16" class="line" id="l16">     16</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/71c814bd038605f9c1e94148beb759c745ef5650">71c814bd038605f9c1e94148beb759c745ef5650</a></td><td>[Sat  8 Jan 2022 12:18:03 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l17" class="line" id="l17">     17</a> 	&quot;unistore/schemas/common&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/71c814bd038605f9c1e94148beb759c745ef5650">71c814bd038605f9c1e94148beb759c745ef5650</a></td><td>[Sat  8 Jan 2022 12:18:03 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l18" class="line" id="l18">     18</a> 	&quot;unistore/schemas/service&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/6cf9e636c8eb0b09381d35619a44380d899140dc">6cf9e636c8eb0b09381d35619a44380d899140dc</a></td><td>[Fri 31 Dec 2021 18:14:01 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l19" class="line" id="l19">     19</a> )</pre></td></tr>
+<tr>
+<td><a href="../../../commit/6cf9e636c8eb0b09381d35619a44380d899140dc">6cf9e636c8eb0b09381d35619a44380d899140dc</a></td><td>[Fri 31 Dec 2021 18:14:01 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l20" class="line" id="l20">     20</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/be3fd4b201e55024e119b811a03be3eb8df63365">be3fd4b201e55024e119b811a03be3eb8df63365</a></td><td>[Sat  1 Jan 2022 19:16:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l21" class="line" id="l21">     21</a> // List of known console output formats.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/be3fd4b201e55024e119b811a03be3eb8df63365">be3fd4b201e55024e119b811a03be3eb8df63365</a></td><td>[Sat  1 Jan 2022 19:16:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l22" class="line" id="l22">     22</a> const (</pre></td></tr>
+<tr>
+<td><a href="../../../commit/be3fd4b201e55024e119b811a03be3eb8df63365">be3fd4b201e55024e119b811a03be3eb8df63365</a></td><td>[Sat  1 Jan 2022 19:16:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l23" class="line" id="l23">     23</a> 	outputFormatJSON    = &quot;json&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/be3fd4b201e55024e119b811a03be3eb8df63365">be3fd4b201e55024e119b811a03be3eb8df63365</a></td><td>[Sat  1 Jan 2022 19:16:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l24" class="line" id="l24">     24</a> 	outputFormatText    = &quot;text&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/be3fd4b201e55024e119b811a03be3eb8df63365">be3fd4b201e55024e119b811a03be3eb8df63365</a></td><td>[Sat  1 Jan 2022 19:16:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l25" class="line" id="l25">     25</a> 	outputFormatYAML    = &quot;yaml&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l26" class="line" id="l26">     26</a> 	outputFormatHuman   = &quot;human&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/be3fd4b201e55024e119b811a03be3eb8df63365">be3fd4b201e55024e119b811a03be3eb8df63365</a></td><td>[Sat  1 Jan 2022 19:16:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l27" class="line" id="l27">     27</a> 	outputFormatDefault = &quot;&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/be3fd4b201e55024e119b811a03be3eb8df63365">be3fd4b201e55024e119b811a03be3eb8df63365</a></td><td>[Sat  1 Jan 2022 19:16:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l28" class="line" id="l28">     28</a> )</pre></td></tr>
+<tr>
+<td><a href="../../../commit/be3fd4b201e55024e119b811a03be3eb8df63365">be3fd4b201e55024e119b811a03be3eb8df63365</a></td><td>[Sat  1 Jan 2022 19:16:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l29" class="line" id="l29">     29</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/be3fd4b201e55024e119b811a03be3eb8df63365">be3fd4b201e55024e119b811a03be3eb8df63365</a></td><td>[Sat  1 Jan 2022 19:16:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l30" class="line" id="l30">     30</a> const (</pre></td></tr>
+<tr>
+<td><a href="../../../commit/6cf9e636c8eb0b09381d35619a44380d899140dc">6cf9e636c8eb0b09381d35619a44380d899140dc</a></td><td>[Fri 31 Dec 2021 18:14:01 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l31" class="line" id="l31">     31</a> 	// Default rendering indentation level; four spaces.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/6cf9e636c8eb0b09381d35619a44380d899140dc">6cf9e636c8eb0b09381d35619a44380d899140dc</a></td><td>[Fri 31 Dec 2021 18:14:01 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l32" class="line" id="l32">     32</a> 	defaultIndent = &quot;    &quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/6cf9e636c8eb0b09381d35619a44380d899140dc">6cf9e636c8eb0b09381d35619a44380d899140dc</a></td><td>[Fri 31 Dec 2021 18:14:01 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l33" class="line" id="l33">     33</a> )</pre></td></tr>
+<tr>
+<td><a href="../../../commit/6cf9e636c8eb0b09381d35619a44380d899140dc">6cf9e636c8eb0b09381d35619a44380d899140dc</a></td><td>[Fri 31 Dec 2021 18:14:01 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l34" class="line" id="l34">     34</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l35" class="line" id="l35">     35</a> var (</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l36" class="line" id="l36">     36</a> 	// errUnsupportedMessage is returned when attempting to use a format renderer with no</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l37" class="line" id="l37">     37</a> 	// implementation for the accepted message type.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l38" class="line" id="l38">     38</a> 	errUnsupportedMessage = errors.New(&quot;unsupported message type for format renderer&quot;)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l39" class="line" id="l39">     39</a> )</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l40" class="line" id="l40">     40</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l41" class="line" id="l41">     41</a> // renderer provides the capability to render formatted messages to an output.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l42" class="line" id="l42">     42</a> type renderer interface {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l43" class="line" id="l43">     43</a> 	// proto is used for rendering Protobuf messages.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l44" class="line" id="l44">     44</a> 	proto(message proto.Message) error</pre></td></tr>
+<tr>
+<td><a href="../../../commit/6cf9e636c8eb0b09381d35619a44380d899140dc">6cf9e636c8eb0b09381d35619a44380d899140dc</a></td><td>[Fri 31 Dec 2021 18:14:01 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l45" class="line" id="l45">     45</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l46" class="line" id="l46">     46</a> 	// any is used for interface{} messages of arbitrary type.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l47" class="line" id="l47">     47</a> 	any(message interface{}) error</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l48" class="line" id="l48">     48</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l49" class="line" id="l49">     49</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l50" class="line" id="l50">     50</a> // newRenderer creates a new renderer for the desired output format.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l51" class="line" id="l51">     51</a> func newRenderer(format string, output io.Writer) renderer {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/6cf9e636c8eb0b09381d35619a44380d899140dc">6cf9e636c8eb0b09381d35619a44380d899140dc</a></td><td>[Fri 31 Dec 2021 18:14:01 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l52" class="line" id="l52">     52</a> 	switch format {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/be3fd4b201e55024e119b811a03be3eb8df63365">be3fd4b201e55024e119b811a03be3eb8df63365</a></td><td>[Sat  1 Jan 2022 19:16:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l53" class="line" id="l53">     53</a> 	case outputFormatJSON:</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l54" class="line" id="l54">     54</a> 		return &amp;jsonRenderer{output}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/be3fd4b201e55024e119b811a03be3eb8df63365">be3fd4b201e55024e119b811a03be3eb8df63365</a></td><td>[Sat  1 Jan 2022 19:16:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l55" class="line" id="l55">     55</a> 	case outputFormatYAML:</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l56" class="line" id="l56">     56</a> 		return &amp;yamlRenderer{output}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l57" class="line" id="l57">     57</a> 	case outputFormatHuman:</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l58" class="line" id="l58">     58</a> 		return &amp;humanRenderer{output}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/be3fd4b201e55024e119b811a03be3eb8df63365">be3fd4b201e55024e119b811a03be3eb8df63365</a></td><td>[Sat  1 Jan 2022 19:16:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l59" class="line" id="l59">     59</a> 	case outputFormatDefault, outputFormatText:</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l60" class="line" id="l60">     60</a> 		return &amp;textRenderer{output}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l61" class="line" id="l61">     61</a> 	default:</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l62" class="line" id="l62">     62</a> 		return &amp;defaultRenderer{output}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l63" class="line" id="l63">     63</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l64" class="line" id="l64">     64</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l65" class="line" id="l65">     65</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l66" class="line" id="l66">     66</a> // defaultRenderer is a default implementation for unknown output formats.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l67" class="line" id="l67">     67</a> type defaultRenderer struct {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l68" class="line" id="l68">     68</a> 	output io.Writer</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l69" class="line" id="l69">     69</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../commit/6cf9e636c8eb0b09381d35619a44380d899140dc">6cf9e636c8eb0b09381d35619a44380d899140dc</a></td><td>[Fri 31 Dec 2021 18:14:01 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l70" class="line" id="l70">     70</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l71" class="line" id="l71">     71</a> // proto errors with errUnsupportedMessage.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l72" class="line" id="l72">     72</a> func (d *defaultRenderer) proto(message proto.Message) error {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l73" class="line" id="l73">     73</a> 	return errUnsupportedMessage</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l74" class="line" id="l74">     74</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../commit/be3fd4b201e55024e119b811a03be3eb8df63365">be3fd4b201e55024e119b811a03be3eb8df63365</a></td><td>[Sat  1 Jan 2022 19:16:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l75" class="line" id="l75">     75</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l76" class="line" id="l76">     76</a> // any errors with errUnsupportedMessage.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l77" class="line" id="l77">     77</a> func (d *defaultRenderer) any(message interface{}) error {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l78" class="line" id="l78">     78</a> 	return errUnsupportedMessage</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l79" class="line" id="l79">     79</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../commit/6cf9e636c8eb0b09381d35619a44380d899140dc">6cf9e636c8eb0b09381d35619a44380d899140dc</a></td><td>[Fri 31 Dec 2021 18:14:01 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l80" class="line" id="l80">     80</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l81" class="line" id="l81">     81</a> // jsonRenderer is a JSON renderer.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l82" class="line" id="l82">     82</a> type jsonRenderer struct {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l83" class="line" id="l83">     83</a> 	output io.Writer</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l84" class="line" id="l84">     84</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l85" class="line" id="l85">     85</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l86" class="line" id="l86">     86</a> // proto reuses the implementation for interface{} types.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l87" class="line" id="l87">     87</a> func (j *jsonRenderer) proto(message proto.Message) error {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l88" class="line" id="l88">     88</a> 	return j.any(message)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l89" class="line" id="l89">     89</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l90" class="line" id="l90">     90</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l91" class="line" id="l91">     91</a> // any marshals any type implementing json.Marshaler or any struct with JSON tags.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l92" class="line" id="l92">     92</a> func (j *jsonRenderer) any(message interface{}) error {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l93" class="line" id="l93">     93</a> 	rendered, err := json.MarshalIndent(message, &quot;&quot;, defaultIndent)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l94" class="line" id="l94">     94</a> 	if err != nil {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l95" class="line" id="l95">     95</a> 		return err</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l96" class="line" id="l96">     96</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l97" class="line" id="l97">     97</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l98" class="line" id="l98">     98</a> 	_, err = fmt.Fprintln(j.output, strings.TrimSpace(string(rendered)))</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l99" class="line" id="l99">     99</a> 	return err</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l100" class="line" id="l100">    100</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l101" class="line" id="l101">    101</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l102" class="line" id="l102">    102</a> // yamlRenderer is a YAML renderer.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l103" class="line" id="l103">    103</a> type yamlRenderer struct {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l104" class="line" id="l104">    104</a> 	output io.Writer</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l105" class="line" id="l105">    105</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l106" class="line" id="l106">    106</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l107" class="line" id="l107">    107</a> // proto errors with errUnsupportedMessage.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l108" class="line" id="l108">    108</a> // Go-generated code from Protobuf message do not include YAML tags.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l109" class="line" id="l109">    109</a> func (y *yamlRenderer) proto(message proto.Message) error {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l110" class="line" id="l110">    110</a> 	return errUnsupportedMessage</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l111" class="line" id="l111">    111</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l112" class="line" id="l112">    112</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l113" class="line" id="l113">    113</a> // any marshals any type implementing yaml.Marshaler or any struct with YAML tags.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l114" class="line" id="l114">    114</a> func (y *yamlRenderer) any(message interface{}) error {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c4d9b2d95073de52dc5dc24edced9be9b4e9989a">c4d9b2d95073de52dc5dc24edced9be9b4e9989a</a></td><td>[Sat  8 Jan 2022 12:20:10 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l115" class="line" id="l115">    115</a> 	encoder := yaml.NewEncoder(y.output)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c4d9b2d95073de52dc5dc24edced9be9b4e9989a">c4d9b2d95073de52dc5dc24edced9be9b4e9989a</a></td><td>[Sat  8 Jan 2022 12:20:10 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l116" class="line" id="l116">    116</a> 	encoder.SetIndent(len(defaultIndent))</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c4d9b2d95073de52dc5dc24edced9be9b4e9989a">c4d9b2d95073de52dc5dc24edced9be9b4e9989a</a></td><td>[Sat  8 Jan 2022 12:20:10 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l117" class="line" id="l117">    117</a> 	return encoder.Encode(message)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l118" class="line" id="l118">    118</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l119" class="line" id="l119">    119</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l120" class="line" id="l120">    120</a> // textRenderer is a Protobuf textproto format renderer.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l121" class="line" id="l121">    121</a> type textRenderer struct {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l122" class="line" id="l122">    122</a> 	output io.Writer</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l123" class="line" id="l123">    123</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l124" class="line" id="l124">    124</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l125" class="line" id="l125">    125</a> // proto renders the message with the textproto format.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l126" class="line" id="l126">    126</a> func (t *textRenderer) proto(message proto.Message) error {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l127" class="line" id="l127">    127</a> 	opts := prototext.MarshalOptions{</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l128" class="line" id="l128">    128</a> 		Multiline: true,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l129" class="line" id="l129">    129</a> 		Indent:    defaultIndent,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/6cf9e636c8eb0b09381d35619a44380d899140dc">6cf9e636c8eb0b09381d35619a44380d899140dc</a></td><td>[Fri 31 Dec 2021 18:14:01 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l130" class="line" id="l130">    130</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/6cf9e636c8eb0b09381d35619a44380d899140dc">6cf9e636c8eb0b09381d35619a44380d899140dc</a></td><td>[Fri 31 Dec 2021 18:14:01 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l131" class="line" id="l131">    131</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l132" class="line" id="l132">    132</a> 	rendered, err := opts.Marshal(message)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l133" class="line" id="l133">    133</a> 	if err != nil {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l134" class="line" id="l134">    134</a> 		return err</pre></td></tr>
+<tr>
+<td><a href="../../../commit/6cf9e636c8eb0b09381d35619a44380d899140dc">6cf9e636c8eb0b09381d35619a44380d899140dc</a></td><td>[Fri 31 Dec 2021 18:14:01 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l135" class="line" id="l135">    135</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/6cf9e636c8eb0b09381d35619a44380d899140dc">6cf9e636c8eb0b09381d35619a44380d899140dc</a></td><td>[Fri 31 Dec 2021 18:14:01 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l136" class="line" id="l136">    136</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l137" class="line" id="l137">    137</a> 	_, err = fmt.Fprintln(t.output, strings.TrimSpace(string(rendered)))</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l138" class="line" id="l138">    138</a> 	return err</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l139" class="line" id="l139">    139</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l140" class="line" id="l140">    140</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l141" class="line" id="l141">    141</a> // any errors with errUnsupportedMessage.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l142" class="line" id="l142">    142</a> func (t *textRenderer) any(message interface{}) error {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l143" class="line" id="l143">    143</a> 	return errUnsupportedMessage</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l144" class="line" id="l144">    144</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l145" class="line" id="l145">    145</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l146" class="line" id="l146">    146</a> // humanRenderer is a message type-dependent renderer expressing messages in an easily</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l147" class="line" id="l147">    147</a> // human-readable form. Implementations are defined manually by message type.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l148" class="line" id="l148">    148</a> type humanRenderer struct {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l149" class="line" id="l149">    149</a> 	output io.Writer</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l150" class="line" id="l150">    150</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l151" class="line" id="l151">    151</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/71c814bd038605f9c1e94148beb759c745ef5650">71c814bd038605f9c1e94148beb759c745ef5650</a></td><td>[Sat  8 Jan 2022 12:18:03 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l152" class="line" id="l152">    152</a> // proto renders a human-readable representation of supported Protobuf messages.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l153" class="line" id="l153">    153</a> func (h *humanRenderer) proto(message proto.Message) error {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/71c814bd038605f9c1e94148beb759c745ef5650">71c814bd038605f9c1e94148beb759c745ef5650</a></td><td>[Sat  8 Jan 2022 12:18:03 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l154" class="line" id="l154">    154</a> 	switch m := message.(type) {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l155" class="line" id="l155">    155</a> 	case *service.InfoResponse:</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l156" class="line" id="l156">    156</a> 		return h.protoInfoResponse(m)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/e0ffabff983d2b9e0da3ad8a606e1c34712b3acf">e0ffabff983d2b9e0da3ad8a606e1c34712b3acf</a></td><td>[Mon 17 Jan 2022 13:48:25 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l157" class="line" id="l157">    157</a> 	case *service.ListBucketsResponse:</pre></td></tr>
+<tr>
+<td><a href="../../../commit/e0ffabff983d2b9e0da3ad8a606e1c34712b3acf">e0ffabff983d2b9e0da3ad8a606e1c34712b3acf</a></td><td>[Mon 17 Jan 2022 13:48:25 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l158" class="line" id="l158">    158</a> 		return h.protoListBucketsResponse(m)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/71c814bd038605f9c1e94148beb759c745ef5650">71c814bd038605f9c1e94148beb759c745ef5650</a></td><td>[Sat  8 Jan 2022 12:18:03 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l159" class="line" id="l159">    159</a> 	case *service.ListObjectsResponse:</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l160" class="line" id="l160">    160</a> 		return h.protoListObjectsResponse(m)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l161" class="line" id="l161">    161</a> 	default:</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l162" class="line" id="l162">    162</a> 		return errUnsupportedMessage</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l163" class="line" id="l163">    163</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l164" class="line" id="l164">    164</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l165" class="line" id="l165">    165</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l166" class="line" id="l166">    166</a> // protoInfoResponse renders a service.InfoResponse.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l167" class="line" id="l167">    167</a> func (h *humanRenderer) protoInfoResponse(response *service.InfoResponse) error {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l168" class="line" id="l168">    168</a> 	var renderNode func(node *common.Node) []string</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l169" class="line" id="l169">    169</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l170" class="line" id="l170">    170</a> 	renderNode = func(node *common.Node) []string {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l171" class="line" id="l171">    171</a> 		var out []string</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l172" class="line" id="l172">    172</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l173" class="line" id="l173">    173</a> 		childrenConstants := make(map[string]string)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l174" class="line" id="l174">    174</a> 		childrenNodes := make(map[string]*common.Node)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l175" class="line" id="l175">    175</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l176" class="line" id="l176">    176</a> 		for param, value := range node.Children {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l177" class="line" id="l177">    177</a> 			switch c := value.Child.(type) {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l178" class="line" id="l178">    178</a> 			case *common.Node_Value_Value:</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l179" class="line" id="l179">    179</a> 				childrenConstants[param] = c.Value</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l180" class="line" id="l180">    180</a> 			case *common.Node_Value_Node:</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l181" class="line" id="l181">    181</a> 				childrenNodes[param] = c.Node</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l182" class="line" id="l182">    182</a> 			}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l183" class="line" id="l183">    183</a> 		}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l184" class="line" id="l184">    184</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l185" class="line" id="l185">    185</a> 		if len(childrenConstants) &gt; 0 {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l186" class="line" id="l186">    186</a> 			var params []string</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l187" class="line" id="l187">    187</a> 			for param, value := range childrenConstants {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l188" class="line" id="l188">    188</a> 				params = append(params, fmt.Sprintf(&quot;%s: %s&quot;, param, value))</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l189" class="line" id="l189">    189</a> 			}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l190" class="line" id="l190">    190</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l191" class="line" id="l191">    191</a> 			out = append(out, fmt.Sprintf(&quot;%s [%s]&quot;, node.Name, strings.Join(params, &quot;, &quot;)))</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l192" class="line" id="l192">    192</a> 		} else {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l193" class="line" id="l193">    193</a> 			out = append(out, node.Name)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l194" class="line" id="l194">    194</a> 		}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l195" class="line" id="l195">    195</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l196" class="line" id="l196">    196</a> 		for _, n := range childrenNodes {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l197" class="line" id="l197">    197</a> 			for _, line := range renderNode(n) {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l198" class="line" id="l198">    198</a> 				out = append(out, fmt.Sprintf(&quot;%s%s&quot;, defaultIndent, line))</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l199" class="line" id="l199">    199</a> 			}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l200" class="line" id="l200">    200</a> 		}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l201" class="line" id="l201">    201</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l202" class="line" id="l202">    202</a> 		return out</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l203" class="line" id="l203">    203</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l204" class="line" id="l204">    204</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l205" class="line" id="l205">    205</a> 	fmt.Fprintln(h.output, &quot;server version:&quot;)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l206" class="line" id="l206">    206</a> 	fmt.Fprintf(h.output, &quot;%sunistore/%s\n\n&quot;, defaultIndent, response.Version)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l207" class="line" id="l207">    207</a> 	fmt.Fprintln(h.output, &quot;server listener:&quot;)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l208" class="line" id="l208">    208</a> 	fmt.Fprintf(h.output, &quot;%s%s\n\n&quot;, defaultIndent, response.Address)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l209" class="line" id="l209">    209</a> 	fmt.Fprintln(h.output, &quot;server backend composition tree:&quot;)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l210" class="line" id="l210">    210</a> 	for _, line := range renderNode(response.Backend) {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l211" class="line" id="l211">    211</a> 		fmt.Fprintf(h.output, &quot;%s%s\n&quot;, defaultIndent, line)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l212" class="line" id="l212">    212</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l213" class="line" id="l213">    213</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l214" class="line" id="l214">    214</a> 	return nil</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l215" class="line" id="l215">    215</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a></td><td>[Sat  8 Jan 2022 13:38:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l216" class="line" id="l216">    216</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/e0ffabff983d2b9e0da3ad8a606e1c34712b3acf">e0ffabff983d2b9e0da3ad8a606e1c34712b3acf</a></td><td>[Mon 17 Jan 2022 13:48:25 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l217" class="line" id="l217">    217</a> // protoListBucketsResponse renders a service.ListBucketsResponse.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/e0ffabff983d2b9e0da3ad8a606e1c34712b3acf">e0ffabff983d2b9e0da3ad8a606e1c34712b3acf</a></td><td>[Mon 17 Jan 2022 13:48:25 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l218" class="line" id="l218">    218</a> func (h *humanRenderer) protoListBucketsResponse(response *service.ListBucketsResponse) error {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/e0ffabff983d2b9e0da3ad8a606e1c34712b3acf">e0ffabff983d2b9e0da3ad8a606e1c34712b3acf</a></td><td>[Mon 17 Jan 2022 13:48:25 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l219" class="line" id="l219">    219</a> 	var objects service.ListObjectsResponse</pre></td></tr>
+<tr>
+<td><a href="../../../commit/e0ffabff983d2b9e0da3ad8a606e1c34712b3acf">e0ffabff983d2b9e0da3ad8a606e1c34712b3acf</a></td><td>[Mon 17 Jan 2022 13:48:25 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l220" class="line" id="l220">    220</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/e0ffabff983d2b9e0da3ad8a606e1c34712b3acf">e0ffabff983d2b9e0da3ad8a606e1c34712b3acf</a></td><td>[Mon 17 Jan 2022 13:48:25 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l221" class="line" id="l221">    221</a> 	// Reuse the existing renderer for ListObjects by reshaping the ListBuckets response to</pre></td></tr>
+<tr>
+<td><a href="../../../commit/e0ffabff983d2b9e0da3ad8a606e1c34712b3acf">e0ffabff983d2b9e0da3ad8a606e1c34712b3acf</a></td><td>[Mon 17 Jan 2022 13:48:25 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l222" class="line" id="l222">    222</a> 	// a list of objects with Object.DIRECTORY type.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/e0ffabff983d2b9e0da3ad8a606e1c34712b3acf">e0ffabff983d2b9e0da3ad8a606e1c34712b3acf</a></td><td>[Mon 17 Jan 2022 13:48:25 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l223" class="line" id="l223">    223</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/e0ffabff983d2b9e0da3ad8a606e1c34712b3acf">e0ffabff983d2b9e0da3ad8a606e1c34712b3acf</a></td><td>[Mon 17 Jan 2022 13:48:25 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l224" class="line" id="l224">    224</a> 	for _, bucket := range response.Buckets {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/e0ffabff983d2b9e0da3ad8a606e1c34712b3acf">e0ffabff983d2b9e0da3ad8a606e1c34712b3acf</a></td><td>[Mon 17 Jan 2022 13:48:25 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l225" class="line" id="l225">    225</a> 		head := &amp;service.HeadObjectResponse{</pre></td></tr>
+<tr>
+<td><a href="../../../commit/e0ffabff983d2b9e0da3ad8a606e1c34712b3acf">e0ffabff983d2b9e0da3ad8a606e1c34712b3acf</a></td><td>[Mon 17 Jan 2022 13:48:25 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l226" class="line" id="l226">    226</a> 			Metadata: &amp;common.Metadata{</pre></td></tr>
+<tr>
+<td><a href="../../../commit/e0ffabff983d2b9e0da3ad8a606e1c34712b3acf">e0ffabff983d2b9e0da3ad8a606e1c34712b3acf</a></td><td>[Mon 17 Jan 2022 13:48:25 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l227" class="line" id="l227">    227</a> 				Key:          bucket.Bucket.Name,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/e0ffabff983d2b9e0da3ad8a606e1c34712b3acf">e0ffabff983d2b9e0da3ad8a606e1c34712b3acf</a></td><td>[Mon 17 Jan 2022 13:48:25 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l228" class="line" id="l228">    228</a> 				ModifiedTime: bucket.Bucket.Timestamp,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/e0ffabff983d2b9e0da3ad8a606e1c34712b3acf">e0ffabff983d2b9e0da3ad8a606e1c34712b3acf</a></td><td>[Mon 17 Jan 2022 13:48:25 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l229" class="line" id="l229">    229</a> 				ObjectType:   common.Object_DIRECTORY,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/e0ffabff983d2b9e0da3ad8a606e1c34712b3acf">e0ffabff983d2b9e0da3ad8a606e1c34712b3acf</a></td><td>[Mon 17 Jan 2022 13:48:25 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l230" class="line" id="l230">    230</a> 			},</pre></td></tr>
+<tr>
+<td><a href="../../../commit/e0ffabff983d2b9e0da3ad8a606e1c34712b3acf">e0ffabff983d2b9e0da3ad8a606e1c34712b3acf</a></td><td>[Mon 17 Jan 2022 13:48:25 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l231" class="line" id="l231">    231</a> 		}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/e0ffabff983d2b9e0da3ad8a606e1c34712b3acf">e0ffabff983d2b9e0da3ad8a606e1c34712b3acf</a></td><td>[Mon 17 Jan 2022 13:48:25 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l232" class="line" id="l232">    232</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/e0ffabff983d2b9e0da3ad8a606e1c34712b3acf">e0ffabff983d2b9e0da3ad8a606e1c34712b3acf</a></td><td>[Mon 17 Jan 2022 13:48:25 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l233" class="line" id="l233">    233</a> 		objects.Objects = append(objects.Objects, head)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/e0ffabff983d2b9e0da3ad8a606e1c34712b3acf">e0ffabff983d2b9e0da3ad8a606e1c34712b3acf</a></td><td>[Mon 17 Jan 2022 13:48:25 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l234" class="line" id="l234">    234</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/e0ffabff983d2b9e0da3ad8a606e1c34712b3acf">e0ffabff983d2b9e0da3ad8a606e1c34712b3acf</a></td><td>[Mon 17 Jan 2022 13:48:25 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l235" class="line" id="l235">    235</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/e0ffabff983d2b9e0da3ad8a606e1c34712b3acf">e0ffabff983d2b9e0da3ad8a606e1c34712b3acf</a></td><td>[Mon 17 Jan 2022 13:48:25 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l236" class="line" id="l236">    236</a> 	return h.protoListObjectsResponse(&amp;objects)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/e0ffabff983d2b9e0da3ad8a606e1c34712b3acf">e0ffabff983d2b9e0da3ad8a606e1c34712b3acf</a></td><td>[Mon 17 Jan 2022 13:48:25 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l237" class="line" id="l237">    237</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../commit/e0ffabff983d2b9e0da3ad8a606e1c34712b3acf">e0ffabff983d2b9e0da3ad8a606e1c34712b3acf</a></td><td>[Mon 17 Jan 2022 13:48:25 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l238" class="line" id="l238">    238</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l239" class="line" id="l239">    239</a> // protoListObjectsResponse renders a service.ListObjectsResponse.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l240" class="line" id="l240">    240</a> func (h *humanRenderer) protoListObjectsResponse(response *service.ListObjectsResponse) error {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l241" class="line" id="l241">    241</a> 	// Sort the objects alphabetically by key name, while grouping directories at the</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l242" class="line" id="l242">    242</a> 	// beginning of the list.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l243" class="line" id="l243">    243</a> 	sort.Slice(response.Objects, func(i int, j int) bool {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l244" class="line" id="l244">    244</a> 		l := response.Objects[i]</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l245" class="line" id="l245">    245</a> 		r := response.Objects[j]</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l246" class="line" id="l246">    246</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l247" class="line" id="l247">    247</a> 		if l.Metadata.ObjectType == common.Object_DIRECTORY &amp;&amp;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l248" class="line" id="l248">    248</a> 			r.Metadata.ObjectType == common.Object_DIRECTORY {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l249" class="line" id="l249">    249</a> 			// Both objects are directories; sort alphabetically</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l250" class="line" id="l250">    250</a> 			return l.Metadata.Key &lt; r.Metadata.Key</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l251" class="line" id="l251">    251</a> 		} else if l.Metadata.ObjectType == common.Object_DIRECTORY {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l252" class="line" id="l252">    252</a> 			// The left object is a directory; always prefer it</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l253" class="line" id="l253">    253</a> 			return true</pre></td></tr>
+<tr>
+<td><a href="../../../commit/ab68764b2b34f853c88fc0e8fc0a38b66adf1850">ab68764b2b34f853c88fc0e8fc0a38b66adf1850</a></td><td>[Sat 15 Jan 2022 09:17:26 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l254" class="line" id="l254">    254</a> 		} else if r.Metadata.ObjectType == common.Object_DIRECTORY {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l255" class="line" id="l255">    255</a> 			// The right object is a directory; always prefer it</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l256" class="line" id="l256">    256</a> 			return false</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l257" class="line" id="l257">    257</a> 		} else {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l258" class="line" id="l258">    258</a> 			// Both objects are non-directories; sort alphabetically</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l259" class="line" id="l259">    259</a> 			return l.Metadata.Key &lt; r.Metadata.Key</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l260" class="line" id="l260">    260</a> 		}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l261" class="line" id="l261">    261</a> 	})</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l262" class="line" id="l262">    262</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l263" class="line" id="l263">    263</a> 	for _, object := range response.Objects {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l264" class="line" id="l264">    264</a> 		switch object.Metadata.ObjectType {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l265" class="line" id="l265">    265</a> 		case common.Object_DIRECTORY:</pre></td></tr>
+<tr>
+<td><a href="../../../commit/fbf71d9ffa5f7b03e5a3a2cf9e771791acd6d613">fbf71d9ffa5f7b03e5a3a2cf9e771791acd6d613</a></td><td>[Sun  9 Jan 2022 20:47:01 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l266" class="line" id="l266">    266</a> 			if !strings.HasSuffix(object.Metadata.Key, &quot;/&quot;) {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/fbf71d9ffa5f7b03e5a3a2cf9e771791acd6d613">fbf71d9ffa5f7b03e5a3a2cf9e771791acd6d613</a></td><td>[Sun  9 Jan 2022 20:47:01 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l267" class="line" id="l267">    267</a> 				object.Metadata.Key = fmt.Sprintf(&quot;%s/&quot;, object.Metadata.Key)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/fbf71d9ffa5f7b03e5a3a2cf9e771791acd6d613">fbf71d9ffa5f7b03e5a3a2cf9e771791acd6d613</a></td><td>[Sun  9 Jan 2022 20:47:01 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l268" class="line" id="l268">    268</a> 			}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/fbf71d9ffa5f7b03e5a3a2cf9e771791acd6d613">fbf71d9ffa5f7b03e5a3a2cf9e771791acd6d613</a></td><td>[Sun  9 Jan 2022 20:47:01 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l269" class="line" id="l269">    269</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l270" class="line" id="l270">    270</a> 			_, err := fmt.Fprintf(</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l271" class="line" id="l271">    271</a> 				h.output,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l272" class="line" id="l272">    272</a> 				&quot;%v\t%s\t%s\n&quot;,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l273" class="line" id="l273">    273</a> 				object.Metadata.ModifiedTime.AsTime().Format(time.RFC3339),</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l274" class="line" id="l274">    274</a> 				&quot;-&quot;,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/fbf71d9ffa5f7b03e5a3a2cf9e771791acd6d613">fbf71d9ffa5f7b03e5a3a2cf9e771791acd6d613</a></td><td>[Sun  9 Jan 2022 20:47:01 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l275" class="line" id="l275">    275</a> 				object.Metadata.Key,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l276" class="line" id="l276">    276</a> 			)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l277" class="line" id="l277">    277</a> 			if err != nil {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l278" class="line" id="l278">    278</a> 				return err</pre></td></tr>
+<tr>
+<td><a href="../../../commit/71c814bd038605f9c1e94148beb759c745ef5650">71c814bd038605f9c1e94148beb759c745ef5650</a></td><td>[Sat  8 Jan 2022 12:18:03 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l279" class="line" id="l279">    279</a> 			}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l280" class="line" id="l280">    280</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l281" class="line" id="l281">    281</a> 		case common.Object_REGULAR:</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l282" class="line" id="l282">    282</a> 			_, err := fmt.Fprintf(</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l283" class="line" id="l283">    283</a> 				h.output,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l284" class="line" id="l284">    284</a> 				&quot;%v\t%s\t%s\n&quot;,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l285" class="line" id="l285">    285</a> 				object.Metadata.ModifiedTime.AsTime().Format(time.RFC3339),</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l286" class="line" id="l286">    286</a> 				humanize.Bytes(object.Metadata.Size),</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l287" class="line" id="l287">    287</a> 				object.Metadata.Key,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l288" class="line" id="l288">    288</a> 			)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l289" class="line" id="l289">    289</a> 			if err != nil {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l290" class="line" id="l290">    290</a> 				return err</pre></td></tr>
+<tr>
+<td><a href="../../../commit/71c814bd038605f9c1e94148beb759c745ef5650">71c814bd038605f9c1e94148beb759c745ef5650</a></td><td>[Sat  8 Jan 2022 12:18:03 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l291" class="line" id="l291">    291</a> 			}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/71c814bd038605f9c1e94148beb759c745ef5650">71c814bd038605f9c1e94148beb759c745ef5650</a></td><td>[Sat  8 Jan 2022 12:18:03 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l292" class="line" id="l292">    292</a> 		}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/71c814bd038605f9c1e94148beb759c745ef5650">71c814bd038605f9c1e94148beb759c745ef5650</a></td><td>[Sat  8 Jan 2022 12:18:03 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l293" class="line" id="l293">    293</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l294" class="line" id="l294">    294</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/c89830e2e5f355c216abcc44e0c0c57c0bf8a76d">c89830e2e5f355c216abcc44e0c0c57c0bf8a76d</a></td><td>[Sat  8 Jan 2022 13:27:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l295" class="line" id="l295">    295</a> 	return nil</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l296" class="line" id="l296">    296</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l297" class="line" id="l297">    297</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l298" class="line" id="l298">    298</a> // any errors with errUnsupportedMessage.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l299" class="line" id="l299">    299</a> func (h *humanRenderer) any(message interface{}) error {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/36e219b68a3fd8e364fe489df04b5312268fa5c8">36e219b68a3fd8e364fe489df04b5312268fa5c8</a></td><td>[Sat  8 Jan 2022 12:01:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l300" class="line" id="l300">    300</a> 	return errUnsupportedMessage</pre></td></tr>
+<tr>
+<td><a href="../../../commit/6cf9e636c8eb0b09381d35619a44380d899140dc">6cf9e636c8eb0b09381d35619a44380d899140dc</a></td><td>[Fri 31 Dec 2021 18:14:01 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l301" class="line" id="l301">    301</a> }</pre></td></tr>
+</table>
+</div>
+</body>
+</html>

@@ -1,0 +1,83 @@
+syntax = "proto3";
+
+package schemas.common;
+
+option go_package = "lib.kevinlin.info/schemas/unistore/common";
+
+import "google/protobuf/timestamp.proto";
+import "schemas/common/backend.proto";
+
+// Object enumerates known object types.
+// Note that the storage backend implementation ascribes semantics to each of these fields, and a
+// particular object type designation may simply be a convenience annotation rather than an inherent
+// property of the underlying object in storage.
+enum Object {
+  // Unknown is used when the object type is unknown or when the backend does not differentiate
+  // different types of objects.
+  UNKNOWN = 0;
+  // Regular is an analog for a regular file.
+  REGULAR = 1;
+  // Directory is an analog for a directory. Unistore standardizes on the use of "/" as the
+  // canonical delimiter for directories.
+  DIRECTORY = 2;
+}
+
+// Range describes a contiguous range of data.
+message Range {
+  // Unit is the unit name for the start and end indices, for examples, "bytes".
+  string unit = 1;
+  // Start is the inclusive start index of the range.
+  uint64 start = 2;
+  // End is the exclusive end index of the range.
+  uint64 end = 3;
+  // Total is the total number of available units for consumption, for which this range describes a
+  // subset. It is generally expected that the total value be no less than the highest end value.
+  // In some scenarios (e.g. streaming), it may not be known in advance, and can thus be omitted.
+  uint64 total = 4;
+}
+
+// Metadata describes metadata about an object.
+// Note that the storage backend implementation ascribes semantics to each of these fields, and may
+// choose to define or omit fields based on available information.
+message Metadata {
+  // ID is the object's backend-defined unique ID.
+  string id = 1;
+  // Key is the object's unique key or path.
+  string key = 2;
+  // Size is the total size of the object contents, in bytes.
+  uint64 size = 3;
+  // Object type is the file type of the object.
+  Object object_type = 4;
+  // MIME type is the string MIME type of the object, if known.
+  string mime_type = 5;
+  // Modified time is a timestamp describing the last time the object was modified.
+  google.protobuf.Timestamp modified_time = 6;
+  // Checksum is the object's checksum, in a backend-defined format.
+  string checksum = 7;
+  // Attributes describes storage-colocated properties about the object, assigned by the server.
+  Attributes attributes = 8;
+}
+
+// Attributes describes server-assigned extended metadata about an object.
+// It differs from Metadata in that its values, with the exception of extra, depend on the state of
+// the server and its configuration. Attributes are typically colocated with the object data in
+// storage.
+message Attributes {
+  // Server is the hostname of the server instance that originally wrote the object.
+  string server = 1;
+  // Version is the Unistore version that originally wrote the object.
+  string version = 2;
+  // Timestamp is the server timestamp recorded when the object is written.
+  google.protobuf.Timestamp timestamp = 3;
+  // Backend is the original backend to which the object was written.
+  common.Backend backend = 4;
+  // Compression is the compression algorithm used in-flight, if applicable.
+  common.Compression compression = 5;
+  // Encryption is the encryption algorithm used in-flight, if applicable.
+  common.Encryption encryption = 6;
+  // Size is the original size of the object as read from the client, before any middleware filters
+  // that may change the effective size of the file in storage.
+  uint64 size = 7;
+  // Extra is a map of additional tags that may be specified by the user.
+  map<string, string> extra = 8;
+}

@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>client.go - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../../../../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../../../../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../../../../log">Log</a> | <a href="../../../../files">Files</a> | <a href="../../../../refs">Refs</a> | <a href="../../../../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<p>pkg/client/b2/<strong>client.go</strong> (14559B) (<a href="../../../../raw/pkg/client/b2/client.go">raw</a>) (<a href="../../../../blame/pkg/client/b2/client.go">blame</a>)</p><hr/>
+<pre id="blob">
+<a href="#l1" class="line" id="l1">      1</a> package b2
+<a href="#l2" class="line" id="l2">      2</a> 
+<a href="#l3" class="line" id="l3">      3</a> import (
+<a href="#l4" class="line" id="l4">      4</a> 	&quot;bytes&quot;
+<a href="#l5" class="line" id="l5">      5</a> 	&quot;context&quot;
+<a href="#l6" class="line" id="l6">      6</a> 	&quot;encoding/json&quot;
+<a href="#l7" class="line" id="l7">      7</a> 	&quot;fmt&quot;
+<a href="#l8" class="line" id="l8">      8</a> 	&quot;io&quot;
+<a href="#l9" class="line" id="l9">      9</a> 	&quot;net/http&quot;
+<a href="#l10" class="line" id="l10">     10</a> 	&quot;net/url&quot;
+<a href="#l11" class="line" id="l11">     11</a> 	&quot;path&quot;
+<a href="#l12" class="line" id="l12">     12</a> 	&quot;regexp&quot;
+<a href="#l13" class="line" id="l13">     13</a> 	&quot;strconv&quot;
+<a href="#l14" class="line" id="l14">     14</a> 	&quot;strings&quot;
+<a href="#l15" class="line" id="l15">     15</a> 
+<a href="#l16" class="line" id="l16">     16</a> 	&quot;go.uber.org/zap&quot;
+<a href="#l17" class="line" id="l17">     17</a> )
+<a href="#l18" class="line" id="l18">     18</a> 
+<a href="#l19" class="line" id="l19">     19</a> // Option aliases a callback function to apply options on the client.
+<a href="#l20" class="line" id="l20">     20</a> type Option func(*Client)
+<a href="#l21" class="line" id="l21">     21</a> 
+<a href="#l22" class="line" id="l22">     22</a> // Client is a structured wrapper for the B2 API. Note that it provides minimal additional features
+<a href="#l23" class="line" id="l23">     23</a> // and mostly intends to provide a 1:1 mapping to B2 HTTP APIs.
+<a href="#l24" class="line" id="l24">     24</a> type Client struct {
+<a href="#l25" class="line" id="l25">     25</a> 	http     *http.Client
+<a href="#l26" class="line" id="l26">     26</a> 	log      *zap.Logger
+<a href="#l27" class="line" id="l27">     27</a> 	identity string
+<a href="#l28" class="line" id="l28">     28</a> }
+<a href="#l29" class="line" id="l29">     29</a> 
+<a href="#l30" class="line" id="l30">     30</a> // New creates a new B2 client with an optional set of options.
+<a href="#l31" class="line" id="l31">     31</a> func New(opts ...Option) (*Client, error) {
+<a href="#l32" class="line" id="l32">     32</a> 	client := &amp;Client{
+<a href="#l33" class="line" id="l33">     33</a> 		http:     http.DefaultClient,
+<a href="#l34" class="line" id="l34">     34</a> 		log:      zap.NewNop(),
+<a href="#l35" class="line" id="l35">     35</a> 		identity: DefaultClientID,
+<a href="#l36" class="line" id="l36">     36</a> 	}
+<a href="#l37" class="line" id="l37">     37</a> 
+<a href="#l38" class="line" id="l38">     38</a> 	for _, opt := range opts {
+<a href="#l39" class="line" id="l39">     39</a> 		opt(client)
+<a href="#l40" class="line" id="l40">     40</a> 	}
+<a href="#l41" class="line" id="l41">     41</a> 
+<a href="#l42" class="line" id="l42">     42</a> 	return client, nil
+<a href="#l43" class="line" id="l43">     43</a> }
+<a href="#l44" class="line" id="l44">     44</a> 
+<a href="#l45" class="line" id="l45">     45</a> // WithTransport provides a custom HTTP client transport.
+<a href="#l46" class="line" id="l46">     46</a> func WithTransport(transport http.RoundTripper) Option {
+<a href="#l47" class="line" id="l47">     47</a> 	return func(c *Client) {
+<a href="#l48" class="line" id="l48">     48</a> 		c.http.Transport = transport
+<a href="#l49" class="line" id="l49">     49</a> 	}
+<a href="#l50" class="line" id="l50">     50</a> }
+<a href="#l51" class="line" id="l51">     51</a> 
+<a href="#l52" class="line" id="l52">     52</a> // WithLogger enables verbose logging to the specified logger.
+<a href="#l53" class="line" id="l53">     53</a> func WithLogger(log *zap.Logger) Option {
+<a href="#l54" class="line" id="l54">     54</a> 	return func(c *Client) {
+<a href="#l55" class="line" id="l55">     55</a> 		c.log = log
+<a href="#l56" class="line" id="l56">     56</a> 	}
+<a href="#l57" class="line" id="l57">     57</a> }
+<a href="#l58" class="line" id="l58">     58</a> 
+<a href="#l59" class="line" id="l59">     59</a> // WithClientID specifies a client identity to use as the User-Agent for outbound HTTP requests to
+<a href="#l60" class="line" id="l60">     60</a> // the B2 API.
+<a href="#l61" class="line" id="l61">     61</a> func WithClientID(id string) Option {
+<a href="#l62" class="line" id="l62">     62</a> 	return func(c *Client) {
+<a href="#l63" class="line" id="l63">     63</a> 		c.identity = id
+<a href="#l64" class="line" id="l64">     64</a> 	}
+<a href="#l65" class="line" id="l65">     65</a> }
+<a href="#l66" class="line" id="l66">     66</a> 
+<a href="#l67" class="line" id="l67">     67</a> // AuthorizeAccount implements the b2_authorize_account API.
+<a href="#l68" class="line" id="l68">     68</a> // Reference: https://www.backblaze.com/b2/docs/b2_authorize_account.html
+<a href="#l69" class="line" id="l69">     69</a> func (c *Client) AuthorizeAccount(ctx context.Context, request *AuthorizeAccountRequest) (*AuthorizeAccountResponse, error) {
+<a href="#l70" class="line" id="l70">     70</a> 	var response AuthorizeAccountResponse
+<a href="#l71" class="line" id="l71">     71</a> 
+<a href="#l72" class="line" id="l72">     72</a> 	u, err := url.Parse(APIV2BaseURL)
+<a href="#l73" class="line" id="l73">     73</a> 	if err != nil {
+<a href="#l74" class="line" id="l74">     74</a> 		return nil, statusFromError(err)
+<a href="#l75" class="line" id="l75">     75</a> 	}
+<a href="#l76" class="line" id="l76">     76</a> 
+<a href="#l77" class="line" id="l77">     77</a> 	r, err := c.createAPIRequest(ctx, u, EndpointAuthorizeAccount, http.MethodGet, request)
+<a href="#l78" class="line" id="l78">     78</a> 	if err != nil {
+<a href="#l79" class="line" id="l79">     79</a> 		return nil, err
+<a href="#l80" class="line" id="l80">     80</a> 	}
+<a href="#l81" class="line" id="l81">     81</a> 
+<a href="#l82" class="line" id="l82">     82</a> 	r.SetBasicAuth(request.ApplicationKeyID, request.ApplicationKey)
+<a href="#l83" class="line" id="l83">     83</a> 
+<a href="#l84" class="line" id="l84">     84</a> 	if _, err := c.doAPI(r, &amp;response); err != nil {
+<a href="#l85" class="line" id="l85">     85</a> 		return nil, err
+<a href="#l86" class="line" id="l86">     86</a> 	}
+<a href="#l87" class="line" id="l87">     87</a> 
+<a href="#l88" class="line" id="l88">     88</a> 	return &amp;response, nil
+<a href="#l89" class="line" id="l89">     89</a> }
+<a href="#l90" class="line" id="l90">     90</a> 
+<a href="#l91" class="line" id="l91">     91</a> // CancelLargeFile implements the b2_cancel_large_file API.
+<a href="#l92" class="line" id="l92">     92</a> // Reference: https://www.backblaze.com/b2/docs/b2_cancel_large_file.html
+<a href="#l93" class="line" id="l93">     93</a> func (c *Client) CancelLargeFile(ctx context.Context, request *CancelLargeFileRequest) (*CancelLargeFileResponse, error) {
+<a href="#l94" class="line" id="l94">     94</a> 	var response CancelLargeFileResponse
+<a href="#l95" class="line" id="l95">     95</a> 
+<a href="#l96" class="line" id="l96">     96</a> 	r, err := c.createAPIRequest(ctx, request.BaseURL, EndpointCancelLargeFile, http.MethodPost, request)
+<a href="#l97" class="line" id="l97">     97</a> 	if err != nil {
+<a href="#l98" class="line" id="l98">     98</a> 		return nil, err
+<a href="#l99" class="line" id="l99">     99</a> 	}
+<a href="#l100" class="line" id="l100">    100</a> 
+<a href="#l101" class="line" id="l101">    101</a> 	if _, err := c.doAPI(r, &amp;response); err != nil {
+<a href="#l102" class="line" id="l102">    102</a> 		return nil, err
+<a href="#l103" class="line" id="l103">    103</a> 	}
+<a href="#l104" class="line" id="l104">    104</a> 
+<a href="#l105" class="line" id="l105">    105</a> 	return &amp;response, nil
+<a href="#l106" class="line" id="l106">    106</a> }
+<a href="#l107" class="line" id="l107">    107</a> 
+<a href="#l108" class="line" id="l108">    108</a> // CopyFile implements the b2_copy_file API.
+<a href="#l109" class="line" id="l109">    109</a> // Reference: https://www.backblaze.com/b2/docs/b2_copy_file.html
+<a href="#l110" class="line" id="l110">    110</a> func (c *Client) CopyFile(ctx context.Context, request *CopyFileRequest) (*CopyFileResponse, error) {
+<a href="#l111" class="line" id="l111">    111</a> 	var response CopyFileResponse
+<a href="#l112" class="line" id="l112">    112</a> 
+<a href="#l113" class="line" id="l113">    113</a> 	r, err := c.createAPIRequest(ctx, request.BaseURL, EndpointCopyFile, http.MethodPost, request)
+<a href="#l114" class="line" id="l114">    114</a> 	if err != nil {
+<a href="#l115" class="line" id="l115">    115</a> 		return nil, err
+<a href="#l116" class="line" id="l116">    116</a> 	}
+<a href="#l117" class="line" id="l117">    117</a> 
+<a href="#l118" class="line" id="l118">    118</a> 	if _, err := c.doAPI(r, &amp;response); err != nil {
+<a href="#l119" class="line" id="l119">    119</a> 		return nil, err
+<a href="#l120" class="line" id="l120">    120</a> 	}
+<a href="#l121" class="line" id="l121">    121</a> 
+<a href="#l122" class="line" id="l122">    122</a> 	return &amp;response, nil
+<a href="#l123" class="line" id="l123">    123</a> }
+<a href="#l124" class="line" id="l124">    124</a> 
+<a href="#l125" class="line" id="l125">    125</a> // CopyPart implements the b2_copy_part API.
+<a href="#l126" class="line" id="l126">    126</a> // Reference: https://www.backblaze.com/b2/docs/b2_copy_part.html
+<a href="#l127" class="line" id="l127">    127</a> func (c *Client) CopyPart(ctx context.Context, request *CopyPartRequest) (*CopyPartResponse, error) {
+<a href="#l128" class="line" id="l128">    128</a> 	var response CopyPartResponse
+<a href="#l129" class="line" id="l129">    129</a> 
+<a href="#l130" class="line" id="l130">    130</a> 	r, err := c.createAPIRequest(ctx, request.BaseURL, EndpointCopyPart, http.MethodPost, request)
+<a href="#l131" class="line" id="l131">    131</a> 	if err != nil {
+<a href="#l132" class="line" id="l132">    132</a> 		return nil, err
+<a href="#l133" class="line" id="l133">    133</a> 	}
+<a href="#l134" class="line" id="l134">    134</a> 
+<a href="#l135" class="line" id="l135">    135</a> 	if _, err := c.doAPI(r, &amp;response); err != nil {
+<a href="#l136" class="line" id="l136">    136</a> 		return nil, err
+<a href="#l137" class="line" id="l137">    137</a> 	}
+<a href="#l138" class="line" id="l138">    138</a> 
+<a href="#l139" class="line" id="l139">    139</a> 	return &amp;response, nil
+<a href="#l140" class="line" id="l140">    140</a> }
+<a href="#l141" class="line" id="l141">    141</a> 
+<a href="#l142" class="line" id="l142">    142</a> // DeleteFileVersion implements the b2_delete_file_version API.
+<a href="#l143" class="line" id="l143">    143</a> // Reference: https://www.backblaze.com/b2/docs/b2_delete_file_version.html
+<a href="#l144" class="line" id="l144">    144</a> func (c *Client) DeleteFileVersion(ctx context.Context, request *DeleteFileVersionRequest) (*DeleteFileVersionResponse, error) {
+<a href="#l145" class="line" id="l145">    145</a> 	var response DeleteFileVersionResponse
+<a href="#l146" class="line" id="l146">    146</a> 
+<a href="#l147" class="line" id="l147">    147</a> 	r, err := c.createAPIRequest(ctx, request.BaseURL, EndpointDeleteFileVersion, http.MethodPost, request)
+<a href="#l148" class="line" id="l148">    148</a> 	if err != nil {
+<a href="#l149" class="line" id="l149">    149</a> 		return nil, err
+<a href="#l150" class="line" id="l150">    150</a> 	}
+<a href="#l151" class="line" id="l151">    151</a> 
+<a href="#l152" class="line" id="l152">    152</a> 	if _, err := c.doAPI(r, &amp;response); err != nil {
+<a href="#l153" class="line" id="l153">    153</a> 		return nil, err
+<a href="#l154" class="line" id="l154">    154</a> 	}
+<a href="#l155" class="line" id="l155">    155</a> 
+<a href="#l156" class="line" id="l156">    156</a> 	return &amp;response, nil
+<a href="#l157" class="line" id="l157">    157</a> }
+<a href="#l158" class="line" id="l158">    158</a> 
+<a href="#l159" class="line" id="l159">    159</a> // DownloadFileByName implements the b2_download_file_by_name API.
+<a href="#l160" class="line" id="l160">    160</a> // Reference: https://www.backblaze.com/b2/docs/b2_download_file_by_name.html
+<a href="#l161" class="line" id="l161">    161</a> func (c *Client) DownloadFileByName(ctx context.Context, request *DownloadFileByNameRequest) (*DownloadFileByNameResponse, error) {
+<a href="#l162" class="line" id="l162">    162</a> 	r, err := c.createAPIRequest(ctx, request.DownloadURL, &quot;&quot;, http.MethodGet, request)
+<a href="#l163" class="line" id="l163">    163</a> 	if err != nil {
+<a href="#l164" class="line" id="l164">    164</a> 		return nil, err
+<a href="#l165" class="line" id="l165">    165</a> 	}
+<a href="#l166" class="line" id="l166">    166</a> 
+<a href="#l167" class="line" id="l167">    167</a> 	ref := &amp;url.URL{Path: path.Join(&quot;file&quot;, request.Bucket, request.File)}
+<a href="#l168" class="line" id="l168">    168</a> 	r.URL = r.URL.ResolveReference(ref)
+<a href="#l169" class="line" id="l169">    169</a> 
+<a href="#l170" class="line" id="l170">    170</a> 	if request.Range.Start &gt; 0 &amp;&amp; request.Range.End &gt; 0 {
+<a href="#l171" class="line" id="l171">    171</a> 		r.Header.Set(
+<a href="#l172" class="line" id="l172">    172</a> 			&quot;Range&quot;,
+<a href="#l173" class="line" id="l173">    173</a> 			fmt.Sprintf(&quot;%s=%d-%d&quot;, request.Range.Unit, request.Range.Start, request.Range.End),
+<a href="#l174" class="line" id="l174">    174</a> 		)
+<a href="#l175" class="line" id="l175">    175</a> 	} else if request.Range.Start &gt; 0 {
+<a href="#l176" class="line" id="l176">    176</a> 		r.Header.Set(
+<a href="#l177" class="line" id="l177">    177</a> 			&quot;Range&quot;,
+<a href="#l178" class="line" id="l178">    178</a> 			fmt.Sprintf(&quot;%s=%d-&quot;, request.Range.Unit, request.Range.Start),
+<a href="#l179" class="line" id="l179">    179</a> 		)
+<a href="#l180" class="line" id="l180">    180</a> 	} else if request.Range.End &gt; 0 {
+<a href="#l181" class="line" id="l181">    181</a> 		r.Header.Set(
+<a href="#l182" class="line" id="l182">    182</a> 			&quot;Range&quot;,
+<a href="#l183" class="line" id="l183">    183</a> 			fmt.Sprintf(&quot;%s=0-%d&quot;, request.Range.Unit, request.Range.End),
+<a href="#l184" class="line" id="l184">    184</a> 		)
+<a href="#l185" class="line" id="l185">    185</a> 	}
+<a href="#l186" class="line" id="l186">    186</a> 
+<a href="#l187" class="line" id="l187">    187</a> 	// Note that the response body is not closed as this layer since it is passed directly to
+<a href="#l188" class="line" id="l188">    188</a> 	// the client as an io.ReadCloser; it is the responsibility of the caller to close the
+<a href="#l189" class="line" id="l189">    189</a> 	// body when it has been consumed.
+<a href="#l190" class="line" id="l190">    190</a> 	response, err := c.doRaw(r)
+<a href="#l191" class="line" id="l191">    191</a> 	if err != nil {
+<a href="#l192" class="line" id="l192">    192</a> 		return nil, err
+<a href="#l193" class="line" id="l193">    193</a> 	}
+<a href="#l194" class="line" id="l194">    194</a> 
+<a href="#l195" class="line" id="l195">    195</a> 	size, err := strconv.Atoi(response.Header.Get(&quot;Content-Length&quot;))
+<a href="#l196" class="line" id="l196">    196</a> 	if err != nil {
+<a href="#l197" class="line" id="l197">    197</a> 		return nil, statusFromError(err)
+<a href="#l198" class="line" id="l198">    198</a> 	}
+<a href="#l199" class="line" id="l199">    199</a> 
+<a href="#l200" class="line" id="l200">    200</a> 	contentRange := Range{}
+<a href="#l201" class="line" id="l201">    201</a> 	contentRangeRe := regexp.MustCompile(&quot;^(?P&lt;unit&gt;[^\\s]+)\\s(?P&lt;start&gt;\\d+)-(?P&lt;end&gt;\\d+)/(?P&lt;total&gt;\\d+)$&quot;)
+<a href="#l202" class="line" id="l202">    202</a> 	matches := contentRangeRe.FindStringSubmatch(response.Header.Get(&quot;Content-Range&quot;))
+<a href="#l203" class="line" id="l203">    203</a> 	if len(matches) == 5 {
+<a href="#l204" class="line" id="l204">    204</a> 		start, err := strconv.Atoi(matches[contentRangeRe.SubexpIndex(&quot;start&quot;)])
+<a href="#l205" class="line" id="l205">    205</a> 		if err != nil {
+<a href="#l206" class="line" id="l206">    206</a> 			return nil, statusFromError(err)
+<a href="#l207" class="line" id="l207">    207</a> 		}
+<a href="#l208" class="line" id="l208">    208</a> 
+<a href="#l209" class="line" id="l209">    209</a> 		end, err := strconv.Atoi(matches[contentRangeRe.SubexpIndex(&quot;end&quot;)])
+<a href="#l210" class="line" id="l210">    210</a> 		if err != nil {
+<a href="#l211" class="line" id="l211">    211</a> 			return nil, statusFromError(err)
+<a href="#l212" class="line" id="l212">    212</a> 		}
+<a href="#l213" class="line" id="l213">    213</a> 
+<a href="#l214" class="line" id="l214">    214</a> 		total, err := strconv.Atoi(matches[contentRangeRe.SubexpIndex(&quot;total&quot;)])
+<a href="#l215" class="line" id="l215">    215</a> 		if err != nil {
+<a href="#l216" class="line" id="l216">    216</a> 			return nil, statusFromError(err)
+<a href="#l217" class="line" id="l217">    217</a> 		}
+<a href="#l218" class="line" id="l218">    218</a> 
+<a href="#l219" class="line" id="l219">    219</a> 		contentRange.Unit = matches[contentRangeRe.SubexpIndex(&quot;unit&quot;)]
+<a href="#l220" class="line" id="l220">    220</a> 		contentRange.Start = start
+<a href="#l221" class="line" id="l221">    221</a> 		contentRange.End = end
+<a href="#l222" class="line" id="l222">    222</a> 		contentRange.Total = total
+<a href="#l223" class="line" id="l223">    223</a> 	}
+<a href="#l224" class="line" id="l224">    224</a> 
+<a href="#l225" class="line" id="l225">    225</a> 	fileInfo := make(map[string]string)
+<a href="#l226" class="line" id="l226">    226</a> 	for header := range response.Header {
+<a href="#l227" class="line" id="l227">    227</a> 		if strings.HasPrefix(header, &quot;X-Bz-Info-&quot;) {
+<a href="#l228" class="line" id="l228">    228</a> 			fileInfo[strings.ToLower(header[len(&quot;X-Bz-Info-&quot;):])] = response.Header.Get(header)
+<a href="#l229" class="line" id="l229">    229</a> 		}
+<a href="#l230" class="line" id="l230">    230</a> 	}
+<a href="#l231" class="line" id="l231">    231</a> 
+<a href="#l232" class="line" id="l232">    232</a> 	var uploadTimestamp UnixTimestamp
+<a href="#l233" class="line" id="l233">    233</a> 	if err := json.Unmarshal([]byte(response.Header.Get(&quot;X-Bz-Upload-Timestamp&quot;)), &amp;uploadTimestamp); err != nil {
+<a href="#l234" class="line" id="l234">    234</a> 		return nil, statusFromError(err)
+<a href="#l235" class="line" id="l235">    235</a> 	}
+<a href="#l236" class="line" id="l236">    236</a> 
+<a href="#l237" class="line" id="l237">    237</a> 	return &amp;DownloadFileByNameResponse{
+<a href="#l238" class="line" id="l238">    238</a> 		FileID:          response.Header.Get(&quot;X-Bz-File-Id&quot;),
+<a href="#l239" class="line" id="l239">    239</a> 		FileName:        response.Header.Get(&quot;X-Bz-File-Name&quot;),
+<a href="#l240" class="line" id="l240">    240</a> 		FileInfo:        fileInfo,
+<a href="#l241" class="line" id="l241">    241</a> 		ContentSHA1:     response.Header.Get(&quot;X-Bz-Content-Sha1&quot;),
+<a href="#l242" class="line" id="l242">    242</a> 		Size:            size,
+<a href="#l243" class="line" id="l243">    243</a> 		ContentType:     response.Header.Get(&quot;Content-Type&quot;),
+<a href="#l244" class="line" id="l244">    244</a> 		Range:           contentRange,
+<a href="#l245" class="line" id="l245">    245</a> 		UploadTimestamp: &amp;uploadTimestamp,
+<a href="#l246" class="line" id="l246">    246</a> 		Data:            response.Body,
+<a href="#l247" class="line" id="l247">    247</a> 	}, nil
+<a href="#l248" class="line" id="l248">    248</a> }
+<a href="#l249" class="line" id="l249">    249</a> 
+<a href="#l250" class="line" id="l250">    250</a> // FinishLargeFile implements the b2_finish_large_file API.
+<a href="#l251" class="line" id="l251">    251</a> // Reference: https://www.backblaze.com/b2/docs/b2_finish_large_file.html
+<a href="#l252" class="line" id="l252">    252</a> func (c *Client) FinishLargeFile(ctx context.Context, request *FinishLargeFileRequest) (*FinishLargeFileResponse, error) {
+<a href="#l253" class="line" id="l253">    253</a> 	var response FinishLargeFileResponse
+<a href="#l254" class="line" id="l254">    254</a> 
+<a href="#l255" class="line" id="l255">    255</a> 	r, err := c.createAPIRequest(ctx, request.BaseURL, EndpointFinishLargeFile, http.MethodPost, request)
+<a href="#l256" class="line" id="l256">    256</a> 	if err != nil {
+<a href="#l257" class="line" id="l257">    257</a> 		return nil, err
+<a href="#l258" class="line" id="l258">    258</a> 	}
+<a href="#l259" class="line" id="l259">    259</a> 
+<a href="#l260" class="line" id="l260">    260</a> 	if _, err := c.doAPI(r, &amp;response); err != nil {
+<a href="#l261" class="line" id="l261">    261</a> 		return nil, err
+<a href="#l262" class="line" id="l262">    262</a> 	}
+<a href="#l263" class="line" id="l263">    263</a> 
+<a href="#l264" class="line" id="l264">    264</a> 	return &amp;response, nil
+<a href="#l265" class="line" id="l265">    265</a> }
+<a href="#l266" class="line" id="l266">    266</a> 
+<a href="#l267" class="line" id="l267">    267</a> // GetUploadPartURL implements the b2_get_upload_part_url API.
+<a href="#l268" class="line" id="l268">    268</a> // Reference: https://www.backblaze.com/b2/docs/b2_get_upload_part_url.html
+<a href="#l269" class="line" id="l269">    269</a> func (c *Client) GetUploadPartURL(ctx context.Context, request *GetUploadPartURLRequest) (*GetUploadPartURLResponse, error) {
+<a href="#l270" class="line" id="l270">    270</a> 	var response GetUploadPartURLResponse
+<a href="#l271" class="line" id="l271">    271</a> 
+<a href="#l272" class="line" id="l272">    272</a> 	r, err := c.createAPIRequest(ctx, request.BaseURL, EndpointGetUploadPartURL, http.MethodPost, request)
+<a href="#l273" class="line" id="l273">    273</a> 	if err != nil {
+<a href="#l274" class="line" id="l274">    274</a> 		return nil, err
+<a href="#l275" class="line" id="l275">    275</a> 	}
+<a href="#l276" class="line" id="l276">    276</a> 
+<a href="#l277" class="line" id="l277">    277</a> 	if _, err := c.doAPI(r, &amp;response); err != nil {
+<a href="#l278" class="line" id="l278">    278</a> 		return nil, err
+<a href="#l279" class="line" id="l279">    279</a> 	}
+<a href="#l280" class="line" id="l280">    280</a> 
+<a href="#l281" class="line" id="l281">    281</a> 	return &amp;response, nil
+<a href="#l282" class="line" id="l282">    282</a> }
+<a href="#l283" class="line" id="l283">    283</a> 
+<a href="#l284" class="line" id="l284">    284</a> // GetUploadURL implements the b2_get_upload_url API.
+<a href="#l285" class="line" id="l285">    285</a> // Reference: https://www.backblaze.com/b2/docs/b2_get_upload_url.html
+<a href="#l286" class="line" id="l286">    286</a> func (c *Client) GetUploadURL(ctx context.Context, request *GetUploadURLRequest) (*GetUploadURLResponse, error) {
+<a href="#l287" class="line" id="l287">    287</a> 	var response GetUploadURLResponse
+<a href="#l288" class="line" id="l288">    288</a> 
+<a href="#l289" class="line" id="l289">    289</a> 	r, err := c.createAPIRequest(ctx, request.BaseURL, EndpointGetUploadURL, http.MethodPost, request)
+<a href="#l290" class="line" id="l290">    290</a> 	if err != nil {
+<a href="#l291" class="line" id="l291">    291</a> 		return nil, err
+<a href="#l292" class="line" id="l292">    292</a> 	}
+<a href="#l293" class="line" id="l293">    293</a> 
+<a href="#l294" class="line" id="l294">    294</a> 	if _, err := c.doAPI(r, &amp;response); err != nil {
+<a href="#l295" class="line" id="l295">    295</a> 		return nil, err
+<a href="#l296" class="line" id="l296">    296</a> 	}
+<a href="#l297" class="line" id="l297">    297</a> 
+<a href="#l298" class="line" id="l298">    298</a> 	return &amp;response, nil
+<a href="#l299" class="line" id="l299">    299</a> }
+<a href="#l300" class="line" id="l300">    300</a> 
+<a href="#l301" class="line" id="l301">    301</a> // ListBuckets implements the b2_list_buckets API.
+<a href="#l302" class="line" id="l302">    302</a> // Reference: https://www.backblaze.com/b2/docs/b2_list_buckets.html
+<a href="#l303" class="line" id="l303">    303</a> func (c *Client) ListBuckets(ctx context.Context, request *ListBucketsRequest) (*ListBucketsResponse, error) {
+<a href="#l304" class="line" id="l304">    304</a> 	var response ListBucketsResponse
+<a href="#l305" class="line" id="l305">    305</a> 
+<a href="#l306" class="line" id="l306">    306</a> 	r, err := c.createAPIRequest(ctx, request.BaseURL, EndpointListBuckets, http.MethodPost, request)
+<a href="#l307" class="line" id="l307">    307</a> 	if err != nil {
+<a href="#l308" class="line" id="l308">    308</a> 		return nil, err
+<a href="#l309" class="line" id="l309">    309</a> 	}
+<a href="#l310" class="line" id="l310">    310</a> 
+<a href="#l311" class="line" id="l311">    311</a> 	if _, err := c.doAPI(r, &amp;response); err != nil {
+<a href="#l312" class="line" id="l312">    312</a> 		return nil, err
+<a href="#l313" class="line" id="l313">    313</a> 	}
+<a href="#l314" class="line" id="l314">    314</a> 
+<a href="#l315" class="line" id="l315">    315</a> 	return &amp;response, nil
+<a href="#l316" class="line" id="l316">    316</a> }
+<a href="#l317" class="line" id="l317">    317</a> 
+<a href="#l318" class="line" id="l318">    318</a> // ListFileNames implements the b2_list_file_names API.
+<a href="#l319" class="line" id="l319">    319</a> // Reference: https://www.backblaze.com/b2/docs/b2_list_file_names.html
+<a href="#l320" class="line" id="l320">    320</a> func (c *Client) ListFileNames(ctx context.Context, request *ListFileNamesRequest) (*ListFileNamesResponse, error) {
+<a href="#l321" class="line" id="l321">    321</a> 	var response ListFileNamesResponse
+<a href="#l322" class="line" id="l322">    322</a> 
+<a href="#l323" class="line" id="l323">    323</a> 	r, err := c.createAPIRequest(ctx, request.BaseURL, EndpointListFileNames, http.MethodPost, request)
+<a href="#l324" class="line" id="l324">    324</a> 	if err != nil {
+<a href="#l325" class="line" id="l325">    325</a> 		return nil, err
+<a href="#l326" class="line" id="l326">    326</a> 	}
+<a href="#l327" class="line" id="l327">    327</a> 
+<a href="#l328" class="line" id="l328">    328</a> 	if _, err := c.doAPI(r, &amp;response); err != nil {
+<a href="#l329" class="line" id="l329">    329</a> 		return nil, err
+<a href="#l330" class="line" id="l330">    330</a> 	}
+<a href="#l331" class="line" id="l331">    331</a> 
+<a href="#l332" class="line" id="l332">    332</a> 	return &amp;response, nil
+<a href="#l333" class="line" id="l333">    333</a> }
+<a href="#l334" class="line" id="l334">    334</a> 
+<a href="#l335" class="line" id="l335">    335</a> // StartLargeFile implements the b2_start_large_file API.
+<a href="#l336" class="line" id="l336">    336</a> // Reference: https://www.backblaze.com/b2/docs/b2_start_large_file.html
+<a href="#l337" class="line" id="l337">    337</a> func (c *Client) StartLargeFile(ctx context.Context, request *StartLargeFileRequest) (*StartLargeFileResponse, error) {
+<a href="#l338" class="line" id="l338">    338</a> 	var response StartLargeFileResponse
+<a href="#l339" class="line" id="l339">    339</a> 
+<a href="#l340" class="line" id="l340">    340</a> 	r, err := c.createAPIRequest(ctx, request.BaseURL, EndpointStartLargeFile, http.MethodPost, request)
+<a href="#l341" class="line" id="l341">    341</a> 	if err != nil {
+<a href="#l342" class="line" id="l342">    342</a> 		return nil, err
+<a href="#l343" class="line" id="l343">    343</a> 	}
+<a href="#l344" class="line" id="l344">    344</a> 
+<a href="#l345" class="line" id="l345">    345</a> 	if _, err := c.doAPI(r, &amp;response); err != nil {
+<a href="#l346" class="line" id="l346">    346</a> 		return nil, err
+<a href="#l347" class="line" id="l347">    347</a> 	}
+<a href="#l348" class="line" id="l348">    348</a> 
+<a href="#l349" class="line" id="l349">    349</a> 	return &amp;response, nil
+<a href="#l350" class="line" id="l350">    350</a> }
+<a href="#l351" class="line" id="l351">    351</a> 
+<a href="#l352" class="line" id="l352">    352</a> // UploadFile implements the b2_upload_file API.
+<a href="#l353" class="line" id="l353">    353</a> // Reference: https://www.backblaze.com/b2/docs/b2_upload_file.html
+<a href="#l354" class="line" id="l354">    354</a> func (c *Client) UploadFile(ctx context.Context, request *UploadFileRequest) (*UploadFileResponse, error) {
+<a href="#l355" class="line" id="l355">    355</a> 	var response UploadFileResponse
+<a href="#l356" class="line" id="l356">    356</a> 
+<a href="#l357" class="line" id="l357">    357</a> 	r, err := c.createAPIRequest(ctx, request.UploadURL, &quot;&quot;, http.MethodPost, request)
+<a href="#l358" class="line" id="l358">    358</a> 	if err != nil {
+<a href="#l359" class="line" id="l359">    359</a> 		return nil, err
+<a href="#l360" class="line" id="l360">    360</a> 	}
+<a href="#l361" class="line" id="l361">    361</a> 
+<a href="#l362" class="line" id="l362">    362</a> 	if request.FileInfo != nil {
+<a href="#l363" class="line" id="l363">    363</a> 		for key, info := range request.FileInfo {
+<a href="#l364" class="line" id="l364">    364</a> 			r.Header.Set(fmt.Sprintf(&quot;X-Bz-Info-%s&quot;, key), url.QueryEscape(info))
+<a href="#l365" class="line" id="l365">    365</a> 		}
+<a href="#l366" class="line" id="l366">    366</a> 	}
+<a href="#l367" class="line" id="l367">    367</a> 
+<a href="#l368" class="line" id="l368">    368</a> 	// Specify the content length explicitly to prevent net/http from automatically converting
+<a href="#l369" class="line" id="l369">    369</a> 	// the request to use chunked transfer encoding, which is not supported by the B2 API for
+<a href="#l370" class="line" id="l370">    370</a> 	// uploads.
+<a href="#l371" class="line" id="l371">    371</a> 	r.ContentLength = int64(request.ContentLength)
+<a href="#l372" class="line" id="l372">    372</a> 	r.Body = request.Data
+<a href="#l373" class="line" id="l373">    373</a> 
+<a href="#l374" class="line" id="l374">    374</a> 	if _, err := c.doAPI(r, &amp;response); err != nil {
+<a href="#l375" class="line" id="l375">    375</a> 		return nil, err
+<a href="#l376" class="line" id="l376">    376</a> 	}
+<a href="#l377" class="line" id="l377">    377</a> 
+<a href="#l378" class="line" id="l378">    378</a> 	return &amp;response, err
+<a href="#l379" class="line" id="l379">    379</a> }
+<a href="#l380" class="line" id="l380">    380</a> 
+<a href="#l381" class="line" id="l381">    381</a> // UploadPart implements the b2_upload_part API.
+<a href="#l382" class="line" id="l382">    382</a> // Reference: https://www.backblaze.com/b2/docs/b2_upload_part.html
+<a href="#l383" class="line" id="l383">    383</a> func (c *Client) UploadPart(ctx context.Context, request *UploadPartRequest) (*UploadPartResponse, error) {
+<a href="#l384" class="line" id="l384">    384</a> 	var response UploadPartResponse
+<a href="#l385" class="line" id="l385">    385</a> 
+<a href="#l386" class="line" id="l386">    386</a> 	r, err := c.createAPIRequest(ctx, request.UploadURL, &quot;&quot;, http.MethodPost, request)
+<a href="#l387" class="line" id="l387">    387</a> 	if err != nil {
+<a href="#l388" class="line" id="l388">    388</a> 		return nil, err
+<a href="#l389" class="line" id="l389">    389</a> 	}
+<a href="#l390" class="line" id="l390">    390</a> 
+<a href="#l391" class="line" id="l391">    391</a> 	r.ContentLength = int64(request.ContentLength)
+<a href="#l392" class="line" id="l392">    392</a> 	r.Body = request.Data
+<a href="#l393" class="line" id="l393">    393</a> 
+<a href="#l394" class="line" id="l394">    394</a> 	if _, err := c.doAPI(r, &amp;response); err != nil {
+<a href="#l395" class="line" id="l395">    395</a> 		return nil, err
+<a href="#l396" class="line" id="l396">    396</a> 	}
+<a href="#l397" class="line" id="l397">    397</a> 
+<a href="#l398" class="line" id="l398">    398</a> 	return &amp;response, err
+<a href="#l399" class="line" id="l399">    399</a> }
+<a href="#l400" class="line" id="l400">    400</a> 
+<a href="#l401" class="line" id="l401">    401</a> // createAPIRequest creates a http.Request object, obeying B2 conventions, based on the specified
+<a href="#l402" class="line" id="l402">    402</a> // base URL, endpoint, HTTP method, and request struct.
+<a href="#l403" class="line" id="l403">    403</a> func (c *Client) createAPIRequest(ctx context.Context, baseURL *url.URL, endpoint string, method string, request interface{}) (*http.Request, error) {
+<a href="#l404" class="line" id="l404">    404</a> 	var body io.ReadCloser
+<a href="#l405" class="line" id="l405">    405</a> 
+<a href="#l406" class="line" id="l406">    406</a> 	u := baseURL
+<a href="#l407" class="line" id="l407">    407</a> 	if endpoint != &quot;&quot; {
+<a href="#l408" class="line" id="l408">    408</a> 		u = baseURL.ResolveReference(&amp;url.URL{Path: path.Join(APIV2BasePath, endpoint)})
+<a href="#l409" class="line" id="l409">    409</a> 	}
+<a href="#l410" class="line" id="l410">    410</a> 
+<a href="#l411" class="line" id="l411">    411</a> 	headers, err := marshalHeaders(request)
+<a href="#l412" class="line" id="l412">    412</a> 	if err != nil {
+<a href="#l413" class="line" id="l413">    413</a> 		return nil, statusFromError(err)
+<a href="#l414" class="line" id="l414">    414</a> 	}
+<a href="#l415" class="line" id="l415">    415</a> 
+<a href="#l416" class="line" id="l416">    416</a> 	headers.Set(&quot;User-Agent&quot;, c.identity)
+<a href="#l417" class="line" id="l417">    417</a> 
+<a href="#l418" class="line" id="l418">    418</a> 	if method == http.MethodPost {
+<a href="#l419" class="line" id="l419">    419</a> 		payload, err := json.Marshal(request)
+<a href="#l420" class="line" id="l420">    420</a> 		if err != nil {
+<a href="#l421" class="line" id="l421">    421</a> 			return nil, statusFromError(err)
+<a href="#l422" class="line" id="l422">    422</a> 		}
+<a href="#l423" class="line" id="l423">    423</a> 
+<a href="#l424" class="line" id="l424">    424</a> 		body = io.NopCloser(bytes.NewReader(payload))
+<a href="#l425" class="line" id="l425">    425</a> 	}
+<a href="#l426" class="line" id="l426">    426</a> 
+<a href="#l427" class="line" id="l427">    427</a> 	r := &amp;http.Request{
+<a href="#l428" class="line" id="l428">    428</a> 		Method: method,
+<a href="#l429" class="line" id="l429">    429</a> 		URL:    u,
+<a href="#l430" class="line" id="l430">    430</a> 		Header: headers,
+<a href="#l431" class="line" id="l431">    431</a> 		Body:   body,
+<a href="#l432" class="line" id="l432">    432</a> 	}
+<a href="#l433" class="line" id="l433">    433</a> 
+<a href="#l434" class="line" id="l434">    434</a> 	return r.WithContext(ctx), nil
+<a href="#l435" class="line" id="l435">    435</a> }
+<a href="#l436" class="line" id="l436">    436</a> 
+<a href="#l437" class="line" id="l437">    437</a> // doAPI executes the request as a canonical API request, whose response body can be parsed as JSON
+<a href="#l438" class="line" id="l438">    438</a> // into the provided container.
+<a href="#l439" class="line" id="l439">    439</a> func (c *Client) doAPI(request *http.Request, data interface{}) (*http.Response, error) {
+<a href="#l440" class="line" id="l440">    440</a> 	response, err := c.doRaw(request)
+<a href="#l441" class="line" id="l441">    441</a> 	if err != nil {
+<a href="#l442" class="line" id="l442">    442</a> 		return nil, statusFromError(err)
+<a href="#l443" class="line" id="l443">    443</a> 	}
+<a href="#l444" class="line" id="l444">    444</a> 
+<a href="#l445" class="line" id="l445">    445</a> 	defer response.Body.Close()
+<a href="#l446" class="line" id="l446">    446</a> 
+<a href="#l447" class="line" id="l447">    447</a> 	body, err := io.ReadAll(response.Body)
+<a href="#l448" class="line" id="l448">    448</a> 	if err != nil {
+<a href="#l449" class="line" id="l449">    449</a> 		return response, statusFromError(err)
+<a href="#l450" class="line" id="l450">    450</a> 	}
+<a href="#l451" class="line" id="l451">    451</a> 
+<a href="#l452" class="line" id="l452">    452</a> 	if data != nil {
+<a href="#l453" class="line" id="l453">    453</a> 		if err := json.Unmarshal(body, &amp;data); err != nil {
+<a href="#l454" class="line" id="l454">    454</a> 			return response, statusFromError(err)
+<a href="#l455" class="line" id="l455">    455</a> 		}
+<a href="#l456" class="line" id="l456">    456</a> 	}
+<a href="#l457" class="line" id="l457">    457</a> 
+<a href="#l458" class="line" id="l458">    458</a> 	return response, nil
+<a href="#l459" class="line" id="l459">    459</a> }
+<a href="#l460" class="line" id="l460">    460</a> 
+<a href="#l461" class="line" id="l461">    461</a> // doRaw executes the request, handling HTTP errors semantically as API errors, and returns the
+<a href="#l462" class="line" id="l462">    462</a> // response as-is without any response body manipulation.
+<a href="#l463" class="line" id="l463">    463</a> func (c *Client) doRaw(request *http.Request) (*http.Response, error) {
+<a href="#l464" class="line" id="l464">    464</a> 	var status Status
+<a href="#l465" class="line" id="l465">    465</a> 
+<a href="#l466" class="line" id="l466">    466</a> 	c.log.Debug(
+<a href="#l467" class="line" id="l467">    467</a> 		&quot;dispatching HTTP request&quot;,
+<a href="#l468" class="line" id="l468">    468</a> 		zap.String(&quot;method&quot;, request.Method),
+<a href="#l469" class="line" id="l469">    469</a> 		zap.Any(&quot;headers&quot;, request.Header),
+<a href="#l470" class="line" id="l470">    470</a> 		zap.Stringer(&quot;url&quot;, request.URL),
+<a href="#l471" class="line" id="l471">    471</a> 	)
+<a href="#l472" class="line" id="l472">    472</a> 
+<a href="#l473" class="line" id="l473">    473</a> 	response, err := c.http.Do(request)
+<a href="#l474" class="line" id="l474">    474</a> 	if err != nil {
+<a href="#l475" class="line" id="l475">    475</a> 		c.log.Error(
+<a href="#l476" class="line" id="l476">    476</a> 			&quot;fatal transport error during HTTP dispatch&quot;,
+<a href="#l477" class="line" id="l477">    477</a> 			zap.String(&quot;method&quot;, request.Method),
+<a href="#l478" class="line" id="l478">    478</a> 			zap.Stringer(&quot;url&quot;, request.URL),
+<a href="#l479" class="line" id="l479">    479</a> 			zap.Error(err),
+<a href="#l480" class="line" id="l480">    480</a> 		)
+<a href="#l481" class="line" id="l481">    481</a> 
+<a href="#l482" class="line" id="l482">    482</a> 		return nil, statusFromError(err)
+<a href="#l483" class="line" id="l483">    483</a> 	}
+<a href="#l484" class="line" id="l484">    484</a> 
+<a href="#l485" class="line" id="l485">    485</a> 	if response.StatusCode &gt;= http.StatusBadRequest {
+<a href="#l486" class="line" id="l486">    486</a> 		body, err := io.ReadAll(response.Body)
+<a href="#l487" class="line" id="l487">    487</a> 		if err != nil {
+<a href="#l488" class="line" id="l488">    488</a> 			return response, statusFromError(err)
+<a href="#l489" class="line" id="l489">    489</a> 		}
+<a href="#l490" class="line" id="l490">    490</a> 
+<a href="#l491" class="line" id="l491">    491</a> 		if err := json.Unmarshal(body, &amp;status); err != nil {
+<a href="#l492" class="line" id="l492">    492</a> 			return response, statusFromError(err)
+<a href="#l493" class="line" id="l493">    493</a> 		}
+<a href="#l494" class="line" id="l494">    494</a> 
+<a href="#l495" class="line" id="l495">    495</a> 		response.Body.Close()
+<a href="#l496" class="line" id="l496">    496</a> 
+<a href="#l497" class="line" id="l497">    497</a> 		c.log.Debug(
+<a href="#l498" class="line" id="l498">    498</a> 			&quot;received application-level error from B2 API&quot;,
+<a href="#l499" class="line" id="l499">    499</a> 			zap.Int(&quot;status&quot;, status.Status),
+<a href="#l500" class="line" id="l500">    500</a> 			zap.String(&quot;code&quot;, status.Code),
+<a href="#l501" class="line" id="l501">    501</a> 			zap.String(&quot;message&quot;, status.Message),
+<a href="#l502" class="line" id="l502">    502</a> 		)
+<a href="#l503" class="line" id="l503">    503</a> 
+<a href="#l504" class="line" id="l504">    504</a> 		return response, &amp;status
+<a href="#l505" class="line" id="l505">    505</a> 	}
+<a href="#l506" class="line" id="l506">    506</a> 
+<a href="#l507" class="line" id="l507">    507</a> 	c.log.Debug(
+<a href="#l508" class="line" id="l508">    508</a> 		&quot;successful B2 API response&quot;,
+<a href="#l509" class="line" id="l509">    509</a> 		zap.String(&quot;method&quot;, response.Request.Method),
+<a href="#l510" class="line" id="l510">    510</a> 		zap.Stringer(&quot;url&quot;, response.Request.URL),
+<a href="#l511" class="line" id="l511">    511</a> 		zap.Int(&quot;status&quot;, response.StatusCode),
+<a href="#l512" class="line" id="l512">    512</a> 		zap.Int64(&quot;size&quot;, response.ContentLength),
+<a href="#l513" class="line" id="l513">    513</a> 	)
+<a href="#l514" class="line" id="l514">    514</a> 
+<a href="#l515" class="line" id="l515">    515</a> 	return response, nil
+<a href="#l516" class="line" id="l516">    516</a> }
+</pre>
+</div>
+</body>
+</html>

@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/backend: Migrate checksum, compression, encryption backends to validate enum value from proto schema - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/caf16ecf1a73e13343233e40b008f326b3fc1a61">caf16ecf1a73e13343233e40b008f326b3fc1a61</a>
+<b>parent</b> <a href="../commit/a2ddb69fb817cf3ac4d13d5ef3af8690942b6a4c">a2ddb69fb817cf3ac4d13d5ef3af8690942b6a4c</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Wed 29 Dec 2021 20:04:49 -0800
+
+internal/backend: Migrate checksum, compression, encryption backends to validate enum value from proto schema
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/backend/checksum.go</a></td><td> | </td><td class="num">34</td><td><span class="i">+++++++++++++++</span><span class="d">-------------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">internal/backend/compression.go</a></td><td> | </td><td class="num">19</td><td><span class="i">++++++++++</span><span class="d">---------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">internal/backend/encrypt.go</a></td><td> | </td><td class="num">10</td><td><span class="i">++</span><span class="d">--------</span></td></tr>
+</table></pre><pre>3 files changed, 27 insertions(+), 36 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/backend/checksum.go">internal/backend/checksum.go</a> b/<a href="../file/internal/backend/checksum.go">internal/backend/checksum.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -8,6 +8,9 @@ import (
+</a> 	&quot;fmt&quot;
+ 	&quot;hash&quot;
+ 	&quot;hash/crc32&quot;
+<a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;strings&quot;
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+	&quot;unistore/schemas/common&quot;
+</a> 
+ 	&quot;google.golang.org/grpc/codes&quot;
+ 	&quot;google.golang.org/grpc/status&quot;
+<a href="#h0-1" id="h0-1" class="h">@@ -15,34 +18,27 @@ import (
+</a> 	&quot;unistore/schemas/service&quot;
+ )
+ 
+<a href="#h0-1-3" id="h0-1-3" class="d">-// List of supported checksum algorithms.
+</a><a href="#h0-1-4" id="h0-1-4" class="d">-const (
+</a><a href="#h0-1-5" id="h0-1-5" class="d">-	algorithmCRC32  = &quot;crc32&quot;
+</a><a href="#h0-1-6" id="h0-1-6" class="d">-	algorithmMD5    = &quot;md5&quot;
+</a><a href="#h0-1-7" id="h0-1-7" class="d">-	algorithmSHA1   = &quot;sha1&quot;
+</a><a href="#h0-1-8" id="h0-1-8" class="d">-	algorithmSHA256 = &quot;sha256&quot;
+</a><a href="#h0-1-9" id="h0-1-9" class="d">-	algorithmSHA512 = &quot;sha512&quot;
+</a><a href="#h0-1-10" id="h0-1-10" class="d">-)
+</a><a href="#h0-1-11" id="h0-1-11" class="d">-
+</a> // Checksum is a Backend that computes checksums for outgoing get object requests and validates
+ // client-provided checksums for incoming put object requests. In general, this middleware should be
+ // applied at the highest possible layer so that the checksum is most likely to represent the data
+ // the client interacts with (i.e. without modification by other middleware layers in the chain).
+ type Checksum struct {
+<a href="#h0-1-17" id="h0-1-17" class="d">-	algorithm string
+</a><a href="#h0-1-18" id="h0-1-18" class="i">+	algorithm common.Checksum
+</a> 	Backend
+ }
+ 
+ // NewChecksum creates a Checksum with the specified algorithm.
+ func NewChecksum(algorithm string, backend Backend) (Backend, error) {
+<a href="#h0-1-24" id="h0-1-24" class="d">-	switch algorithm {
+</a><a href="#h0-1-25" id="h0-1-25" class="d">-	case algorithmCRC32, algorithmMD5, algorithmSHA1, algorithmSHA256, algorithmSHA512:
+</a><a href="#h0-1-26" id="h0-1-26" class="d">-	default:
+</a><a href="#h0-1-27" id="h0-1-27" class="i">+	var parsed common.Checksum
+</a><a href="#h0-1-28" id="h0-1-28" class="i">+
+</a><a href="#h0-1-29" id="h0-1-29" class="i">+	if c, ok := common.Checksum_value[strings.ToUpper(algorithm)]; ok {
+</a><a href="#h0-1-30" id="h0-1-30" class="i">+		parsed = common.Checksum(c)
+</a><a href="#h0-1-31" id="h0-1-31" class="i">+	} else {
+</a> 		return nil, fmt.Errorf(&quot;backend: unknown checksum: algorithm=%s&quot;, algorithm)
+ 	}
+ 
+ 	return &amp;Checksum{
+<a href="#h0-1-36" id="h0-1-36" class="d">-		algorithm: algorithm,
+</a><a href="#h0-1-37" id="h0-1-37" class="i">+		algorithm: parsed,
+</a> 		Backend:   backend,
+ 	}, nil
+ }
+<a href="#h0-2" id="h0-2" class="h">@@ -133,15 +129,15 @@ func (c *Checksum) checksum(data []byte) string {
+</a> 	var h hash.Hash
+ 
+ 	switch c.algorithm {
+<a href="#h0-2-3" id="h0-2-3" class="d">-	case algorithmCRC32:
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+	case common.Checksum_CRC32:
+</a> 		h = crc32.NewIEEE()
+<a href="#h0-2-6" id="h0-2-6" class="d">-	case algorithmMD5:
+</a><a href="#h0-2-7" id="h0-2-7" class="i">+	case common.Checksum_MD5:
+</a> 		h = md5.New()
+<a href="#h0-2-9" id="h0-2-9" class="d">-	case algorithmSHA1:
+</a><a href="#h0-2-10" id="h0-2-10" class="i">+	case common.Checksum_SHA1:
+</a> 		h = sha1.New()
+<a href="#h0-2-12" id="h0-2-12" class="d">-	case algorithmSHA256:
+</a><a href="#h0-2-13" id="h0-2-13" class="i">+	case common.Checksum_SHA256:
+</a> 		h = sha256.New()
+<a href="#h0-2-15" id="h0-2-15" class="d">-	case algorithmSHA512:
+</a><a href="#h0-2-16" id="h0-2-16" class="i">+	case common.Checksum_SHA512:
+</a> 		h = sha512.New()
+ 	default:
+ 		return &quot;&quot;
+<b>diff --git a/<a id="h1" href="../file/internal/backend/compression.go">internal/backend/compression.go</a> b/<a href="../file/internal/backend/compression.go">internal/backend/compression.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -6,6 +6,7 @@ import (
+</a> 	&quot;fmt&quot;
+ 	&quot;io&quot;
+ 	&quot;log&quot;
+<a href="#h1-0-3" id="h1-0-3" class="i">+	&quot;strings&quot;
+</a> 
+ 	&quot;google.golang.org/grpc/codes&quot;
+ 	&quot;google.golang.org/grpc/status&quot;
+<a href="#h1-1" id="h1-1" class="h">@@ -14,11 +15,6 @@ import (
+</a> 	&quot;unistore/schemas/service&quot;
+ )
+ 
+<a href="#h1-1-3" id="h1-1-3" class="d">-// List of supported compression algorithms.
+</a><a href="#h1-1-4" id="h1-1-4" class="d">-const (
+</a><a href="#h1-1-5" id="h1-1-5" class="d">-	algorithmGzip = &quot;gzip&quot;
+</a><a href="#h1-1-6" id="h1-1-6" class="d">-)
+</a><a href="#h1-1-7" id="h1-1-7" class="d">-
+</a> // compressorFactory packages factories for both a reader (decompressor) and writer (compressor).
+ type compressorFactory struct {
+ 	writer func(io.Writer) (io.WriteCloser, error)
+<a href="#h1-2" id="h1-2" class="h">@@ -35,9 +31,16 @@ type Compression struct {
+</a> // NewCompression creates a new Compression with the specified algorithm and compression level.
+ func NewCompression(algorithm string, level int, backend Backend) (Backend, error) {
+ 	var compressor compressorFactory
+<a href="#h1-2-3" id="h1-2-3" class="i">+	var parsed common.Compression
+</a><a href="#h1-2-4" id="h1-2-4" class="i">+
+</a><a href="#h1-2-5" id="h1-2-5" class="i">+	if c, ok := common.Compression_value[strings.ToUpper(algorithm)]; ok {
+</a><a href="#h1-2-6" id="h1-2-6" class="i">+		parsed = common.Compression(c)
+</a><a href="#h1-2-7" id="h1-2-7" class="i">+	} else {
+</a><a href="#h1-2-8" id="h1-2-8" class="i">+		return nil, fmt.Errorf(&quot;backend: unknown compression: algorithm=%s&quot;, algorithm)
+</a><a href="#h1-2-9" id="h1-2-9" class="i">+	}
+</a> 
+<a href="#h1-2-11" id="h1-2-11" class="d">-	switch algorithm {
+</a><a href="#h1-2-12" id="h1-2-12" class="d">-	case algorithmGzip:
+</a><a href="#h1-2-13" id="h1-2-13" class="i">+	switch parsed {
+</a><a href="#h1-2-14" id="h1-2-14" class="i">+	case common.Compression_GZIP:
+</a> 		compressor = compressorFactory{
+ 			writer: func(raw io.Writer) (io.WriteCloser, error) {
+ 				if level == 0 {
+<a href="#h1-3" id="h1-3" class="h">@@ -50,8 +53,6 @@ func NewCompression(algorithm string, level int, backend Backend) (Backend, erro
+</a> 				return gzip.NewReader(raw)
+ 			},
+ 		}
+<a href="#h1-3-3" id="h1-3-3" class="d">-	default:
+</a><a href="#h1-3-4" id="h1-3-4" class="d">-		return nil, fmt.Errorf(&quot;backend: unknown compression: algorithm=%s&quot;, algorithm)
+</a> 	}
+ 
+ 	return &amp;Compression{
+<b>diff --git a/<a id="h2" href="../file/internal/backend/encrypt.go">internal/backend/encrypt.go</a> b/<a href="../file/internal/backend/encrypt.go">internal/backend/encrypt.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -6,6 +6,7 @@ import (
+</a> 	&quot;fmt&quot;
+ 	&quot;io&quot;
+ 	&quot;log&quot;
+<a href="#h2-0-3" id="h2-0-3" class="i">+	&quot;strings&quot;
+</a> 
+ 	&quot;filippo.io/age&quot;
+ 	&quot;google.golang.org/grpc/codes&quot;
+<a href="#h2-1" id="h2-1" class="h">@@ -15,11 +16,6 @@ import (
+</a> 	&quot;unistore/schemas/service&quot;
+ )
+ 
+<a href="#h2-1-3" id="h2-1-3" class="d">-// List of supported encryption mechanisms.
+</a><a href="#h2-1-4" id="h2-1-4" class="d">-const (
+</a><a href="#h2-1-5" id="h2-1-5" class="d">-	mechanismAge = &quot;age&quot;
+</a><a href="#h2-1-6" id="h2-1-6" class="d">-)
+</a><a href="#h2-1-7" id="h2-1-7" class="d">-
+</a> const (
+ 	// streamingEncryptChunkSize is the read chunk size for buffering encrypted data during
+ 	// streaming put requests. Each chunk translates to one dispatched chunked put request to
+<a href="#h2-2" id="h2-2" class="h">@@ -39,9 +35,7 @@ type Encrypt struct {
+</a> // NewEncrypt creates a new Encrypt with the specified private and public keys for decryption and
+ // encryption, respectively.
+ func NewEncrypt(mechanism string, privateKey string, publicKey string, backend Backend) (Backend, error) {
+<a href="#h2-2-3" id="h2-2-3" class="d">-	switch mechanism {
+</a><a href="#h2-2-4" id="h2-2-4" class="d">-	case mechanismAge:
+</a><a href="#h2-2-5" id="h2-2-5" class="d">-	default:
+</a><a href="#h2-2-6" id="h2-2-6" class="i">+	if _, ok := common.Encryption_value[strings.ToUpper(mechanism)]; !ok {
+</a> 		return nil, fmt.Errorf(&quot;backend: unknown encryption: mechanism=%s&quot;, mechanism)
+ 	}
+ 
+</pre>
+</div>
+</body>
+</html>

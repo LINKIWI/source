@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>pkg/client/b2: Parameterize client ID (user agent) - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/986fa2fc0f1f6a5f7255e3baa87922994d2e691b">986fa2fc0f1f6a5f7255e3baa87922994d2e691b</a>
+<b>parent</b> <a href="../commit/bb5ceb6c7d1d227ef9188082781fd1865bac7132">bb5ceb6c7d1d227ef9188082781fd1865bac7132</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Fri 31 Dec 2021 08:56:40 -0800
+
+pkg/client/b2: Parameterize client ID (user agent)
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">pkg/client/b2/client.go</a></td><td> | </td><td class="num">20</td><td><span class="i">+++++++++++++++</span><span class="d">-----</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">pkg/client/b2/types.go</a></td><td> | </td><td class="num">11</td><td><span class="i">++++</span><span class="d">-------</span></td></tr>
+</table></pre><pre>2 files changed, 19 insertions(+), 12 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/pkg/client/b2/client.go">pkg/client/b2/client.go</a> b/<a href="../file/pkg/client/b2/client.go">pkg/client/b2/client.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -19,15 +19,17 @@ type Option func(*Client)
+</a> // Client is a structured wrapper for the B2 API. Note that it provides minimal additional features
+ // and mostly intends to provide a 1:1 mapping to B2 HTTP APIs.
+ type Client struct {
+<a href="#h0-0-3" id="h0-0-3" class="d">-	http *http.Client
+</a><a href="#h0-0-4" id="h0-0-4" class="d">-	log  *log.Logger
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+	http     *http.Client
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+	log      *log.Logger
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+	identity string
+</a> }
+ 
+ // New creates a new B2 client with an optional set of options.
+ func New(opts ...Option) (*Client, error) {
+ 	client := &amp;Client{
+<a href="#h0-0-13" id="h0-0-13" class="d">-		http: http.DefaultClient,
+</a><a href="#h0-0-14" id="h0-0-14" class="d">-		log:  log.New(io.Discard, &quot;&quot;, 0),
+</a><a href="#h0-0-15" id="h0-0-15" class="i">+		http:     http.DefaultClient,
+</a><a href="#h0-0-16" id="h0-0-16" class="i">+		log:      log.New(io.Discard, &quot;&quot;, 0),
+</a><a href="#h0-0-17" id="h0-0-17" class="i">+		identity: DefaultClientID,
+</a> 	}
+ 
+ 	for _, opt := range opts {
+<a href="#h0-1" id="h0-1" class="h">@@ -51,6 +53,14 @@ func WithLogger(log *log.Logger) Option {
+</a> 	}
+ }
+ 
+<a href="#h0-1-3" id="h0-1-3" class="i">+// WithClientID specifies a client identity to use as the User-Agent for outbound HTTP requests to
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+// the B2 API.
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+func WithClientID(id string) Option {
+</a><a href="#h0-1-6" id="h0-1-6" class="i">+	return func(c *Client) {
+</a><a href="#h0-1-7" id="h0-1-7" class="i">+		c.identity = id
+</a><a href="#h0-1-8" id="h0-1-8" class="i">+	}
+</a><a href="#h0-1-9" id="h0-1-9" class="i">+}
+</a><a href="#h0-1-10" id="h0-1-10" class="i">+
+</a> // AuthorizeAccount implements the b2_authorize_account API.
+ // Reference: https://www.backblaze.com/b2/docs/b2_authorize_account.html
+ func (c *Client) AuthorizeAccount(request *AuthorizeAccountRequest) (*AuthorizeAccountResponse, error) {
+<a href="#h0-2" id="h0-2" class="h">@@ -351,7 +361,7 @@ func (c *Client) createAPIRequest(baseURL *url.URL, endpoint string, method stri
+</a> 		body = io.NopCloser(bytes.NewReader(payload))
+ 	}
+ 
+<a href="#h0-2-3" id="h0-2-3" class="d">-	headers.Set(&quot;User-Agent&quot;, ClientID)
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+	headers.Set(&quot;User-Agent&quot;, c.identity)
+</a> 
+ 	return &amp;http.Request{
+ 		Method: method,
+<b>diff --git a/<a id="h1" href="../file/pkg/client/b2/types.go">pkg/client/b2/types.go</a> b/<a href="../file/pkg/client/b2/types.go">pkg/client/b2/types.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -1,11 +1,8 @@
+</a> package b2
+ 
+ import (
+<a href="#h1-0-3" id="h1-0-3" class="d">-	&quot;fmt&quot;
+</a> 	&quot;io&quot;
+ 	&quot;net/url&quot;
+<a href="#h1-0-6" id="h1-0-6" class="d">-
+</a><a href="#h1-0-7" id="h1-0-7" class="d">-	&quot;unistore/internal/meta&quot;
+</a> )
+ 
+ // Base API constants.
+<a href="#h1-1" id="h1-1" class="h">@@ -27,10 +24,10 @@ const (
+</a> 	EndpointStartLargeFile    = &quot;b2_start_large_file&quot;
+ )
+ 
+<a href="#h1-1-3" id="h1-1-3" class="d">-var (
+</a><a href="#h1-1-4" id="h1-1-4" class="d">-	// ClientID is a client identifier for this B2 client, used as the User-Agent for all
+</a><a href="#h1-1-5" id="h1-1-5" class="d">-	// outbound HTTP requests to the B2 API.
+</a><a href="#h1-1-6" id="h1-1-6" class="d">-	ClientID = fmt.Sprintf(&quot;unistore/%s&quot;, meta.Version)
+</a><a href="#h1-1-7" id="h1-1-7" class="i">+const (
+</a><a href="#h1-1-8" id="h1-1-8" class="i">+	// DefaultClientID is the default client identifier for this B2 client, used as the
+</a><a href="#h1-1-9" id="h1-1-9" class="i">+	// User-Agent for all outbound HTTP requests to the B2 API.
+</a><a href="#h1-1-10" id="h1-1-10" class="i">+	DefaultClientID = &quot;unistore/1.0.0&quot;
+</a> )
+ 
+ // Range specifies a seek range describing part of an object.
+</pre>
+</div>
+</body>
+</html>

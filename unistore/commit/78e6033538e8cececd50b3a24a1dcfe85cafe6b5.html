@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>cmd/unistore-cli: Move TLS client config initialization to dedicated function - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/78e6033538e8cececd50b3a24a1dcfe85cafe6b5">78e6033538e8cececd50b3a24a1dcfe85cafe6b5</a>
+<b>parent</b> <a href="../commit/e347ca8f2bb9f72ce94b60442f6bf85e13513e07">e347ca8f2bb9f72ce94b60442f6bf85e13513e07</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sat  1 Jan 2022 18:32:52 -0800
+
+cmd/unistore-cli: Move TLS client config initialization to dedicated function
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">cmd/unistore-cli/client.go</a></td><td> | </td><td class="num">125</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++</span><span class="d">------------------------------------</span></td></tr>
+</table></pre><pre>1 file changed, 68 insertions(+), 57 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/cmd/unistore-cli/client.go">cmd/unistore-cli/client.go</a> b/<a href="../file/cmd/unistore-cli/client.go">cmd/unistore-cli/client.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -40,7 +40,6 @@ func initStoreConfig(path string, store string) (*config.Store, error) {
+</a> // initUnistoreClient initializes a Unistore gRPC client based on the client configuration.
+ func initUnistoreClient(cfg *config.Store) (*unistore.Client, error) {
+ 	var cancel context.CancelFunc
+<a href="#h0-0-3" id="h0-0-3" class="d">-	var certificates []tls.Certificate
+</a> 	var opts []grpc.DialOption
+ 
+ 	instance := &quot;cli&quot;
+<a href="#h0-1" id="h0-1" class="h">@@ -59,82 +58,94 @@ func initUnistoreClient(cfg *config.Store) (*unistore.Client, error) {
+</a> 	opts = append(opts, grpc.WithUnaryInterceptor(newRequestTimeoutUnaryInterceptor(cfg.Connection.RequestTimeout)))
+ 
+ 	if tlsCtx := cfg.Connection.TLSContext; tlsCtx != nil {
+<a href="#h0-1-3" id="h0-1-3" class="d">-		caPool, err := x509.SystemCertPool()
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+		tlsCfg, err := newTLSConfig(tlsCtx)
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+		if err != nil {
+</a><a href="#h0-1-6" id="h0-1-6" class="i">+			return nil, err
+</a><a href="#h0-1-7" id="h0-1-7" class="i">+		}
+</a><a href="#h0-1-8" id="h0-1-8" class="i">+
+</a><a href="#h0-1-9" id="h0-1-9" class="i">+		tlsCfg.ServerName = cfg.Authority
+</a><a href="#h0-1-10" id="h0-1-10" class="i">+		opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(tlsCfg)))
+</a><a href="#h0-1-11" id="h0-1-11" class="i">+	} else {
+</a><a href="#h0-1-12" id="h0-1-12" class="i">+		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+</a><a href="#h0-1-13" id="h0-1-13" class="i">+	}
+</a><a href="#h0-1-14" id="h0-1-14" class="i">+
+</a><a href="#h0-1-15" id="h0-1-15" class="i">+	ctx := context.Background()
+</a><a href="#h0-1-16" id="h0-1-16" class="i">+	if cfg.Connection.ConnectTimeout &gt; 0 {
+</a><a href="#h0-1-17" id="h0-1-17" class="i">+		ctx, cancel = context.WithTimeout(ctx, cfg.Connection.ConnectTimeout)
+</a><a href="#h0-1-18" id="h0-1-18" class="i">+		defer cancel()
+</a><a href="#h0-1-19" id="h0-1-19" class="i">+	}
+</a><a href="#h0-1-20" id="h0-1-20" class="i">+
+</a><a href="#h0-1-21" id="h0-1-21" class="i">+	return unistore.New(ctx, cfg.Address, opts...)
+</a><a href="#h0-1-22" id="h0-1-22" class="i">+}
+</a><a href="#h0-1-23" id="h0-1-23" class="i">+
+</a><a href="#h0-1-24" id="h0-1-24" class="i">+// newTLSConfig creates a new *tls.Config from the configuration-declared TLS context.
+</a><a href="#h0-1-25" id="h0-1-25" class="i">+func newTLSConfig(cfg *config.TLSContext) (*tls.Config, error) {
+</a><a href="#h0-1-26" id="h0-1-26" class="i">+	var certificates []tls.Certificate
+</a><a href="#h0-1-27" id="h0-1-27" class="i">+
+</a><a href="#h0-1-28" id="h0-1-28" class="i">+	caPool, err := x509.SystemCertPool()
+</a><a href="#h0-1-29" id="h0-1-29" class="i">+	if err != nil {
+</a><a href="#h0-1-30" id="h0-1-30" class="i">+		return nil, fmt.Errorf(
+</a><a href="#h0-1-31" id="h0-1-31" class="i">+			&quot;error retrieving system CA certificate pool: err=%v&quot;,
+</a><a href="#h0-1-32" id="h0-1-32" class="i">+			err,
+</a><a href="#h0-1-33" id="h0-1-33" class="i">+		)
+</a><a href="#h0-1-34" id="h0-1-34" class="i">+	}
+</a><a href="#h0-1-35" id="h0-1-35" class="i">+
+</a><a href="#h0-1-36" id="h0-1-36" class="i">+	for _, cert := range cfg.Certificates {
+</a><a href="#h0-1-37" id="h0-1-37" class="i">+		keypair, err := tls.LoadX509KeyPair(cert.Certificate, cert.Key)
+</a> 		if err != nil {
+ 			return nil, fmt.Errorf(
+<a href="#h0-1-40" id="h0-1-40" class="d">-				&quot;error retrieving system CA certificate pool: err=%v&quot;,
+</a><a href="#h0-1-41" id="h0-1-41" class="i">+				&quot;error loading client keypair: key=%s cert=%s err=%v&quot;,
+</a><a href="#h0-1-42" id="h0-1-42" class="i">+				cert.Key,
+</a><a href="#h0-1-43" id="h0-1-43" class="i">+				cert.Certificate,
+</a> 				err,
+ 			)
+ 		}
+ 
+<a href="#h0-1-48" id="h0-1-48" class="d">-		for _, cert := range tlsCtx.Certificates {
+</a><a href="#h0-1-49" id="h0-1-49" class="d">-			keypair, err := tls.LoadX509KeyPair(cert.Certificate, cert.Key)
+</a><a href="#h0-1-50" id="h0-1-50" class="i">+		if cert.Authority != &quot;&quot; {
+</a><a href="#h0-1-51" id="h0-1-51" class="i">+			ca, err := os.ReadFile(cert.Authority)
+</a> 			if err != nil {
+ 				return nil, fmt.Errorf(
+<a href="#h0-1-54" id="h0-1-54" class="d">-					&quot;error loading client keypair: key=%s cert=%s err=%v&quot;,
+</a><a href="#h0-1-55" id="h0-1-55" class="d">-					cert.Key,
+</a><a href="#h0-1-56" id="h0-1-56" class="d">-					cert.Certificate,
+</a><a href="#h0-1-57" id="h0-1-57" class="i">+					&quot;error reading CA certificate: cert=%s err=%v&quot;,
+</a><a href="#h0-1-58" id="h0-1-58" class="i">+					cert.Authority,
+</a> 					err,
+ 				)
+ 			}
+ 
+<a href="#h0-1-63" id="h0-1-63" class="d">-			if cert.Authority != &quot;&quot; {
+</a><a href="#h0-1-64" id="h0-1-64" class="d">-				ca, err := os.ReadFile(cert.Authority)
+</a><a href="#h0-1-65" id="h0-1-65" class="d">-				if err != nil {
+</a><a href="#h0-1-66" id="h0-1-66" class="d">-					return nil, fmt.Errorf(
+</a><a href="#h0-1-67" id="h0-1-67" class="d">-						&quot;error reading CA certificate: cert=%s err=%v&quot;,
+</a><a href="#h0-1-68" id="h0-1-68" class="d">-						cert.Authority,
+</a><a href="#h0-1-69" id="h0-1-69" class="d">-						err,
+</a><a href="#h0-1-70" id="h0-1-70" class="d">-					)
+</a><a href="#h0-1-71" id="h0-1-71" class="d">-				}
+</a><a href="#h0-1-72" id="h0-1-72" class="d">-
+</a><a href="#h0-1-73" id="h0-1-73" class="d">-				caPool.AppendCertsFromPEM(ca)
+</a><a href="#h0-1-74" id="h0-1-74" class="d">-			}
+</a><a href="#h0-1-75" id="h0-1-75" class="d">-
+</a><a href="#h0-1-76" id="h0-1-76" class="d">-			certificates = append(certificates, keypair)
+</a><a href="#h0-1-77" id="h0-1-77" class="i">+			caPool.AppendCertsFromPEM(ca)
+</a> 		}
+ 
+<a href="#h0-1-80" id="h0-1-80" class="d">-		tlsCfg := &amp;tls.Config{
+</a><a href="#h0-1-81" id="h0-1-81" class="d">-			Certificates: certificates,
+</a><a href="#h0-1-82" id="h0-1-82" class="d">-			RootCAs:      caPool,
+</a><a href="#h0-1-83" id="h0-1-83" class="d">-			ServerName:   cfg.Authority,
+</a><a href="#h0-1-84" id="h0-1-84" class="d">-		}
+</a><a href="#h0-1-85" id="h0-1-85" class="i">+		certificates = append(certificates, keypair)
+</a><a href="#h0-1-86" id="h0-1-86" class="i">+	}
+</a><a href="#h0-1-87" id="h0-1-87" class="i">+
+</a><a href="#h0-1-88" id="h0-1-88" class="i">+	tlsCfg := &amp;tls.Config{
+</a><a href="#h0-1-89" id="h0-1-89" class="i">+		Certificates: certificates,
+</a><a href="#h0-1-90" id="h0-1-90" class="i">+		RootCAs:      caPool,
+</a><a href="#h0-1-91" id="h0-1-91" class="i">+	}
+</a> 
+<a href="#h0-1-93" id="h0-1-93" class="d">-		if tlsCtx.VerifyPeer != &quot;&quot; {
+</a><a href="#h0-1-94" id="h0-1-94" class="d">-			tlsCfg.InsecureSkipVerify = true
+</a><a href="#h0-1-95" id="h0-1-95" class="d">-			tlsCfg.VerifyConnection = func(state tls.ConnectionState) error {
+</a><a href="#h0-1-96" id="h0-1-96" class="d">-				verifyOpts := x509.VerifyOptions{
+</a><a href="#h0-1-97" id="h0-1-97" class="d">-					Intermediates: x509.NewCertPool(),
+</a><a href="#h0-1-98" id="h0-1-98" class="d">-					Roots:         caPool,
+</a><a href="#h0-1-99" id="h0-1-99" class="d">-				}
+</a><a href="#h0-1-100" id="h0-1-100" class="d">-
+</a><a href="#h0-1-101" id="h0-1-101" class="d">-				for _, cert := range state.PeerCertificates[1:] {
+</a><a href="#h0-1-102" id="h0-1-102" class="d">-					verifyOpts.Intermediates.AddCert(cert)
+</a><a href="#h0-1-103" id="h0-1-103" class="d">-				}
+</a><a href="#h0-1-104" id="h0-1-104" class="d">-
+</a><a href="#h0-1-105" id="h0-1-105" class="d">-				if _, err := state.PeerCertificates[0].Verify(verifyOpts); err != nil {
+</a><a href="#h0-1-106" id="h0-1-106" class="d">-					return fmt.Errorf(
+</a><a href="#h0-1-107" id="h0-1-107" class="d">-						&quot;native server certificate verification failed: err=%v&quot;,
+</a><a href="#h0-1-108" id="h0-1-108" class="d">-						err,
+</a><a href="#h0-1-109" id="h0-1-109" class="d">-					)
+</a><a href="#h0-1-110" id="h0-1-110" class="d">-				}
+</a><a href="#h0-1-111" id="h0-1-111" class="d">-
+</a><a href="#h0-1-112" id="h0-1-112" class="d">-				return state.PeerCertificates[0].VerifyHostname(tlsCtx.VerifyPeer)
+</a><a href="#h0-1-113" id="h0-1-113" class="i">+	if cfg.VerifyPeer != &quot;&quot; {
+</a><a href="#h0-1-114" id="h0-1-114" class="i">+		tlsCfg.InsecureSkipVerify = true
+</a><a href="#h0-1-115" id="h0-1-115" class="i">+		tlsCfg.VerifyConnection = func(state tls.ConnectionState) error {
+</a><a href="#h0-1-116" id="h0-1-116" class="i">+			verifyOpts := x509.VerifyOptions{
+</a><a href="#h0-1-117" id="h0-1-117" class="i">+				Intermediates: x509.NewCertPool(),
+</a><a href="#h0-1-118" id="h0-1-118" class="i">+				Roots:         caPool,
+</a> 			}
+<a href="#h0-1-120" id="h0-1-120" class="d">-		}
+</a> 
+<a href="#h0-1-122" id="h0-1-122" class="d">-		opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(tlsCfg)))
+</a><a href="#h0-1-123" id="h0-1-123" class="d">-	} else {
+</a><a href="#h0-1-124" id="h0-1-124" class="d">-		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+</a><a href="#h0-1-125" id="h0-1-125" class="d">-	}
+</a><a href="#h0-1-126" id="h0-1-126" class="i">+			for _, cert := range state.PeerCertificates[1:] {
+</a><a href="#h0-1-127" id="h0-1-127" class="i">+				verifyOpts.Intermediates.AddCert(cert)
+</a><a href="#h0-1-128" id="h0-1-128" class="i">+			}
+</a> 
+<a href="#h0-1-130" id="h0-1-130" class="d">-	ctx := context.Background()
+</a><a href="#h0-1-131" id="h0-1-131" class="d">-	if cfg.Connection.ConnectTimeout &gt; 0 {
+</a><a href="#h0-1-132" id="h0-1-132" class="d">-		ctx, cancel = context.WithTimeout(ctx, cfg.Connection.ConnectTimeout)
+</a><a href="#h0-1-133" id="h0-1-133" class="d">-		defer cancel()
+</a><a href="#h0-1-134" id="h0-1-134" class="i">+			if _, err := state.PeerCertificates[0].Verify(verifyOpts); err != nil {
+</a><a href="#h0-1-135" id="h0-1-135" class="i">+				return fmt.Errorf(
+</a><a href="#h0-1-136" id="h0-1-136" class="i">+					&quot;native server certificate verification failed: err=%v&quot;,
+</a><a href="#h0-1-137" id="h0-1-137" class="i">+					err,
+</a><a href="#h0-1-138" id="h0-1-138" class="i">+				)
+</a><a href="#h0-1-139" id="h0-1-139" class="i">+			}
+</a><a href="#h0-1-140" id="h0-1-140" class="i">+
+</a><a href="#h0-1-141" id="h0-1-141" class="i">+			return state.PeerCertificates[0].VerifyHostname(cfg.VerifyPeer)
+</a><a href="#h0-1-142" id="h0-1-142" class="i">+		}
+</a> 	}
+ 
+<a href="#h0-1-145" id="h0-1-145" class="d">-	return unistore.New(ctx, cfg.Address, opts...)
+</a><a href="#h0-1-146" id="h0-1-146" class="i">+	return tlsCfg, nil
+</a> }
+ 
+ // newRequestTimeoutUnaryInterceptor creates a new grpc.UnaryClientInterceptor that automatically
+</pre>
+</div>
+</body>
+</html>

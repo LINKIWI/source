@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>composite.go - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../../../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../../../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../../../log">Log</a> | <a href="../../../files">Files</a> | <a href="../../../refs">Refs</a> | <a href="../../../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<p>internal/backend/<strong>composite.go</strong> (12451B) (<a href="../../../raw/internal/backend/composite.go">raw</a>) (<a href="../../../file/internal/backend/composite.go">file</a>)</p><hr/>
+<table id="blob">
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l1" class="line" id="l1">      1</a> package backend</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l2" class="line" id="l2">      2</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l3" class="line" id="l3">      3</a> import (</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l4" class="line" id="l4">      4</a> 	&quot;context&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l5" class="line" id="l5">      5</a> 	&quot;fmt&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l6" class="line" id="l6">      6</a> 	&quot;math/rand&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l7" class="line" id="l7">      7</a> 	&quot;strings&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l8" class="line" id="l8">      8</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/c351fe3d2e1edc037c0e3cc3055b780e547e7069">c351fe3d2e1edc037c0e3cc3055b780e547e7069</a></td><td>[Sun  9 Jan 2022 21:52:16 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l9" class="line" id="l9">      9</a> 	&quot;go.uber.org/zap&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/4c7bb04504d7c3901136c4ee76bee9ef282fe3d5">4c7bb04504d7c3901136c4ee76bee9ef282fe3d5</a></td><td>[Sun  9 Jan 2022 19:54:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l10" class="line" id="l10">     10</a> 	&quot;google.golang.org/grpc/codes&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/4c7bb04504d7c3901136c4ee76bee9ef282fe3d5">4c7bb04504d7c3901136c4ee76bee9ef282fe3d5</a></td><td>[Sun  9 Jan 2022 19:54:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l11" class="line" id="l11">     11</a> 	&quot;google.golang.org/grpc/status&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l12" class="line" id="l12">     12</a> 	&quot;google.golang.org/protobuf/proto&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l13" class="line" id="l13">     13</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/aa7c29b20eda4cc32217e36f48f971e147237968">aa7c29b20eda4cc32217e36f48f971e147237968</a></td><td>[Tue 11 Jan 2022 21:09:19 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l14" class="line" id="l14">     14</a> 	&quot;unistore/internal/schemas&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l15" class="line" id="l15">     15</a> 	&quot;unistore/schemas/common&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l16" class="line" id="l16">     16</a> 	&quot;unistore/schemas/service&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l17" class="line" id="l17">     17</a> )</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l18" class="line" id="l18">     18</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l19" class="line" id="l19">     19</a> // Composite is a Backend that abstracts over one or more children backends with configurable</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l20" class="line" id="l20">     20</a> // dispatch policies partitioned along read and write RPCs. It is useful for high-availability</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l21" class="line" id="l21">     21</a> // deployments where data redundancy and/or online failover is required.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l22" class="line" id="l22">     22</a> type Composite struct {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l23" class="line" id="l23">     23</a> 	readDispatch  common.Dispatch</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l24" class="line" id="l24">     24</a> 	writeDispatch common.Dispatch</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l25" class="line" id="l25">     25</a> 	backends      []Backend</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l26" class="line" id="l26">     26</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l27" class="line" id="l27">     27</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l28" class="line" id="l28">     28</a> // NewComposite creates a new Composite with the specified dispatch policies and children.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l29" class="line" id="l29">     29</a> func NewComposite(readDispatch string, writeDispatch string, backends []Backend) Backend {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l30" class="line" id="l30">     30</a> 	c := &amp;Composite{</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l31" class="line" id="l31">     31</a> 		readDispatch:  common.Dispatch(common.Dispatch_value[strings.ToUpper(readDispatch)]),</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l32" class="line" id="l32">     32</a> 		writeDispatch: common.Dispatch(common.Dispatch_value[strings.ToUpper(writeDispatch)]),</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l33" class="line" id="l33">     33</a> 		backends:      backends,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l34" class="line" id="l34">     34</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l35" class="line" id="l35">     35</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l36" class="line" id="l36">     36</a> 	return newInstrumentation(&quot;composite&quot;, c)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l37" class="line" id="l37">     37</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l38" class="line" id="l38">     38</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2cbf0dd91a5294f6571226d21701d3c7d80e058c">2cbf0dd91a5294f6571226d21701d3c7d80e058c</a></td><td>[Mon 17 Jan 2022 12:00:54 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l39" class="line" id="l39">     39</a> // HeadBucket invokes HeadBucket in one or more composed backends.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2cbf0dd91a5294f6571226d21701d3c7d80e058c">2cbf0dd91a5294f6571226d21701d3c7d80e058c</a></td><td>[Mon 17 Jan 2022 12:00:54 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l40" class="line" id="l40">     40</a> func (c *Composite) HeadBucket(ctx context.Context, request *service.HeadBucketRequest) (*service.HeadBucketResponse, error) {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2cbf0dd91a5294f6571226d21701d3c7d80e058c">2cbf0dd91a5294f6571226d21701d3c7d80e058c</a></td><td>[Mon 17 Jan 2022 12:00:54 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l41" class="line" id="l41">     41</a> 	rpc := func(backend Backend) (proto.Message, error) {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2cbf0dd91a5294f6571226d21701d3c7d80e058c">2cbf0dd91a5294f6571226d21701d3c7d80e058c</a></td><td>[Mon 17 Jan 2022 12:00:54 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l42" class="line" id="l42">     42</a> 		return backend.HeadBucket(ctx, proto.Clone(request).(*service.HeadBucketRequest))</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2cbf0dd91a5294f6571226d21701d3c7d80e058c">2cbf0dd91a5294f6571226d21701d3c7d80e058c</a></td><td>[Mon 17 Jan 2022 12:00:54 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l43" class="line" id="l43">     43</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2cbf0dd91a5294f6571226d21701d3c7d80e058c">2cbf0dd91a5294f6571226d21701d3c7d80e058c</a></td><td>[Mon 17 Jan 2022 12:00:54 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l44" class="line" id="l44">     44</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2cbf0dd91a5294f6571226d21701d3c7d80e058c">2cbf0dd91a5294f6571226d21701d3c7d80e058c</a></td><td>[Mon 17 Jan 2022 12:00:54 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l45" class="line" id="l45">     45</a> 	response, err := c.dispatch(c.readDispatch, rpc)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2cbf0dd91a5294f6571226d21701d3c7d80e058c">2cbf0dd91a5294f6571226d21701d3c7d80e058c</a></td><td>[Mon 17 Jan 2022 12:00:54 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l46" class="line" id="l46">     46</a> 	if err != nil {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2cbf0dd91a5294f6571226d21701d3c7d80e058c">2cbf0dd91a5294f6571226d21701d3c7d80e058c</a></td><td>[Mon 17 Jan 2022 12:00:54 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l47" class="line" id="l47">     47</a> 		return nil, err</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2cbf0dd91a5294f6571226d21701d3c7d80e058c">2cbf0dd91a5294f6571226d21701d3c7d80e058c</a></td><td>[Mon 17 Jan 2022 12:00:54 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l48" class="line" id="l48">     48</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2cbf0dd91a5294f6571226d21701d3c7d80e058c">2cbf0dd91a5294f6571226d21701d3c7d80e058c</a></td><td>[Mon 17 Jan 2022 12:00:54 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l49" class="line" id="l49">     49</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2cbf0dd91a5294f6571226d21701d3c7d80e058c">2cbf0dd91a5294f6571226d21701d3c7d80e058c</a></td><td>[Mon 17 Jan 2022 12:00:54 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l50" class="line" id="l50">     50</a> 	return response.(*service.HeadBucketResponse), nil</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2cbf0dd91a5294f6571226d21701d3c7d80e058c">2cbf0dd91a5294f6571226d21701d3c7d80e058c</a></td><td>[Mon 17 Jan 2022 12:00:54 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l51" class="line" id="l51">     51</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2cbf0dd91a5294f6571226d21701d3c7d80e058c">2cbf0dd91a5294f6571226d21701d3c7d80e058c</a></td><td>[Mon 17 Jan 2022 12:00:54 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l52" class="line" id="l52">     52</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l53" class="line" id="l53">     53</a> // HeadObject invokes HeadObject in one or more composed backends.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l54" class="line" id="l54">     54</a> func (c *Composite) HeadObject(ctx context.Context, request *service.HeadObjectRequest) (*service.HeadObjectResponse, error) {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l55" class="line" id="l55">     55</a> 	rpc := func(backend Backend) (proto.Message, error) {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l56" class="line" id="l56">     56</a> 		return backend.HeadObject(ctx, proto.Clone(request).(*service.HeadObjectRequest))</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l57" class="line" id="l57">     57</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l58" class="line" id="l58">     58</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l59" class="line" id="l59">     59</a> 	response, err := c.dispatch(c.readDispatch, rpc)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l60" class="line" id="l60">     60</a> 	if err != nil {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l61" class="line" id="l61">     61</a> 		return nil, err</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l62" class="line" id="l62">     62</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l63" class="line" id="l63">     63</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l64" class="line" id="l64">     64</a> 	return response.(*service.HeadObjectResponse), nil</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l65" class="line" id="l65">     65</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l66" class="line" id="l66">     66</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l67" class="line" id="l67">     67</a> // GetObject invokes GetObject in one or more composed backends.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l68" class="line" id="l68">     68</a> func (c *Composite) GetObject(ctx context.Context, request *service.GetObjectRequest) (*service.GetObjectResponse, error) {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l69" class="line" id="l69">     69</a> 	rpc := func(backend Backend) (proto.Message, error) {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l70" class="line" id="l70">     70</a> 		return backend.GetObject(ctx, proto.Clone(request).(*service.GetObjectRequest))</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l71" class="line" id="l71">     71</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l72" class="line" id="l72">     72</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l73" class="line" id="l73">     73</a> 	response, err := c.dispatch(c.readDispatch, rpc)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l74" class="line" id="l74">     74</a> 	if err != nil {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l75" class="line" id="l75">     75</a> 		return nil, err</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l76" class="line" id="l76">     76</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l77" class="line" id="l77">     77</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l78" class="line" id="l78">     78</a> 	return response.(*service.GetObjectResponse), nil</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l79" class="line" id="l79">     79</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l80" class="line" id="l80">     80</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l81" class="line" id="l81">     81</a> // StreamGetObject invokes StreamGetObject in one or more composed backends.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l82" class="line" id="l82">     82</a> // Note that only specific dispatch policies are implemented, and composite streaming gets come with</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l83" class="line" id="l83">     83</a> // a set of unique behavior nuances; see the inline commentary for details.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l84" class="line" id="l84">     84</a> func (c *Composite) StreamGetObject(ctx context.Context, request *service.GetObjectStreamRequest) (&lt;-chan *service.GetObjectStreamResponse, chan error) {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l85" class="line" id="l85">     85</a> 	// StreamGetObject is a bit of a special case. In practice, only one backend serves the</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l86" class="line" id="l86">     86</a> 	// response that is eventually consumed by the client; dispatching the request to multiple</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l87" class="line" id="l87">     87</a> 	// backends would result in a stuck coroutine (due to an absence of channel consumption).</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l88" class="line" id="l88">     88</a> 	// Thus, only a few dispatch policies are supported by this RPC.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l89" class="line" id="l89">     89</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l90" class="line" id="l90">     90</a> 	responseProxy := make(chan *service.GetObjectStreamResponse)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l91" class="line" id="l91">     91</a> 	errsProxy := make(chan error, 1)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l92" class="line" id="l92">     92</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l93" class="line" id="l93">     93</a> 	switch c.readDispatch {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l94" class="line" id="l94">     94</a> 	case common.Dispatch_RANDOM:</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l95" class="line" id="l95">     95</a> 		return c.backends[rand.Intn(len(c.backends))].StreamGetObject(ctx, request)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l96" class="line" id="l96">     96</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l97" class="line" id="l97">     97</a> 	case common.Dispatch_INITIAL:</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l98" class="line" id="l98">     98</a> 		return c.backends[0].StreamGetObject(ctx, request)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l99" class="line" id="l99">     99</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l100" class="line" id="l100">    100</a> 	case common.Dispatch_FAILOVER:</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l101" class="line" id="l101">    101</a> 		go func() {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l102" class="line" id="l102">    102</a> 			for _, backend := range c.backends {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l103" class="line" id="l103">    103</a> 				responses, errs := backend.StreamGetObject(ctx, request)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l104" class="line" id="l104">    104</a> 				if responses == nil {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l105" class="line" id="l105">    105</a> 					// It must be the case that there is an error; don&#39;t attempt</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l106" class="line" id="l106">    106</a> 					// to consume responses and just try the next backend.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l107" class="line" id="l107">    107</a> 					continue</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l108" class="line" id="l108">    108</a> 				}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l109" class="line" id="l109">    109</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l110" class="line" id="l110">    110</a> 				// At this point, the stream is non-nil and any potential future</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l111" class="line" id="l111">    111</a> 				// errors would be encountered mid-stream. However, since data is</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l112" class="line" id="l112">    112</a> 				// already being exchanged at this point, failover is no longer</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l113" class="line" id="l113">    113</a> 				// permissible as it would semantically equivalent to restarting the</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l114" class="line" id="l114">    114</a> 				// data stream. Instead, propagate any encountered errors directly</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l115" class="line" id="l115">    115</a> 				// to the client (which effectively errors out the entire request).</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l116" class="line" id="l116">    116</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l117" class="line" id="l117">    117</a> 				select {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l118" class="line" id="l118">    118</a> 				case err := &lt;-errs:</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l119" class="line" id="l119">    119</a> 					errsProxy &lt;- err</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l120" class="line" id="l120">    120</a> 					return</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l121" class="line" id="l121">    121</a> 				case response, ok := &lt;-responses:</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l122" class="line" id="l122">    122</a> 					if !ok {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l123" class="line" id="l123">    123</a> 						close(responseProxy)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l124" class="line" id="l124">    124</a> 						return</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l125" class="line" id="l125">    125</a> 					}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l126" class="line" id="l126">    126</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l127" class="line" id="l127">    127</a> 					responseProxy &lt;- response</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l128" class="line" id="l128">    128</a> 				}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l129" class="line" id="l129">    129</a> 			}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l130" class="line" id="l130">    130</a> 		}()</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l131" class="line" id="l131">    131</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l132" class="line" id="l132">    132</a> 		return responseProxy, errsProxy</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l133" class="line" id="l133">    133</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l134" class="line" id="l134">    134</a> 	default:</pre></td></tr>
+<tr>
+<td><a href="../../../commit/4c7bb04504d7c3901136c4ee76bee9ef282fe3d5">4c7bb04504d7c3901136c4ee76bee9ef282fe3d5</a></td><td>[Sun  9 Jan 2022 19:54:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l135" class="line" id="l135">    135</a> 		errsProxy &lt;- status.Errorf(</pre></td></tr>
+<tr>
+<td><a href="../../../commit/4c7bb04504d7c3901136c4ee76bee9ef282fe3d5">4c7bb04504d7c3901136c4ee76bee9ef282fe3d5</a></td><td>[Sun  9 Jan 2022 19:54:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l136" class="line" id="l136">    136</a> 			codes.Unimplemented,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/4c7bb04504d7c3901136c4ee76bee9ef282fe3d5">4c7bb04504d7c3901136c4ee76bee9ef282fe3d5</a></td><td>[Sun  9 Jan 2022 19:54:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l137" class="line" id="l137">    137</a> 			&quot;backend: unsupported dispatch policy for streaming get: policy=%v&quot;,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/4c7bb04504d7c3901136c4ee76bee9ef282fe3d5">4c7bb04504d7c3901136c4ee76bee9ef282fe3d5</a></td><td>[Sun  9 Jan 2022 19:54:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l138" class="line" id="l138">    138</a> 			c.readDispatch,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/4c7bb04504d7c3901136c4ee76bee9ef282fe3d5">4c7bb04504d7c3901136c4ee76bee9ef282fe3d5</a></td><td>[Sun  9 Jan 2022 19:54:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l139" class="line" id="l139">    139</a> 		)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/4c7bb04504d7c3901136c4ee76bee9ef282fe3d5">4c7bb04504d7c3901136c4ee76bee9ef282fe3d5</a></td><td>[Sun  9 Jan 2022 19:54:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l140" class="line" id="l140">    140</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l141" class="line" id="l141">    141</a> 		return nil, errsProxy</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l142" class="line" id="l142">    142</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l143" class="line" id="l143">    143</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l144" class="line" id="l144">    144</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l145" class="line" id="l145">    145</a> // PutObject invokes PutObject in one or more composed backends.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l146" class="line" id="l146">    146</a> func (c *Composite) PutObject(ctx context.Context, request *service.PutObjectRequest) (*service.PutObjectResponse, error) {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l147" class="line" id="l147">    147</a> 	rpc := func(backend Backend) (proto.Message, error) {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l148" class="line" id="l148">    148</a> 		return backend.PutObject(ctx, proto.Clone(request).(*service.PutObjectRequest))</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l149" class="line" id="l149">    149</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l150" class="line" id="l150">    150</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l151" class="line" id="l151">    151</a> 	response, err := c.dispatch(c.writeDispatch, rpc)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l152" class="line" id="l152">    152</a> 	if err != nil {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l153" class="line" id="l153">    153</a> 		return nil, err</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l154" class="line" id="l154">    154</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l155" class="line" id="l155">    155</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l156" class="line" id="l156">    156</a> 	return response.(*service.PutObjectResponse), nil</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l157" class="line" id="l157">    157</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l158" class="line" id="l158">    158</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l159" class="line" id="l159">    159</a> // StreamPutObject invokes StreamPutObject in one or more composed backends.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l160" class="line" id="l160">    160</a> func (c *Composite) StreamPutObject(ctx context.Context, stream chan *service.PutObjectStreamRequest) (*service.PutObjectStreamResponse, error) {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/4c7bb04504d7c3901136c4ee76bee9ef282fe3d5">4c7bb04504d7c3901136c4ee76bee9ef282fe3d5</a></td><td>[Sun  9 Jan 2022 19:54:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l161" class="line" id="l161">    161</a> 	// Synchronous dispatch is inherently incompatible with streaming writes. Semantically, one</pre></td></tr>
+<tr>
+<td><a href="../../../commit/4c7bb04504d7c3901136c4ee76bee9ef282fe3d5">4c7bb04504d7c3901136c4ee76bee9ef282fe3d5</a></td><td>[Sun  9 Jan 2022 19:54:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l162" class="line" id="l162">    162</a> 	// would expect for an ALL_SYNC policy to complete the full stream of writes to the nth</pre></td></tr>
+<tr>
+<td><a href="../../../commit/4c7bb04504d7c3901136c4ee76bee9ef282fe3d5">4c7bb04504d7c3901136c4ee76bee9ef282fe3d5</a></td><td>[Sun  9 Jan 2022 19:54:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l163" class="line" id="l163">    163</a> 	// backend, followed by repeating the same sequence of writes to subsequent (n + 1)th</pre></td></tr>
+<tr>
+<td><a href="../../../commit/4c7bb04504d7c3901136c4ee76bee9ef282fe3d5">4c7bb04504d7c3901136c4ee76bee9ef282fe3d5</a></td><td>[Sun  9 Jan 2022 19:54:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l164" class="line" id="l164">    164</a> 	// backends. However, this is impossible to accomplish unless the server buffered the full</pre></td></tr>
+<tr>
+<td><a href="../../../commit/4c7bb04504d7c3901136c4ee76bee9ef282fe3d5">4c7bb04504d7c3901136c4ee76bee9ef282fe3d5</a></td><td>[Sun  9 Jan 2022 19:54:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l165" class="line" id="l165">    165</a> 	// sequence of chunks from the entire stream in memory, which defeats the purpose of a</pre></td></tr>
+<tr>
+<td><a href="../../../commit/4c7bb04504d7c3901136c4ee76bee9ef282fe3d5">4c7bb04504d7c3901136c4ee76bee9ef282fe3d5</a></td><td>[Sun  9 Jan 2022 19:54:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l166" class="line" id="l166">    166</a> 	// streaming API and runs counter to its coroutine-oriented architecture. Thus, simply</pre></td></tr>
+<tr>
+<td><a href="../../../commit/4c7bb04504d7c3901136c4ee76bee9ef282fe3d5">4c7bb04504d7c3901136c4ee76bee9ef282fe3d5</a></td><td>[Sun  9 Jan 2022 19:54:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l167" class="line" id="l167">    167</a> 	// reject this dispatch policy altogether.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/4c7bb04504d7c3901136c4ee76bee9ef282fe3d5">4c7bb04504d7c3901136c4ee76bee9ef282fe3d5</a></td><td>[Sun  9 Jan 2022 19:54:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l168" class="line" id="l168">    168</a> 	if c.writeDispatch == common.Dispatch_ALL_SYNC {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/4c7bb04504d7c3901136c4ee76bee9ef282fe3d5">4c7bb04504d7c3901136c4ee76bee9ef282fe3d5</a></td><td>[Sun  9 Jan 2022 19:54:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l169" class="line" id="l169">    169</a> 		return nil, status.Error(</pre></td></tr>
+<tr>
+<td><a href="../../../commit/4c7bb04504d7c3901136c4ee76bee9ef282fe3d5">4c7bb04504d7c3901136c4ee76bee9ef282fe3d5</a></td><td>[Sun  9 Jan 2022 19:54:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l170" class="line" id="l170">    170</a> 			codes.Unimplemented,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/4c7bb04504d7c3901136c4ee76bee9ef282fe3d5">4c7bb04504d7c3901136c4ee76bee9ef282fe3d5</a></td><td>[Sun  9 Jan 2022 19:54:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l171" class="line" id="l171">    171</a> 			&quot;backend: ALL_SYNC dispatch policy is not supported for streaming puts&quot;,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/4c7bb04504d7c3901136c4ee76bee9ef282fe3d5">4c7bb04504d7c3901136c4ee76bee9ef282fe3d5</a></td><td>[Sun  9 Jan 2022 19:54:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l172" class="line" id="l172">    172</a> 		)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/4c7bb04504d7c3901136c4ee76bee9ef282fe3d5">4c7bb04504d7c3901136c4ee76bee9ef282fe3d5</a></td><td>[Sun  9 Jan 2022 19:54:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l173" class="line" id="l173">    173</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/4c7bb04504d7c3901136c4ee76bee9ef282fe3d5">4c7bb04504d7c3901136c4ee76bee9ef282fe3d5</a></td><td>[Sun  9 Jan 2022 19:54:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l174" class="line" id="l174">    174</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/4c7bb04504d7c3901136c4ee76bee9ef282fe3d5">4c7bb04504d7c3901136c4ee76bee9ef282fe3d5</a></td><td>[Sun  9 Jan 2022 19:54:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l175" class="line" id="l175">    175</a> 	// Duplicate the inbound request to separate channels, one per backend.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l176" class="line" id="l176">    176</a> 	proxy := make(map[Backend]chan *service.PutObjectStreamRequest)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l177" class="line" id="l177">    177</a> 	for _, backend := range c.backends {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l178" class="line" id="l178">    178</a> 		proxy[backend] = make(chan *service.PutObjectStreamRequest)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l179" class="line" id="l179">    179</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l180" class="line" id="l180">    180</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l181" class="line" id="l181">    181</a> 	go func() {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l182" class="line" id="l182">    182</a> 		for request := range stream {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l183" class="line" id="l183">    183</a> 			for _, backend := range c.backends {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/4c7bb04504d7c3901136c4ee76bee9ef282fe3d5">4c7bb04504d7c3901136c4ee76bee9ef282fe3d5</a></td><td>[Sun  9 Jan 2022 19:54:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l184" class="line" id="l184">    184</a> 				proxy[backend] &lt;- proto.Clone(request).(*service.PutObjectStreamRequest)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l185" class="line" id="l185">    185</a> 			}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l186" class="line" id="l186">    186</a> 		}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l187" class="line" id="l187">    187</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l188" class="line" id="l188">    188</a> 		for _, backend := range c.backends {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/4c7bb04504d7c3901136c4ee76bee9ef282fe3d5">4c7bb04504d7c3901136c4ee76bee9ef282fe3d5</a></td><td>[Sun  9 Jan 2022 19:54:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l189" class="line" id="l189">    189</a> 			close(proxy[backend])</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l190" class="line" id="l190">    190</a> 		}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l191" class="line" id="l191">    191</a> 	}()</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l192" class="line" id="l192">    192</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l193" class="line" id="l193">    193</a> 	rpc := func(backend Backend) (proto.Message, error) {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l194" class="line" id="l194">    194</a> 		return backend.StreamPutObject(ctx, proxy[backend])</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l195" class="line" id="l195">    195</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l196" class="line" id="l196">    196</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l197" class="line" id="l197">    197</a> 	response, err := c.dispatch(c.writeDispatch, rpc)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l198" class="line" id="l198">    198</a> 	if err != nil {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l199" class="line" id="l199">    199</a> 		return nil, err</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l200" class="line" id="l200">    200</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l201" class="line" id="l201">    201</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l202" class="line" id="l202">    202</a> 	return response.(*service.PutObjectStreamResponse), nil</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l203" class="line" id="l203">    203</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l204" class="line" id="l204">    204</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l205" class="line" id="l205">    205</a> // DeleteObject invokes DeleteObject in one or more composed backends.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l206" class="line" id="l206">    206</a> func (c *Composite) DeleteObject(ctx context.Context, request *service.DeleteObjectRequest) (*service.DeleteObjectResponse, error) {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l207" class="line" id="l207">    207</a> 	rpc := func(backend Backend) (proto.Message, error) {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l208" class="line" id="l208">    208</a> 		return backend.DeleteObject(ctx, proto.Clone(request).(*service.DeleteObjectRequest))</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l209" class="line" id="l209">    209</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l210" class="line" id="l210">    210</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l211" class="line" id="l211">    211</a> 	response, err := c.dispatch(c.writeDispatch, rpc)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l212" class="line" id="l212">    212</a> 	if err != nil {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l213" class="line" id="l213">    213</a> 		return nil, err</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l214" class="line" id="l214">    214</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l215" class="line" id="l215">    215</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l216" class="line" id="l216">    216</a> 	return response.(*service.DeleteObjectResponse), nil</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l217" class="line" id="l217">    217</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l218" class="line" id="l218">    218</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/ecc57de301a291067b7b53805d894e16ed0b1bea">ecc57de301a291067b7b53805d894e16ed0b1bea</a></td><td>[Mon 17 Jan 2022 12:31:29 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l219" class="line" id="l219">    219</a> // ListBuckets invokes ListBuckets in one or more composed backends.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/ecc57de301a291067b7b53805d894e16ed0b1bea">ecc57de301a291067b7b53805d894e16ed0b1bea</a></td><td>[Mon 17 Jan 2022 12:31:29 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l220" class="line" id="l220">    220</a> func (c *Composite) ListBuckets(ctx context.Context, request *service.ListBucketsRequest) (*service.ListBucketsResponse, error) {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/ecc57de301a291067b7b53805d894e16ed0b1bea">ecc57de301a291067b7b53805d894e16ed0b1bea</a></td><td>[Mon 17 Jan 2022 12:31:29 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l221" class="line" id="l221">    221</a> 	rpc := func(backend Backend) (proto.Message, error) {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/ecc57de301a291067b7b53805d894e16ed0b1bea">ecc57de301a291067b7b53805d894e16ed0b1bea</a></td><td>[Mon 17 Jan 2022 12:31:29 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l222" class="line" id="l222">    222</a> 		return backend.ListBuckets(ctx, proto.Clone(request).(*service.ListBucketsRequest))</pre></td></tr>
+<tr>
+<td><a href="../../../commit/ecc57de301a291067b7b53805d894e16ed0b1bea">ecc57de301a291067b7b53805d894e16ed0b1bea</a></td><td>[Mon 17 Jan 2022 12:31:29 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l223" class="line" id="l223">    223</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/ecc57de301a291067b7b53805d894e16ed0b1bea">ecc57de301a291067b7b53805d894e16ed0b1bea</a></td><td>[Mon 17 Jan 2022 12:31:29 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l224" class="line" id="l224">    224</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/ecc57de301a291067b7b53805d894e16ed0b1bea">ecc57de301a291067b7b53805d894e16ed0b1bea</a></td><td>[Mon 17 Jan 2022 12:31:29 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l225" class="line" id="l225">    225</a> 	response, err := c.dispatch(c.readDispatch, rpc)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/ecc57de301a291067b7b53805d894e16ed0b1bea">ecc57de301a291067b7b53805d894e16ed0b1bea</a></td><td>[Mon 17 Jan 2022 12:31:29 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l226" class="line" id="l226">    226</a> 	if err != nil {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/ecc57de301a291067b7b53805d894e16ed0b1bea">ecc57de301a291067b7b53805d894e16ed0b1bea</a></td><td>[Mon 17 Jan 2022 12:31:29 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l227" class="line" id="l227">    227</a> 		return nil, err</pre></td></tr>
+<tr>
+<td><a href="../../../commit/ecc57de301a291067b7b53805d894e16ed0b1bea">ecc57de301a291067b7b53805d894e16ed0b1bea</a></td><td>[Mon 17 Jan 2022 12:31:29 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l228" class="line" id="l228">    228</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/ecc57de301a291067b7b53805d894e16ed0b1bea">ecc57de301a291067b7b53805d894e16ed0b1bea</a></td><td>[Mon 17 Jan 2022 12:31:29 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l229" class="line" id="l229">    229</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/ecc57de301a291067b7b53805d894e16ed0b1bea">ecc57de301a291067b7b53805d894e16ed0b1bea</a></td><td>[Mon 17 Jan 2022 12:31:29 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l230" class="line" id="l230">    230</a> 	return response.(*service.ListBucketsResponse), nil</pre></td></tr>
+<tr>
+<td><a href="../../../commit/ecc57de301a291067b7b53805d894e16ed0b1bea">ecc57de301a291067b7b53805d894e16ed0b1bea</a></td><td>[Mon 17 Jan 2022 12:31:29 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l231" class="line" id="l231">    231</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../commit/ecc57de301a291067b7b53805d894e16ed0b1bea">ecc57de301a291067b7b53805d894e16ed0b1bea</a></td><td>[Mon 17 Jan 2022 12:31:29 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l232" class="line" id="l232">    232</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l233" class="line" id="l233">    233</a> // ListObjects invokes ListObjects in one or more composed backends.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l234" class="line" id="l234">    234</a> func (c *Composite) ListObjects(ctx context.Context, request *service.ListObjectsRequest) (*service.ListObjectsResponse, error) {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l235" class="line" id="l235">    235</a> 	rpc := func(backend Backend) (proto.Message, error) {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l236" class="line" id="l236">    236</a> 		return backend.ListObjects(ctx, proto.Clone(request).(*service.ListObjectsRequest))</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l237" class="line" id="l237">    237</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l238" class="line" id="l238">    238</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l239" class="line" id="l239">    239</a> 	response, err := c.dispatch(c.readDispatch, rpc)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l240" class="line" id="l240">    240</a> 	if err != nil {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l241" class="line" id="l241">    241</a> 		return nil, err</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l242" class="line" id="l242">    242</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l243" class="line" id="l243">    243</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l244" class="line" id="l244">    244</a> 	return response.(*service.ListObjectsResponse), nil</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l245" class="line" id="l245">    245</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l246" class="line" id="l246">    246</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l247" class="line" id="l247">    247</a> // Descriptor returns a structured Protobuf-defined descriptor of this backend.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l248" class="line" id="l248">    248</a> func (c *Composite) Descriptor() *common.Node {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l249" class="line" id="l249">    249</a> 	children := map[string]*common.Node_Value{</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l250" class="line" id="l250">    250</a> 		&quot;read_dispatch&quot;: {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l251" class="line" id="l251">    251</a> 			Child: &amp;common.Node_Value_Value{</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l252" class="line" id="l252">    252</a> 				Value: c.readDispatch.String(),</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l253" class="line" id="l253">    253</a> 			},</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l254" class="line" id="l254">    254</a> 		},</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l255" class="line" id="l255">    255</a> 		&quot;write_dispatch&quot;: {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l256" class="line" id="l256">    256</a> 			Child: &amp;common.Node_Value_Value{</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l257" class="line" id="l257">    257</a> 				Value: c.writeDispatch.String(),</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l258" class="line" id="l258">    258</a> 			},</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l259" class="line" id="l259">    259</a> 		},</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l260" class="line" id="l260">    260</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l261" class="line" id="l261">    261</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l262" class="line" id="l262">    262</a> 	for i, backend := range c.backends {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l263" class="line" id="l263">    263</a> 		children[fmt.Sprintf(&quot;backend_%d&quot;, i)] = &amp;common.Node_Value{</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l264" class="line" id="l264">    264</a> 			Child: &amp;common.Node_Value_Node{</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l265" class="line" id="l265">    265</a> 				Node: backend.Descriptor(),</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l266" class="line" id="l266">    266</a> 			},</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l267" class="line" id="l267">    267</a> 		}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l268" class="line" id="l268">    268</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l269" class="line" id="l269">    269</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l270" class="line" id="l270">    270</a> 	return &amp;common.Node{</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l271" class="line" id="l271">    271</a> 		Name:     &quot;composite&quot;,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l272" class="line" id="l272">    272</a> 		Children: children,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l273" class="line" id="l273">    273</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l274" class="line" id="l274">    274</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l275" class="line" id="l275">    275</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l276" class="line" id="l276">    276</a> // String returns a human-consumable representation of this backend.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l277" class="line" id="l277">    277</a> func (c *Composite) String() string {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/aa7c29b20eda4cc32217e36f48f971e147237968">aa7c29b20eda4cc32217e36f48f971e147237968</a></td><td>[Tue 11 Jan 2022 21:09:19 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l278" class="line" id="l278">    278</a> 	return schemas.MarshalDescriptor(c.Descriptor())</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l279" class="line" id="l279">    279</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l280" class="line" id="l280">    280</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l281" class="line" id="l281">    281</a> // dispatch is a convenience method to dispatch a request based on the selected dispatch policy.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l282" class="line" id="l282">    282</a> func (c *Composite) dispatch(policy common.Dispatch, rpc func(backend Backend) (proto.Message, error)) (proto.Message, error) {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l283" class="line" id="l283">    283</a> 	switch policy {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l284" class="line" id="l284">    284</a> 	case common.Dispatch_RANDOM:</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l285" class="line" id="l285">    285</a> 		return c.dispatchRandom(rpc)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l286" class="line" id="l286">    286</a> 	case common.Dispatch_INITIAL:</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l287" class="line" id="l287">    287</a> 		return c.dispatchInitial(rpc)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l288" class="line" id="l288">    288</a> 	case common.Dispatch_FAILOVER:</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l289" class="line" id="l289">    289</a> 		return c.dispatchFailover(rpc)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l290" class="line" id="l290">    290</a> 	case common.Dispatch_ALL_SYNC:</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l291" class="line" id="l291">    291</a> 		return c.dispatchAllSync(rpc)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l292" class="line" id="l292">    292</a> 	case common.Dispatch_ALL_ASYNC:</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l293" class="line" id="l293">    293</a> 		return c.dispatchAllAsync(rpc)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l294" class="line" id="l294">    294</a> 	default:</pre></td></tr>
+<tr>
+<td><a href="../../../commit/4c7bb04504d7c3901136c4ee76bee9ef282fe3d5">4c7bb04504d7c3901136c4ee76bee9ef282fe3d5</a></td><td>[Sun  9 Jan 2022 19:54:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l295" class="line" id="l295">    295</a> 		return nil, status.Errorf(</pre></td></tr>
+<tr>
+<td><a href="../../../commit/4c7bb04504d7c3901136c4ee76bee9ef282fe3d5">4c7bb04504d7c3901136c4ee76bee9ef282fe3d5</a></td><td>[Sun  9 Jan 2022 19:54:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l296" class="line" id="l296">    296</a> 			codes.Unimplemented,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/4c7bb04504d7c3901136c4ee76bee9ef282fe3d5">4c7bb04504d7c3901136c4ee76bee9ef282fe3d5</a></td><td>[Sun  9 Jan 2022 19:54:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l297" class="line" id="l297">    297</a> 			&quot;backend: unsupported dispatch policy for method: policy=%v&quot;,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/4c7bb04504d7c3901136c4ee76bee9ef282fe3d5">4c7bb04504d7c3901136c4ee76bee9ef282fe3d5</a></td><td>[Sun  9 Jan 2022 19:54:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l298" class="line" id="l298">    298</a> 			policy,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/4c7bb04504d7c3901136c4ee76bee9ef282fe3d5">4c7bb04504d7c3901136c4ee76bee9ef282fe3d5</a></td><td>[Sun  9 Jan 2022 19:54:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l299" class="line" id="l299">    299</a> 		)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l300" class="line" id="l300">    300</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l301" class="line" id="l301">    301</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l302" class="line" id="l302">    302</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l303" class="line" id="l303">    303</a> // dispatchRandom is a dispatcher implementation that dispatches the request to a randomly selected</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l304" class="line" id="l304">    304</a> // backend.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l305" class="line" id="l305">    305</a> func (c *Composite) dispatchRandom(rpc func(backend Backend) (proto.Message, error)) (proto.Message, error) {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l306" class="line" id="l306">    306</a> 	return rpc(c.backends[rand.Intn(len(c.backends))])</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l307" class="line" id="l307">    307</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l308" class="line" id="l308">    308</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l309" class="line" id="l309">    309</a> // dispatchInitial is a dispatcher implementation that dispatches the request to the first backend.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l310" class="line" id="l310">    310</a> func (c *Composite) dispatchInitial(rpc func(backend Backend) (proto.Message, error)) (proto.Message, error) {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l311" class="line" id="l311">    311</a> 	return rpc(c.backends[0])</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l312" class="line" id="l312">    312</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l313" class="line" id="l313">    313</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l314" class="line" id="l314">    314</a> // dispatchFailover is a dispatcher implementation that attempts the request against backends</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l315" class="line" id="l315">    315</a> // sequentially until one provides a non-error result.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l316" class="line" id="l316">    316</a> func (c *Composite) dispatchFailover(rpc func(backend Backend) (proto.Message, error)) (proto.Message, error) {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l317" class="line" id="l317">    317</a> 	var errs []error</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l318" class="line" id="l318">    318</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l319" class="line" id="l319">    319</a> 	for _, backend := range c.backends {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l320" class="line" id="l320">    320</a> 		response, err := rpc(backend)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l321" class="line" id="l321">    321</a> 		if err == nil {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l322" class="line" id="l322">    322</a> 			return response, nil</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l323" class="line" id="l323">    323</a> 		}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l324" class="line" id="l324">    324</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/c351fe3d2e1edc037c0e3cc3055b780e547e7069">c351fe3d2e1edc037c0e3cc3055b780e547e7069</a></td><td>[Sun  9 Jan 2022 21:52:16 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l325" class="line" id="l325">    325</a> 		zap.L().Warn(</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c351fe3d2e1edc037c0e3cc3055b780e547e7069">c351fe3d2e1edc037c0e3cc3055b780e547e7069</a></td><td>[Sun  9 Jan 2022 21:52:16 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l326" class="line" id="l326">    326</a> 			&quot;error during invocation; advancing to next backend by failover policy&quot;,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c351fe3d2e1edc037c0e3cc3055b780e547e7069">c351fe3d2e1edc037c0e3cc3055b780e547e7069</a></td><td>[Sun  9 Jan 2022 21:52:16 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l327" class="line" id="l327">    327</a> 			zap.Error(err),</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c351fe3d2e1edc037c0e3cc3055b780e547e7069">c351fe3d2e1edc037c0e3cc3055b780e547e7069</a></td><td>[Sun  9 Jan 2022 21:52:16 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l328" class="line" id="l328">    328</a> 		)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c351fe3d2e1edc037c0e3cc3055b780e547e7069">c351fe3d2e1edc037c0e3cc3055b780e547e7069</a></td><td>[Sun  9 Jan 2022 21:52:16 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l329" class="line" id="l329">    329</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l330" class="line" id="l330">    330</a> 		errs = append(errs, err)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l331" class="line" id="l331">    331</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l332" class="line" id="l332">    332</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l333" class="line" id="l333">    333</a> 	return nil, fmt.Errorf(&quot;backend: all backends errored in failover policy: errs=%v&quot;, errs)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l334" class="line" id="l334">    334</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l335" class="line" id="l335">    335</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l336" class="line" id="l336">    336</a> // dispatchAllSync is a dispatcher implementation that synchronously dispatches the request to all</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l337" class="line" id="l337">    337</a> // backends, one after the other in sequential order.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l338" class="line" id="l338">    338</a> func (c *Composite) dispatchAllSync(rpc func(backend Backend) (proto.Message, error)) (proto.Message, error) {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l339" class="line" id="l339">    339</a> 	var response proto.Message</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l340" class="line" id="l340">    340</a> 	var err error</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l341" class="line" id="l341">    341</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l342" class="line" id="l342">    342</a> 	for _, backend := range c.backends {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l343" class="line" id="l343">    343</a> 		response, err = rpc(backend)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l344" class="line" id="l344">    344</a> 		if err != nil {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l345" class="line" id="l345">    345</a> 			return nil, err</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l346" class="line" id="l346">    346</a> 		}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l347" class="line" id="l347">    347</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l348" class="line" id="l348">    348</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l349" class="line" id="l349">    349</a> 	return response, nil</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l350" class="line" id="l350">    350</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l351" class="line" id="l351">    351</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l352" class="line" id="l352">    352</a> // dispatchAllAsync is a dispatcher implementation that asynchronously dispatches the request to all</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l353" class="line" id="l353">    353</a> // backends and waits for all requests to complete. If any request errors, that error is propagated</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l354" class="line" id="l354">    354</a> // to the client. Otherwise, the first successful response is returned.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l355" class="line" id="l355">    355</a> func (c *Composite) dispatchAllAsync(rpc func(backend Backend) (proto.Message, error)) (proto.Message, error) {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l356" class="line" id="l356">    356</a> 	responses := make(chan proto.Message, len(c.backends))</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l357" class="line" id="l357">    357</a> 	errs := make(chan error, len(c.backends))</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l358" class="line" id="l358">    358</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l359" class="line" id="l359">    359</a> 	for _, backend := range c.backends {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l360" class="line" id="l360">    360</a> 		go func(backend Backend) {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l361" class="line" id="l361">    361</a> 			response, err := rpc(backend)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l362" class="line" id="l362">    362</a> 			errs &lt;- err</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l363" class="line" id="l363">    363</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l364" class="line" id="l364">    364</a> 			if response != nil {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l365" class="line" id="l365">    365</a> 				responses &lt;- response</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l366" class="line" id="l366">    366</a> 			}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l367" class="line" id="l367">    367</a> 		}(backend)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l368" class="line" id="l368">    368</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l369" class="line" id="l369">    369</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l370" class="line" id="l370">    370</a> 	// Block until all requests have been completed.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l371" class="line" id="l371">    371</a> 	for i := 0; i &lt; len(c.backends); i++ {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l372" class="line" id="l372">    372</a> 		if err := &lt;-errs; err != nil {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l373" class="line" id="l373">    373</a> 			return nil, err</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l374" class="line" id="l374">    374</a> 		}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l375" class="line" id="l375">    375</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l376" class="line" id="l376">    376</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l377" class="line" id="l377">    377</a> 	return &lt;-responses, nil</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2b23f65238ce69f6c3e9771d9071645066f4cceb">2b23f65238ce69f6c3e9771d9071645066f4cceb</a></td><td>[Sun  9 Jan 2022 19:35:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l378" class="line" id="l378">    378</a> }</pre></td></tr>
+</table>
+</div>
+</body>
+</html>

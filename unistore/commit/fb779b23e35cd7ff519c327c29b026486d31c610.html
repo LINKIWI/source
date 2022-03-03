@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/backend: Implement retry with backoff for server errors in PutObject uploads - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/fb779b23e35cd7ff519c327c29b026486d31c610">fb779b23e35cd7ff519c327c29b026486d31c610</a>
+<b>parent</b> <a href="../commit/aaa37998a2bb46d20970a77c0c6127bb8bd3e66c">aaa37998a2bb46d20970a77c0c6127bb8bd3e66c</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Mon  3 Jan 2022 17:09:47 -0800
+
+internal/backend: Implement retry with backoff for server errors in PutObject uploads
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/backend/b2.go</a></td><td> | </td><td class="num">102</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">----------------------------</span></td></tr>
+</table></pre><pre>1 file changed, 66 insertions(+), 36 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/backend/b2.go">internal/backend/b2.go</a> b/<a href="../file/internal/backend/b2.go">internal/backend/b2.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -31,6 +31,12 @@ const (
+</a> 	// most recently issued authorization token, the authorization API should be invoked again
+ 	// to obtain a new set of credentials.
+ 	authenticationRefreshInterval = 3 * time.Hour
+<a href="#h0-0-3" id="h0-0-3" class="i">+	// uploadRetryBudget is the number of upload attempts that will be made for a single upload
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+	// request, for both full uploads and chunked (part) uploads.
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+	uploadRetryBudget = 5
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+	// uploadRetryInitialBackoff is the initial delay used by the client before retrying a
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+	// failed upload request. Retries follow an exponential backoff policy for each attempt.
+</a><a href="#h0-0-8" id="h0-0-8" class="i">+	uploadRetryInitialBackoff = 10 * time.Second
+</a> )
+ 
+ // authenticationState is a container for current B2 API authentication state.
+<a href="#h0-1" id="h0-1" class="h">@@ -285,6 +291,9 @@ func (b *B2) StreamGetObject(ctx context.Context, request *service.GetObjectStre
+</a> 
+ // PutObject uploads the request file in full.
+ func (b *B2) PutObject(ctx context.Context, request *service.PutObjectRequest) (*service.PutObjectResponse, error) {
+<a href="#h0-1-3" id="h0-1-3" class="i">+	retryAttempt := 0
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+	retryDelay := uploadRetryInitialBackoff
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+
+</a> 	auth, err := b.authorizeAccount(ctx)
+ 	if err != nil {
+ 		return nil, b.createError(err)
+<a href="#h0-2" id="h0-2" class="h">@@ -311,47 +320,68 @@ func (b *B2) PutObject(ctx context.Context, request *service.PutObjectRequest) (
+</a> 		)
+ 	}
+ 
+<a href="#h0-2-3" id="h0-2-3" class="d">-	uuReq := &amp;b2.GetUploadURLRequest{
+</a><a href="#h0-2-4" id="h0-2-4" class="d">-		Authorization: auth.authorizationToken,
+</a><a href="#h0-2-5" id="h0-2-5" class="d">-		BaseURL:       auth.apiURL,
+</a><a href="#h0-2-6" id="h0-2-6" class="d">-		BucketID:      lbResp.Buckets[0].BucketID,
+</a><a href="#h0-2-7" id="h0-2-7" class="d">-	}
+</a><a href="#h0-2-8" id="h0-2-8" class="i">+	for {
+</a><a href="#h0-2-9" id="h0-2-9" class="i">+		uuReq := &amp;b2.GetUploadURLRequest{
+</a><a href="#h0-2-10" id="h0-2-10" class="i">+			Authorization: auth.authorizationToken,
+</a><a href="#h0-2-11" id="h0-2-11" class="i">+			BaseURL:       auth.apiURL,
+</a><a href="#h0-2-12" id="h0-2-12" class="i">+			BucketID:      lbResp.Buckets[0].BucketID,
+</a><a href="#h0-2-13" id="h0-2-13" class="i">+		}
+</a> 
+<a href="#h0-2-15" id="h0-2-15" class="d">-	uuResp, err := b.client.GetUploadURL(ctx, uuReq)
+</a><a href="#h0-2-16" id="h0-2-16" class="d">-	if err != nil {
+</a><a href="#h0-2-17" id="h0-2-17" class="d">-		return nil, b.createError(err)
+</a><a href="#h0-2-18" id="h0-2-18" class="d">-	}
+</a><a href="#h0-2-19" id="h0-2-19" class="i">+		uuResp, err := b.client.GetUploadURL(ctx, uuReq)
+</a><a href="#h0-2-20" id="h0-2-20" class="i">+		if err != nil {
+</a><a href="#h0-2-21" id="h0-2-21" class="i">+			return nil, b.createError(err)
+</a><a href="#h0-2-22" id="h0-2-22" class="i">+		}
+</a> 
+<a href="#h0-2-24" id="h0-2-24" class="d">-	hash := sha1.New()
+</a><a href="#h0-2-25" id="h0-2-25" class="d">-	hash.Write(request.Data)
+</a><a href="#h0-2-26" id="h0-2-26" class="d">-	checksum := fmt.Sprintf(&quot;%x&quot;, hash.Sum(nil))
+</a><a href="#h0-2-27" id="h0-2-27" class="i">+		hash := sha1.New()
+</a><a href="#h0-2-28" id="h0-2-28" class="i">+		hash.Write(request.Data)
+</a><a href="#h0-2-29" id="h0-2-29" class="i">+		checksum := fmt.Sprintf(&quot;%x&quot;, hash.Sum(nil))
+</a> 
+<a href="#h0-2-31" id="h0-2-31" class="d">-	ufReq := &amp;b2.UploadFileRequest{
+</a><a href="#h0-2-32" id="h0-2-32" class="d">-		Authorization: uuResp.AuthorizationToken,
+</a><a href="#h0-2-33" id="h0-2-33" class="d">-		UploadURL:     uuResp.UploadURL.URL,
+</a><a href="#h0-2-34" id="h0-2-34" class="d">-		FileName:      request.Key,
+</a><a href="#h0-2-35" id="h0-2-35" class="d">-		ContentType:   &quot;b2/x-auto&quot;,
+</a><a href="#h0-2-36" id="h0-2-36" class="d">-		ContentLength: len(request.Data),
+</a><a href="#h0-2-37" id="h0-2-37" class="d">-		ContentSHA1:   checksum,
+</a><a href="#h0-2-38" id="h0-2-38" class="d">-		Data:          io.NopCloser(bytes.NewReader(request.Data)),
+</a><a href="#h0-2-39" id="h0-2-39" class="d">-	}
+</a><a href="#h0-2-40" id="h0-2-40" class="i">+		ufReq := &amp;b2.UploadFileRequest{
+</a><a href="#h0-2-41" id="h0-2-41" class="i">+			Authorization: uuResp.AuthorizationToken,
+</a><a href="#h0-2-42" id="h0-2-42" class="i">+			UploadURL:     uuResp.UploadURL.URL,
+</a><a href="#h0-2-43" id="h0-2-43" class="i">+			FileName:      request.Key,
+</a><a href="#h0-2-44" id="h0-2-44" class="i">+			ContentType:   &quot;b2/x-auto&quot;,
+</a><a href="#h0-2-45" id="h0-2-45" class="i">+			ContentLength: len(request.Data),
+</a><a href="#h0-2-46" id="h0-2-46" class="i">+			ContentSHA1:   checksum,
+</a><a href="#h0-2-47" id="h0-2-47" class="i">+			Data:          io.NopCloser(bytes.NewReader(request.Data)),
+</a><a href="#h0-2-48" id="h0-2-48" class="i">+		}
+</a> 
+<a href="#h0-2-50" id="h0-2-50" class="d">-	ufResp, err := b.client.UploadFile(ctx, ufReq)
+</a><a href="#h0-2-51" id="h0-2-51" class="d">-	if err != nil {
+</a><a href="#h0-2-52" id="h0-2-52" class="d">-		return nil, b.createError(err)
+</a><a href="#h0-2-53" id="h0-2-53" class="d">-	}
+</a><a href="#h0-2-54" id="h0-2-54" class="i">+		ufResp, err := b.client.UploadFile(ctx, ufReq)
+</a><a href="#h0-2-55" id="h0-2-55" class="i">+		if err != nil {
+</a><a href="#h0-2-56" id="h0-2-56" class="i">+			if e, ok := err.(*b2.Status); ok &amp;&amp; e.Status &gt;= http.StatusInternalServerError &amp;&amp; retryAttempt &lt; uploadRetryBudget {
+</a><a href="#h0-2-57" id="h0-2-57" class="i">+				zap.L().Warn(
+</a><a href="#h0-2-58" id="h0-2-58" class="i">+					&quot;full file upload failed with server error; retrying after delay&quot;,
+</a><a href="#h0-2-59" id="h0-2-59" class="i">+					zap.Int(&quot;attempt&quot;, retryAttempt),
+</a><a href="#h0-2-60" id="h0-2-60" class="i">+					zap.Duration(&quot;delay&quot;, retryDelay),
+</a><a href="#h0-2-61" id="h0-2-61" class="i">+					zap.Error(err),
+</a><a href="#h0-2-62" id="h0-2-62" class="i">+				)
+</a> 
+<a href="#h0-2-64" id="h0-2-64" class="d">-	return &amp;service.PutObjectResponse{
+</a><a href="#h0-2-65" id="h0-2-65" class="d">-		Metadata: &amp;common.Metadata{
+</a><a href="#h0-2-66" id="h0-2-66" class="d">-			Id:           ufResp.FileID,
+</a><a href="#h0-2-67" id="h0-2-67" class="d">-			Key:          ufResp.FileName,
+</a><a href="#h0-2-68" id="h0-2-68" class="d">-			Size:         uint64(ufResp.ContentLength),
+</a><a href="#h0-2-69" id="h0-2-69" class="d">-			ObjectType:   common.Object_REGULAR,
+</a><a href="#h0-2-70" id="h0-2-70" class="d">-			MimeType:     ufResp.ContentType,
+</a><a href="#h0-2-71" id="h0-2-71" class="d">-			ModifiedTime: timestamppb.New(ufResp.UploadTimestamp.Time),
+</a><a href="#h0-2-72" id="h0-2-72" class="d">-			Checksum:     ufResp.ContentSHA1,
+</a><a href="#h0-2-73" id="h0-2-73" class="d">-		},
+</a><a href="#h0-2-74" id="h0-2-74" class="d">-	}, nil
+</a><a href="#h0-2-75" id="h0-2-75" class="i">+				select {
+</a><a href="#h0-2-76" id="h0-2-76" class="i">+				case &lt;-ctx.Done():
+</a><a href="#h0-2-77" id="h0-2-77" class="i">+					return nil, status.FromContextError(ctx.Err()).Err()
+</a><a href="#h0-2-78" id="h0-2-78" class="i">+				case &lt;-time.After(retryDelay):
+</a><a href="#h0-2-79" id="h0-2-79" class="i">+				}
+</a><a href="#h0-2-80" id="h0-2-80" class="i">+
+</a><a href="#h0-2-81" id="h0-2-81" class="i">+				retryAttempt++
+</a><a href="#h0-2-82" id="h0-2-82" class="i">+				retryDelay *= 2 // Exponential backoff
+</a><a href="#h0-2-83" id="h0-2-83" class="i">+				continue
+</a><a href="#h0-2-84" id="h0-2-84" class="i">+			}
+</a><a href="#h0-2-85" id="h0-2-85" class="i">+
+</a><a href="#h0-2-86" id="h0-2-86" class="i">+			return nil, b.createError(err)
+</a><a href="#h0-2-87" id="h0-2-87" class="i">+		}
+</a><a href="#h0-2-88" id="h0-2-88" class="i">+
+</a><a href="#h0-2-89" id="h0-2-89" class="i">+		return &amp;service.PutObjectResponse{
+</a><a href="#h0-2-90" id="h0-2-90" class="i">+			Metadata: &amp;common.Metadata{
+</a><a href="#h0-2-91" id="h0-2-91" class="i">+				Id:           ufResp.FileID,
+</a><a href="#h0-2-92" id="h0-2-92" class="i">+				Key:          ufResp.FileName,
+</a><a href="#h0-2-93" id="h0-2-93" class="i">+				Size:         uint64(ufResp.ContentLength),
+</a><a href="#h0-2-94" id="h0-2-94" class="i">+				ObjectType:   common.Object_REGULAR,
+</a><a href="#h0-2-95" id="h0-2-95" class="i">+				MimeType:     ufResp.ContentType,
+</a><a href="#h0-2-96" id="h0-2-96" class="i">+				ModifiedTime: timestamppb.New(ufResp.UploadTimestamp.Time),
+</a><a href="#h0-2-97" id="h0-2-97" class="i">+				Checksum:     ufResp.ContentSHA1,
+</a><a href="#h0-2-98" id="h0-2-98" class="i">+			},
+</a><a href="#h0-2-99" id="h0-2-99" class="i">+		}, nil
+</a><a href="#h0-2-100" id="h0-2-100" class="i">+	}
+</a> }
+ 
+ // StreamPutObject is a streaming implementation of PutObject. It identifies the target file, starts
+</pre>
+</div>
+</body>
+</html>

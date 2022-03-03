@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>pkg/client/b2: Support file info key-value pairs in UploadFile - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/c88d9ab55b4a3fd790f5ab71286d9b1d6721f03e">c88d9ab55b4a3fd790f5ab71286d9b1d6721f03e</a>
+<b>parent</b> <a href="../commit/d20158c5fcf956b89f71d7870059fdf318086616">d20158c5fcf956b89f71d7870059fdf318086616</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sat  8 Jan 2022 16:07:45 -0800
+
+pkg/client/b2: Support file info key-value pairs in UploadFile
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">pkg/client/b2/client.go</a></td><td> | </td><td class="num">6</td><td><span class="i">++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">pkg/client/b2/types.go</a></td><td> | </td><td class="num">3</td><td><span class="i">++</span><span class="d">-</span></td></tr>
+</table></pre><pre>2 files changed, 8 insertions(+), 1 deletion(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/pkg/client/b2/client.go">pkg/client/b2/client.go</a> b/<a href="../file/pkg/client/b2/client.go">pkg/client/b2/client.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -305,6 +305,12 @@ func (c *Client) UploadFile(ctx context.Context, request *UploadFileRequest) (*U
+</a> 		return nil, err
+ 	}
+ 
+<a href="#h0-0-3" id="h0-0-3" class="i">+	if request.FileInfo != nil {
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+		for key, info := range request.FileInfo {
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+			r.Header.Set(fmt.Sprintf(&quot;X-Bz-Info-%s&quot;, key), url.QueryEscape(info))
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+		}
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+	}
+</a><a href="#h0-0-8" id="h0-0-8" class="i">+
+</a> 	// Specify the content length explicitly to prevent net/http from automatically converting
+ 	// the request to use chunked transfer encoding, which is not supported by the B2 API for
+ 	// uploads.
+<b>diff --git a/<a id="h1" href="../file/pkg/client/b2/types.go">pkg/client/b2/types.go</a> b/<a href="../file/pkg/client/b2/types.go">pkg/client/b2/types.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -221,8 +221,8 @@ type StartLargeFileRequest struct {
+</a> 	BaseURL       *url.URL          `json:&quot;-&quot;`
+ 	BucketID      string            `json:&quot;bucketId&quot;`
+ 	FileName      string            `json:&quot;fileName&quot;`
+<a href="#h1-0-3" id="h1-0-3" class="d">-	ContentType   string            `json:&quot;contentType&quot;`
+</a> 	FileInfo      map[string]string `json:&quot;fileInfo&quot;`
+<a href="#h1-0-5" id="h1-0-5" class="i">+	ContentType   string            `json:&quot;contentType&quot;`
+</a> }
+ 
+ // StartLargeFileResponse is the response schema for b2_start_large_file.
+<a href="#h1-1" id="h1-1" class="h">@@ -245,6 +245,7 @@ type UploadFileRequest struct {
+</a> 	Authorization string `header:&quot;Authorization&quot;`
+ 	UploadURL     *url.URL
+ 	FileName      string `header:&quot;X-Bz-File-Name,encode&quot;`
+<a href="#h1-1-3" id="h1-1-3" class="i">+	FileInfo      map[string]string
+</a> 	ContentType   string `header:&quot;Content-Type&quot;`
+ 	ContentLength int    `header:&quot;Content-Length&quot;`
+ 	ContentSHA1   string `header:&quot;X-Bz-Content-Sha1&quot;`
+</pre>
+</div>
+</body>
+</html>
