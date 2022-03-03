@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>config.go - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../../../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../../../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../../../log">Log</a> | <a href="../../../files">Files</a> | <a href="../../../refs">Refs</a> | <a href="../../../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<p>internal/config/<strong>config.go</strong> (18708B) (<a href="../../../raw/internal/config/config.go">raw</a>) (<a href="../../../blame/internal/config/config.go">blame</a>)</p><hr/>
+<pre id="blob">
+<a href="#l1" class="line" id="l1">      1</a> package config
+<a href="#l2" class="line" id="l2">      2</a> 
+<a href="#l3" class="line" id="l3">      3</a> import (
+<a href="#l4" class="line" id="l4">      4</a> 	&quot;context&quot;
+<a href="#l5" class="line" id="l5">      5</a> 	&quot;crypto/sha256&quot;
+<a href="#l6" class="line" id="l6">      6</a> 	&quot;crypto/tls&quot;
+<a href="#l7" class="line" id="l7">      7</a> 	&quot;crypto/x509&quot;
+<a href="#l8" class="line" id="l8">      8</a> 	&quot;fmt&quot;
+<a href="#l9" class="line" id="l9">      9</a> 	&quot;net&quot;
+<a href="#l10" class="line" id="l10">     10</a> 	&quot;net/http&quot;
+<a href="#l11" class="line" id="l11">     11</a> 	&quot;os&quot;
+<a href="#l12" class="line" id="l12">     12</a> 	&quot;time&quot;
+<a href="#l13" class="line" id="l13">     13</a> 
+<a href="#l14" class="line" id="l14">     14</a> 	&quot;go.uber.org/zap&quot;
+<a href="#l15" class="line" id="l15">     15</a> 	&quot;golang.org/x/net/http2&quot;
+<a href="#l16" class="line" id="l16">     16</a> 	&quot;golang.org/x/net/proxy&quot;
+<a href="#l17" class="line" id="l17">     17</a> 	&quot;gopkg.in/yaml.v3&quot;
+<a href="#l18" class="line" id="l18">     18</a> 
+<a href="#l19" class="line" id="l19">     19</a> 	&quot;courier/internal/util&quot;
+<a href="#l20" class="line" id="l20">     20</a> )
+<a href="#l21" class="line" id="l21">     21</a> 
+<a href="#l22" class="line" id="l22">     22</a> // New creates a configuration object from a path on disk.
+<a href="#l23" class="line" id="l23">     23</a> func New(path string) (*Config, error) {
+<a href="#l24" class="line" id="l24">     24</a> 	var cfg *Config
+<a href="#l25" class="line" id="l25">     25</a> 
+<a href="#l26" class="line" id="l26">     26</a> 	file, err := os.OpenFile(path, os.O_RDONLY, 0)
+<a href="#l27" class="line" id="l27">     27</a> 	if err != nil {
+<a href="#l28" class="line" id="l28">     28</a> 		return nil, &amp;util.Error{
+<a href="#l29" class="line" id="l29">     29</a> 			Namespace: &quot;config&quot;,
+<a href="#l30" class="line" id="l30">     30</a> 			Message:   &quot;error opening config file on disk&quot;,
+<a href="#l31" class="line" id="l31">     31</a> 			Tags: map[string]interface{}{
+<a href="#l32" class="line" id="l32">     32</a> 				&quot;path&quot;: path,
+<a href="#l33" class="line" id="l33">     33</a> 			},
+<a href="#l34" class="line" id="l34">     34</a> 			StackedError: err,
+<a href="#l35" class="line" id="l35">     35</a> 		}
+<a href="#l36" class="line" id="l36">     36</a> 	}
+<a href="#l37" class="line" id="l37">     37</a> 
+<a href="#l38" class="line" id="l38">     38</a> 	decoder := yaml.NewDecoder(file)
+<a href="#l39" class="line" id="l39">     39</a> 	decoder.KnownFields(true)
+<a href="#l40" class="line" id="l40">     40</a> 
+<a href="#l41" class="line" id="l41">     41</a> 	if err := decoder.Decode(&amp;cfg); err != nil {
+<a href="#l42" class="line" id="l42">     42</a> 		return nil, &amp;util.Error{
+<a href="#l43" class="line" id="l43">     43</a> 			Namespace: &quot;config&quot;,
+<a href="#l44" class="line" id="l44">     44</a> 			Message:   &quot;error deserializing config file contents&quot;,
+<a href="#l45" class="line" id="l45">     45</a> 			Tags: map[string]interface{}{
+<a href="#l46" class="line" id="l46">     46</a> 				&quot;path&quot;: path,
+<a href="#l47" class="line" id="l47">     47</a> 			},
+<a href="#l48" class="line" id="l48">     48</a> 			StackedError: err,
+<a href="#l49" class="line" id="l49">     49</a> 		}
+<a href="#l50" class="line" id="l50">     50</a> 	}
+<a href="#l51" class="line" id="l51">     51</a> 
+<a href="#l52" class="line" id="l52">     52</a> 	if err := cfg.Validate(); err != nil {
+<a href="#l53" class="line" id="l53">     53</a> 		return nil, &amp;util.Error{
+<a href="#l54" class="line" id="l54">     54</a> 			Namespace: &quot;config&quot;,
+<a href="#l55" class="line" id="l55">     55</a> 			Message:   &quot;error validating config&quot;,
+<a href="#l56" class="line" id="l56">     56</a> 			Tags: map[string]interface{}{
+<a href="#l57" class="line" id="l57">     57</a> 				&quot;path&quot;: path,
+<a href="#l58" class="line" id="l58">     58</a> 			},
+<a href="#l59" class="line" id="l59">     59</a> 			StackedError: err,
+<a href="#l60" class="line" id="l60">     60</a> 		}
+<a href="#l61" class="line" id="l61">     61</a> 	}
+<a href="#l62" class="line" id="l62">     62</a> 
+<a href="#l63" class="line" id="l63">     63</a> 	return cfg, nil
+<a href="#l64" class="line" id="l64">     64</a> }
+<a href="#l65" class="line" id="l65">     65</a> 
+<a href="#l66" class="line" id="l66">     66</a> // Hash generates a deterministic and unique identifier for the currently active config.
+<a href="#l67" class="line" id="l67">     67</a> func (c *Config) Hash() string {
+<a href="#l68" class="line" id="l68">     68</a> 	encoded, _ := yaml.Marshal(c)
+<a href="#l69" class="line" id="l69">     69</a> 	return fmt.Sprintf(&quot;%x&quot;, sha256.Sum256(encoded))
+<a href="#l70" class="line" id="l70">     70</a> }
+<a href="#l71" class="line" id="l71">     71</a> 
+<a href="#l72" class="line" id="l72">     72</a> // Validate validates the configuration.
+<a href="#l73" class="line" id="l73">     73</a> func (c *Config) Validate() error {
+<a href="#l74" class="line" id="l74">     74</a> 	vhosts := make(map[string]bool)
+<a href="#l75" class="line" id="l75">     75</a> 
+<a href="#l76" class="line" id="l76">     76</a> 	if c.Application == nil {
+<a href="#l77" class="line" id="l77">     77</a> 		return &amp;util.Error{
+<a href="#l78" class="line" id="l78">     78</a> 			Namespace: &quot;config&quot;,
+<a href="#l79" class="line" id="l79">     79</a> 			Message:   &quot;missing application configuration&quot;,
+<a href="#l80" class="line" id="l80">     80</a> 		}
+<a href="#l81" class="line" id="l81">     81</a> 	} else if c.Application.Instance == &quot;&quot; {
+<a href="#l82" class="line" id="l82">     82</a> 		return &amp;util.Error{
+<a href="#l83" class="line" id="l83">     83</a> 			Namespace: &quot;config&quot;,
+<a href="#l84" class="line" id="l84">     84</a> 			Message:   &quot;missing application instance identifier&quot;,
+<a href="#l85" class="line" id="l85">     85</a> 		}
+<a href="#l86" class="line" id="l86">     86</a> 	} else if c.Application.Metrics != nil {
+<a href="#l87" class="line" id="l87">     87</a> 		if _, ok := metricSerializers[c.Application.Metrics.Serializer]; !ok {
+<a href="#l88" class="line" id="l88">     88</a> 			return &amp;util.Error{
+<a href="#l89" class="line" id="l89">     89</a> 				Namespace: &quot;config&quot;,
+<a href="#l90" class="line" id="l90">     90</a> 				Message:   &quot;unknown metric serializer&quot;,
+<a href="#l91" class="line" id="l91">     91</a> 				Tags: map[string]interface{}{
+<a href="#l92" class="line" id="l92">     92</a> 					&quot;serializer&quot;: c.Application.Metrics.Serializer,
+<a href="#l93" class="line" id="l93">     93</a> 				},
+<a href="#l94" class="line" id="l94">     94</a> 			}
+<a href="#l95" class="line" id="l95">     95</a> 		}
+<a href="#l96" class="line" id="l96">     96</a> 	}
+<a href="#l97" class="line" id="l97">     97</a> 
+<a href="#l98" class="line" id="l98">     98</a> 	if c.Server == nil {
+<a href="#l99" class="line" id="l99">     99</a> 		return &amp;util.Error{
+<a href="#l100" class="line" id="l100">    100</a> 			Namespace: &quot;config&quot;,
+<a href="#l101" class="line" id="l101">    101</a> 			Message:   &quot;missing server configuration&quot;,
+<a href="#l102" class="line" id="l102">    102</a> 		}
+<a href="#l103" class="line" id="l103">    103</a> 	} else if len(c.Server.Listeners) == 0 {
+<a href="#l104" class="line" id="l104">    104</a> 		return &amp;util.Error{
+<a href="#l105" class="line" id="l105">    105</a> 			Namespace: &quot;config&quot;,
+<a href="#l106" class="line" id="l106">    106</a> 			Message:   &quot;missing server listeners&quot;,
+<a href="#l107" class="line" id="l107">    107</a> 		}
+<a href="#l108" class="line" id="l108">    108</a> 	}
+<a href="#l109" class="line" id="l109">    109</a> 
+<a href="#l110" class="line" id="l110">    110</a> 	for _, listener := range c.Server.Listeners {
+<a href="#l111" class="line" id="l111">    111</a> 		if listener.Name == &quot;&quot; {
+<a href="#l112" class="line" id="l112">    112</a> 			return &amp;util.Error{
+<a href="#l113" class="line" id="l113">    113</a> 				Namespace: &quot;config&quot;,
+<a href="#l114" class="line" id="l114">    114</a> 				Message:   &quot;listener is missing name&quot;,
+<a href="#l115" class="line" id="l115">    115</a> 			}
+<a href="#l116" class="line" id="l116">    116</a> 		} else if listener.Address == nil {
+<a href="#l117" class="line" id="l117">    117</a> 			return &amp;util.Error{
+<a href="#l118" class="line" id="l118">    118</a> 				Namespace: &quot;config&quot;,
+<a href="#l119" class="line" id="l119">    119</a> 				Message:   &quot;listener missing address&quot;,
+<a href="#l120" class="line" id="l120">    120</a> 				Tags: map[string]interface{}{
+<a href="#l121" class="line" id="l121">    121</a> 					&quot;name&quot;: listener.Name,
+<a href="#l122" class="line" id="l122">    122</a> 				},
+<a href="#l123" class="line" id="l123">    123</a> 			}
+<a href="#l124" class="line" id="l124">    124</a> 		} else if _, ok := connectionProtocols[listener.Protocol]; !ok {
+<a href="#l125" class="line" id="l125">    125</a> 			return &amp;util.Error{
+<a href="#l126" class="line" id="l126">    126</a> 				Namespace: &quot;config&quot;,
+<a href="#l127" class="line" id="l127">    127</a> 				Message:   &quot;unknown listener protocol&quot;,
+<a href="#l128" class="line" id="l128">    128</a> 				Tags: map[string]interface{}{
+<a href="#l129" class="line" id="l129">    129</a> 					&quot;name&quot;:     listener.Name,
+<a href="#l130" class="line" id="l130">    130</a> 					&quot;protocol&quot;: listener.Protocol,
+<a href="#l131" class="line" id="l131">    131</a> 				},
+<a href="#l132" class="line" id="l132">    132</a> 			}
+<a href="#l133" class="line" id="l133">    133</a> 		}
+<a href="#l134" class="line" id="l134">    134</a> 
+<a href="#l135" class="line" id="l135">    135</a> 		if listener.TLSContext != nil {
+<a href="#l136" class="line" id="l136">    136</a> 			if listener.TLSContext.Certificates == nil || len(listener.TLSContext.Certificates) == 0 {
+<a href="#l137" class="line" id="l137">    137</a> 				return &amp;util.Error{
+<a href="#l138" class="line" id="l138">    138</a> 					Namespace: &quot;config&quot;,
+<a href="#l139" class="line" id="l139">    139</a> 					Message:   &quot;missing server TLS certificates&quot;,
+<a href="#l140" class="line" id="l140">    140</a> 					Tags: map[string]interface{}{
+<a href="#l141" class="line" id="l141">    141</a> 						&quot;name&quot;: listener.Name,
+<a href="#l142" class="line" id="l142">    142</a> 					},
+<a href="#l143" class="line" id="l143">    143</a> 				}
+<a href="#l144" class="line" id="l144">    144</a> 			} else if _, ok := tlsVerifyModes[listener.TLSContext.VerifyMode]; !ok {
+<a href="#l145" class="line" id="l145">    145</a> 				return &amp;util.Error{
+<a href="#l146" class="line" id="l146">    146</a> 					Namespace: &quot;config&quot;,
+<a href="#l147" class="line" id="l147">    147</a> 					Message:   &quot;unknown TLS client verification mode&quot;,
+<a href="#l148" class="line" id="l148">    148</a> 					Tags: map[string]interface{}{
+<a href="#l149" class="line" id="l149">    149</a> 						&quot;name&quot;:       listener.Name,
+<a href="#l150" class="line" id="l150">    150</a> 						&quot;mode&quot;:       listener.TLSContext.VerifyMode,
+<a href="#l151" class="line" id="l151">    151</a> 						&quot;candidates&quot;: tlsVerifyModes,
+<a href="#l152" class="line" id="l152">    152</a> 					},
+<a href="#l153" class="line" id="l153">    153</a> 				}
+<a href="#l154" class="line" id="l154">    154</a> 			} else if listener.TLSContext.VerifyPeer != nil &amp;&amp; listener.TLSContext.VerifyMode != &quot;strict&quot; {
+<a href="#l155" class="line" id="l155">    155</a> 				return &amp;util.Error{
+<a href="#l156" class="line" id="l156">    156</a> 					Namespace: &quot;config&quot;,
+<a href="#l157" class="line" id="l157">    157</a> 					Message:   &quot;TLS verify mode must be strict to enable peer identity verification&quot;,
+<a href="#l158" class="line" id="l158">    158</a> 					Tags: map[string]interface{}{
+<a href="#l159" class="line" id="l159">    159</a> 						&quot;name&quot;: listener.Name,
+<a href="#l160" class="line" id="l160">    160</a> 						&quot;mode&quot;: listener.TLSContext.VerifyMode,
+<a href="#l161" class="line" id="l161">    161</a> 						&quot;peer&quot;: listener.TLSContext.VerifyPeer,
+<a href="#l162" class="line" id="l162">    162</a> 					},
+<a href="#l163" class="line" id="l163">    163</a> 				}
+<a href="#l164" class="line" id="l164">    164</a> 			} else if _, ok := tlsProtocolVersions[listener.TLSContext.ProtocolVersion]; !ok {
+<a href="#l165" class="line" id="l165">    165</a> 				return &amp;util.Error{
+<a href="#l166" class="line" id="l166">    166</a> 					Namespace: &quot;config&quot;,
+<a href="#l167" class="line" id="l167">    167</a> 					Message:   &quot;unknown TLS protocol version constraint&quot;,
+<a href="#l168" class="line" id="l168">    168</a> 					Tags: map[string]interface{}{
+<a href="#l169" class="line" id="l169">    169</a> 						&quot;name&quot;:       listener.Name,
+<a href="#l170" class="line" id="l170">    170</a> 						&quot;constraint&quot;: listener.TLSContext.ProtocolVersion,
+<a href="#l171" class="line" id="l171">    171</a> 						&quot;candidates&quot;: tlsProtocolVersions,
+<a href="#l172" class="line" id="l172">    172</a> 					},
+<a href="#l173" class="line" id="l173">    173</a> 				}
+<a href="#l174" class="line" id="l174">    174</a> 			}
+<a href="#l175" class="line" id="l175">    175</a> 
+<a href="#l176" class="line" id="l176">    176</a> 			for _, cert := range listener.TLSContext.Certificates {
+<a href="#l177" class="line" id="l177">    177</a> 				if cert.Key == &quot;&quot; {
+<a href="#l178" class="line" id="l178">    178</a> 					return &amp;util.Error{
+<a href="#l179" class="line" id="l179">    179</a> 						Namespace: &quot;config&quot;,
+<a href="#l180" class="line" id="l180">    180</a> 						Message:   &quot;TLS certificate is missing key path&quot;,
+<a href="#l181" class="line" id="l181">    181</a> 						Tags: map[string]interface{}{
+<a href="#l182" class="line" id="l182">    182</a> 							&quot;name&quot;: listener.Name,
+<a href="#l183" class="line" id="l183">    183</a> 						},
+<a href="#l184" class="line" id="l184">    184</a> 					}
+<a href="#l185" class="line" id="l185">    185</a> 				} else if cert.Certificate == &quot;&quot; {
+<a href="#l186" class="line" id="l186">    186</a> 					return &amp;util.Error{
+<a href="#l187" class="line" id="l187">    187</a> 						Namespace: &quot;config&quot;,
+<a href="#l188" class="line" id="l188">    188</a> 						Message:   &quot;TLS certificate is missing certificate path&quot;,
+<a href="#l189" class="line" id="l189">    189</a> 						Tags: map[string]interface{}{
+<a href="#l190" class="line" id="l190">    190</a> 							&quot;name&quot;: listener.Name,
+<a href="#l191" class="line" id="l191">    191</a> 						},
+<a href="#l192" class="line" id="l192">    192</a> 					}
+<a href="#l193" class="line" id="l193">    193</a> 				}
+<a href="#l194" class="line" id="l194">    194</a> 			}
+<a href="#l195" class="line" id="l195">    195</a> 		}
+<a href="#l196" class="line" id="l196">    196</a> 	}
+<a href="#l197" class="line" id="l197">    197</a> 
+<a href="#l198" class="line" id="l198">    198</a> 	for _, vhost := range c.Server.VirtualHosts {
+<a href="#l199" class="line" id="l199">    199</a> 		upstreams := make(map[string]bool)
+<a href="#l200" class="line" id="l200">    200</a> 
+<a href="#l201" class="line" id="l201">    201</a> 		if _, ok := vhosts[vhost.Name]; ok {
+<a href="#l202" class="line" id="l202">    202</a> 			return &amp;util.Error{
+<a href="#l203" class="line" id="l203">    203</a> 				Namespace: &quot;config&quot;,
+<a href="#l204" class="line" id="l204">    204</a> 				Message:   &quot;duplicated virtual host name&quot;,
+<a href="#l205" class="line" id="l205">    205</a> 				Tags: map[string]interface{}{
+<a href="#l206" class="line" id="l206">    206</a> 					&quot;name&quot;: vhost.Name,
+<a href="#l207" class="line" id="l207">    207</a> 				},
+<a href="#l208" class="line" id="l208">    208</a> 			}
+<a href="#l209" class="line" id="l209">    209</a> 		} else if len(vhost.Upstreams) == 0 {
+<a href="#l210" class="line" id="l210">    210</a> 			return &amp;util.Error{
+<a href="#l211" class="line" id="l211">    211</a> 				Namespace: &quot;config&quot;,
+<a href="#l212" class="line" id="l212">    212</a> 				Message:   &quot;virtual host missing upstream configuration&quot;,
+<a href="#l213" class="line" id="l213">    213</a> 				Tags: map[string]interface{}{
+<a href="#l214" class="line" id="l214">    214</a> 					&quot;name&quot;: vhost.Name,
+<a href="#l215" class="line" id="l215">    215</a> 				},
+<a href="#l216" class="line" id="l216">    216</a> 			}
+<a href="#l217" class="line" id="l217">    217</a> 		} else if len(vhost.Routes) == 0 {
+<a href="#l218" class="line" id="l218">    218</a> 			return &amp;util.Error{
+<a href="#l219" class="line" id="l219">    219</a> 				Namespace: &quot;config&quot;,
+<a href="#l220" class="line" id="l220">    220</a> 				Message:   &quot;virtual host missing route configuration&quot;,
+<a href="#l221" class="line" id="l221">    221</a> 				Tags: map[string]interface{}{
+<a href="#l222" class="line" id="l222">    222</a> 					&quot;name&quot;: vhost.Name,
+<a href="#l223" class="line" id="l223">    223</a> 				},
+<a href="#l224" class="line" id="l224">    224</a> 			}
+<a href="#l225" class="line" id="l225">    225</a> 		}
+<a href="#l226" class="line" id="l226">    226</a> 
+<a href="#l227" class="line" id="l227">    227</a> 		vhosts[vhost.Name] = true
+<a href="#l228" class="line" id="l228">    228</a> 
+<a href="#l229" class="line" id="l229">    229</a> 		for _, upstream := range vhost.Upstreams {
+<a href="#l230" class="line" id="l230">    230</a> 			if upstream.Name == &quot;&quot; {
+<a href="#l231" class="line" id="l231">    231</a> 				return &amp;util.Error{
+<a href="#l232" class="line" id="l232">    232</a> 					Namespace: &quot;config&quot;,
+<a href="#l233" class="line" id="l233">    233</a> 					Message:   &quot;upstream missing name&quot;,
+<a href="#l234" class="line" id="l234">    234</a> 					Tags: map[string]interface{}{
+<a href="#l235" class="line" id="l235">    235</a> 						&quot;vhost&quot;: vhost.Name,
+<a href="#l236" class="line" id="l236">    236</a> 					},
+<a href="#l237" class="line" id="l237">    237</a> 				}
+<a href="#l238" class="line" id="l238">    238</a> 			} else if _, ok := upstreams[upstream.Name]; ok {
+<a href="#l239" class="line" id="l239">    239</a> 				return &amp;util.Error{
+<a href="#l240" class="line" id="l240">    240</a> 					Namespace: &quot;config&quot;,
+<a href="#l241" class="line" id="l241">    241</a> 					Message:   &quot;duplicated upstream name&quot;,
+<a href="#l242" class="line" id="l242">    242</a> 					Tags: map[string]interface{}{
+<a href="#l243" class="line" id="l243">    243</a> 						&quot;vhost&quot;:    vhost.Name,
+<a href="#l244" class="line" id="l244">    244</a> 						&quot;upstream&quot;: upstream.Name,
+<a href="#l245" class="line" id="l245">    245</a> 					},
+<a href="#l246" class="line" id="l246">    246</a> 				}
+<a href="#l247" class="line" id="l247">    247</a> 			} else if upstream.Address == nil {
+<a href="#l248" class="line" id="l248">    248</a> 				return &amp;util.Error{
+<a href="#l249" class="line" id="l249">    249</a> 					Namespace: &quot;config&quot;,
+<a href="#l250" class="line" id="l250">    250</a> 					Message:   &quot;upstream missing address&quot;,
+<a href="#l251" class="line" id="l251">    251</a> 					Tags: map[string]interface{}{
+<a href="#l252" class="line" id="l252">    252</a> 						&quot;vhost&quot;:    vhost.Name,
+<a href="#l253" class="line" id="l253">    253</a> 						&quot;upstream&quot;: upstream.Name,
+<a href="#l254" class="line" id="l254">    254</a> 					},
+<a href="#l255" class="line" id="l255">    255</a> 				}
+<a href="#l256" class="line" id="l256">    256</a> 			} else if _, ok := upstreamTransports[upstream.Transport]; !ok {
+<a href="#l257" class="line" id="l257">    257</a> 				return &amp;util.Error{
+<a href="#l258" class="line" id="l258">    258</a> 					Namespace: &quot;config&quot;,
+<a href="#l259" class="line" id="l259">    259</a> 					Message:   &quot;unknown virtual host transport&quot;,
+<a href="#l260" class="line" id="l260">    260</a> 					Tags: map[string]interface{}{
+<a href="#l261" class="line" id="l261">    261</a> 						&quot;vhost&quot;:     vhost.Name,
+<a href="#l262" class="line" id="l262">    262</a> 						&quot;upstream&quot;:  upstream.Name,
+<a href="#l263" class="line" id="l263">    263</a> 						&quot;transport&quot;: upstream.Transport,
+<a href="#l264" class="line" id="l264">    264</a> 					},
+<a href="#l265" class="line" id="l265">    265</a> 				}
+<a href="#l266" class="line" id="l266">    266</a> 			}
+<a href="#l267" class="line" id="l267">    267</a> 
+<a href="#l268" class="line" id="l268">    268</a> 			if upstream.HealthCheck != nil {
+<a href="#l269" class="line" id="l269">    269</a> 				if _, ok := healthCheckMethods[upstream.HealthCheck.Method]; !ok {
+<a href="#l270" class="line" id="l270">    270</a> 					return &amp;util.Error{
+<a href="#l271" class="line" id="l271">    271</a> 						Namespace: &quot;config&quot;,
+<a href="#l272" class="line" id="l272">    272</a> 						Message:   &quot;unknown HTTP health check method&quot;,
+<a href="#l273" class="line" id="l273">    273</a> 						Tags: map[string]interface{}{
+<a href="#l274" class="line" id="l274">    274</a> 							&quot;vhost&quot;:    vhost.Name,
+<a href="#l275" class="line" id="l275">    275</a> 							&quot;upstream&quot;: upstream.Name,
+<a href="#l276" class="line" id="l276">    276</a> 							&quot;method&quot;:   upstream.HealthCheck.Method,
+<a href="#l277" class="line" id="l277">    277</a> 						},
+<a href="#l278" class="line" id="l278">    278</a> 					}
+<a href="#l279" class="line" id="l279">    279</a> 				} else if upstream.HealthCheck.Interval &lt;= 0 {
+<a href="#l280" class="line" id="l280">    280</a> 					return &amp;util.Error{
+<a href="#l281" class="line" id="l281">    281</a> 						Namespace: &quot;config&quot;,
+<a href="#l282" class="line" id="l282">    282</a> 						Message:   &quot;health check interval must be a positive value&quot;,
+<a href="#l283" class="line" id="l283">    283</a> 						Tags: map[string]interface{}{
+<a href="#l284" class="line" id="l284">    284</a> 							&quot;vhost&quot;:    vhost.Name,
+<a href="#l285" class="line" id="l285">    285</a> 							&quot;upstream&quot;: upstream.Name,
+<a href="#l286" class="line" id="l286">    286</a> 							&quot;interval&quot;: upstream.HealthCheck.Interval,
+<a href="#l287" class="line" id="l287">    287</a> 						},
+<a href="#l288" class="line" id="l288">    288</a> 					}
+<a href="#l289" class="line" id="l289">    289</a> 				}
+<a href="#l290" class="line" id="l290">    290</a> 			}
+<a href="#l291" class="line" id="l291">    291</a> 
+<a href="#l292" class="line" id="l292">    292</a> 			if upstream.TLSContext != nil {
+<a href="#l293" class="line" id="l293">    293</a> 				if _, ok := tlsVerifyModes[upstream.TLSContext.VerifyMode]; !ok {
+<a href="#l294" class="line" id="l294">    294</a> 					return &amp;util.Error{
+<a href="#l295" class="line" id="l295">    295</a> 						Namespace: &quot;config&quot;,
+<a href="#l296" class="line" id="l296">    296</a> 						Message:   &quot;unknown TLS server verification mode&quot;,
+<a href="#l297" class="line" id="l297">    297</a> 						Tags: map[string]interface{}{
+<a href="#l298" class="line" id="l298">    298</a> 							&quot;vhost&quot;:      vhost.Name,
+<a href="#l299" class="line" id="l299">    299</a> 							&quot;upstream&quot;:   upstream.Name,
+<a href="#l300" class="line" id="l300">    300</a> 							&quot;mode&quot;:       upstream.TLSContext.VerifyMode,
+<a href="#l301" class="line" id="l301">    301</a> 							&quot;candidates&quot;: tlsVerifyModes,
+<a href="#l302" class="line" id="l302">    302</a> 						},
+<a href="#l303" class="line" id="l303">    303</a> 					}
+<a href="#l304" class="line" id="l304">    304</a> 				} else if upstream.TLSContext.VerifyPeer != nil &amp;&amp; upstream.TLSContext.VerifyMode != &quot;strict&quot; {
+<a href="#l305" class="line" id="l305">    305</a> 					return &amp;util.Error{
+<a href="#l306" class="line" id="l306">    306</a> 						Namespace: &quot;config&quot;,
+<a href="#l307" class="line" id="l307">    307</a> 						Message:   &quot;TLS verify mode must be strict to enable peer identity verification&quot;,
+<a href="#l308" class="line" id="l308">    308</a> 						Tags: map[string]interface{}{
+<a href="#l309" class="line" id="l309">    309</a> 							&quot;vhost&quot;:    vhost.Name,
+<a href="#l310" class="line" id="l310">    310</a> 							&quot;upstream&quot;: upstream.Name,
+<a href="#l311" class="line" id="l311">    311</a> 							&quot;mode&quot;:     upstream.TLSContext.VerifyMode,
+<a href="#l312" class="line" id="l312">    312</a> 							&quot;peer&quot;:     upstream.TLSContext.VerifyPeer,
+<a href="#l313" class="line" id="l313">    313</a> 						},
+<a href="#l314" class="line" id="l314">    314</a> 					}
+<a href="#l315" class="line" id="l315">    315</a> 				} else if _, ok := tlsProtocolVersions[upstream.TLSContext.ProtocolVersion]; !ok {
+<a href="#l316" class="line" id="l316">    316</a> 					return &amp;util.Error{
+<a href="#l317" class="line" id="l317">    317</a> 						Namespace: &quot;config&quot;,
+<a href="#l318" class="line" id="l318">    318</a> 						Message:   &quot;unknown TLS protocol version constraint&quot;,
+<a href="#l319" class="line" id="l319">    319</a> 						Tags: map[string]interface{}{
+<a href="#l320" class="line" id="l320">    320</a> 							&quot;vhost&quot;:      vhost.Name,
+<a href="#l321" class="line" id="l321">    321</a> 							&quot;upstream&quot;:   upstream.Name,
+<a href="#l322" class="line" id="l322">    322</a> 							&quot;constraint&quot;: upstream.TLSContext.ProtocolVersion,
+<a href="#l323" class="line" id="l323">    323</a> 							&quot;candidates&quot;: tlsProtocolVersions,
+<a href="#l324" class="line" id="l324">    324</a> 						},
+<a href="#l325" class="line" id="l325">    325</a> 					}
+<a href="#l326" class="line" id="l326">    326</a> 				}
+<a href="#l327" class="line" id="l327">    327</a> 			}
+<a href="#l328" class="line" id="l328">    328</a> 
+<a href="#l329" class="line" id="l329">    329</a> 			upstreams[upstream.Name] = true
+<a href="#l330" class="line" id="l330">    330</a> 		}
+<a href="#l331" class="line" id="l331">    331</a> 
+<a href="#l332" class="line" id="l332">    332</a> 		for _, route := range vhost.Routes {
+<a href="#l333" class="line" id="l333">    333</a> 			if route.Upstream == &quot;&quot; {
+<a href="#l334" class="line" id="l334">    334</a> 				return &amp;util.Error{
+<a href="#l335" class="line" id="l335">    335</a> 					Namespace: &quot;config&quot;,
+<a href="#l336" class="line" id="l336">    336</a> 					Message:   &quot;route upstream name is missing&quot;,
+<a href="#l337" class="line" id="l337">    337</a> 					Tags: map[string]interface{}{
+<a href="#l338" class="line" id="l338">    338</a> 						&quot;vhost&quot;:      vhost.Name,
+<a href="#l339" class="line" id="l339">    339</a> 						&quot;candidates&quot;: upstreams,
+<a href="#l340" class="line" id="l340">    340</a> 					},
+<a href="#l341" class="line" id="l341">    341</a> 				}
+<a href="#l342" class="line" id="l342">    342</a> 			} else if _, ok := upstreams[route.Upstream]; !ok {
+<a href="#l343" class="line" id="l343">    343</a> 				return &amp;util.Error{
+<a href="#l344" class="line" id="l344">    344</a> 					Namespace: &quot;config&quot;,
+<a href="#l345" class="line" id="l345">    345</a> 					Message:   &quot;unknown route upstream&quot;,
+<a href="#l346" class="line" id="l346">    346</a> 					Tags: map[string]interface{}{
+<a href="#l347" class="line" id="l347">    347</a> 						&quot;vhost&quot;:      vhost.Name,
+<a href="#l348" class="line" id="l348">    348</a> 						&quot;upstream&quot;:   route.Upstream,
+<a href="#l349" class="line" id="l349">    349</a> 						&quot;candidates&quot;: upstreams,
+<a href="#l350" class="line" id="l350">    350</a> 					},
+<a href="#l351" class="line" id="l351">    351</a> 				}
+<a href="#l352" class="line" id="l352">    352</a> 			} else if route.Match.Header != nil {
+<a href="#l353" class="line" id="l353">    353</a> 				if route.Match.Header.Key == &quot;&quot; {
+<a href="#l354" class="line" id="l354">    354</a> 					return &amp;util.Error{
+<a href="#l355" class="line" id="l355">    355</a> 						Namespace: &quot;config&quot;,
+<a href="#l356" class="line" id="l356">    356</a> 						Message:   &quot;route match header key is missing&quot;,
+<a href="#l357" class="line" id="l357">    357</a> 						Tags: map[string]interface{}{
+<a href="#l358" class="line" id="l358">    358</a> 							&quot;vhost&quot;:    vhost.Name,
+<a href="#l359" class="line" id="l359">    359</a> 							&quot;upstream&quot;: route.Upstream,
+<a href="#l360" class="line" id="l360">    360</a> 						},
+<a href="#l361" class="line" id="l361">    361</a> 					}
+<a href="#l362" class="line" id="l362">    362</a> 				} else if route.Match.Header.Value == nil {
+<a href="#l363" class="line" id="l363">    363</a> 					return &amp;util.Error{
+<a href="#l364" class="line" id="l364">    364</a> 						Namespace: &quot;config&quot;,
+<a href="#l365" class="line" id="l365">    365</a> 						Message:   &quot;route match header value is missing&quot;,
+<a href="#l366" class="line" id="l366">    366</a> 						Tags: map[string]interface{}{
+<a href="#l367" class="line" id="l367">    367</a> 							&quot;vhost&quot;:    vhost.Name,
+<a href="#l368" class="line" id="l368">    368</a> 							&quot;upstream&quot;: route.Upstream,
+<a href="#l369" class="line" id="l369">    369</a> 							&quot;key&quot;:      route.Match.Header.Key,
+<a href="#l370" class="line" id="l370">    370</a> 						},
+<a href="#l371" class="line" id="l371">    371</a> 					}
+<a href="#l372" class="line" id="l372">    372</a> 				}
+<a href="#l373" class="line" id="l373">    373</a> 			}
+<a href="#l374" class="line" id="l374">    374</a> 		}
+<a href="#l375" class="line" id="l375">    375</a> 
+<a href="#l376" class="line" id="l376">    376</a> 		for _, filter := range vhost.Filters {
+<a href="#l377" class="line" id="l377">    377</a> 			if filter.Name == &quot;&quot; {
+<a href="#l378" class="line" id="l378">    378</a> 				return &amp;util.Error{
+<a href="#l379" class="line" id="l379">    379</a> 					Namespace: &quot;config&quot;,
+<a href="#l380" class="line" id="l380">    380</a> 					Message:   &quot;missing filter name&quot;,
+<a href="#l381" class="line" id="l381">    381</a> 					Tags:      map[string]interface{}{&quot;vhost&quot;: vhost.Name},
+<a href="#l382" class="line" id="l382">    382</a> 				}
+<a href="#l383" class="line" id="l383">    383</a> 			} else if filter.Type == &quot;&quot; {
+<a href="#l384" class="line" id="l384">    384</a> 				return &amp;util.Error{
+<a href="#l385" class="line" id="l385">    385</a> 					Namespace: &quot;config&quot;,
+<a href="#l386" class="line" id="l386">    386</a> 					Message:   &quot;missing filter type&quot;,
+<a href="#l387" class="line" id="l387">    387</a> 					Tags:      map[string]interface{}{&quot;vhost&quot;: vhost.Name},
+<a href="#l388" class="line" id="l388">    388</a> 				}
+<a href="#l389" class="line" id="l389">    389</a> 			} else if _, ok := filterTypes[filter.Type]; !ok {
+<a href="#l390" class="line" id="l390">    390</a> 				return &amp;util.Error{
+<a href="#l391" class="line" id="l391">    391</a> 					Namespace: &quot;config&quot;,
+<a href="#l392" class="line" id="l392">    392</a> 					Message:   &quot;unknown filter type&quot;,
+<a href="#l393" class="line" id="l393">    393</a> 					Tags: map[string]interface{}{
+<a href="#l394" class="line" id="l394">    394</a> 						&quot;vhost&quot;: vhost.Name,
+<a href="#l395" class="line" id="l395">    395</a> 						&quot;type&quot;:  filter.Type,
+<a href="#l396" class="line" id="l396">    396</a> 					},
+<a href="#l397" class="line" id="l397">    397</a> 				}
+<a href="#l398" class="line" id="l398">    398</a> 			}
+<a href="#l399" class="line" id="l399">    399</a> 		}
+<a href="#l400" class="line" id="l400">    400</a> 	}
+<a href="#l401" class="line" id="l401">    401</a> 
+<a href="#l402" class="line" id="l402">    402</a> 	return nil
+<a href="#l403" class="line" id="l403">    403</a> }
+<a href="#l404" class="line" id="l404">    404</a> 
+<a href="#l405" class="line" id="l405">    405</a> // ClientTransport creates a new http.RoundTripper transport derived from the upstream connection
+<a href="#l406" class="line" id="l406">    406</a> // configuration. Note that this method initializes new resources and the returned transport should
+<a href="#l407" class="line" id="l407">    407</a> // thus be reused across multiple connections for this upstream in order to avoid resource leaks.
+<a href="#l408" class="line" id="l408">    408</a> func (u *Upstream) ClientTransport() (http.RoundTripper, error) {
+<a href="#l409" class="line" id="l409">    409</a> 	var err error
+<a href="#l410" class="line" id="l410">    410</a> 	var tlsCfg *tls.Config
+<a href="#l411" class="line" id="l411">    411</a> 
+<a href="#l412" class="line" id="l412">    412</a> 	if u.TLSContext != nil {
+<a href="#l413" class="line" id="l413">    413</a> 		zap.L().Debug(
+<a href="#l414" class="line" id="l414">    414</a> 			&quot;creating client TLS origination context&quot;,
+<a href="#l415" class="line" id="l415">    415</a> 			zap.String(&quot;upstream&quot;, u.Address.String()),
+<a href="#l416" class="line" id="l416">    416</a> 		)
+<a href="#l417" class="line" id="l417">    417</a> 
+<a href="#l418" class="line" id="l418">    418</a> 		tlsCfg, err = u.TLSContext.ClientConfig()
+<a href="#l419" class="line" id="l419">    419</a> 		if err != nil {
+<a href="#l420" class="line" id="l420">    420</a> 			return nil, &amp;util.Error{
+<a href="#l421" class="line" id="l421">    421</a> 				Namespace:    &quot;config&quot;,
+<a href="#l422" class="line" id="l422">    422</a> 				Message:      &quot;error creating client TLS origination context&quot;,
+<a href="#l423" class="line" id="l423">    423</a> 				StackedError: err,
+<a href="#l424" class="line" id="l424">    424</a> 			}
+<a href="#l425" class="line" id="l425">    425</a> 		}
+<a href="#l426" class="line" id="l426">    426</a> 	}
+<a href="#l427" class="line" id="l427">    427</a> 
+<a href="#l428" class="line" id="l428">    428</a> 	switch u.Transport {
+<a href="#l429" class="line" id="l429">    429</a> 	case &quot;http2&quot;:
+<a href="#l430" class="line" id="l430">    430</a> 		zap.L().Debug(
+<a href="#l431" class="line" id="l431">    431</a> 			&quot;creating client HTTP/2 transport&quot;,
+<a href="#l432" class="line" id="l432">    432</a> 			zap.String(&quot;upstream&quot;, u.Address.String()),
+<a href="#l433" class="line" id="l433">    433</a> 			zap.Stringer(&quot;proxy&quot;, u.Proxy),
+<a href="#l434" class="line" id="l434">    434</a> 			zap.Any(&quot;connection&quot;, u.Connection),
+<a href="#l435" class="line" id="l435">    435</a> 		)
+<a href="#l436" class="line" id="l436">    436</a> 
+<a href="#l437" class="line" id="l437">    437</a> 		return &amp;http2.Transport{
+<a href="#l438" class="line" id="l438">    438</a> 			AllowHTTP:       true,
+<a href="#l439" class="line" id="l439">    439</a> 			TLSClientConfig: tlsCfg,
+<a href="#l440" class="line" id="l440">    440</a> 			DialTLS: func(network string, addr string, cfg *tls.Config) (net.Conn, error) {
+<a href="#l441" class="line" id="l441">    441</a> 				var dialer proxy.Dialer
+<a href="#l442" class="line" id="l442">    442</a> 				var cancel context.CancelFunc
+<a href="#l443" class="line" id="l443">    443</a> 
+<a href="#l444" class="line" id="l444">    444</a> 				dialer = &amp;net.Dialer{
+<a href="#l445" class="line" id="l445">    445</a> 					Timeout:   u.Connection.ConnectTimeout,
+<a href="#l446" class="line" id="l446">    446</a> 					KeepAlive: u.Connection.KeepaliveInterval,
+<a href="#l447" class="line" id="l447">    447</a> 				}
+<a href="#l448" class="line" id="l448">    448</a> 
+<a href="#l449" class="line" id="l449">    449</a> 				if u.TLSContext != nil {
+<a href="#l450" class="line" id="l450">    450</a> 					dialer = &amp;tls.Dialer{
+<a href="#l451" class="line" id="l451">    451</a> 						NetDialer: dialer.(*net.Dialer),
+<a href="#l452" class="line" id="l452">    452</a> 						Config:    cfg,
+<a href="#l453" class="line" id="l453">    453</a> 					}
+<a href="#l454" class="line" id="l454">    454</a> 				}
+<a href="#l455" class="line" id="l455">    455</a> 
+<a href="#l456" class="line" id="l456">    456</a> 				if u.Proxy != nil {
+<a href="#l457" class="line" id="l457">    457</a> 					dialer, err = proxy.FromURL(u.Proxy.URL, dialer)
+<a href="#l458" class="line" id="l458">    458</a> 					if err != nil {
+<a href="#l459" class="line" id="l459">    459</a> 						return nil, &amp;util.Error{
+<a href="#l460" class="line" id="l460">    460</a> 							Namespace: &quot;config&quot;,
+<a href="#l461" class="line" id="l461">    461</a> 							Message:   &quot;error creating HTTP/2 proxy dialer&quot;,
+<a href="#l462" class="line" id="l462">    462</a> 							Tags: map[string]interface{}{
+<a href="#l463" class="line" id="l463">    463</a> 								&quot;name&quot;:  u.Name,
+<a href="#l464" class="line" id="l464">    464</a> 								&quot;addr&quot;:  u.Address,
+<a href="#l465" class="line" id="l465">    465</a> 								&quot;proxy&quot;: u.Proxy,
+<a href="#l466" class="line" id="l466">    466</a> 							},
+<a href="#l467" class="line" id="l467">    467</a> 							StackedError: err,
+<a href="#l468" class="line" id="l468">    468</a> 						}
+<a href="#l469" class="line" id="l469">    469</a> 					}
+<a href="#l470" class="line" id="l470">    470</a> 				}
+<a href="#l471" class="line" id="l471">    471</a> 
+<a href="#l472" class="line" id="l472">    472</a> 				network, addr = u.Address.Address()
+<a href="#l473" class="line" id="l473">    473</a> 				conn, err := dialer.Dial(network, addr)
+<a href="#l474" class="line" id="l474">    474</a> 				if err != nil {
+<a href="#l475" class="line" id="l475">    475</a> 					return nil, &amp;util.Error{
+<a href="#l476" class="line" id="l476">    476</a> 						Namespace: &quot;config&quot;,
+<a href="#l477" class="line" id="l477">    477</a> 						Message:   &quot;error dialing upstream address over HTTP/2&quot;,
+<a href="#l478" class="line" id="l478">    478</a> 						Tags: map[string]interface{}{
+<a href="#l479" class="line" id="l479">    479</a> 							&quot;name&quot;: u.Name,
+<a href="#l480" class="line" id="l480">    480</a> 							&quot;addr&quot;: u.Address,
+<a href="#l481" class="line" id="l481">    481</a> 						},
+<a href="#l482" class="line" id="l482">    482</a> 						StackedError: err,
+<a href="#l483" class="line" id="l483">    483</a> 					}
+<a href="#l484" class="line" id="l484">    484</a> 				}
+<a href="#l485" class="line" id="l485">    485</a> 
+<a href="#l486" class="line" id="l486">    486</a> 				if u.TLSContext != nil {
+<a href="#l487" class="line" id="l487">    487</a> 					ctx := context.Background()
+<a href="#l488" class="line" id="l488">    488</a> 					if u.TLSContext.HandshakeTimeout &gt; 0 {
+<a href="#l489" class="line" id="l489">    489</a> 						ctx, cancel = context.WithTimeout(
+<a href="#l490" class="line" id="l490">    490</a> 							context.Background(),
+<a href="#l491" class="line" id="l491">    491</a> 							u.TLSContext.HandshakeTimeout,
+<a href="#l492" class="line" id="l492">    492</a> 						)
+<a href="#l493" class="line" id="l493">    493</a> 						defer cancel()
+<a href="#l494" class="line" id="l494">    494</a> 					}
+<a href="#l495" class="line" id="l495">    495</a> 
+<a href="#l496" class="line" id="l496">    496</a> 					if err := conn.(*tls.Conn).HandshakeContext(ctx); err != nil {
+<a href="#l497" class="line" id="l497">    497</a> 						return nil, &amp;util.Error{
+<a href="#l498" class="line" id="l498">    498</a> 							Namespace: &quot;config&quot;,
+<a href="#l499" class="line" id="l499">    499</a> 							Message:   &quot;error during upstream TLS handshake&quot;,
+<a href="#l500" class="line" id="l500">    500</a> 							Tags: map[string]interface{}{
+<a href="#l501" class="line" id="l501">    501</a> 								&quot;name&quot;: u.Name,
+<a href="#l502" class="line" id="l502">    502</a> 								&quot;addr&quot;: u.Address,
+<a href="#l503" class="line" id="l503">    503</a> 							},
+<a href="#l504" class="line" id="l504">    504</a> 							StackedError: err,
+<a href="#l505" class="line" id="l505">    505</a> 						}
+<a href="#l506" class="line" id="l506">    506</a> 					}
+<a href="#l507" class="line" id="l507">    507</a> 				}
+<a href="#l508" class="line" id="l508">    508</a> 
+<a href="#l509" class="line" id="l509">    509</a> 				return newTimeoutConn(
+<a href="#l510" class="line" id="l510">    510</a> 					u.Connection.ReadTimeout,
+<a href="#l511" class="line" id="l511">    511</a> 					u.Connection.WriteTimeout,
+<a href="#l512" class="line" id="l512">    512</a> 					conn,
+<a href="#l513" class="line" id="l513">    513</a> 				), nil
+<a href="#l514" class="line" id="l514">    514</a> 			},
+<a href="#l515" class="line" id="l515">    515</a> 		}, nil
+<a href="#l516" class="line" id="l516">    516</a> 	default:
+<a href="#l517" class="line" id="l517">    517</a> 		var tlsHandshakeTimeout time.Duration
+<a href="#l518" class="line" id="l518">    518</a> 
+<a href="#l519" class="line" id="l519">    519</a> 		zap.L().Debug(
+<a href="#l520" class="line" id="l520">    520</a> 			&quot;creating client HTTP/1.1 transport&quot;,
+<a href="#l521" class="line" id="l521">    521</a> 			zap.String(&quot;upstream&quot;, u.Address.String()),
+<a href="#l522" class="line" id="l522">    522</a> 			zap.Stringer(&quot;proxy&quot;, u.Proxy),
+<a href="#l523" class="line" id="l523">    523</a> 			zap.Any(&quot;connection&quot;, u.Connection),
+<a href="#l524" class="line" id="l524">    524</a> 		)
+<a href="#l525" class="line" id="l525">    525</a> 
+<a href="#l526" class="line" id="l526">    526</a> 		if u.TLSContext != nil {
+<a href="#l527" class="line" id="l527">    527</a> 			tlsHandshakeTimeout = u.TLSContext.HandshakeTimeout
+<a href="#l528" class="line" id="l528">    528</a> 		}
+<a href="#l529" class="line" id="l529">    529</a> 
+<a href="#l530" class="line" id="l530">    530</a> 		return &amp;http.Transport{
+<a href="#l531" class="line" id="l531">    531</a> 			ResponseHeaderTimeout: u.Connection.ReadHeaderTimeout,
+<a href="#l532" class="line" id="l532">    532</a> 			ExpectContinueTimeout: u.Connection.ExpectContinueTimeout,
+<a href="#l533" class="line" id="l533">    533</a> 			IdleConnTimeout:       u.Connection.IdleTimeout,
+<a href="#l534" class="line" id="l534">    534</a> 			TLSHandshakeTimeout:   tlsHandshakeTimeout,
+<a href="#l535" class="line" id="l535">    535</a> 			MaxIdleConnsPerHost:   u.Connection.IdleLimit,
+<a href="#l536" class="line" id="l536">    536</a> 			DisableKeepAlives:     u.Connection.KeepaliveInterval &lt; 0,
+<a href="#l537" class="line" id="l537">    537</a> 			ReadBufferSize:        u.Connection.ReadBufferSize,
+<a href="#l538" class="line" id="l538">    538</a> 			WriteBufferSize:       u.Connection.WriteBufferSize,
+<a href="#l539" class="line" id="l539">    539</a> 			TLSClientConfig:       tlsCfg,
+<a href="#l540" class="line" id="l540">    540</a> 			// Even if an HTTP/2 upstream transport is not explicitly requested, attempt
+<a href="#l541" class="line" id="l541">    541</a> 			// an upgrade regardless and gracefully fall back to HTTP/1.1 when the
+<a href="#l542" class="line" id="l542">    542</a> 			// upstream does not support HTTP/2 or otherwise refuses the upgrade.
+<a href="#l543" class="line" id="l543">    543</a> 			ForceAttemptHTTP2: true,
+<a href="#l544" class="line" id="l544">    544</a> 			DialContext: func(ctx context.Context, network string, addr string) (net.Conn, error) {
+<a href="#l545" class="line" id="l545">    545</a> 				var dialer proxy.Dialer
+<a href="#l546" class="line" id="l546">    546</a> 
+<a href="#l547" class="line" id="l547">    547</a> 				dialer = &amp;net.Dialer{
+<a href="#l548" class="line" id="l548">    548</a> 					Timeout:   u.Connection.ConnectTimeout,
+<a href="#l549" class="line" id="l549">    549</a> 					KeepAlive: u.Connection.KeepaliveInterval,
+<a href="#l550" class="line" id="l550">    550</a> 				}
+<a href="#l551" class="line" id="l551">    551</a> 
+<a href="#l552" class="line" id="l552">    552</a> 				if u.Proxy != nil {
+<a href="#l553" class="line" id="l553">    553</a> 					dialer, err = proxy.FromURL(u.Proxy.URL, dialer)
+<a href="#l554" class="line" id="l554">    554</a> 					if err != nil {
+<a href="#l555" class="line" id="l555">    555</a> 						return nil, &amp;util.Error{
+<a href="#l556" class="line" id="l556">    556</a> 							Namespace: &quot;config&quot;,
+<a href="#l557" class="line" id="l557">    557</a> 							Message:   &quot;error creating proxy dialer&quot;,
+<a href="#l558" class="line" id="l558">    558</a> 							Tags: map[string]interface{}{
+<a href="#l559" class="line" id="l559">    559</a> 								&quot;name&quot;:  u.Name,
+<a href="#l560" class="line" id="l560">    560</a> 								&quot;addr&quot;:  u.Address,
+<a href="#l561" class="line" id="l561">    561</a> 								&quot;proxy&quot;: u.Proxy,
+<a href="#l562" class="line" id="l562">    562</a> 							},
+<a href="#l563" class="line" id="l563">    563</a> 							StackedError: err,
+<a href="#l564" class="line" id="l564">    564</a> 						}
+<a href="#l565" class="line" id="l565">    565</a> 					}
+<a href="#l566" class="line" id="l566">    566</a> 				}
+<a href="#l567" class="line" id="l567">    567</a> 
+<a href="#l568" class="line" id="l568">    568</a> 				network, addr = u.Address.Address()
+<a href="#l569" class="line" id="l569">    569</a> 				conn, err := dialer.Dial(network, addr)
+<a href="#l570" class="line" id="l570">    570</a> 				if err != nil {
+<a href="#l571" class="line" id="l571">    571</a> 					return nil, &amp;util.Error{
+<a href="#l572" class="line" id="l572">    572</a> 						Namespace: &quot;config&quot;,
+<a href="#l573" class="line" id="l573">    573</a> 						Message:   &quot;error dialing upstream address&quot;,
+<a href="#l574" class="line" id="l574">    574</a> 						Tags: map[string]interface{}{
+<a href="#l575" class="line" id="l575">    575</a> 							&quot;name&quot;: u.Name,
+<a href="#l576" class="line" id="l576">    576</a> 							&quot;addr&quot;: u.Address,
+<a href="#l577" class="line" id="l577">    577</a> 						},
+<a href="#l578" class="line" id="l578">    578</a> 						StackedError: err,
+<a href="#l579" class="line" id="l579">    579</a> 					}
+<a href="#l580" class="line" id="l580">    580</a> 				}
+<a href="#l581" class="line" id="l581">    581</a> 
+<a href="#l582" class="line" id="l582">    582</a> 				return newTimeoutConn(
+<a href="#l583" class="line" id="l583">    583</a> 					u.Connection.ReadTimeout,
+<a href="#l584" class="line" id="l584">    584</a> 					u.Connection.WriteTimeout,
+<a href="#l585" class="line" id="l585">    585</a> 					conn,
+<a href="#l586" class="line" id="l586">    586</a> 				), nil
+<a href="#l587" class="line" id="l587">    587</a> 			},
+<a href="#l588" class="line" id="l588">    588</a> 		}, nil
+<a href="#l589" class="line" id="l589">    589</a> 	}
+<a href="#l590" class="line" id="l590">    590</a> }
+<a href="#l591" class="line" id="l591">    591</a> 
+<a href="#l592" class="line" id="l592">    592</a> // ClientConfig transforms the TLS context into a tls.Config appropriate for purposes of TLS
+<a href="#l593" class="line" id="l593">    593</a> // origination from a client.
+<a href="#l594" class="line" id="l594">    594</a> func (t *TLSContext) ClientConfig() (*tls.Config, error) {
+<a href="#l595" class="line" id="l595">    595</a> 	var verifyConnection func(tls.ConnectionState) error
+<a href="#l596" class="line" id="l596">    596</a> 	var minVersion uint16
+<a href="#l597" class="line" id="l597">    597</a> 
+<a href="#l598" class="line" id="l598">    598</a> 	cs, err := newCertificateStore(t, func() (*x509.CertPool, error) {
+<a href="#l599" class="line" id="l599">    599</a> 		return x509.SystemCertPool()
+<a href="#l600" class="line" id="l600">    600</a> 	})
+<a href="#l601" class="line" id="l601">    601</a> 	if err != nil {
+<a href="#l602" class="line" id="l602">    602</a> 		return nil, &amp;util.Error{
+<a href="#l603" class="line" id="l603">    603</a> 			Namespace:    &quot;config&quot;,
+<a href="#l604" class="line" id="l604">    604</a> 			Message:      &quot;failed to initialize client certificate store&quot;,
+<a href="#l605" class="line" id="l605">    605</a> 			StackedError: err,
+<a href="#l606" class="line" id="l606">    606</a> 		}
+<a href="#l607" class="line" id="l607">    607</a> 	}
+<a href="#l608" class="line" id="l608">    608</a> 
+<a href="#l609" class="line" id="l609">    609</a> 	if t.VerifyPeer != nil {
+<a href="#l610" class="line" id="l610">    610</a> 		pv := &amp;peerVerifier{
+<a href="#l611" class="line" id="l611">    611</a> 			pattern: t.VerifyPeer,
+<a href="#l612" class="line" id="l612">    612</a> 			roots:   cs.cas,
+<a href="#l613" class="line" id="l613">    613</a> 		}
+<a href="#l614" class="line" id="l614">    614</a> 
+<a href="#l615" class="line" id="l615">    615</a> 		verifyConnection = pv.verifyServer
+<a href="#l616" class="line" id="l616">    616</a> 	}
+<a href="#l617" class="line" id="l617">    617</a> 
+<a href="#l618" class="line" id="l618">    618</a> 	switch t.ProtocolVersion {
+<a href="#l619" class="line" id="l619">    619</a> 	case &quot;lenient&quot;:
+<a href="#l620" class="line" id="l620">    620</a> 		minVersion = tls.VersionTLS11
+<a href="#l621" class="line" id="l621">    621</a> 	case &quot;standard&quot;:
+<a href="#l622" class="line" id="l622">    622</a> 		minVersion = tls.VersionTLS12
+<a href="#l623" class="line" id="l623">    623</a> 	case &quot;modern&quot;:
+<a href="#l624" class="line" id="l624">    624</a> 		minVersion = tls.VersionTLS13
+<a href="#l625" class="line" id="l625">    625</a> 	default:
+<a href="#l626" class="line" id="l626">    626</a> 		minVersion = tls.VersionTLS12
+<a href="#l627" class="line" id="l627">    627</a> 	}
+<a href="#l628" class="line" id="l628">    628</a> 
+<a href="#l629" class="line" id="l629">    629</a> 	return &amp;tls.Config{
+<a href="#l630" class="line" id="l630">    630</a> 		GetClientCertificate: cs.getClientCertificate,
+<a href="#l631" class="line" id="l631">    631</a> 		RootCAs:              cs.cas,
+<a href="#l632" class="line" id="l632">    632</a> 		// Defer to the overridden connection verification in place of default validation
+<a href="#l633" class="line" id="l633">    633</a> 		// when explicit peer verification is enabled.
+<a href="#l634" class="line" id="l634">    634</a> 		InsecureSkipVerify: t.VerifyMode == &quot;none&quot; ||
+<a href="#l635" class="line" id="l635">    635</a> 			t.VerifyMode == &quot;relaxed&quot; ||
+<a href="#l636" class="line" id="l636">    636</a> 			t.VerifyPeer != nil,
+<a href="#l637" class="line" id="l637">    637</a> 		MinVersion:         minVersion,
+<a href="#l638" class="line" id="l638">    638</a> 		ClientSessionCache: tls.NewLRUClientSessionCache(128),
+<a href="#l639" class="line" id="l639">    639</a> 		VerifyConnection:   verifyConnection,
+<a href="#l640" class="line" id="l640">    640</a> 	}, nil
+<a href="#l641" class="line" id="l641">    641</a> }
+<a href="#l642" class="line" id="l642">    642</a> 
+<a href="#l643" class="line" id="l643">    643</a> // ServerConfig transforms the TLS context into a tls.Config appropriate for purposes of TLS
+<a href="#l644" class="line" id="l644">    644</a> // termination at a server.
+<a href="#l645" class="line" id="l645">    645</a> func (t *TLSContext) ServerConfig() (*tls.Config, error) {
+<a href="#l646" class="line" id="l646">    646</a> 	var verifyMode tls.ClientAuthType
+<a href="#l647" class="line" id="l647">    647</a> 	var verifyConnection func(tls.ConnectionState) error
+<a href="#l648" class="line" id="l648">    648</a> 	var minVersion uint16
+<a href="#l649" class="line" id="l649">    649</a> 
+<a href="#l650" class="line" id="l650">    650</a> 	// Explicitly use a nil (empty) seed CA certificate pool in order to use only the CAs
+<a href="#l651" class="line" id="l651">    651</a> 	// specified in TLS configuration for client certificate authentication.
+<a href="#l652" class="line" id="l652">    652</a> 	cs, err := newCertificateStore(t, nil)
+<a href="#l653" class="line" id="l653">    653</a> 	if err != nil {
+<a href="#l654" class="line" id="l654">    654</a> 		return nil, &amp;util.Error{
+<a href="#l655" class="line" id="l655">    655</a> 			Namespace:    &quot;config&quot;,
+<a href="#l656" class="line" id="l656">    656</a> 			Message:      &quot;failed to initialize server certificate store&quot;,
+<a href="#l657" class="line" id="l657">    657</a> 			StackedError: err,
+<a href="#l658" class="line" id="l658">    658</a> 		}
+<a href="#l659" class="line" id="l659">    659</a> 	}
+<a href="#l660" class="line" id="l660">    660</a> 
+<a href="#l661" class="line" id="l661">    661</a> 	switch t.VerifyMode {
+<a href="#l662" class="line" id="l662">    662</a> 	case &quot;none&quot;:
+<a href="#l663" class="line" id="l663">    663</a> 		verifyMode = tls.NoClientCert
+<a href="#l664" class="line" id="l664">    664</a> 	case &quot;relaxed&quot;:
+<a href="#l665" class="line" id="l665">    665</a> 		verifyMode = tls.VerifyClientCertIfGiven
+<a href="#l666" class="line" id="l666">    666</a> 	case &quot;strict&quot;:
+<a href="#l667" class="line" id="l667">    667</a> 		verifyMode = tls.RequireAndVerifyClientCert
+<a href="#l668" class="line" id="l668">    668</a> 	default:
+<a href="#l669" class="line" id="l669">    669</a> 		verifyMode = tls.NoClientCert
+<a href="#l670" class="line" id="l670">    670</a> 	}
+<a href="#l671" class="line" id="l671">    671</a> 
+<a href="#l672" class="line" id="l672">    672</a> 	if t.VerifyPeer != nil {
+<a href="#l673" class="line" id="l673">    673</a> 		pv := &amp;peerVerifier{
+<a href="#l674" class="line" id="l674">    674</a> 			pattern: t.VerifyPeer,
+<a href="#l675" class="line" id="l675">    675</a> 			roots:   cs.cas,
+<a href="#l676" class="line" id="l676">    676</a> 		}
+<a href="#l677" class="line" id="l677">    677</a> 
+<a href="#l678" class="line" id="l678">    678</a> 		verifyConnection = pv.verifyClient
+<a href="#l679" class="line" id="l679">    679</a> 	}
+<a href="#l680" class="line" id="l680">    680</a> 
+<a href="#l681" class="line" id="l681">    681</a> 	switch t.ProtocolVersion {
+<a href="#l682" class="line" id="l682">    682</a> 	case &quot;lenient&quot;:
+<a href="#l683" class="line" id="l683">    683</a> 		minVersion = tls.VersionTLS11
+<a href="#l684" class="line" id="l684">    684</a> 	case &quot;standard&quot;:
+<a href="#l685" class="line" id="l685">    685</a> 		minVersion = tls.VersionTLS12
+<a href="#l686" class="line" id="l686">    686</a> 	case &quot;modern&quot;:
+<a href="#l687" class="line" id="l687">    687</a> 		minVersion = tls.VersionTLS13
+<a href="#l688" class="line" id="l688">    688</a> 	default:
+<a href="#l689" class="line" id="l689">    689</a> 		minVersion = tls.VersionTLS12
+<a href="#l690" class="line" id="l690">    690</a> 	}
+<a href="#l691" class="line" id="l691">    691</a> 
+<a href="#l692" class="line" id="l692">    692</a> 	return &amp;tls.Config{
+<a href="#l693" class="line" id="l693">    693</a> 		GetCertificate:   cs.getServerCertificate,
+<a href="#l694" class="line" id="l694">    694</a> 		ClientCAs:        cs.cas,
+<a href="#l695" class="line" id="l695">    695</a> 		ClientAuth:       verifyMode,
+<a href="#l696" class="line" id="l696">    696</a> 		MinVersion:       minVersion,
+<a href="#l697" class="line" id="l697">    697</a> 		VerifyConnection: verifyConnection,
+<a href="#l698" class="line" id="l698">    698</a> 	}, nil
+<a href="#l699" class="line" id="l699">    699</a> }
+</pre>
+</div>
+</body>
+</html>

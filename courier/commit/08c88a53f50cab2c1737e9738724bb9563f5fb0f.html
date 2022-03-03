@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/config: Certificate regex pattern to customize eligibility for use in TLS handshakes - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/08c88a53f50cab2c1737e9738724bb9563f5fb0f">08c88a53f50cab2c1737e9738724bb9563f5fb0f</a>
+<b>parent</b> <a href="../commit/9d8afc60794b3cbc0400983340b47c61b1c1cbef">9d8afc60794b3cbc0400983340b47c61b1c1cbef</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sun  2 May 2021 11:23:33 -0700
+
+internal/config: Certificate regex pattern to customize eligibility for use in TLS handshakes
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/config/tls.go</a></td><td> | </td><td class="num">110</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">----------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">internal/config/types.go</a></td><td> | </td><td class="num">1</td><td><span class="i">+</span><span class="d"></span></td></tr>
+</table></pre><pre>2 files changed, 89 insertions(+), 22 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/config/tls.go">internal/config/tls.go</a> b/<a href="../file/internal/config/tls.go">internal/config/tls.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -3,6 +3,8 @@ package config
+</a> import (
+ 	&quot;crypto/tls&quot;
+ 	&quot;crypto/x509&quot;
+<a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;crypto/x509/pkix&quot;
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+	&quot;encoding/asn1&quot;
+</a> 	&quot;os&quot;
+ 	&quot;sync&quot;
+ 	&quot;time&quot;
+<a href="#h0-1" id="h0-1" class="h">@@ -18,7 +20,7 @@ type certificateStore struct {
+</a> 	ctx        *TLSContext
+ 	seedCAPool func() (*x509.CertPool, error)
+ 
+<a href="#h0-1-3" id="h0-1-3" class="d">-	certs      []tls.Certificate
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+	certs      []*certificate
+</a> 	cas        *x509.CertPool
+ 	lastReload time.Time
+ 	mutex      sync.Mutex
+<a href="#h0-2" id="h0-2" class="h">@@ -51,7 +53,7 @@ func (cs *certificateStore) reload() error {
+</a> 	cs.mutex.Lock()
+ 	defer cs.mutex.Unlock()
+ 
+<a href="#h0-2-3" id="h0-2-3" class="d">-	var certs []tls.Certificate
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+	var certs []*certificate
+</a> 
+ 	cas, err := cs.seedCAPool()
+ 	if err != nil {
+<a href="#h0-3" id="h0-3" class="h">@@ -68,26 +70,14 @@ func (cs *certificateStore) reload() error {
+</a> 			zap.String(&quot;certificate&quot;, cert.Certificate),
+ 			zap.String(&quot;key&quot;, cert.Key),
+ 			zap.String(&quot;authority&quot;, cert.Authority),
+<a href="#h0-3-3" id="h0-3-3" class="i">+			zap.Stringer(&quot;peer&quot;, cert.Peer),
+</a> 		)
+ 
+<a href="#h0-3-6" id="h0-3-6" class="d">-		keypair, err := tls.LoadX509KeyPair(cert.Certificate, cert.Key)
+</a><a href="#h0-3-7" id="h0-3-7" class="i">+		keypair, err := newCertificate(cert)
+</a> 		if err != nil {
+ 			return &amp;util.Error{
+ 				Namespace: &quot;config&quot;,
+<a href="#h0-3-11" id="h0-3-11" class="d">-				Message:   &quot;failed to load certificate keypair&quot;,
+</a><a href="#h0-3-12" id="h0-3-12" class="d">-				Tags: map[string]interface{}{
+</a><a href="#h0-3-13" id="h0-3-13" class="d">-					&quot;cert&quot;: cert.Certificate,
+</a><a href="#h0-3-14" id="h0-3-14" class="d">-					&quot;key&quot;:  cert.Key,
+</a><a href="#h0-3-15" id="h0-3-15" class="d">-				},
+</a><a href="#h0-3-16" id="h0-3-16" class="d">-				StackedError: err,
+</a><a href="#h0-3-17" id="h0-3-17" class="d">-			}
+</a><a href="#h0-3-18" id="h0-3-18" class="d">-		}
+</a><a href="#h0-3-19" id="h0-3-19" class="d">-
+</a><a href="#h0-3-20" id="h0-3-20" class="d">-		keypair.Leaf, err = x509.ParseCertificate(keypair.Certificate[0])
+</a><a href="#h0-3-21" id="h0-3-21" class="d">-		if err != nil {
+</a><a href="#h0-3-22" id="h0-3-22" class="d">-			return &amp;util.Error{
+</a><a href="#h0-3-23" id="h0-3-23" class="d">-				Namespace: &quot;config&quot;,
+</a><a href="#h0-3-24" id="h0-3-24" class="d">-				Message:   &quot;failed to parse certificate leaf&quot;,
+</a><a href="#h0-3-25" id="h0-3-25" class="i">+				Message:   &quot;error reading X509 keypair from disk&quot;,
+</a> 				Tags: map[string]interface{}{
+ 					&quot;cert&quot;: cert.Certificate,
+ 					&quot;key&quot;:  cert.Key,
+<a href="#h0-4" id="h0-4" class="h">@@ -101,7 +91,7 @@ func (cs *certificateStore) reload() error {
+</a> 			if err != nil {
+ 				return &amp;util.Error{
+ 					Namespace: &quot;config&quot;,
+<a href="#h0-4-3" id="h0-4-3" class="d">-					Message:   &quot;failed to read CA from disk&quot;,
+</a><a href="#h0-4-4" id="h0-4-4" class="i">+					Message:   &quot;error reading CA certificate from disk&quot;,
+</a> 					Tags: map[string]interface{}{
+ 						&quot;authority&quot;: cert.Authority,
+ 					},
+<a href="#h0-5" id="h0-5" class="h">@@ -157,8 +147,8 @@ func (cs *certificateStore) getClientCertificate(request *tls.CertificateRequest
+</a> 	cs.checkStaleness() // Ignore errors
+ 
+ 	for _, cert := range cs.certs {
+<a href="#h0-5-3" id="h0-5-3" class="d">-		if err := request.SupportsCertificate(&amp;cert); err == nil {
+</a><a href="#h0-5-4" id="h0-5-4" class="d">-			return &amp;cert, nil
+</a><a href="#h0-5-5" id="h0-5-5" class="i">+		if cert.supportsServer(request) {
+</a><a href="#h0-5-6" id="h0-5-6" class="i">+			return &amp;cert.keypair, nil
+</a> 		}
+ 	}
+ 
+<a href="#h0-6" id="h0-6" class="h">@@ -175,8 +165,8 @@ func (cs *certificateStore) getServerCertificate(hello *tls.ClientHelloInfo) (*t
+</a> 	cs.checkStaleness() // Ignore errors
+ 
+ 	for _, cert := range cs.certs {
+<a href="#h0-6-3" id="h0-6-3" class="d">-		if err := hello.SupportsCertificate(&amp;cert); err == nil {
+</a><a href="#h0-6-4" id="h0-6-4" class="d">-			return &amp;cert, nil
+</a><a href="#h0-6-5" id="h0-6-5" class="i">+		if cert.supportsClient(hello) {
+</a><a href="#h0-6-6" id="h0-6-6" class="i">+			return &amp;cert.keypair, nil
+</a> 		}
+ 	}
+ 
+<a href="#h0-7" id="h0-7" class="h">@@ -187,6 +177,82 @@ func (cs *certificateStore) getServerCertificate(hello *tls.ClientHelloInfo) (*t
+</a> 	}
+ }
+ 
+<a href="#h0-7-3" id="h0-7-3" class="i">+// certificate is an abstraction over a tls.Certificate that supports a peer regular expression
+</a><a href="#h0-7-4" id="h0-7-4" class="i">+// pattern to determine eligibility for the certificate to be offered in a TLS handshake.
+</a><a href="#h0-7-5" id="h0-7-5" class="i">+type certificate struct {
+</a><a href="#h0-7-6" id="h0-7-6" class="i">+	keypair tls.Certificate
+</a><a href="#h0-7-7" id="h0-7-7" class="i">+	pattern *Regex
+</a><a href="#h0-7-8" id="h0-7-8" class="i">+}
+</a><a href="#h0-7-9" id="h0-7-9" class="i">+
+</a><a href="#h0-7-10" id="h0-7-10" class="i">+// newCertificate loads the X509 keypair in the configuration specification from disk.
+</a><a href="#h0-7-11" id="h0-7-11" class="i">+func newCertificate(cert *TLSCertificate) (*certificate, error) {
+</a><a href="#h0-7-12" id="h0-7-12" class="i">+	keypair, err := tls.LoadX509KeyPair(cert.Certificate, cert.Key)
+</a><a href="#h0-7-13" id="h0-7-13" class="i">+	if err != nil {
+</a><a href="#h0-7-14" id="h0-7-14" class="i">+		return nil, &amp;util.Error{
+</a><a href="#h0-7-15" id="h0-7-15" class="i">+			Namespace:    &quot;config&quot;,
+</a><a href="#h0-7-16" id="h0-7-16" class="i">+			Message:      &quot;failed to load certificate keypair&quot;,
+</a><a href="#h0-7-17" id="h0-7-17" class="i">+			StackedError: err,
+</a><a href="#h0-7-18" id="h0-7-18" class="i">+		}
+</a><a href="#h0-7-19" id="h0-7-19" class="i">+	}
+</a><a href="#h0-7-20" id="h0-7-20" class="i">+
+</a><a href="#h0-7-21" id="h0-7-21" class="i">+	keypair.Leaf, err = x509.ParseCertificate(keypair.Certificate[0])
+</a><a href="#h0-7-22" id="h0-7-22" class="i">+	if err != nil {
+</a><a href="#h0-7-23" id="h0-7-23" class="i">+		return nil, &amp;util.Error{
+</a><a href="#h0-7-24" id="h0-7-24" class="i">+			Namespace:    &quot;config&quot;,
+</a><a href="#h0-7-25" id="h0-7-25" class="i">+			Message:      &quot;failed to parse certificate leaf&quot;,
+</a><a href="#h0-7-26" id="h0-7-26" class="i">+			StackedError: err,
+</a><a href="#h0-7-27" id="h0-7-27" class="i">+		}
+</a><a href="#h0-7-28" id="h0-7-28" class="i">+	}
+</a><a href="#h0-7-29" id="h0-7-29" class="i">+
+</a><a href="#h0-7-30" id="h0-7-30" class="i">+	return &amp;certificate{
+</a><a href="#h0-7-31" id="h0-7-31" class="i">+		keypair: keypair,
+</a><a href="#h0-7-32" id="h0-7-32" class="i">+		pattern: cert.Peer,
+</a><a href="#h0-7-33" id="h0-7-33" class="i">+	}, nil
+</a><a href="#h0-7-34" id="h0-7-34" class="i">+}
+</a><a href="#h0-7-35" id="h0-7-35" class="i">+
+</a><a href="#h0-7-36" id="h0-7-36" class="i">+// supportsClient determines whether this certificate is eligible for use in a TLS handshake against
+</a><a href="#h0-7-37" id="h0-7-37" class="i">+// a client-supplied *tls.ClientHelloInfo.
+</a><a href="#h0-7-38" id="h0-7-38" class="i">+// When no peer pattern is explicitly specified, this defers to Go&#39;s native certificate selection
+</a><a href="#h0-7-39" id="h0-7-39" class="i">+// logic, which examines whether the client SNI (server name) matches a SAN in the certificate.
+</a><a href="#h0-7-40" id="h0-7-40" class="i">+// When a peer pattern is explicitly specified, the certificate is deemed eligible as long as the
+</a><a href="#h0-7-41" id="h0-7-41" class="i">+// pattern matches the client SNI.
+</a><a href="#h0-7-42" id="h0-7-42" class="i">+func (c *certificate) supportsClient(hello *tls.ClientHelloInfo) bool {
+</a><a href="#h0-7-43" id="h0-7-43" class="i">+	if c.pattern == nil {
+</a><a href="#h0-7-44" id="h0-7-44" class="i">+		return hello.SupportsCertificate(&amp;c.keypair) == nil
+</a><a href="#h0-7-45" id="h0-7-45" class="i">+	}
+</a><a href="#h0-7-46" id="h0-7-46" class="i">+
+</a><a href="#h0-7-47" id="h0-7-47" class="i">+	return c.pattern.MatchString(hello.ServerName)
+</a><a href="#h0-7-48" id="h0-7-48" class="i">+}
+</a><a href="#h0-7-49" id="h0-7-49" class="i">+
+</a><a href="#h0-7-50" id="h0-7-50" class="i">+// supportsServer determines whether this certificate is eligible for use in a TLS handshake against
+</a><a href="#h0-7-51" id="h0-7-51" class="i">+// a server-supplied *tls.CertificateRequestInfo.
+</a><a href="#h0-7-52" id="h0-7-52" class="i">+// When no peer pattern is explicitly specified, this defers to Go&#39;s native certificate selection
+</a><a href="#h0-7-53" id="h0-7-53" class="i">+// logic, which offers the certificate if it signed by a CA the server advertises as acceptable.
+</a><a href="#h0-7-54" id="h0-7-54" class="i">+// When a peer pattern is explicitly specified, the certificate is deemed eligible if the pattern
+</a><a href="#h0-7-55" id="h0-7-55" class="i">+// matches the common name of any of the server&#39;s advertised acceptable CAs.
+</a><a href="#h0-7-56" id="h0-7-56" class="i">+func (c *certificate) supportsServer(request *tls.CertificateRequestInfo) bool {
+</a><a href="#h0-7-57" id="h0-7-57" class="i">+	if c.pattern == nil {
+</a><a href="#h0-7-58" id="h0-7-58" class="i">+		return request.SupportsCertificate(&amp;c.keypair) == nil
+</a><a href="#h0-7-59" id="h0-7-59" class="i">+	}
+</a><a href="#h0-7-60" id="h0-7-60" class="i">+
+</a><a href="#h0-7-61" id="h0-7-61" class="i">+	for _, ca := range request.AcceptableCAs {
+</a><a href="#h0-7-62" id="h0-7-62" class="i">+		var name pkix.Name
+</a><a href="#h0-7-63" id="h0-7-63" class="i">+		var seq pkix.RDNSequence
+</a><a href="#h0-7-64" id="h0-7-64" class="i">+
+</a><a href="#h0-7-65" id="h0-7-65" class="i">+		if _, err := asn1.Unmarshal(ca, &amp;seq); err != nil {
+</a><a href="#h0-7-66" id="h0-7-66" class="i">+			return false
+</a><a href="#h0-7-67" id="h0-7-67" class="i">+		}
+</a><a href="#h0-7-68" id="h0-7-68" class="i">+
+</a><a href="#h0-7-69" id="h0-7-69" class="i">+		name.FillFromRDNSequence(&amp;seq)
+</a><a href="#h0-7-70" id="h0-7-70" class="i">+
+</a><a href="#h0-7-71" id="h0-7-71" class="i">+		if c.pattern.MatchString(name.CommonName) {
+</a><a href="#h0-7-72" id="h0-7-72" class="i">+			return true
+</a><a href="#h0-7-73" id="h0-7-73" class="i">+		}
+</a><a href="#h0-7-74" id="h0-7-74" class="i">+	}
+</a><a href="#h0-7-75" id="h0-7-75" class="i">+
+</a><a href="#h0-7-76" id="h0-7-76" class="i">+	return false
+</a><a href="#h0-7-77" id="h0-7-77" class="i">+}
+</a><a href="#h0-7-78" id="h0-7-78" class="i">+
+</a> // peerVerifier provides functions for verifying both client and server connections against an
+ // authorized name pattern. Its implementation first defers Go&#39;s native x509 verification routine
+ // before checking peer certificate SANs against the specified regular expression.
+<b>diff --git a/<a id="h1" href="../file/internal/config/types.go">internal/config/types.go</a> b/<a href="../file/internal/config/types.go">internal/config/types.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -140,6 +140,7 @@ type TLSCertificate struct {
+</a> 	Key         string `yaml:&quot;key&quot;`
+ 	Certificate string `yaml:&quot;certificate&quot;`
+ 	Authority   string `yaml:&quot;authority&quot;`
+<a href="#h1-0-3" id="h1-0-3" class="i">+	Peer        *Regex `yaml:&quot;peer&quot;`
+</a> }
+ 
+ // TLSContext describes server TLS configuration.
+</pre>
+</div>
+</body>
+</html>

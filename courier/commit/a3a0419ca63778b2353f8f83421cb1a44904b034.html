@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/server: Support proxy to HTTP/2 H2C upstreams with and without TLS - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/a3a0419ca63778b2353f8f83421cb1a44904b034">a3a0419ca63778b2353f8f83421cb1a44904b034</a>
+<b>parent</b> <a href="../commit/17f9026aa9302cc6ab0a49e4c38a4c4c6fd7ce50">17f9026aa9302cc6ab0a49e4c38a4c4c6fd7ce50</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sat 30 Jan 2021 22:43:24 -0800
+
+internal/server: Support proxy to HTTP/2 H2C upstreams with and without TLS
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/server/proxy.go</a></td><td> | </td><td class="num">51</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++</span><span class="d">------------</span></td></tr>
+</table></pre><pre>1 file changed, 39 insertions(+), 12 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/server/proxy.go">internal/server/proxy.go</a> b/<a href="../file/internal/server/proxy.go">internal/server/proxy.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -2,11 +2,13 @@ package server
+</a> 
+ import (
+ 	&quot;context&quot;
+<a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;crypto/tls&quot;
+</a> 	&quot;io&quot;
+ 	&quot;net&quot;
+ 	&quot;net/http&quot;
+ 	&quot;net/http/httputil&quot;
+ 
+<a href="#h0-0-9" id="h0-0-9" class="i">+	&quot;golang.org/x/net/http2&quot;
+</a> 	&quot;golang.org/x/net/proxy&quot;
+ 
+ 	&quot;courier/internal/config&quot;
+<a href="#h0-1" id="h0-1" class="h">@@ -99,6 +101,7 @@ func newReverseProxy(vhosts []*config.VirtualHost) (http.Handler, error) {
+</a> func (rp *reverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+ 	var err error
+ 	var abortResp *http.Response
+<a href="#h0-1-3" id="h0-1-3" class="i">+	var transport http.RoundTripper
+</a> 
+ 	proxyReq := req.Clone(context.Background())
+ 
+<a href="#h0-2" id="h0-2" class="h">@@ -125,24 +128,48 @@ func (rp *reverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+</a> 		return
+ 	}
+ 
+<a href="#h0-2-3" id="h0-2-3" class="d">-	backend := httputil.ReverseProxy{
+</a><a href="#h0-2-4" id="h0-2-4" class="d">-		Transport: &amp;http.Transport{
+</a><a href="#h0-2-5" id="h0-2-5" class="d">-			DialContext: func(ctx context.Context, network string, addr string) (net.Conn, error) {
+</a><a href="#h0-2-6" id="h0-2-6" class="d">-				dialer := &amp;net.Dialer{Timeout: vhost.Connection.ConnectTimeout}
+</a><a href="#h0-2-7" id="h0-2-7" class="i">+	switch vhost.Transport {
+</a><a href="#h0-2-8" id="h0-2-8" class="i">+	case &quot;http2&quot;:
+</a><a href="#h0-2-9" id="h0-2-9" class="i">+		transport = &amp;http2.Transport{
+</a><a href="#h0-2-10" id="h0-2-10" class="i">+			AllowHTTP: true,
+</a><a href="#h0-2-11" id="h0-2-11" class="i">+			DialTLS: func(network string, addr string, cfg *tls.Config) (net.Conn, error) {
+</a><a href="#h0-2-12" id="h0-2-12" class="i">+				var dialer proxy.Dialer
+</a> 
+<a href="#h0-2-14" id="h0-2-14" class="d">-				if vhost.Proxy == nil {
+</a><a href="#h0-2-15" id="h0-2-15" class="d">-					return dialer.DialContext(ctx, network, addr)
+</a><a href="#h0-2-16" id="h0-2-16" class="i">+				dialer = &amp;net.Dialer{Timeout: vhost.Connection.ConnectTimeout}
+</a><a href="#h0-2-17" id="h0-2-17" class="i">+
+</a><a href="#h0-2-18" id="h0-2-18" class="i">+				if vhost.Upstream.Scheme == &quot;https&quot; {
+</a><a href="#h0-2-19" id="h0-2-19" class="i">+					dialer = &amp;tls.Dialer{
+</a><a href="#h0-2-20" id="h0-2-20" class="i">+						NetDialer: dialer.(*net.Dialer),
+</a><a href="#h0-2-21" id="h0-2-21" class="i">+						Config:    cfg,
+</a><a href="#h0-2-22" id="h0-2-22" class="i">+					}
+</a> 				}
+ 
+<a href="#h0-2-25" id="h0-2-25" class="d">-				socksDialer, err := proxy.SOCKS5(&quot;tcp&quot;, vhost.Proxy.String(), nil, dialer)
+</a><a href="#h0-2-26" id="h0-2-26" class="d">-				if err != nil {
+</a><a href="#h0-2-27" id="h0-2-27" class="d">-					return nil, err
+</a><a href="#h0-2-28" id="h0-2-28" class="i">+				if vhost.Proxy != nil {
+</a><a href="#h0-2-29" id="h0-2-29" class="i">+					dialer, _ = proxy.SOCKS5(&quot;tcp&quot;, vhost.Proxy.String(), nil, dialer)
+</a> 				}
+ 
+<a href="#h0-2-32" id="h0-2-32" class="d">-				return socksDialer.Dial(network, addr)
+</a><a href="#h0-2-33" id="h0-2-33" class="i">+				return dialer.Dial(network, addr)
+</a> 			},
+<a href="#h0-2-35" id="h0-2-35" class="d">-			TLSHandshakeTimeout: 0,
+</a><a href="#h0-2-36" id="h0-2-36" class="d">-		},
+</a><a href="#h0-2-37" id="h0-2-37" class="i">+		}
+</a><a href="#h0-2-38" id="h0-2-38" class="i">+	default:
+</a><a href="#h0-2-39" id="h0-2-39" class="i">+		transport = &amp;http.Transport{
+</a><a href="#h0-2-40" id="h0-2-40" class="i">+			TLSHandshakeTimeout: vhost.Connection.TLSHandshakeTimeout,
+</a><a href="#h0-2-41" id="h0-2-41" class="i">+			DialContext: func(ctx context.Context, network string, addr string) (net.Conn, error) {
+</a><a href="#h0-2-42" id="h0-2-42" class="i">+				var dialer proxy.Dialer
+</a><a href="#h0-2-43" id="h0-2-43" class="i">+
+</a><a href="#h0-2-44" id="h0-2-44" class="i">+				dialer = &amp;net.Dialer{Timeout: vhost.Connection.ConnectTimeout}
+</a><a href="#h0-2-45" id="h0-2-45" class="i">+
+</a><a href="#h0-2-46" id="h0-2-46" class="i">+				if vhost.Proxy != nil {
+</a><a href="#h0-2-47" id="h0-2-47" class="i">+					dialer, _ = proxy.SOCKS5(&quot;tcp&quot;, vhost.Proxy.String(), nil, dialer)
+</a><a href="#h0-2-48" id="h0-2-48" class="i">+				}
+</a><a href="#h0-2-49" id="h0-2-49" class="i">+
+</a><a href="#h0-2-50" id="h0-2-50" class="i">+				return dialer.Dial(network, addr)
+</a><a href="#h0-2-51" id="h0-2-51" class="i">+			},
+</a><a href="#h0-2-52" id="h0-2-52" class="i">+		}
+</a><a href="#h0-2-53" id="h0-2-53" class="i">+	}
+</a><a href="#h0-2-54" id="h0-2-54" class="i">+
+</a><a href="#h0-2-55" id="h0-2-55" class="i">+	backend := httputil.ReverseProxy{
+</a><a href="#h0-2-56" id="h0-2-56" class="i">+		Transport: transport,
+</a> 		Director: func(clientReq *http.Request) {
+ 			// The Director routine is a noop because the request passed to the reverse
+ 			// proxy has already been cascaded through all request filters.
+</pre>
+</div>
+</body>
+</html>

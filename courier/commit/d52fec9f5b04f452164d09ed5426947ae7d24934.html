@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/config: Move VirtualHosts to Server - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/d52fec9f5b04f452164d09ed5426947ae7d24934">d52fec9f5b04f452164d09ed5426947ae7d24934</a>
+<b>parent</b> <a href="../commit/d6948f7b190535bf99b5f94f359445f798604864">d6948f7b190535bf99b5f94f359445f798604864</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Mon  1 Feb 2021 22:30:32 -0800
+
+internal/config: Move VirtualHosts to Server
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">cmd/courier/main.go</a></td><td> | </td><td class="num">2</td><td><span class="i">+</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">config.example.yaml</a></td><td> | </td><td class="num">107</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++</span><span class="d">---------------------------------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">internal/config/config.go</a></td><td> | </td><td class="num">2</td><td><span class="i">+</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">internal/config/types.go</a></td><td> | </td><td class="num">8</td><td><span class="i">++++</span><span class="d">----</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h4">internal/server/server.go</a></td><td> | </td><td class="num">2</td><td><span class="i">+</span><span class="d">-</span></td></tr>
+</table></pre><pre>5 files changed, 61 insertions(+), 60 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/cmd/courier/main.go">cmd/courier/main.go</a> b/<a href="../file/cmd/courier/main.go">cmd/courier/main.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -61,7 +61,7 @@ func main() {
+</a> 			zap.Any(&quot;tls_context&quot;, listener.TLSContext),
+ 		)
+ 	}
+<a href="#h0-0-3" id="h0-0-3" class="d">-	for _, vhost := range cfg.VirtualHosts {
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+	for _, vhost := range cfg.Server.VirtualHosts {
+</a> 		log.Info(
+ 			&quot;registered virtual host&quot;,
+ 			zap.String(&quot;name&quot;, vhost.Name),
+<b>diff --git a/<a id="h1" href="../file/config.example.yaml">config.example.yaml</a> b/<a href="../file/config.example.yaml">config.example.yaml</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -5,56 +5,57 @@ application:
+</a>     prefix: courier
+ 
+ server:
+<a href="#h1-0-3" id="h1-0-3" class="d">-  listen_addr: 127.0.0.1:8200
+</a><a href="#h1-0-4" id="h1-0-4" class="d">-  connection:
+</a><a href="#h1-0-5" id="h1-0-5" class="d">-    read_timeout: 2s
+</a><a href="#h1-0-6" id="h1-0-6" class="d">-    write_timeout: 5s
+</a><a href="#h1-0-7" id="h1-0-7" class="d">-  tls_context:
+</a><a href="#h1-0-8" id="h1-0-8" class="d">-    verify_mode: strict
+</a><a href="#h1-0-9" id="h1-0-9" class="d">-    certificates:
+</a><a href="#h1-0-10" id="h1-0-10" class="d">-      - key: /etc/ssl/service/key.pem
+</a><a href="#h1-0-11" id="h1-0-11" class="d">-        certificate: /etc/ssl/service/cert.pem
+</a><a href="#h1-0-12" id="h1-0-12" class="d">-        authority: /etc/ssl/service/ca.pem
+</a><a href="#h1-0-13" id="h1-0-13" class="d">-
+</a><a href="#h1-0-14" id="h1-0-14" class="d">-virtual_hosts:
+</a><a href="#h1-0-15" id="h1-0-15" class="d">-  - name: foo
+</a><a href="#h1-0-16" id="h1-0-16" class="d">-    host: foo.example.com
+</a><a href="#h1-0-17" id="h1-0-17" class="d">-    upstream: unix:/var/run/http/http.sock
+</a><a href="#h1-0-18" id="h1-0-18" class="d">-    connection:
+</a><a href="#h1-0-19" id="h1-0-19" class="d">-      connect_timeout: 4s
+</a><a href="#h1-0-20" id="h1-0-20" class="d">-      read_timeout: 10s
+</a><a href="#h1-0-21" id="h1-0-21" class="d">-      write_timeout: 10s
+</a><a href="#h1-0-22" id="h1-0-22" class="d">-    filters:
+</a><a href="#h1-0-23" id="h1-0-23" class="d">-      - name: metadata
+</a><a href="#h1-0-24" id="h1-0-24" class="d">-      - name: log
+</a><a href="#h1-0-25" id="h1-0-25" class="d">-        params:
+</a><a href="#h1-0-26" id="h1-0-26" class="d">-          path: /var/log/courier/foo.log
+</a><a href="#h1-0-27" id="h1-0-27" class="d">-  - name: bar
+</a><a href="#h1-0-28" id="h1-0-28" class="d">-    host: bar.example.com
+</a><a href="#h1-0-29" id="h1-0-29" class="d">-    upstream: 10.1.0.1:8200
+</a><a href="#h1-0-30" id="h1-0-30" class="d">-    connection:
+</a><a href="#h1-0-31" id="h1-0-31" class="d">-      connect_timeout: 1s
+</a><a href="#h1-0-32" id="h1-0-32" class="d">-      tls_handshake_timeout: 1s
+</a><a href="#h1-0-33" id="h1-0-33" class="d">-    tls_context:
+</a><a href="#h1-0-34" id="h1-0-34" class="d">-      certificates:
+</a><a href="#h1-0-35" id="h1-0-35" class="d">-        - key: /etc/ssl/service/key.pem
+</a><a href="#h1-0-36" id="h1-0-36" class="d">-          certificate: /etc/ssl/service/cert.pem
+</a><a href="#h1-0-37" id="h1-0-37" class="d">-          authority: /etc/ssl/service/ca.pem
+</a><a href="#h1-0-38" id="h1-0-38" class="d">-    filters:
+</a><a href="#h1-0-39" id="h1-0-39" class="d">-      - name: ip
+</a><a href="#h1-0-40" id="h1-0-40" class="d">-        params:
+</a><a href="#h1-0-41" id="h1-0-41" class="d">-          default: deny
+</a><a href="#h1-0-42" id="h1-0-42" class="d">-          rules:
+</a><a href="#h1-0-43" id="h1-0-43" class="d">-            - cidr: 127.0.0.1/32
+</a><a href="#h1-0-44" id="h1-0-44" class="d">-              action: allow
+</a><a href="#h1-0-45" id="h1-0-45" class="d">-            - cidr: 10.0.0.0/8
+</a><a href="#h1-0-46" id="h1-0-46" class="d">-              action: allow
+</a><a href="#h1-0-47" id="h1-0-47" class="d">-      - name: rewrite
+</a><a href="#h1-0-48" id="h1-0-48" class="d">-        params:
+</a><a href="#h1-0-49" id="h1-0-49" class="d">-          host:
+</a><a href="#h1-0-50" id="h1-0-50" class="d">-            - find: &#39;/(.*)/&#39;
+</a><a href="#h1-0-51" id="h1-0-51" class="d">-              replace: bar.upstream.example.com
+</a><a href="#h1-0-52" id="h1-0-52" class="d">-  - name: grpc
+</a><a href="#h1-0-53" id="h1-0-53" class="d">-    host: baz.example.com
+</a><a href="#h1-0-54" id="h1-0-54" class="d">-    upstream: localhost:9090
+</a><a href="#h1-0-55" id="h1-0-55" class="d">-    transport: http2
+</a><a href="#h1-0-56" id="h1-0-56" class="i">+  listeners:
+</a><a href="#h1-0-57" id="h1-0-57" class="i">+    - name: courier
+</a><a href="#h1-0-58" id="h1-0-58" class="i">+      address: 127.0.0.1:8200
+</a><a href="#h1-0-59" id="h1-0-59" class="i">+      connection:
+</a><a href="#h1-0-60" id="h1-0-60" class="i">+        read_timeout: 2s
+</a><a href="#h1-0-61" id="h1-0-61" class="i">+        write_timeout: 5s
+</a><a href="#h1-0-62" id="h1-0-62" class="i">+      tls_context:
+</a><a href="#h1-0-63" id="h1-0-63" class="i">+        verify_mode: strict
+</a><a href="#h1-0-64" id="h1-0-64" class="i">+        certificates:
+</a><a href="#h1-0-65" id="h1-0-65" class="i">+          - key: /etc/ssl/service/key.pem
+</a><a href="#h1-0-66" id="h1-0-66" class="i">+            certificate: /etc/ssl/service/cert.pem
+</a><a href="#h1-0-67" id="h1-0-67" class="i">+            authority: /etc/ssl/service/ca.pem
+</a><a href="#h1-0-68" id="h1-0-68" class="i">+  virtual_hosts:
+</a><a href="#h1-0-69" id="h1-0-69" class="i">+    - name: foo
+</a><a href="#h1-0-70" id="h1-0-70" class="i">+      host: foo.example.com
+</a><a href="#h1-0-71" id="h1-0-71" class="i">+      upstream: unix:/var/run/http/http.sock
+</a><a href="#h1-0-72" id="h1-0-72" class="i">+      connection:
+</a><a href="#h1-0-73" id="h1-0-73" class="i">+        connect_timeout: 4s
+</a><a href="#h1-0-74" id="h1-0-74" class="i">+        read_timeout: 10s
+</a><a href="#h1-0-75" id="h1-0-75" class="i">+        write_timeout: 10s
+</a><a href="#h1-0-76" id="h1-0-76" class="i">+      filters:
+</a><a href="#h1-0-77" id="h1-0-77" class="i">+        - name: metadata
+</a><a href="#h1-0-78" id="h1-0-78" class="i">+        - name: log
+</a><a href="#h1-0-79" id="h1-0-79" class="i">+          params:
+</a><a href="#h1-0-80" id="h1-0-80" class="i">+            path: /var/log/courier/foo.log
+</a><a href="#h1-0-81" id="h1-0-81" class="i">+    - name: bar
+</a><a href="#h1-0-82" id="h1-0-82" class="i">+      host: bar.example.com
+</a><a href="#h1-0-83" id="h1-0-83" class="i">+      upstream: 10.1.0.1:8200
+</a><a href="#h1-0-84" id="h1-0-84" class="i">+      connection:
+</a><a href="#h1-0-85" id="h1-0-85" class="i">+        connect_timeout: 1s
+</a><a href="#h1-0-86" id="h1-0-86" class="i">+        tls_handshake_timeout: 1s
+</a><a href="#h1-0-87" id="h1-0-87" class="i">+      tls_context:
+</a><a href="#h1-0-88" id="h1-0-88" class="i">+        certificates:
+</a><a href="#h1-0-89" id="h1-0-89" class="i">+          - key: /etc/ssl/service/key.pem
+</a><a href="#h1-0-90" id="h1-0-90" class="i">+            certificate: /etc/ssl/service/cert.pem
+</a><a href="#h1-0-91" id="h1-0-91" class="i">+            authority: /etc/ssl/service/ca.pem
+</a><a href="#h1-0-92" id="h1-0-92" class="i">+      filters:
+</a><a href="#h1-0-93" id="h1-0-93" class="i">+        - name: ip
+</a><a href="#h1-0-94" id="h1-0-94" class="i">+          params:
+</a><a href="#h1-0-95" id="h1-0-95" class="i">+            default: deny
+</a><a href="#h1-0-96" id="h1-0-96" class="i">+            rules:
+</a><a href="#h1-0-97" id="h1-0-97" class="i">+              - cidr: 127.0.0.1/32
+</a><a href="#h1-0-98" id="h1-0-98" class="i">+                action: allow
+</a><a href="#h1-0-99" id="h1-0-99" class="i">+              - cidr: 10.0.0.0/8
+</a><a href="#h1-0-100" id="h1-0-100" class="i">+                action: allow
+</a><a href="#h1-0-101" id="h1-0-101" class="i">+        - name: rewrite
+</a><a href="#h1-0-102" id="h1-0-102" class="i">+          params:
+</a><a href="#h1-0-103" id="h1-0-103" class="i">+            host:
+</a><a href="#h1-0-104" id="h1-0-104" class="i">+              - find: &#39;/(.*)/&#39;
+</a><a href="#h1-0-105" id="h1-0-105" class="i">+                replace: bar.upstream.example.com
+</a><a href="#h1-0-106" id="h1-0-106" class="i">+    - name: grpc
+</a><a href="#h1-0-107" id="h1-0-107" class="i">+      host: baz.example.com
+</a><a href="#h1-0-108" id="h1-0-108" class="i">+      upstream: localhost:9090
+</a><a href="#h1-0-109" id="h1-0-109" class="i">+      transport: http2
+</a><b>diff --git a/<a id="h2" href="../file/internal/config/config.go">internal/config/config.go</a> b/<a href="../file/internal/config/config.go">internal/config/config.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -127,7 +127,7 @@ func (c *Config) Validate() error {
+</a> 		}
+ 	}
+ 
+<a href="#h2-0-3" id="h2-0-3" class="d">-	for _, vhost := range c.VirtualHosts {
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+	for _, vhost := range c.Server.VirtualHosts {
+</a> 		if _, ok := vhosts[vhost.Name]; ok {
+ 			return &amp;util.Error{
+ 				Namespace: &quot;config&quot;,
+<b>diff --git a/<a id="h3" href="../file/internal/config/types.go">internal/config/types.go</a> b/<a href="../file/internal/config/types.go">internal/config/types.go</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -61,7 +61,8 @@ type Listener struct {
+</a> 
+ // Server describes configuration for the server.
+ type Server struct {
+<a href="#h3-0-3" id="h3-0-3" class="d">-	Listeners []*Listener `yaml:&quot;listeners&quot;`
+</a><a href="#h3-0-4" id="h3-0-4" class="i">+	Listeners    []*Listener    `yaml:&quot;listeners&quot;`
+</a><a href="#h3-0-5" id="h3-0-5" class="i">+	VirtualHosts []*VirtualHost `yaml:&quot;virtual_hosts&quot;`
+</a> }
+ 
+ // Metrics describes metrics output configuration.
+<a href="#h3-1" id="h3-1" class="h">@@ -79,7 +80,6 @@ type Application struct {
+</a> 
+ // Config is the top-level application config.
+ type Config struct {
+<a href="#h3-1-3" id="h3-1-3" class="d">-	Application  *Application   `yaml:&quot;application&quot;`
+</a><a href="#h3-1-4" id="h3-1-4" class="d">-	Server       *Server        `yaml:&quot;server&quot;`
+</a><a href="#h3-1-5" id="h3-1-5" class="d">-	VirtualHosts []*VirtualHost `yaml:&quot;virtual_hosts&quot;`
+</a><a href="#h3-1-6" id="h3-1-6" class="i">+	Application *Application `yaml:&quot;application&quot;`
+</a><a href="#h3-1-7" id="h3-1-7" class="i">+	Server      *Server      `yaml:&quot;server&quot;`
+</a> }
+<b>diff --git a/<a id="h4" href="../file/internal/server/server.go">internal/server/server.go</a> b/<a href="../file/internal/server/server.go">internal/server/server.go</a></b>
+<a href="#h4-0" id="h4-0" class="h">@@ -22,7 +22,7 @@ type Server struct {
+</a> 
+ // New creates a new Courier server from the configuration.
+ func New(cfg *config.Config) (*Server, error) {
+<a href="#h4-0-3" id="h4-0-3" class="d">-	rp, err := newReverseProxy(cfg.VirtualHosts)
+</a><a href="#h4-0-4" id="h4-0-4" class="i">+	rp, err := newReverseProxy(cfg.Server.VirtualHosts)
+</a> 	if err != nil {
+ 		return nil, &amp;util.Error{
+ 			Namespace:    &quot;server&quot;,
+</pre>
+</div>
+</body>
+</html>

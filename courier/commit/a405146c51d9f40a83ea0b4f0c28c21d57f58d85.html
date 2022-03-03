@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>cmd/courier: Simplify flags and migrate to global logger - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/a405146c51d9f40a83ea0b4f0c28c21d57f58d85">a405146c51d9f40a83ea0b4f0c28c21d57f58d85</a>
+<b>parent</b> <a href="../commit/57831adc770889a9779727b67c2ddcbed1cc33e2">57831adc770889a9779727b67c2ddcbed1cc33e2</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Wed  3 Feb 2021 22:12:27 -0800
+
+cmd/courier: Simplify flags and migrate to global logger
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">cmd/courier/main.go</a></td><td> | </td><td class="num">68</td><td><span class="i">++++++++++++++++++++++++++++</span><span class="d">----------------------------------------</span></td></tr>
+</table></pre><pre>1 file changed, 28 insertions(+), 40 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/cmd/courier/main.go">cmd/courier/main.go</a> b/<a href="../file/cmd/courier/main.go">cmd/courier/main.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -8,56 +8,44 @@ import (
+</a> 	&quot;go.uber.org/zap&quot;
+ 
+ 	&quot;courier/internal/config&quot;
+<a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;courier/internal/log&quot;
+</a> 	&quot;courier/internal/meta&quot;
+ 	&quot;courier/internal/metrics&quot;
+ 	&quot;courier/internal/server&quot;
+ )
+ 
+ var (
+<a href="#h0-0-10" id="h0-0-10" class="d">-	log *zap.Logger
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+	cfg *config.Config
+</a> )
+ 
+ var (
+<a href="#h0-0-15" id="h0-0-15" class="d">-	flagConfig    = flag.String(&quot;config&quot;, os.Getenv(&quot;COURIER_CONFIG&quot;), &quot;path to the courier config file&quot;)
+</a><a href="#h0-0-16" id="h0-0-16" class="d">-	flagVerbosity = flag.String(&quot;verbosity&quot;, zap.InfoLevel.String(), &quot;log level&quot;)
+</a><a href="#h0-0-17" id="h0-0-17" class="d">-	flagValidate  = flag.Bool(&quot;validate&quot;, false, &quot;validate the configuration file and exit&quot;)
+</a><a href="#h0-0-18" id="h0-0-18" class="d">-	flagVersion   = flag.Bool(&quot;version&quot;, false, &quot;print the application version and exit&quot;)
+</a><a href="#h0-0-19" id="h0-0-19" class="i">+	flagConfig   = flag.String(&quot;config&quot;, os.Getenv(&quot;COURIER_CONFIG&quot;), &quot;path to the courier config file&quot;)
+</a><a href="#h0-0-20" id="h0-0-20" class="i">+	flagValidate = flag.Bool(&quot;validate&quot;, false, &quot;validate the configuration file and exit&quot;)
+</a> )
+ 
+ func init() {
+<a href="#h0-0-24" id="h0-0-24" class="d">-	flag.Parse()
+</a><a href="#h0-0-25" id="h0-0-25" class="d">-
+</a><a href="#h0-0-26" id="h0-0-26" class="d">-	level := zap.NewAtomicLevel()
+</a><a href="#h0-0-27" id="h0-0-27" class="d">-	level.UnmarshalText([]byte(*flagVerbosity))
+</a><a href="#h0-0-28" id="h0-0-28" class="d">-	logCfg := zap.Config{
+</a><a href="#h0-0-29" id="h0-0-29" class="d">-		Level:            level,
+</a><a href="#h0-0-30" id="h0-0-30" class="d">-		Encoding:         &quot;json&quot;,
+</a><a href="#h0-0-31" id="h0-0-31" class="d">-		EncoderConfig:    zap.NewProductionEncoderConfig(),
+</a><a href="#h0-0-32" id="h0-0-32" class="d">-		OutputPaths:      []string{&quot;stderr&quot;},
+</a><a href="#h0-0-33" id="h0-0-33" class="d">-		ErrorOutputPaths: []string{&quot;stderr&quot;},
+</a><a href="#h0-0-34" id="h0-0-34" class="d">-	}
+</a><a href="#h0-0-35" id="h0-0-35" class="d">-	log, _ = logCfg.Build()
+</a><a href="#h0-0-36" id="h0-0-36" class="d">-}
+</a><a href="#h0-0-37" id="h0-0-37" class="i">+	var err error
+</a> 
+<a href="#h0-0-39" id="h0-0-39" class="d">-func main() {
+</a><a href="#h0-0-40" id="h0-0-40" class="d">-	log.Info(&quot;initializing courier&quot;, zap.String(&quot;version&quot;, meta.Version))
+</a><a href="#h0-0-41" id="h0-0-41" class="i">+	flag.Parse()
+</a> 
+<a href="#h0-0-43" id="h0-0-43" class="d">-	if *flagVersion {
+</a><a href="#h0-0-44" id="h0-0-44" class="d">-		return
+</a><a href="#h0-0-45" id="h0-0-45" class="i">+	cfg, err = config.New(*flagConfig)
+</a><a href="#h0-0-46" id="h0-0-46" class="i">+	if err != nil {
+</a><a href="#h0-0-47" id="h0-0-47" class="i">+		panic(err)
+</a> 	}
+ 
+<a href="#h0-0-50" id="h0-0-50" class="d">-	if *flagConfig == &quot;&quot; {
+</a><a href="#h0-0-51" id="h0-0-51" class="d">-		log.Fatal(&quot;no config file specified&quot;)
+</a><a href="#h0-0-52" id="h0-0-52" class="i">+	if cfg.Application.Log != nil {
+</a><a href="#h0-0-53" id="h0-0-53" class="i">+		if err := log.Init(cfg); err != nil {
+</a><a href="#h0-0-54" id="h0-0-54" class="i">+			panic(err)
+</a><a href="#h0-0-55" id="h0-0-55" class="i">+		}
+</a> 	}
+<a href="#h0-0-57" id="h0-0-57" class="i">+}
+</a> 
+<a href="#h0-0-59" id="h0-0-59" class="d">-	cfg, err := config.New(*flagConfig)
+</a><a href="#h0-0-60" id="h0-0-60" class="d">-	if err != nil {
+</a><a href="#h0-0-61" id="h0-0-61" class="d">-		log.Fatal(&quot;failed to parse config file&quot;, zap.Error(err))
+</a><a href="#h0-0-62" id="h0-0-62" class="d">-	}
+</a><a href="#h0-0-63" id="h0-0-63" class="i">+func main() {
+</a><a href="#h0-0-64" id="h0-0-64" class="i">+	log.Logger.Info(&quot;initializing courier&quot;, zap.String(&quot;version&quot;, meta.Version))
+</a> 
+<a href="#h0-0-66" id="h0-0-66" class="d">-	log.Info(&quot;successfully loaded configuration&quot;, zap.String(&quot;config&quot;, *flagConfig))
+</a><a href="#h0-0-67" id="h0-0-67" class="i">+	log.Logger.Info(&quot;successfully loaded configuration&quot;, zap.String(&quot;config&quot;, *flagConfig))
+</a> 	for _, listener := range cfg.Server.Listeners {
+<a href="#h0-0-69" id="h0-0-69" class="d">-		log.Info(
+</a><a href="#h0-0-70" id="h0-0-70" class="i">+		log.Logger.Info(
+</a> 			&quot;registered server listener&quot;,
+ 			zap.String(&quot;name&quot;, listener.Name),
+ 			zap.String(&quot;address&quot;, listener.Address.String()),
+<a href="#h0-1" id="h0-1" class="h">@@ -65,7 +53,7 @@ func main() {
+</a> 		)
+ 	}
+ 	for _, vhost := range cfg.Server.VirtualHosts {
+<a href="#h0-1-3" id="h0-1-3" class="d">-		log.Info(
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+		log.Logger.Info(
+</a> 			&quot;registered virtual host&quot;,
+ 			zap.String(&quot;name&quot;, vhost.Name),
+ 			zap.String(&quot;host&quot;, vhost.Host.String()),
+<a href="#h0-2" id="h0-2" class="h">@@ -76,12 +64,12 @@ func main() {
+</a> 	}
+ 
+ 	if *flagValidate {
+<a href="#h0-2-3" id="h0-2-3" class="d">-		log.Info(&quot;config file successfully validated&quot;, zap.String(&quot;config&quot;, *flagConfig))
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+		log.Logger.Info(&quot;config file successfully validated&quot;, zap.String(&quot;config&quot;, *flagConfig))
+</a> 		return
+ 	}
+ 
+ 	if cfg.Application.Metrics != nil {
+<a href="#h0-2-9" id="h0-2-9" class="d">-		log.Info(
+</a><a href="#h0-2-10" id="h0-2-10" class="i">+		log.Logger.Info(
+</a> 			&quot;initializing metrics subsystem&quot;,
+ 			zap.String(&quot;address&quot;, cfg.Application.Metrics.Address),
+ 			zap.String(&quot;prefix&quot;, cfg.Application.Metrics.Prefix),
+<a href="#h0-3" id="h0-3" class="h">@@ -89,12 +77,12 @@ func main() {
+</a> 		)
+ 
+ 		if err := metrics.Init(cfg); err != nil {
+<a href="#h0-3-3" id="h0-3-3" class="d">-			log.Fatal(&quot;failed to initialize metrics subsystem&quot;, zap.Error(err))
+</a><a href="#h0-3-4" id="h0-3-4" class="i">+			log.Logger.Fatal(&quot;failed to initialize metrics subsystem&quot;, zap.Error(err))
+</a> 		}
+ 	}
+ 
+ 	if cfg.Application.SentryDSN != nil {
+<a href="#h0-3-9" id="h0-3-9" class="d">-		log.Info(
+</a><a href="#h0-3-10" id="h0-3-10" class="i">+		log.Logger.Info(
+</a> 			&quot;enabling error reporting&quot;,
+ 			zap.String(&quot;sentry_dsn&quot;, cfg.Application.SentryDSN.String()),
+ 		)
+<a href="#h0-4" id="h0-4" class="h">@@ -107,20 +95,20 @@ func main() {
+</a> 		}
+ 
+ 		if err := sentry.Init(opts); err != nil {
+<a href="#h0-4-3" id="h0-4-3" class="d">-			log.Fatal(&quot;failed to create Sentry client&quot;, zap.Error(err))
+</a><a href="#h0-4-4" id="h0-4-4" class="i">+			log.Logger.Fatal(&quot;failed to create Sentry client&quot;, zap.Error(err))
+</a> 		}
+ 
+ 		defer sentry.Recover()
+ 	}
+ 
+<a href="#h0-4-10" id="h0-4-10" class="d">-	log.Info(&quot;initializing HTTP server&quot;)
+</a><a href="#h0-4-11" id="h0-4-11" class="i">+	log.Logger.Info(&quot;initializing HTTP server&quot;)
+</a> 	srv, err := server.New(cfg)
+ 	if err != nil {
+<a href="#h0-4-14" id="h0-4-14" class="d">-		log.Fatal(&quot;failed to start server&quot;, zap.Error(err))
+</a><a href="#h0-4-15" id="h0-4-15" class="i">+		log.Logger.Fatal(&quot;failed to start server&quot;, zap.Error(err))
+</a> 	}
+ 
+<a href="#h0-4-18" id="h0-4-18" class="d">-	log.Info(&quot;starting indefinite serving&quot;)
+</a><a href="#h0-4-19" id="h0-4-19" class="i">+	log.Logger.Info(&quot;starting indefinite serving&quot;)
+</a> 	if err := srv.Serve(); err != nil {
+<a href="#h0-4-21" id="h0-4-21" class="d">-		log.Fatal(&quot;failed to serve&quot;, zap.Error(err))
+</a><a href="#h0-4-22" id="h0-4-22" class="i">+		log.Logger.Fatal(&quot;failed to serve&quot;, zap.Error(err))
+</a> 	}
+ }
+</pre>
+</div>
+</body>
+</html>

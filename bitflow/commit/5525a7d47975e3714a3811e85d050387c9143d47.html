@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>pkg/proxy: Add name identifier to DirectPipe implementation for logging - bitflow - Layer 4 TCP proxy for secure interconnection of isolated networks</title>
+<meta name="description" content="Layer 4 TCP proxy for secure interconnection of isolated networks" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="bitflow Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="bitflow Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>bitflow</h1><span class="desc">Layer 4 TCP proxy for secure interconnection of isolated networks</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/bitflow.git">https://source.static.kevinlin.info/bitflow.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/5525a7d47975e3714a3811e85d050387c9143d47">5525a7d47975e3714a3811e85d050387c9143d47</a>
+<b>parent</b> <a href="../commit/4f6f659abd14f33085b93bd8acf78fbb05fee331">4f6f659abd14f33085b93bd8acf78fbb05fee331</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Fri 18 Jun 2021 19:10:18 -0700
+
+pkg/proxy: Add name identifier to DirectPipe implementation for logging
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">pkg/proxy/pipe.go</a></td><td> | </td><td class="num">33</td><td><span class="i">+++++++++++++++++++++++++</span><span class="d">--------</span></td></tr>
+</table></pre><pre>1 file changed, 25 insertions(+), 8 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/pkg/proxy/pipe.go">pkg/proxy/pipe.go</a> b/<a href="../file/pkg/proxy/pipe.go">pkg/proxy/pipe.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -11,6 +11,7 @@ import (
+</a> var (
+ 	// DefaultDirectPipe is a DirectPipe with default parameters.
+ 	DefaultDirectPipe = &amp;DirectPipe{
+<a href="#h0-0-3" id="h0-0-3" class="i">+		Name:     &quot;default&quot;,
+</a> 		DebugLog: log.New(io.Discard, &quot;&quot;, 0),
+ 		ErrorLog: log.New(io.Discard, &quot;&quot;, 0),
+ 	}
+<a href="#h0-1" id="h0-1" class="h">@@ -27,6 +28,8 @@ type Pipe interface {
+</a> // In scenarios where it is supported, the pipe gracefully closes the read end of a connection to
+ // avoid attempting to pipe bytes when one side of the connection has closed.
+ type DirectPipe struct {
+<a href="#h0-1-3" id="h0-1-3" class="i">+	// Name is a human-readable identifier for this pipe instance.
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+	Name string
+</a> 	// ConnectionLifetime is the timeout value for the maximum total amount of time the pipe is
+ 	// allowed to take. Connections whose total duration exceeds this value will be considered
+ 	// errored. A zero-valued lifetime will allow connections to take unlimited time.
+<a href="#h0-2" id="h0-2" class="h">@@ -67,7 +70,8 @@ func (p *DirectPipe) Do(dst net.Conn, src net.Conn) (int64, int64, error) {
+</a> 	}
+ 
+ 	p.DebugLog.Printf(
+<a href="#h0-2-3" id="h0-2-3" class="d">-		&quot;proxy: pipe operation started: src=%v dst=%v&quot;,
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+		&quot;proxy: pipe operation started: name=%s src=%v dst=%v&quot;,
+</a><a href="#h0-2-5" id="h0-2-5" class="i">+		p.Name,
+</a> 		src.RemoteAddr(),
+ 		dst.RemoteAddr(),
+ 	)
+<a href="#h0-3" id="h0-3" class="h">@@ -83,14 +87,16 @@ func (p *DirectPipe) Do(dst net.Conn, src net.Conn) (int64, int64, error) {
+</a> 		if err != nil {
+ 			errs &lt;- err
+ 			p.ErrorLog.Printf(
+<a href="#h0-3-3" id="h0-3-3" class="d">-				&quot;proxy: error piping src -&gt; dst: src=%v dst=%v err=%v&quot;,
+</a><a href="#h0-3-4" id="h0-3-4" class="i">+				&quot;proxy: error piping src -&gt; dst: name=%s src=%v dst=%v err=%v&quot;,
+</a><a href="#h0-3-5" id="h0-3-5" class="i">+				p.Name,
+</a> 				src.RemoteAddr(),
+ 				dst.RemoteAddr(),
+ 				err,
+ 			)
+ 		} else {
+ 			p.DebugLog.Printf(
+<a href="#h0-3-12" id="h0-3-12" class="d">-				&quot;proxy: copied bytes src -&gt; dst: src=%v dst=%v bytes=%d&quot;,
+</a><a href="#h0-3-13" id="h0-3-13" class="i">+				&quot;proxy: copied bytes src -&gt; dst: name=%s src=%v dst=%v bytes=%d&quot;,
+</a><a href="#h0-3-14" id="h0-3-14" class="i">+				p.Name,
+</a> 				src.RemoteAddr(),
+ 				dst.RemoteAddr(),
+ 				srcSent,
+<a href="#h0-4" id="h0-4" class="h">@@ -109,14 +115,16 @@ func (p *DirectPipe) Do(dst net.Conn, src net.Conn) (int64, int64, error) {
+</a> 		if err != nil {
+ 			errs &lt;- err
+ 			p.ErrorLog.Printf(
+<a href="#h0-4-3" id="h0-4-3" class="d">-				&quot;proxy: error piping dst -&gt; src: src=%v dst=%v err=%v&quot;,
+</a><a href="#h0-4-4" id="h0-4-4" class="i">+				&quot;proxy: error piping dst -&gt; src: name=%s src=%v dst=%v err=%v&quot;,
+</a><a href="#h0-4-5" id="h0-4-5" class="i">+				p.Name,
+</a> 				src.RemoteAddr(),
+ 				dst.RemoteAddr(),
+ 				err,
+ 			)
+ 		} else {
+ 			p.DebugLog.Printf(
+<a href="#h0-4-12" id="h0-4-12" class="d">-				&quot;proxy: copied bytes dst -&gt; src: src=%v dst=%v bytes=%d&quot;,
+</a><a href="#h0-4-13" id="h0-4-13" class="i">+				&quot;proxy: copied bytes dst -&gt; src: name=%s src=%v dst=%v bytes=%d&quot;,
+</a><a href="#h0-4-14" id="h0-4-14" class="i">+				p.Name,
+</a> 				src.RemoteAddr(),
+ 				dst.RemoteAddr(),
+ 				dstRecv,
+<a href="#h0-5" id="h0-5" class="h">@@ -138,7 +146,11 @@ func (p *DirectPipe) Do(dst net.Conn, src net.Conn) (int64, int64, error) {
+</a> 			p.ConnectionLifetime,
+ 		)
+ 	case &lt;-dstClosed:
+<a href="#h0-5-3" id="h0-5-3" class="d">-		p.DebugLog.Printf(&quot;proxy: dst connection closed: dst=%v&quot;, dst.RemoteAddr())
+</a><a href="#h0-5-4" id="h0-5-4" class="i">+		p.DebugLog.Printf(
+</a><a href="#h0-5-5" id="h0-5-5" class="i">+			&quot;proxy: dst connection closed: name=%s dst=%v&quot;,
+</a><a href="#h0-5-6" id="h0-5-6" class="i">+			p.Name,
+</a><a href="#h0-5-7" id="h0-5-7" class="i">+			dst.RemoteAddr(),
+</a><a href="#h0-5-8" id="h0-5-8" class="i">+		)
+</a> 		switch conn := src.(type) {
+ 		case *net.TCPConn:
+ 			conn.CloseRead()
+<a href="#h0-6" id="h0-6" class="h">@@ -147,7 +159,11 @@ func (p *DirectPipe) Do(dst net.Conn, src net.Conn) (int64, int64, error) {
+</a> 		}
+ 		&lt;-srcClosed
+ 	case &lt;-srcClosed:
+<a href="#h0-6-3" id="h0-6-3" class="d">-		p.DebugLog.Printf(&quot;proxy: src connection closed: src=%v&quot;, src.RemoteAddr())
+</a><a href="#h0-6-4" id="h0-6-4" class="i">+		p.DebugLog.Printf(
+</a><a href="#h0-6-5" id="h0-6-5" class="i">+			&quot;proxy: src connection closed: name=%s src=%v&quot;,
+</a><a href="#h0-6-6" id="h0-6-6" class="i">+			p.Name,
+</a><a href="#h0-6-7" id="h0-6-7" class="i">+			src.RemoteAddr(),
+</a><a href="#h0-6-8" id="h0-6-8" class="i">+		)
+</a> 		switch conn := dst.(type) {
+ 		case *net.TCPConn:
+ 			conn.CloseRead()
+<a href="#h0-7" id="h0-7" class="h">@@ -158,7 +174,8 @@ func (p *DirectPipe) Do(dst net.Conn, src net.Conn) (int64, int64, error) {
+</a> 	}
+ 
+ 	p.DebugLog.Printf(
+<a href="#h0-7-3" id="h0-7-3" class="d">-		&quot;proxy: pipe operation complete: src=%v dst=%v&quot;,
+</a><a href="#h0-7-4" id="h0-7-4" class="i">+		&quot;proxy: pipe operation complete: name=%s src=%v dst=%v&quot;,
+</a><a href="#h0-7-5" id="h0-7-5" class="i">+		p.Name,
+</a> 		src.RemoteAddr(),
+ 		dst.RemoteAddr(),
+ 	)
+</pre>
+</div>
+</body>
+</html>

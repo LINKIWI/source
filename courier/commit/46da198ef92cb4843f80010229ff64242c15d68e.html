@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/config: Server certificates store with automatic reload - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/46da198ef92cb4843f80010229ff64242c15d68e">46da198ef92cb4843f80010229ff64242c15d68e</a>
+<b>parent</b> <a href="../commit/47c9b6763025c487d9139501a76abfc281c98283">47c9b6763025c487d9139501a76abfc281c98283</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Thu  4 Feb 2021 22:04:33 -0800
+
+internal/config: Server certificates store with automatic reload
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/config/config.go</a></td><td> | </td><td class="num">34</td><td><span class="i">++++++++++</span><span class="d">------------------------</span></td></tr>
+<tr><td class="A">A</td><td><a href="#h1">internal/config/tls.go</a></td><td> | </td><td class="num">122</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+</table></pre><pre>2 files changed, 132 insertions(+), 24 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/config/config.go">internal/config/config.go</a> b/<a href="../file/internal/config/config.go">internal/config/config.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -231,24 +231,12 @@ func (t *TLSContext) ClientConfig() (*tls.Config, error) {
+</a> // ServerConfig transforms the TLS context into a tls.Config appropriate for purposes of TLS
+ // termination at a server.
+ func (t *TLSContext) ServerConfig() (*tls.Config, error) {
+<a href="#h0-0-3" id="h0-0-3" class="d">-	var certificates []tls.Certificate
+</a><a href="#h0-0-4" id="h0-0-4" class="d">-	authorities := x509.NewCertPool()
+</a><a href="#h0-0-5" id="h0-0-5" class="d">-
+</a><a href="#h0-0-6" id="h0-0-6" class="d">-	for _, cert := range t.Certificates {
+</a><a href="#h0-0-7" id="h0-0-7" class="d">-		keypair, err := tls.LoadX509KeyPair(cert.Certificate, cert.Key)
+</a><a href="#h0-0-8" id="h0-0-8" class="d">-		if err != nil {
+</a><a href="#h0-0-9" id="h0-0-9" class="d">-			return nil, err
+</a><a href="#h0-0-10" id="h0-0-10" class="d">-		}
+</a><a href="#h0-0-11" id="h0-0-11" class="d">-
+</a><a href="#h0-0-12" id="h0-0-12" class="d">-		certificates = append(certificates, keypair)
+</a><a href="#h0-0-13" id="h0-0-13" class="d">-
+</a><a href="#h0-0-14" id="h0-0-14" class="d">-		if cert.Authority != &quot;&quot; {
+</a><a href="#h0-0-15" id="h0-0-15" class="d">-			ca, err := ioutil.ReadFile(cert.Authority)
+</a><a href="#h0-0-16" id="h0-0-16" class="d">-			if err != nil {
+</a><a href="#h0-0-17" id="h0-0-17" class="d">-				return nil, err
+</a><a href="#h0-0-18" id="h0-0-18" class="d">-			}
+</a><a href="#h0-0-19" id="h0-0-19" class="d">-
+</a><a href="#h0-0-20" id="h0-0-20" class="d">-			authorities.AppendCertsFromPEM(ca)
+</a><a href="#h0-0-21" id="h0-0-21" class="i">+	cs, err := newCertificateStore(t)
+</a><a href="#h0-0-22" id="h0-0-22" class="i">+	if err != nil {
+</a><a href="#h0-0-23" id="h0-0-23" class="i">+		return nil, &amp;util.Error{
+</a><a href="#h0-0-24" id="h0-0-24" class="i">+			Namespace:    &quot;config&quot;,
+</a><a href="#h0-0-25" id="h0-0-25" class="i">+			Message:      &quot;failed to initialize certificate store&quot;,
+</a><a href="#h0-0-26" id="h0-0-26" class="i">+			StackedError: err,
+</a> 		}
+ 	}
+ 
+<a href="#h0-1" id="h0-1" class="h">@@ -257,12 +245,10 @@ func (t *TLSContext) ServerConfig() (*tls.Config, error) {
+</a> 		verifyMode = tls.RequireAndVerifyClientCert
+ 	}
+ 
+<a href="#h0-1-3" id="h0-1-3" class="d">-	// TODO: Implement using GetCertificate instead of building a static list of certificates
+</a><a href="#h0-1-4" id="h0-1-4" class="d">-	// to accommodate dynamic cert reload
+</a> 	return &amp;tls.Config{
+<a href="#h0-1-6" id="h0-1-6" class="d">-		Certificates: certificates,
+</a><a href="#h0-1-7" id="h0-1-7" class="d">-		ClientCAs:    authorities,
+</a><a href="#h0-1-8" id="h0-1-8" class="d">-		ClientAuth:   verifyMode,
+</a><a href="#h0-1-9" id="h0-1-9" class="d">-		MinVersion:   tls.VersionTLS13,
+</a><a href="#h0-1-10" id="h0-1-10" class="i">+		GetCertificate: cs.getServerCertificate,
+</a><a href="#h0-1-11" id="h0-1-11" class="i">+		ClientCAs:      cs.cas,
+</a><a href="#h0-1-12" id="h0-1-12" class="i">+		ClientAuth:     verifyMode,
+</a><a href="#h0-1-13" id="h0-1-13" class="i">+		MinVersion:     tls.VersionTLS13,
+</a> 	}, nil
+ }
+<b>diff --git a/<a id="h1" href="../file/internal/config/tls.go">internal/config/tls.go</a> b/<a href="../file/internal/config/tls.go">internal/config/tls.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -0,0 +1,122 @@
+</a><a href="#h1-0-0" id="h1-0-0" class="i">+package config
+</a><a href="#h1-0-1" id="h1-0-1" class="i">+
+</a><a href="#h1-0-2" id="h1-0-2" class="i">+import (
+</a><a href="#h1-0-3" id="h1-0-3" class="i">+	&quot;crypto/tls&quot;
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+	&quot;crypto/x509&quot;
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+	&quot;io/ioutil&quot;
+</a><a href="#h1-0-6" id="h1-0-6" class="i">+	&quot;sync&quot;
+</a><a href="#h1-0-7" id="h1-0-7" class="i">+	&quot;time&quot;
+</a><a href="#h1-0-8" id="h1-0-8" class="i">+
+</a><a href="#h1-0-9" id="h1-0-9" class="i">+	&quot;go.uber.org/zap&quot;
+</a><a href="#h1-0-10" id="h1-0-10" class="i">+
+</a><a href="#h1-0-11" id="h1-0-11" class="i">+	&quot;courier/internal/util&quot;
+</a><a href="#h1-0-12" id="h1-0-12" class="i">+)
+</a><a href="#h1-0-13" id="h1-0-13" class="i">+
+</a><a href="#h1-0-14" id="h1-0-14" class="i">+// certificateStore is an abstraction over a set of TLS certificates that automatically manages periodic
+</a><a href="#h1-0-15" id="h1-0-15" class="i">+// reloads.
+</a><a href="#h1-0-16" id="h1-0-16" class="i">+type certificateStore struct {
+</a><a href="#h1-0-17" id="h1-0-17" class="i">+	ctx *TLSContext
+</a><a href="#h1-0-18" id="h1-0-18" class="i">+
+</a><a href="#h1-0-19" id="h1-0-19" class="i">+	certs      []tls.Certificate
+</a><a href="#h1-0-20" id="h1-0-20" class="i">+	cas        *x509.CertPool
+</a><a href="#h1-0-21" id="h1-0-21" class="i">+	lastReload time.Time
+</a><a href="#h1-0-22" id="h1-0-22" class="i">+	mutex      sync.Mutex
+</a><a href="#h1-0-23" id="h1-0-23" class="i">+}
+</a><a href="#h1-0-24" id="h1-0-24" class="i">+
+</a><a href="#h1-0-25" id="h1-0-25" class="i">+// newCertificateStore creates a new certificate store.
+</a><a href="#h1-0-26" id="h1-0-26" class="i">+func newCertificateStore(ctx *TLSContext) (*certificateStore, error) {
+</a><a href="#h1-0-27" id="h1-0-27" class="i">+	cs := &amp;certificateStore{ctx: ctx}
+</a><a href="#h1-0-28" id="h1-0-28" class="i">+
+</a><a href="#h1-0-29" id="h1-0-29" class="i">+	if err := cs.reload(); err != nil {
+</a><a href="#h1-0-30" id="h1-0-30" class="i">+		return nil, err
+</a><a href="#h1-0-31" id="h1-0-31" class="i">+	}
+</a><a href="#h1-0-32" id="h1-0-32" class="i">+
+</a><a href="#h1-0-33" id="h1-0-33" class="i">+	return cs, nil
+</a><a href="#h1-0-34" id="h1-0-34" class="i">+}
+</a><a href="#h1-0-35" id="h1-0-35" class="i">+
+</a><a href="#h1-0-36" id="h1-0-36" class="i">+// reload loads the certificates from disk and replaces the current store with the new certificates,
+</a><a href="#h1-0-37" id="h1-0-37" class="i">+// in one atomic, concurrent-safe operation. If the reload fails, the old store&#39;s contents are
+</a><a href="#h1-0-38" id="h1-0-38" class="i">+// retained without modification.
+</a><a href="#h1-0-39" id="h1-0-39" class="i">+func (cs *certificateStore) reload() error {
+</a><a href="#h1-0-40" id="h1-0-40" class="i">+	cs.mutex.Lock()
+</a><a href="#h1-0-41" id="h1-0-41" class="i">+	defer cs.mutex.Unlock()
+</a><a href="#h1-0-42" id="h1-0-42" class="i">+
+</a><a href="#h1-0-43" id="h1-0-43" class="i">+	var certs []tls.Certificate
+</a><a href="#h1-0-44" id="h1-0-44" class="i">+	cas := x509.NewCertPool()
+</a><a href="#h1-0-45" id="h1-0-45" class="i">+
+</a><a href="#h1-0-46" id="h1-0-46" class="i">+	for _, cert := range cs.ctx.Certificates {
+</a><a href="#h1-0-47" id="h1-0-47" class="i">+		zap.L().Debug(
+</a><a href="#h1-0-48" id="h1-0-48" class="i">+			&quot;loading TLS certificate&quot;,
+</a><a href="#h1-0-49" id="h1-0-49" class="i">+			zap.String(&quot;certificate&quot;, cert.Certificate),
+</a><a href="#h1-0-50" id="h1-0-50" class="i">+			zap.String(&quot;key&quot;, cert.Key),
+</a><a href="#h1-0-51" id="h1-0-51" class="i">+			zap.String(&quot;authority&quot;, cert.Authority),
+</a><a href="#h1-0-52" id="h1-0-52" class="i">+		)
+</a><a href="#h1-0-53" id="h1-0-53" class="i">+
+</a><a href="#h1-0-54" id="h1-0-54" class="i">+		keypair, err := tls.LoadX509KeyPair(cert.Certificate, cert.Key)
+</a><a href="#h1-0-55" id="h1-0-55" class="i">+		if err != nil {
+</a><a href="#h1-0-56" id="h1-0-56" class="i">+			return &amp;util.Error{
+</a><a href="#h1-0-57" id="h1-0-57" class="i">+				Namespace: &quot;config&quot;,
+</a><a href="#h1-0-58" id="h1-0-58" class="i">+				Message:   &quot;failed to load certificate keypair&quot;,
+</a><a href="#h1-0-59" id="h1-0-59" class="i">+				Tags: map[string]interface{}{
+</a><a href="#h1-0-60" id="h1-0-60" class="i">+					&quot;cert&quot;: cert.Certificate,
+</a><a href="#h1-0-61" id="h1-0-61" class="i">+					&quot;key&quot;:  cert.Key,
+</a><a href="#h1-0-62" id="h1-0-62" class="i">+				},
+</a><a href="#h1-0-63" id="h1-0-63" class="i">+				StackedError: err,
+</a><a href="#h1-0-64" id="h1-0-64" class="i">+			}
+</a><a href="#h1-0-65" id="h1-0-65" class="i">+		}
+</a><a href="#h1-0-66" id="h1-0-66" class="i">+
+</a><a href="#h1-0-67" id="h1-0-67" class="i">+		if cert.Authority != &quot;&quot; {
+</a><a href="#h1-0-68" id="h1-0-68" class="i">+			ca, err := ioutil.ReadFile(cert.Authority)
+</a><a href="#h1-0-69" id="h1-0-69" class="i">+			if err != nil {
+</a><a href="#h1-0-70" id="h1-0-70" class="i">+				return &amp;util.Error{
+</a><a href="#h1-0-71" id="h1-0-71" class="i">+					Namespace: &quot;config&quot;,
+</a><a href="#h1-0-72" id="h1-0-72" class="i">+					Message:   &quot;failed to read CA from disk&quot;,
+</a><a href="#h1-0-73" id="h1-0-73" class="i">+					Tags: map[string]interface{}{
+</a><a href="#h1-0-74" id="h1-0-74" class="i">+						&quot;authority&quot;: cert.Authority,
+</a><a href="#h1-0-75" id="h1-0-75" class="i">+					},
+</a><a href="#h1-0-76" id="h1-0-76" class="i">+					StackedError: err,
+</a><a href="#h1-0-77" id="h1-0-77" class="i">+				}
+</a><a href="#h1-0-78" id="h1-0-78" class="i">+			}
+</a><a href="#h1-0-79" id="h1-0-79" class="i">+
+</a><a href="#h1-0-80" id="h1-0-80" class="i">+			cas.AppendCertsFromPEM(ca)
+</a><a href="#h1-0-81" id="h1-0-81" class="i">+		}
+</a><a href="#h1-0-82" id="h1-0-82" class="i">+
+</a><a href="#h1-0-83" id="h1-0-83" class="i">+		certs = append(certs, keypair)
+</a><a href="#h1-0-84" id="h1-0-84" class="i">+	}
+</a><a href="#h1-0-85" id="h1-0-85" class="i">+
+</a><a href="#h1-0-86" id="h1-0-86" class="i">+	cs.certs = certs
+</a><a href="#h1-0-87" id="h1-0-87" class="i">+	cs.cas = cas
+</a><a href="#h1-0-88" id="h1-0-88" class="i">+	cs.lastReload = time.Now()
+</a><a href="#h1-0-89" id="h1-0-89" class="i">+
+</a><a href="#h1-0-90" id="h1-0-90" class="i">+	zap.L().Debug(&quot;successfully completed TLS certificate reload routine&quot;)
+</a><a href="#h1-0-91" id="h1-0-91" class="i">+
+</a><a href="#h1-0-92" id="h1-0-92" class="i">+	return nil
+</a><a href="#h1-0-93" id="h1-0-93" class="i">+}
+</a><a href="#h1-0-94" id="h1-0-94" class="i">+
+</a><a href="#h1-0-95" id="h1-0-95" class="i">+// getServerCertificate attempts to retrieve a certificate from the store that is eligible for TLS
+</a><a href="#h1-0-96" id="h1-0-96" class="i">+// termination based on the inbound tls.ClientHelloInfo. This routine will also statefully reload
+</a><a href="#h1-0-97" id="h1-0-97" class="i">+// the certificate store if it deemed stale by the configured reload interval.
+</a><a href="#h1-0-98" id="h1-0-98" class="i">+func (cs *certificateStore) getServerCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+</a><a href="#h1-0-99" id="h1-0-99" class="i">+	if cs.ctx.ReloadInterval &gt; 0 &amp;&amp; time.Since(cs.lastReload) &gt; cs.ctx.ReloadInterval {
+</a><a href="#h1-0-100" id="h1-0-100" class="i">+		zap.L().Debug(
+</a><a href="#h1-0-101" id="h1-0-101" class="i">+			&quot;reloading TLS certificates due to stale store&quot;,
+</a><a href="#h1-0-102" id="h1-0-102" class="i">+			zap.Duration(&quot;age&quot;, time.Since(cs.lastReload)),
+</a><a href="#h1-0-103" id="h1-0-103" class="i">+		)
+</a><a href="#h1-0-104" id="h1-0-104" class="i">+
+</a><a href="#h1-0-105" id="h1-0-105" class="i">+		if err := cs.reload(); err != nil {
+</a><a href="#h1-0-106" id="h1-0-106" class="i">+			zap.L().Error(&quot;failed to reload TLS certificates store&quot;, zap.Error(err))
+</a><a href="#h1-0-107" id="h1-0-107" class="i">+		}
+</a><a href="#h1-0-108" id="h1-0-108" class="i">+	}
+</a><a href="#h1-0-109" id="h1-0-109" class="i">+
+</a><a href="#h1-0-110" id="h1-0-110" class="i">+	for _, cert := range cs.certs {
+</a><a href="#h1-0-111" id="h1-0-111" class="i">+		if err := hello.SupportsCertificate(&amp;cert); err == nil {
+</a><a href="#h1-0-112" id="h1-0-112" class="i">+			return &amp;cert, nil
+</a><a href="#h1-0-113" id="h1-0-113" class="i">+		}
+</a><a href="#h1-0-114" id="h1-0-114" class="i">+	}
+</a><a href="#h1-0-115" id="h1-0-115" class="i">+
+</a><a href="#h1-0-116" id="h1-0-116" class="i">+	return nil, &amp;util.Error{
+</a><a href="#h1-0-117" id="h1-0-117" class="i">+		Namespace: &quot;config&quot;,
+</a><a href="#h1-0-118" id="h1-0-118" class="i">+		Message:   &quot;no TLS certificate available that satisfies handshake requirements&quot;,
+</a><a href="#h1-0-119" id="h1-0-119" class="i">+		Tags:      map[string]interface{}{&quot;server_name&quot;: hello.ServerName},
+</a><a href="#h1-0-120" id="h1-0-120" class="i">+	}
+</a><a href="#h1-0-121" id="h1-0-121" class="i">+}
+</a></pre>
+</div>
+</body>
+</html>

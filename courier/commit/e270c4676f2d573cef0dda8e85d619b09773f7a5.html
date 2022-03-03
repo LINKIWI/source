@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/config: Move client connection, transport, TLS context, proxy to upstream section - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/e270c4676f2d573cef0dda8e85d619b09773f7a5">e270c4676f2d573cef0dda8e85d619b09773f7a5</a>
+<b>parent</b> <a href="../commit/37758554ab7b1730e8deb8452d545cbb44c5fbe9">37758554ab7b1730e8deb8452d545cbb44c5fbe9</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Fri  5 Feb 2021 22:31:33 -0800
+
+internal/config: Move client connection, transport, TLS context, proxy to upstream section
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">cmd/courier/main.go</a></td><td> | </td><td class="num">6</td><td><span class="i">++++</span><span class="d">--</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">config.example.yaml</a></td><td> | </td><td class="num">16</td><td><span class="i">++++++++</span><span class="d">--------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">internal/config/config.go</a></td><td> | </td><td class="num">4</td><td><span class="i">++</span><span class="d">--</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">internal/config/types.go</a></td><td> | </td><td class="num">20</td><td><span class="i">++++++++++</span><span class="d">----------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h4">internal/server/proxy.go</a></td><td> | </td><td class="num">26</td><td><span class="i">+++++++++++++++</span><span class="d">-----------</span></td></tr>
+</table></pre><pre>5 files changed, 39 insertions(+), 33 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/cmd/courier/main.go">cmd/courier/main.go</a> b/<a href="../file/cmd/courier/main.go">cmd/courier/main.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -49,6 +49,7 @@ func main() {
+</a> 			&quot;registered server listener&quot;,
+ 			zap.String(&quot;name&quot;, listener.Name),
+ 			zap.String(&quot;address&quot;, listener.Address.String()),
+<a href="#h0-0-3" id="h0-0-3" class="i">+			zap.Any(&quot;connection&quot;, listener.Connection),
+</a> 			zap.Any(&quot;tls_context&quot;, listener.TLSContext),
+ 		)
+ 	}
+<a href="#h0-1" id="h0-1" class="h">@@ -59,8 +60,9 @@ func main() {
+</a> 			zap.String(&quot;host&quot;, vhost.Host.String()),
+ 			zap.String(&quot;upstream_address&quot;, vhost.Upstream.Address.String()),
+ 			zap.String(&quot;upstream_host&quot;, vhost.Upstream.Host),
+<a href="#h0-1-3" id="h0-1-3" class="d">-			zap.Any(&quot;proxy&quot;, vhost.Proxy),
+</a><a href="#h0-1-4" id="h0-1-4" class="d">-			zap.Any(&quot;tls_context&quot;, vhost.TLSContext),
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+			zap.Any(&quot;upstream_proxy&quot;, vhost.Upstream.Proxy),
+</a><a href="#h0-1-6" id="h0-1-6" class="i">+			zap.Any(&quot;upstream_connection&quot;, vhost.Upstream.Connection),
+</a><a href="#h0-1-7" id="h0-1-7" class="i">+			zap.Any(&quot;upstream_tls_context&quot;, vhost.Upstream.TLSContext),
+</a> 		)
+ 	}
+ 
+<b>diff --git a/<a id="h1" href="../file/config.example.yaml">config.example.yaml</a> b/<a href="../file/config.example.yaml">config.example.yaml</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -29,10 +29,10 @@ server:
+</a>       host: foo.example.com
+       upstream:
+         address: unix:/var/run/http/http.sock
+<a href="#h1-0-3" id="h1-0-3" class="d">-      connection:
+</a><a href="#h1-0-4" id="h1-0-4" class="d">-        connect_timeout: 4s
+</a><a href="#h1-0-5" id="h1-0-5" class="d">-        read_timeout: 10s
+</a><a href="#h1-0-6" id="h1-0-6" class="d">-        write_timeout: 10s
+</a><a href="#h1-0-7" id="h1-0-7" class="i">+        connection:
+</a><a href="#h1-0-8" id="h1-0-8" class="i">+          connect_timeout: 4s
+</a><a href="#h1-0-9" id="h1-0-9" class="i">+          read_timeout: 10s
+</a><a href="#h1-0-10" id="h1-0-10" class="i">+          write_timeout: 10s
+</a>       filters:
+         - name: metadata
+           type: metadata
+<a href="#h1-1" id="h1-1" class="h">@@ -45,9 +45,9 @@ server:
+</a>       upstream:
+         address: 10.1.0.1:8200
+         host: bar.local
+<a href="#h1-1-3" id="h1-1-3" class="d">-      connection:
+</a><a href="#h1-1-4" id="h1-1-4" class="d">-        connect_timeout: 1s
+</a><a href="#h1-1-5" id="h1-1-5" class="d">-        tls_handshake_timeout: 1s
+</a><a href="#h1-1-6" id="h1-1-6" class="i">+        connection:
+</a><a href="#h1-1-7" id="h1-1-7" class="i">+          connect_timeout: 1s
+</a><a href="#h1-1-8" id="h1-1-8" class="i">+          tls_handshake_timeout: 1s
+</a>       tls_context:
+         certificates:
+           - key: /etc/ssl/service/key.pem
+<a href="#h1-2" id="h1-2" class="h">@@ -73,4 +73,4 @@ server:
+</a>       host: baz.example.com
+       upstream:
+         address: localhost:9090
+<a href="#h1-2-3" id="h1-2-3" class="d">-      transport: http2
+</a><a href="#h1-2-4" id="h1-2-4" class="i">+        transport: http2
+</a><b>diff --git a/<a id="h2" href="../file/internal/config/config.go">internal/config/config.go</a> b/<a href="../file/internal/config/config.go">internal/config/config.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -167,13 +167,13 @@ func (c *Config) Validate() error {
+</a> 				},
+ 				StackedError: nil,
+ 			}
+<a href="#h2-0-3" id="h2-0-3" class="d">-		} else if _, ok := upstreamTransports[vhost.Transport]; !ok {
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+		} else if _, ok := upstreamTransports[vhost.Upstream.Transport]; !ok {
+</a> 			return &amp;util.Error{
+ 				Namespace: &quot;config&quot;,
+ 				Message:   &quot;unknown virtual host transport&quot;,
+ 				Tags: map[string]interface{}{
+ 					&quot;name&quot;:      vhost.Name,
+<a href="#h2-0-10" id="h2-0-10" class="d">-					&quot;transport&quot;: vhost.Transport,
+</a><a href="#h2-0-11" id="h2-0-11" class="i">+					&quot;transport&quot;: vhost.Upstream.Transport,
+</a> 				},
+ 			}
+ 		}
+<b>diff --git a/<a id="h3" href="../file/internal/config/types.go">internal/config/types.go</a> b/<a href="../file/internal/config/types.go">internal/config/types.go</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -57,20 +57,20 @@ type ServerConnection struct {
+</a> 
+ // Upstream describes one upstream HTTP server.
+ type Upstream struct {
+<a href="#h3-0-3" id="h3-0-3" class="d">-	Address *Address `yaml:&quot;address&quot;`
+</a><a href="#h3-0-4" id="h3-0-4" class="d">-	Host    string   `yaml:&quot;host&quot;`
+</a><a href="#h3-0-5" id="h3-0-5" class="d">-}
+</a><a href="#h3-0-6" id="h3-0-6" class="d">-
+</a><a href="#h3-0-7" id="h3-0-7" class="d">-// VirtualHost describes one virtual host served by the server.
+</a><a href="#h3-0-8" id="h3-0-8" class="d">-type VirtualHost struct {
+</a><a href="#h3-0-9" id="h3-0-9" class="d">-	Name       string             `yaml:&quot;name&quot;`
+</a><a href="#h3-0-10" id="h3-0-10" class="d">-	Host       *Regex             `yaml:&quot;host&quot;`
+</a><a href="#h3-0-11" id="h3-0-11" class="d">-	Upstream   *Upstream          `yaml:&quot;upstream&quot;`
+</a><a href="#h3-0-12" id="h3-0-12" class="i">+	Address    *Address           `yaml:&quot;address&quot;`
+</a><a href="#h3-0-13" id="h3-0-13" class="i">+	Host       string             `yaml:&quot;host&quot;`
+</a> 	Proxy      *Address           `yaml:&quot;proxy&quot;`
+ 	Transport  string             `yaml:&quot;transport&quot;`
+ 	Connection UpstreamConnection `yaml:&quot;connection&quot;`
+ 	TLSContext *TLSContext        `yaml:&quot;tls_context&quot;`
+<a href="#h3-0-18" id="h3-0-18" class="d">-	Filters    []*Filter          `yaml:&quot;filters&quot;`
+</a><a href="#h3-0-19" id="h3-0-19" class="i">+}
+</a><a href="#h3-0-20" id="h3-0-20" class="i">+
+</a><a href="#h3-0-21" id="h3-0-21" class="i">+// VirtualHost describes one virtual host served by the server.
+</a><a href="#h3-0-22" id="h3-0-22" class="i">+type VirtualHost struct {
+</a><a href="#h3-0-23" id="h3-0-23" class="i">+	Name     string    `yaml:&quot;name&quot;`
+</a><a href="#h3-0-24" id="h3-0-24" class="i">+	Host     *Regex    `yaml:&quot;host&quot;`
+</a><a href="#h3-0-25" id="h3-0-25" class="i">+	Upstream *Upstream `yaml:&quot;upstream&quot;`
+</a><a href="#h3-0-26" id="h3-0-26" class="i">+	Filters  []*Filter `yaml:&quot;filters&quot;`
+</a> }
+ 
+ // TLSCertificate describes a the paths to a single TLS server key and certificate.
+<b>diff --git a/<a id="h4" href="../file/internal/server/proxy.go">internal/server/proxy.go</a> b/<a href="../file/internal/server/proxy.go">internal/server/proxy.go</a></b>
+<a href="#h4-0" id="h4-0" class="h">@@ -172,16 +172,16 @@ func (rp *reverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+</a> 	}
+ 
+ 	// Optional TLS origination configuration
+<a href="#h4-0-3" id="h4-0-3" class="d">-	if vhost.TLSContext != nil {
+</a><a href="#h4-0-4" id="h4-0-4" class="i">+	if vhost.Upstream.TLSContext != nil {
+</a> 		proxyReq.URL.Scheme = &quot;https&quot;
+<a href="#h4-0-6" id="h4-0-6" class="d">-		if tlsCfg, err = vhost.TLSContext.ClientConfig(); err != nil {
+</a><a href="#h4-0-7" id="h4-0-7" class="i">+		if tlsCfg, err = vhost.Upstream.TLSContext.ClientConfig(); err != nil {
+</a> 			rpErrorHandler(errBadTLSConfig)(rw, proxyReq, err)
+ 			return
+ 		}
+ 	}
+ 
+ 	// Transport and dialer selection
+<a href="#h4-0-14" id="h4-0-14" class="d">-	switch vhost.Transport {
+</a><a href="#h4-0-15" id="h4-0-15" class="i">+	switch vhost.Upstream.Transport {
+</a> 	case &quot;http2&quot;:
+ 		transport = &amp;http2.Transport{
+ 			AllowHTTP:       true,
+<a href="#h4-1" id="h4-1" class="h">@@ -189,17 +189,19 @@ func (rp *reverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+</a> 			DialTLS: func(network string, addr string, cfg *tls.Config) (net.Conn, error) {
+ 				var dialer proxy.Dialer
+ 
+<a href="#h4-1-3" id="h4-1-3" class="d">-				dialer = &amp;net.Dialer{Timeout: vhost.Connection.ConnectTimeout}
+</a><a href="#h4-1-4" id="h4-1-4" class="i">+				dialer = &amp;net.Dialer{
+</a><a href="#h4-1-5" id="h4-1-5" class="i">+					Timeout: vhost.Upstream.Connection.ConnectTimeout,
+</a><a href="#h4-1-6" id="h4-1-6" class="i">+				}
+</a> 
+<a href="#h4-1-8" id="h4-1-8" class="d">-				if vhost.TLSContext != nil {
+</a><a href="#h4-1-9" id="h4-1-9" class="i">+				if vhost.Upstream.TLSContext != nil {
+</a> 					dialer = &amp;tls.Dialer{
+ 						NetDialer: dialer.(*net.Dialer),
+ 						Config:    cfg,
+ 					}
+ 				}
+ 
+<a href="#h4-1-16" id="h4-1-16" class="d">-				if vhost.Proxy != nil {
+</a><a href="#h4-1-17" id="h4-1-17" class="d">-					proxyNet, proxyAddr := vhost.Proxy.Address()
+</a><a href="#h4-1-18" id="h4-1-18" class="i">+				if vhost.Upstream.Proxy != nil {
+</a><a href="#h4-1-19" id="h4-1-19" class="i">+					proxyNet, proxyAddr := vhost.Upstream.Proxy.Address()
+</a> 					dialer, _ = proxy.SOCKS5(proxyNet, proxyAddr, nil, dialer)
+ 				}
+ 
+<a href="#h4-2" id="h4-2" class="h">@@ -209,15 +211,17 @@ func (rp *reverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+</a> 		}
+ 	default:
+ 		transport = &amp;http.Transport{
+<a href="#h4-2-3" id="h4-2-3" class="d">-			TLSHandshakeTimeout: vhost.Connection.TLSHandshakeTimeout,
+</a><a href="#h4-2-4" id="h4-2-4" class="i">+			TLSHandshakeTimeout: vhost.Upstream.Connection.TLSHandshakeTimeout,
+</a> 			TLSClientConfig:     tlsCfg,
+ 			DialContext: func(ctx context.Context, network string, addr string) (net.Conn, error) {
+ 				var dialer proxy.Dialer
+ 
+<a href="#h4-2-9" id="h4-2-9" class="d">-				dialer = &amp;net.Dialer{Timeout: vhost.Connection.ConnectTimeout}
+</a><a href="#h4-2-10" id="h4-2-10" class="i">+				dialer = &amp;net.Dialer{
+</a><a href="#h4-2-11" id="h4-2-11" class="i">+					Timeout: vhost.Upstream.Connection.ConnectTimeout,
+</a><a href="#h4-2-12" id="h4-2-12" class="i">+				}
+</a> 
+<a href="#h4-2-14" id="h4-2-14" class="d">-				if vhost.Proxy != nil {
+</a><a href="#h4-2-15" id="h4-2-15" class="d">-					proxyNet, proxyAddr := vhost.Proxy.Address()
+</a><a href="#h4-2-16" id="h4-2-16" class="i">+				if vhost.Upstream.Proxy != nil {
+</a><a href="#h4-2-17" id="h4-2-17" class="i">+					proxyNet, proxyAddr := vhost.Upstream.Proxy.Address()
+</a> 					dialer, _ = proxy.SOCKS5(proxyNet, proxyAddr, nil, dialer)
+ 				}
+ 
+</pre>
+</div>
+</body>
+</html>

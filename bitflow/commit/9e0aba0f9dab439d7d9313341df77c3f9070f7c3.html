@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>cmd/bitflow, internal/log, internal/server: Simplify logging usage with unified Context container - bitflow - Layer 4 TCP proxy for secure interconnection of isolated networks</title>
+<meta name="description" content="Layer 4 TCP proxy for secure interconnection of isolated networks" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="bitflow Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="bitflow Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>bitflow</h1><span class="desc">Layer 4 TCP proxy for secure interconnection of isolated networks</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/bitflow.git">https://source.static.kevinlin.info/bitflow.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/9e0aba0f9dab439d7d9313341df77c3f9070f7c3">9e0aba0f9dab439d7d9313341df77c3f9070f7c3</a>
+<b>parent</b> <a href="../commit/00d23ffe01de11987a3b351ca93e0c190200676a">00d23ffe01de11987a3b351ca93e0c190200676a</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sat  4 Dec 2021 19:17:21 -0800
+
+cmd/bitflow, internal/log, internal/server: Simplify logging usage with unified Context container
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">cmd/bitflow/main.go</a></td><td> | </td><td class="num">24</td><td><span class="i">++++++++++</span><span class="d">--------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">internal/log/log.go</a></td><td> | </td><td class="num">42</td><td><span class="i">+++++++++++++++++++++++++</span><span class="d">-----------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">internal/server/server.go</a></td><td> | </td><td class="num">32</td><td><span class="i">++++++++++++++</span><span class="d">------------------</span></td></tr>
+</table></pre><pre>3 files changed, 49 insertions(+), 49 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/cmd/bitflow/main.go">cmd/bitflow/main.go</a> b/<a href="../file/cmd/bitflow/main.go">cmd/bitflow/main.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -33,14 +33,13 @@ func main() {
+</a> 		panic(err)
+ 	}
+ 
+<a href="#h0-0-3" id="h0-0-3" class="d">-	if cfg.Application.Log != nil {
+</a><a href="#h0-0-4" id="h0-0-4" class="d">-		if err := log.Init(cfg.Application.Log); err != nil {
+</a><a href="#h0-0-5" id="h0-0-5" class="d">-			panic(err)
+</a><a href="#h0-0-6" id="h0-0-6" class="d">-		}
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+	logCtx, err := log.Init(cfg.Application.Log)
+</a><a href="#h0-0-8" id="h0-0-8" class="i">+	if err != nil {
+</a><a href="#h0-0-9" id="h0-0-9" class="i">+		panic(err)
+</a> 	}
+ 
+ 	if cfg.Application.Metrics != nil {
+<a href="#h0-0-13" id="h0-0-13" class="d">-		log.DebugLog.Printf(
+</a><a href="#h0-0-14" id="h0-0-14" class="i">+		logCtx.Debug.Printf(
+</a> 			&quot;main: enabling metrics reporting: address=%s prefix=%s&quot;,
+ 			cfg.Application.Metrics.Address,
+ 			cfg.Application.Metrics.Prefix,
+<a href="#h0-1" id="h0-1" class="h">@@ -64,7 +63,7 @@ func main() {
+</a> 	}
+ 
+ 	if cfg.Application.SentryDSN != &quot;&quot; {
+<a href="#h0-1-3" id="h0-1-3" class="d">-		log.DebugLog.Printf(
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+		logCtx.Debug.Printf(
+</a> 			&quot;main: enabling error reporting: sentry_dsn=%s&quot;,
+ 			cfg.Application.SentryDSN,
+ 		)
+<a href="#h0-2" id="h0-2" class="h">@@ -83,7 +82,7 @@ func main() {
+</a> 		defer sentry.Recover()
+ 	}
+ 
+<a href="#h0-2-3" id="h0-2-3" class="d">-	log.InfoLog.Printf(
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+	logCtx.Info.Printf(
+</a> 		&quot;main: starting Bitflow proxy server: config=%s version=%s proxies=%d&quot;,
+ 		*flagConfig,
+ 		meta.Version,
+<a href="#h0-3" id="h0-3" class="h">@@ -94,12 +93,9 @@ func main() {
+</a> 	signal.Notify(shutdown, os.Interrupt)
+ 
+ 	srv := &amp;server.Server{
+<a href="#h0-3-3" id="h0-3-3" class="d">-		Config:   cfg.Server,
+</a><a href="#h0-3-4" id="h0-3-4" class="d">-		Metrics:  metrics,
+</a><a href="#h0-3-5" id="h0-3-5" class="d">-		DebugLog: log.DebugLog,
+</a><a href="#h0-3-6" id="h0-3-6" class="d">-		InfoLog:  log.InfoLog,
+</a><a href="#h0-3-7" id="h0-3-7" class="d">-		WarnLog:  log.WarnLog,
+</a><a href="#h0-3-8" id="h0-3-8" class="d">-		ErrorLog: log.ErrorLog,
+</a><a href="#h0-3-9" id="h0-3-9" class="i">+		Config:  cfg.Server,
+</a><a href="#h0-3-10" id="h0-3-10" class="i">+		Metrics: metrics,
+</a><a href="#h0-3-11" id="h0-3-11" class="i">+		Log:     logCtx,
+</a> 	}
+ 
+ 	go func() {
+<a href="#h0-4" id="h0-4" class="h">@@ -111,5 +107,5 @@ func main() {
+</a> 		panic(err)
+ 	}
+ 
+<a href="#h0-4-3" id="h0-4-3" class="d">-	log.InfoLog.Printf(&quot;main: completed graceful shutdown: proxies=%d&quot;, len(cfg.Server.Proxies))
+</a><a href="#h0-4-4" id="h0-4-4" class="i">+	logCtx.Info.Printf(&quot;main: completed graceful shutdown: proxies=%d&quot;, len(cfg.Server.Proxies))
+</a> }
+<b>diff --git a/<a id="h1" href="../file/internal/log/log.go">internal/log/log.go</a> b/<a href="../file/internal/log/log.go">internal/log/log.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -13,34 +13,42 @@ var (
+</a> 	defaultFlags = stdlog.Lshortfile | stdlog.Lmsgprefix | stdlog.Ldate | stdlog.Ltime
+ )
+ 
+<a href="#h1-0-3" id="h1-0-3" class="d">-var (
+</a><a href="#h1-0-4" id="h1-0-4" class="d">-	// DebugLog is a global debug level logger.
+</a><a href="#h1-0-5" id="h1-0-5" class="d">-	DebugLog = stdlog.New(io.Discard, &quot;debug: &quot;, defaultFlags)
+</a><a href="#h1-0-6" id="h1-0-6" class="d">-	// InfoLog is a global info level logger.
+</a><a href="#h1-0-7" id="h1-0-7" class="d">-	InfoLog = stdlog.New(io.Discard, &quot;info: &quot;, defaultFlags)
+</a><a href="#h1-0-8" id="h1-0-8" class="d">-	// WarnLog is a global error level logger.
+</a><a href="#h1-0-9" id="h1-0-9" class="d">-	WarnLog = stdlog.New(io.Discard, &quot;warn: &quot;, defaultFlags)
+</a><a href="#h1-0-10" id="h1-0-10" class="d">-	// ErrorLog is a global error level logger.
+</a><a href="#h1-0-11" id="h1-0-11" class="d">-	ErrorLog = stdlog.New(io.Discard, &quot;error: &quot;, defaultFlags)
+</a><a href="#h1-0-12" id="h1-0-12" class="d">-)
+</a><a href="#h1-0-13" id="h1-0-13" class="i">+// Context is a container for debug, info, warn, and error Logger instances.
+</a><a href="#h1-0-14" id="h1-0-14" class="i">+type Context struct {
+</a><a href="#h1-0-15" id="h1-0-15" class="i">+	Debug *stdlog.Logger
+</a><a href="#h1-0-16" id="h1-0-16" class="i">+	Info  *stdlog.Logger
+</a><a href="#h1-0-17" id="h1-0-17" class="i">+	Warn  *stdlog.Logger
+</a><a href="#h1-0-18" id="h1-0-18" class="i">+	Error *stdlog.Logger
+</a><a href="#h1-0-19" id="h1-0-19" class="i">+}
+</a> 
+ // Init statefully initializes the global standard loggers.
+<a href="#h1-0-22" id="h1-0-22" class="d">-func Init(cfg *config.Log) error {
+</a><a href="#h1-0-23" id="h1-0-23" class="i">+func Init(cfg *config.Log) (*Context, error) {
+</a><a href="#h1-0-24" id="h1-0-24" class="i">+	ctx := &amp;Context{
+</a><a href="#h1-0-25" id="h1-0-25" class="i">+		Debug: stdlog.New(io.Discard, &quot;debug: &quot;, defaultFlags),
+</a><a href="#h1-0-26" id="h1-0-26" class="i">+		Info:  stdlog.New(io.Discard, &quot;info: &quot;, defaultFlags),
+</a><a href="#h1-0-27" id="h1-0-27" class="i">+		Warn:  stdlog.New(io.Discard, &quot;warn: &quot;, defaultFlags),
+</a><a href="#h1-0-28" id="h1-0-28" class="i">+		Error: stdlog.New(io.Discard, &quot;error: &quot;, defaultFlags),
+</a><a href="#h1-0-29" id="h1-0-29" class="i">+	}
+</a><a href="#h1-0-30" id="h1-0-30" class="i">+
+</a><a href="#h1-0-31" id="h1-0-31" class="i">+	if cfg == nil {
+</a><a href="#h1-0-32" id="h1-0-32" class="i">+		return ctx, nil
+</a><a href="#h1-0-33" id="h1-0-33" class="i">+	}
+</a><a href="#h1-0-34" id="h1-0-34" class="i">+
+</a> 	switch cfg.Level {
+ 	case &quot;debug&quot;:
+<a href="#h1-0-37" id="h1-0-37" class="d">-		DebugLog.SetOutput(os.Stdout)
+</a><a href="#h1-0-38" id="h1-0-38" class="i">+		ctx.Debug.SetOutput(os.Stdout)
+</a> 		fallthrough
+ 	case &quot;info&quot;:
+<a href="#h1-0-41" id="h1-0-41" class="d">-		InfoLog.SetOutput(os.Stdout)
+</a><a href="#h1-0-42" id="h1-0-42" class="i">+		ctx.Info.SetOutput(os.Stdout)
+</a> 		fallthrough
+ 	case &quot;warn&quot;:
+<a href="#h1-0-45" id="h1-0-45" class="d">-		WarnLog.SetOutput(os.Stdout)
+</a><a href="#h1-0-46" id="h1-0-46" class="i">+		ctx.Warn.SetOutput(os.Stdout)
+</a> 		fallthrough
+ 	case &quot;error&quot;:
+<a href="#h1-0-49" id="h1-0-49" class="d">-		ErrorLog.SetOutput(os.Stdout)
+</a><a href="#h1-0-50" id="h1-0-50" class="i">+		ctx.Error.SetOutput(os.Stdout)
+</a> 	default:
+<a href="#h1-0-52" id="h1-0-52" class="d">-		return fmt.Errorf(&quot;log: unrecognized log level: level=%s&quot;, cfg.Level)
+</a><a href="#h1-0-53" id="h1-0-53" class="i">+		return nil, fmt.Errorf(&quot;log: unrecognized log level: level=%s&quot;, cfg.Level)
+</a> 	}
+ 
+<a href="#h1-0-56" id="h1-0-56" class="d">-	return nil
+</a><a href="#h1-0-57" id="h1-0-57" class="i">+	return ctx, nil
+</a> }
+<b>diff --git a/<a id="h2" href="../file/internal/server/server.go">internal/server/server.go</a> b/<a href="../file/internal/server/server.go">internal/server/server.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -5,7 +5,6 @@ import (
+</a> 	&quot;crypto/tls&quot;
+ 	&quot;fmt&quot;
+ 	&quot;io&quot;
+<a href="#h2-0-3" id="h2-0-3" class="d">-	&quot;log&quot;
+</a> 	&quot;net&quot;
+ 	&quot;os&quot;
+ 	&quot;sync&quot;
+<a href="#h2-1" id="h2-1" class="h">@@ -15,17 +14,15 @@ import (
+</a> 	&quot;lib.kevinlin.info/aperture&quot;
+ 
+ 	&quot;bitflow/internal/config&quot;
+<a href="#h2-1-3" id="h2-1-3" class="i">+	&quot;bitflow/internal/log&quot;
+</a> 	&quot;bitflow/pkg/proxy&quot;
+ )
+ 
+ // Server abstracts multiple TCP proxy servers.
+ type Server struct {
+<a href="#h2-1-9" id="h2-1-9" class="d">-	Config   config.Server
+</a><a href="#h2-1-10" id="h2-1-10" class="d">-	Metrics  aperture.Statsd
+</a><a href="#h2-1-11" id="h2-1-11" class="d">-	DebugLog *log.Logger
+</a><a href="#h2-1-12" id="h2-1-12" class="d">-	InfoLog  *log.Logger
+</a><a href="#h2-1-13" id="h2-1-13" class="d">-	WarnLog  *log.Logger
+</a><a href="#h2-1-14" id="h2-1-14" class="d">-	ErrorLog *log.Logger
+</a><a href="#h2-1-15" id="h2-1-15" class="i">+	Config  config.Server
+</a><a href="#h2-1-16" id="h2-1-16" class="i">+	Metrics aperture.Statsd
+</a><a href="#h2-1-17" id="h2-1-17" class="i">+	Log     *log.Context
+</a> 
+ 	proxies []*instance
+ }
+<a href="#h2-2" id="h2-2" class="h">@@ -37,14 +34,14 @@ func (s *Server) Serve() error {
+</a> 	errs := make(chan error, len(s.Config.Proxies))
+ 
+ 	for _, p := range s.Config.Proxies {
+<a href="#h2-2-3" id="h2-2-3" class="d">-		s.InfoLog.Printf(
+</a><a href="#h2-2-4" id="h2-2-4" class="i">+		s.Log.Info.Printf(
+</a> 			&quot;server: starting proxy server instance: name=%s listener=%v target=%v&quot;,
+ 			p.Name,
+ 			p.Listener.Address,
+ 			p.Target.Address,
+ 		)
+ 
+<a href="#h2-2-11" id="h2-2-11" class="d">-		inst, err := newProxyInstance(p, s.Metrics, s.DebugLog, s.ErrorLog)
+</a><a href="#h2-2-12" id="h2-2-12" class="i">+		inst, err := newProxyInstance(p, s.Metrics, s.Log)
+</a> 		if err != nil {
+ 			return err
+ 		}
+<a href="#h2-3" id="h2-3" class="h">@@ -60,7 +57,7 @@ func (s *Server) Serve() error {
+</a> 	}
+ 
+ 	if err := &lt;-errs; err != nil {
+<a href="#h2-3-3" id="h2-3-3" class="d">-		s.ErrorLog.Printf(
+</a><a href="#h2-3-4" id="h2-3-4" class="i">+		s.Log.Error.Printf(
+</a> 			&quot;server: proxy serving returned fatal error: err=%v&quot;,
+ 			err,
+ 		)
+<a href="#h2-4" id="h2-4" class="h">@@ -76,7 +73,7 @@ func (s *Server) Serve() error {
+</a> // Close closes all individual proxy server instances associated with this server.
+ func (s *Server) Close() {
+ 	for _, inst := range s.proxies {
+<a href="#h2-4-3" id="h2-4-3" class="d">-		s.InfoLog.Printf(
+</a><a href="#h2-4-4" id="h2-4-4" class="i">+		s.Log.Info.Printf(
+</a> 			&quot;server: gracefully shutting down proxy server instance: &quot;+
+ 				&quot;name=%s listener=%v target=%v&quot;,
+ 			inst.cfg.Name,
+<a href="#h2-5" id="h2-5" class="h">@@ -85,7 +82,7 @@ func (s *Server) Close() {
+</a> 		)
+ 
+ 		if err := inst.close(); err != nil {
+<a href="#h2-5-3" id="h2-5-3" class="d">-			s.WarnLog.Printf(
+</a><a href="#h2-5-4" id="h2-5-4" class="i">+			s.Log.Warn.Printf(
+</a> 				&quot;server: error closing proxy server: name=%s err=%v&quot;,
+ 				inst.cfg.Name,
+ 				err,
+<a href="#h2-6" id="h2-6" class="h">@@ -107,8 +104,7 @@ type instance struct {
+</a> func newProxyInstance(
+ 	cfg config.Proxy,
+ 	metrics aperture.Statsd,
+<a href="#h2-6-3" id="h2-6-3" class="d">-	debugLog *log.Logger,
+</a><a href="#h2-6-4" id="h2-6-4" class="d">-	errorLog *log.Logger,
+</a><a href="#h2-6-5" id="h2-6-5" class="i">+	logCtx *log.Context,
+</a> ) (*instance, error) {
+ 	var err error
+ 	var connectionLog io.WriteCloser
+<a href="#h2-7" id="h2-7" class="h">@@ -159,15 +155,15 @@ func newProxyInstance(
+</a> 			SourceWriteTimeout:      cfg.Listener.WriteTimeout,
+ 			DestinationReadTimeout:  cfg.Target.ReadTimeout,
+ 			DestinationWriteTimeout: cfg.Target.WriteTimeout,
+<a href="#h2-7-3" id="h2-7-3" class="d">-			DebugLog:                debugLog,
+</a><a href="#h2-7-4" id="h2-7-4" class="d">-			ErrorLog:                errorLog,
+</a><a href="#h2-7-5" id="h2-7-5" class="i">+			DebugLog:                logCtx.Debug,
+</a><a href="#h2-7-6" id="h2-7-6" class="i">+			ErrorLog:                logCtx.Error,
+</a> 		},
+ 		MaxActiveConnections: cfg.Options.ConnectionLimit,
+ 		EnableProxyHeader:    cfg.Options.EnableProxyHeader,
+ 		DialTarget:           newDirectDialer(cfg),
+ 		Metrics:              metrics,
+<a href="#h2-7-12" id="h2-7-12" class="d">-		DebugLog:             debugLog,
+</a><a href="#h2-7-13" id="h2-7-13" class="d">-		ErrorLog:             errorLog,
+</a><a href="#h2-7-14" id="h2-7-14" class="i">+		DebugLog:             logCtx.Debug,
+</a><a href="#h2-7-15" id="h2-7-15" class="i">+		ErrorLog:             logCtx.Error,
+</a> 		ConnectionLog:        connectionLog,
+ 	}
+ 
+</pre>
+</div>
+</body>
+</html>

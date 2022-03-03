@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>server.go - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../../../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../../../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../../../log">Log</a> | <a href="../../../files">Files</a> | <a href="../../../refs">Refs</a> | <a href="../../../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<p>internal/server/<strong>server.go</strong> (6317B) (<a href="../../../raw/internal/server/server.go">raw</a>) (<a href="../../../blame/internal/server/server.go">blame</a>)</p><hr/>
+<pre id="blob">
+<a href="#l1" class="line" id="l1">      1</a> package server
+<a href="#l2" class="line" id="l2">      2</a> 
+<a href="#l3" class="line" id="l3">      3</a> import (
+<a href="#l4" class="line" id="l4">      4</a> 	&quot;context&quot;
+<a href="#l5" class="line" id="l5">      5</a> 	&quot;crypto/tls&quot;
+<a href="#l6" class="line" id="l6">      6</a> 	&quot;net&quot;
+<a href="#l7" class="line" id="l7">      7</a> 	&quot;net/http&quot;
+<a href="#l8" class="line" id="l8">      8</a> 	&quot;sync/atomic&quot;
+<a href="#l9" class="line" id="l9">      9</a> 
+<a href="#l10" class="line" id="l10">     10</a> 	&quot;go.uber.org/zap&quot;
+<a href="#l11" class="line" id="l11">     11</a> 	&quot;golang.org/x/net/http2&quot;
+<a href="#l12" class="line" id="l12">     12</a> 	&quot;golang.org/x/net/http2/h2c&quot;
+<a href="#l13" class="line" id="l13">     13</a> 	&quot;golang.org/x/net/netutil&quot;
+<a href="#l14" class="line" id="l14">     14</a> 
+<a href="#l15" class="line" id="l15">     15</a> 	&quot;courier/internal/config&quot;
+<a href="#l16" class="line" id="l16">     16</a> 	&quot;courier/internal/log&quot;
+<a href="#l17" class="line" id="l17">     17</a> 	&quot;courier/internal/metrics&quot;
+<a href="#l18" class="line" id="l18">     18</a> 	&quot;courier/internal/util&quot;
+<a href="#l19" class="line" id="l19">     19</a> )
+<a href="#l20" class="line" id="l20">     20</a> 
+<a href="#l21" class="line" id="l21">     21</a> const (
+<a href="#l22" class="line" id="l22">     22</a> 	metricConnectionStateTransition = &quot;server.connection.transition&quot;
+<a href="#l23" class="line" id="l23">     23</a> 	metricConnectionStateTotal      = &quot;server.connection.total&quot;
+<a href="#l24" class="line" id="l24">     24</a> )
+<a href="#l25" class="line" id="l25">     25</a> 
+<a href="#l26" class="line" id="l26">     26</a> // Server is the main Courier server entry point.
+<a href="#l27" class="line" id="l27">     27</a> type Server struct {
+<a href="#l28" class="line" id="l28">     28</a> 	cfg     *config.Config
+<a href="#l29" class="line" id="l29">     29</a> 	rp      http.Handler
+<a href="#l30" class="line" id="l30">     30</a> 	servers []*instance
+<a href="#l31" class="line" id="l31">     31</a> }
+<a href="#l32" class="line" id="l32">     32</a> 
+<a href="#l33" class="line" id="l33">     33</a> // New creates a new Courier server from the configuration.
+<a href="#l34" class="line" id="l34">     34</a> func New(cfg *config.Config) (*Server, error) {
+<a href="#l35" class="line" id="l35">     35</a> 	rp, err := newReverseProxy(cfg.Server.VirtualHosts, cfg.Server.Proxy)
+<a href="#l36" class="line" id="l36">     36</a> 	if err != nil {
+<a href="#l37" class="line" id="l37">     37</a> 		return nil, &amp;util.Error{
+<a href="#l38" class="line" id="l38">     38</a> 			Namespace:    &quot;server&quot;,
+<a href="#l39" class="line" id="l39">     39</a> 			Message:      &quot;failed to initialize reverse proxy&quot;,
+<a href="#l40" class="line" id="l40">     40</a> 			StackedError: err,
+<a href="#l41" class="line" id="l41">     41</a> 		}
+<a href="#l42" class="line" id="l42">     42</a> 	}
+<a href="#l43" class="line" id="l43">     43</a> 
+<a href="#l44" class="line" id="l44">     44</a> 	return &amp;Server{
+<a href="#l45" class="line" id="l45">     45</a> 		cfg:     cfg,
+<a href="#l46" class="line" id="l46">     46</a> 		rp:      rp,
+<a href="#l47" class="line" id="l47">     47</a> 		servers: make([]*instance, len(cfg.Server.Listeners)),
+<a href="#l48" class="line" id="l48">     48</a> 	}, nil
+<a href="#l49" class="line" id="l49">     49</a> }
+<a href="#l50" class="line" id="l50">     50</a> 
+<a href="#l51" class="line" id="l51">     51</a> // Serve starts all individual server instances and serves indefinitely.
+<a href="#l52" class="line" id="l52">     52</a> func (s *Server) Serve() error {
+<a href="#l53" class="line" id="l53">     53</a> 	errs := make(chan error)
+<a href="#l54" class="line" id="l54">     54</a> 
+<a href="#l55" class="line" id="l55">     55</a> 	for i, listener := range s.cfg.Server.Listeners {
+<a href="#l56" class="line" id="l56">     56</a> 		s.servers[i] = newInstance(listener, s.rp)
+<a href="#l57" class="line" id="l57">     57</a> 
+<a href="#l58" class="line" id="l58">     58</a> 		go func(inst *instance) {
+<a href="#l59" class="line" id="l59">     59</a> 			err := inst.serve()
+<a href="#l60" class="line" id="l60">     60</a> 
+<a href="#l61" class="line" id="l61">     61</a> 			// Ignore http.ErrServerClosed errors, since they are always returned when
+<a href="#l62" class="line" id="l62">     62</a> 			// the underlying server is closed and not indicative of a real error during
+<a href="#l63" class="line" id="l63">     63</a> 			// serving. Propagate all other errors or non-errors directly as-is.
+<a href="#l64" class="line" id="l64">     64</a> 			if err == http.ErrServerClosed {
+<a href="#l65" class="line" id="l65">     65</a> 				errs &lt;- nil
+<a href="#l66" class="line" id="l66">     66</a> 			} else {
+<a href="#l67" class="line" id="l67">     67</a> 				errs &lt;- err
+<a href="#l68" class="line" id="l68">     68</a> 			}
+<a href="#l69" class="line" id="l69">     69</a> 		}(s.servers[i])
+<a href="#l70" class="line" id="l70">     70</a> 	}
+<a href="#l71" class="line" id="l71">     71</a> 
+<a href="#l72" class="line" id="l72">     72</a> 	return &lt;-errs
+<a href="#l73" class="line" id="l73">     73</a> }
+<a href="#l74" class="line" id="l74">     74</a> 
+<a href="#l75" class="line" id="l75">     75</a> // Close requests graceful shutdown of all server instances.
+<a href="#l76" class="line" id="l76">     76</a> func (s *Server) Close() error {
+<a href="#l77" class="line" id="l77">     77</a> 	for _, inst := range s.servers {
+<a href="#l78" class="line" id="l78">     78</a> 		if err := inst.close(); err != nil {
+<a href="#l79" class="line" id="l79">     79</a> 			zap.L().Warn(
+<a href="#l80" class="line" id="l80">     80</a> 				&quot;error closing server instance&quot;,
+<a href="#l81" class="line" id="l81">     81</a> 				zap.String(&quot;name&quot;, inst.cfg.Name),
+<a href="#l82" class="line" id="l82">     82</a> 				zap.Stringer(&quot;address&quot;, inst.cfg.Address),
+<a href="#l83" class="line" id="l83">     83</a> 				zap.Error(err),
+<a href="#l84" class="line" id="l84">     84</a> 			)
+<a href="#l85" class="line" id="l85">     85</a> 		}
+<a href="#l86" class="line" id="l86">     86</a> 	}
+<a href="#l87" class="line" id="l87">     87</a> 
+<a href="#l88" class="line" id="l88">     88</a> 	return nil
+<a href="#l89" class="line" id="l89">     89</a> }
+<a href="#l90" class="line" id="l90">     90</a> 
+<a href="#l91" class="line" id="l91">     91</a> // instance represents a single server instance.
+<a href="#l92" class="line" id="l92">     92</a> type instance struct {
+<a href="#l93" class="line" id="l93">     93</a> 	cfg    *config.Listener
+<a href="#l94" class="line" id="l94">     94</a> 	server *http.Server
+<a href="#l95" class="line" id="l95">     95</a> }
+<a href="#l96" class="line" id="l96">     96</a> 
+<a href="#l97" class="line" id="l97">     97</a> // newInstance creates an instance wrapping a single http.Server for one listener specification.
+<a href="#l98" class="line" id="l98">     98</a> func newInstance(cfg *config.Listener, handler http.Handler) *instance {
+<a href="#l99" class="line" id="l99">     99</a> 	connStats := util.NewConcurrentMap()
+<a href="#l100" class="line" id="l100">    100</a> 	connStats.Set(http.StateNew, new(int64))
+<a href="#l101" class="line" id="l101">    101</a> 	connStats.Set(http.StateActive, new(int64))
+<a href="#l102" class="line" id="l102">    102</a> 	connStats.Set(http.StateIdle, new(int64))
+<a href="#l103" class="line" id="l103">    103</a> 	connStats.Set(http.StateHijacked, new(int64))
+<a href="#l104" class="line" id="l104">    104</a> 	connStats.Set(http.StateClosed, new(int64))
+<a href="#l105" class="line" id="l105">    105</a> 
+<a href="#l106" class="line" id="l106">    106</a> 	handler = h2c.NewHandler(handler, &amp;http2.Server{})
+<a href="#l107" class="line" id="l107">    107</a> 	handler = log.NewRequestLogHandler(cfg.Name, handler)
+<a href="#l108" class="line" id="l108">    108</a> 
+<a href="#l109" class="line" id="l109">    109</a> 	server := &amp;http.Server{
+<a href="#l110" class="line" id="l110">    110</a> 		Handler:           handler,
+<a href="#l111" class="line" id="l111">    111</a> 		ReadTimeout:       cfg.Connection.ReadTimeout,
+<a href="#l112" class="line" id="l112">    112</a> 		ReadHeaderTimeout: cfg.Connection.ReadHeaderTimeout,
+<a href="#l113" class="line" id="l113">    113</a> 		WriteTimeout:      cfg.Connection.WriteTimeout,
+<a href="#l114" class="line" id="l114">    114</a> 		IdleTimeout:       cfg.Connection.IdleTimeout,
+<a href="#l115" class="line" id="l115">    115</a> 		ErrorLog:          log.StdErrorLogger,
+<a href="#l116" class="line" id="l116">    116</a> 		ConnState: func(conn net.Conn, state http.ConnState) {
+<a href="#l117" class="line" id="l117">    117</a> 			tags := map[string]interface{}{
+<a href="#l118" class="line" id="l118">    118</a> 				&quot;listener&quot;: cfg.Name,
+<a href="#l119" class="line" id="l119">    119</a> 				&quot;state&quot;:    state.String(),
+<a href="#l120" class="line" id="l120">    120</a> 			}
+<a href="#l121" class="line" id="l121">    121</a> 
+<a href="#l122" class="line" id="l122">    122</a> 			stateTotal, _ := connStats.Get(state)
+<a href="#l123" class="line" id="l123">    123</a> 			atomic.AddInt64(stateTotal.(*int64), 1)
+<a href="#l124" class="line" id="l124">    124</a> 
+<a href="#l125" class="line" id="l125">    125</a> 			metrics.Client.Incr(metricConnectionStateTransition, tags)
+<a href="#l126" class="line" id="l126">    126</a> 			metrics.Client.Gauge(
+<a href="#l127" class="line" id="l127">    127</a> 				metricConnectionStateTotal,
+<a href="#l128" class="line" id="l128">    128</a> 				float64(atomic.LoadInt64(stateTotal.(*int64))),
+<a href="#l129" class="line" id="l129">    129</a> 				tags,
+<a href="#l130" class="line" id="l130">    130</a> 			)
+<a href="#l131" class="line" id="l131">    131</a> 		},
+<a href="#l132" class="line" id="l132">    132</a> 		ConnContext: func(ctx context.Context, conn net.Conn) context.Context {
+<a href="#l133" class="line" id="l133">    133</a> 			return context.WithValue(ctx, ctxLocalConn, conn)
+<a href="#l134" class="line" id="l134">    134</a> 		},
+<a href="#l135" class="line" id="l135">    135</a> 	}
+<a href="#l136" class="line" id="l136">    136</a> 
+<a href="#l137" class="line" id="l137">    137</a> 	return &amp;instance{
+<a href="#l138" class="line" id="l138">    138</a> 		cfg:    cfg,
+<a href="#l139" class="line" id="l139">    139</a> 		server: server,
+<a href="#l140" class="line" id="l140">    140</a> 	}
+<a href="#l141" class="line" id="l141">    141</a> }
+<a href="#l142" class="line" id="l142">    142</a> 
+<a href="#l143" class="line" id="l143">    143</a> // serve configures and creates the listener and starts the underlying http.Server.
+<a href="#l144" class="line" id="l144">    144</a> func (i *instance) serve() error {
+<a href="#l145" class="line" id="l145">    145</a> 	listenNet, listenAddr := i.cfg.Address.Address()
+<a href="#l146" class="line" id="l146">    146</a> 	zap.L().Debug(
+<a href="#l147" class="line" id="l147">    147</a> 		&quot;created server listener&quot;,
+<a href="#l148" class="line" id="l148">    148</a> 		zap.String(&quot;name&quot;, i.cfg.Name),
+<a href="#l149" class="line" id="l149">    149</a> 		zap.String(&quot;net&quot;, listenNet),
+<a href="#l150" class="line" id="l150">    150</a> 		zap.String(&quot;address&quot;, listenAddr),
+<a href="#l151" class="line" id="l151">    151</a> 	)
+<a href="#l152" class="line" id="l152">    152</a> 
+<a href="#l153" class="line" id="l153">    153</a> 	ln, err := net.Listen(listenNet, listenAddr)
+<a href="#l154" class="line" id="l154">    154</a> 	if err != nil {
+<a href="#l155" class="line" id="l155">    155</a> 		return &amp;util.Error{
+<a href="#l156" class="line" id="l156">    156</a> 			Namespace: &quot;server&quot;,
+<a href="#l157" class="line" id="l157">    157</a> 			Message:   &quot;failed to listen on address&quot;,
+<a href="#l158" class="line" id="l158">    158</a> 			Tags: map[string]interface{}{
+<a href="#l159" class="line" id="l159">    159</a> 				&quot;name&quot;:    i.cfg.Name,
+<a href="#l160" class="line" id="l160">    160</a> 				&quot;address&quot;: i.cfg.Address.String(),
+<a href="#l161" class="line" id="l161">    161</a> 			},
+<a href="#l162" class="line" id="l162">    162</a> 			StackedError: err,
+<a href="#l163" class="line" id="l163">    163</a> 		}
+<a href="#l164" class="line" id="l164">    164</a> 	}
+<a href="#l165" class="line" id="l165">    165</a> 
+<a href="#l166" class="line" id="l166">    166</a> 	if i.cfg.Connection.ActiveLimit &gt; 0 {
+<a href="#l167" class="line" id="l167">    167</a> 		zap.L().Debug(
+<a href="#l168" class="line" id="l168">    168</a> 			&quot;enabling active connections limit for listener&quot;,
+<a href="#l169" class="line" id="l169">    169</a> 			zap.String(&quot;name&quot;, i.cfg.Name),
+<a href="#l170" class="line" id="l170">    170</a> 			zap.Int(&quot;limit&quot;, i.cfg.Connection.ActiveLimit),
+<a href="#l171" class="line" id="l171">    171</a> 		)
+<a href="#l172" class="line" id="l172">    172</a> 
+<a href="#l173" class="line" id="l173">    173</a> 		ln = netutil.LimitListener(ln, i.cfg.Connection.ActiveLimit)
+<a href="#l174" class="line" id="l174">    174</a> 	}
+<a href="#l175" class="line" id="l175">    175</a> 
+<a href="#l176" class="line" id="l176">    176</a> 	if len(i.cfg.AuthorizedSources) &gt; 0 {
+<a href="#l177" class="line" id="l177">    177</a> 		for _, source := range i.cfg.AuthorizedSources {
+<a href="#l178" class="line" id="l178">    178</a> 			zap.L().Debug(
+<a href="#l179" class="line" id="l179">    179</a> 				&quot;enabling restricted IP source for listener&quot;,
+<a href="#l180" class="line" id="l180">    180</a> 				zap.String(&quot;name&quot;, i.cfg.Name),
+<a href="#l181" class="line" id="l181">    181</a> 				zap.Stringer(&quot;source&quot;, source),
+<a href="#l182" class="line" id="l182">    182</a> 			)
+<a href="#l183" class="line" id="l183">    183</a> 		}
+<a href="#l184" class="line" id="l184">    184</a> 
+<a href="#l185" class="line" id="l185">    185</a> 		ln = newRestrictedListener(i.cfg.Name, i.cfg.AuthorizedSources, ln)
+<a href="#l186" class="line" id="l186">    186</a> 	}
+<a href="#l187" class="line" id="l187">    187</a> 
+<a href="#l188" class="line" id="l188">    188</a> 	switch i.cfg.Protocol {
+<a href="#l189" class="line" id="l189">    189</a> 	case &quot;haproxy&quot;:
+<a href="#l190" class="line" id="l190">    190</a> 		zap.L().Debug(
+<a href="#l191" class="line" id="l191">    191</a> 			&quot;enabling proxy protocol header parser for listener&quot;,
+<a href="#l192" class="line" id="l192">    192</a> 			zap.String(&quot;name&quot;, i.cfg.Name),
+<a href="#l193" class="line" id="l193">    193</a> 		)
+<a href="#l194" class="line" id="l194">    194</a> 
+<a href="#l195" class="line" id="l195">    195</a> 		headerTimeout := i.cfg.Connection.ReadTimeout
+<a href="#l196" class="line" id="l196">    196</a> 		if i.cfg.Connection.ReadHeaderTimeout &gt; 0 {
+<a href="#l197" class="line" id="l197">    197</a> 			headerTimeout = i.cfg.Connection.ReadHeaderTimeout
+<a href="#l198" class="line" id="l198">    198</a> 		}
+<a href="#l199" class="line" id="l199">    199</a> 
+<a href="#l200" class="line" id="l200">    200</a> 		ln = newProxyListener(i.cfg.Name, headerTimeout, ln)
+<a href="#l201" class="line" id="l201">    201</a> 	}
+<a href="#l202" class="line" id="l202">    202</a> 
+<a href="#l203" class="line" id="l203">    203</a> 	if i.cfg.TLSContext != nil {
+<a href="#l204" class="line" id="l204">    204</a> 		zap.L().Debug(
+<a href="#l205" class="line" id="l205">    205</a> 			&quot;enabling server TLS termination&quot;,
+<a href="#l206" class="line" id="l206">    206</a> 			zap.String(&quot;name&quot;, i.cfg.Name),
+<a href="#l207" class="line" id="l207">    207</a> 			zap.Stringer(&quot;address&quot;, i.cfg.Address),
+<a href="#l208" class="line" id="l208">    208</a> 			zap.Any(&quot;context&quot;, i.cfg.TLSContext),
+<a href="#l209" class="line" id="l209">    209</a> 		)
+<a href="#l210" class="line" id="l210">    210</a> 
+<a href="#l211" class="line" id="l211">    211</a> 		i.server.TLSConfig, err = i.cfg.TLSContext.ServerConfig()
+<a href="#l212" class="line" id="l212">    212</a> 		if err != nil {
+<a href="#l213" class="line" id="l213">    213</a> 			return &amp;util.Error{
+<a href="#l214" class="line" id="l214">    214</a> 				Namespace: &quot;server&quot;,
+<a href="#l215" class="line" id="l215">    215</a> 				Message:   &quot;failed to build server TLS context&quot;,
+<a href="#l216" class="line" id="l216">    216</a> 				Tags: map[string]interface{}{
+<a href="#l217" class="line" id="l217">    217</a> 					&quot;name&quot;: i.cfg.Name,
+<a href="#l218" class="line" id="l218">    218</a> 					&quot;ctx&quot;:  i.cfg.TLSContext,
+<a href="#l219" class="line" id="l219">    219</a> 				},
+<a href="#l220" class="line" id="l220">    220</a> 				StackedError: err,
+<a href="#l221" class="line" id="l221">    221</a> 			}
+<a href="#l222" class="line" id="l222">    222</a> 		}
+<a href="#l223" class="line" id="l223">    223</a> 
+<a href="#l224" class="line" id="l224">    224</a> 		ln = tls.NewListener(ln, i.server.TLSConfig)
+<a href="#l225" class="line" id="l225">    225</a> 
+<a href="#l226" class="line" id="l226">    226</a> 		if i.cfg.TLSContext.HandshakeTimeout &gt; 0 {
+<a href="#l227" class="line" id="l227">    227</a> 			ln = newEagerTLSListener(i.cfg.Name, i.cfg.TLSContext.HandshakeTimeout, ln)
+<a href="#l228" class="line" id="l228">    228</a> 		}
+<a href="#l229" class="line" id="l229">    229</a> 	}
+<a href="#l230" class="line" id="l230">    230</a> 
+<a href="#l231" class="line" id="l231">    231</a> 	if err := http2.ConfigureServer(i.server, &amp;http2.Server{}); err != nil {
+<a href="#l232" class="line" id="l232">    232</a> 		return &amp;util.Error{
+<a href="#l233" class="line" id="l233">    233</a> 			Namespace: &quot;server&quot;,
+<a href="#l234" class="line" id="l234">    234</a> 			Message:   &quot;error configuring HTTP/2 on server&quot;,
+<a href="#l235" class="line" id="l235">    235</a> 			Tags: map[string]interface{}{
+<a href="#l236" class="line" id="l236">    236</a> 				&quot;name&quot;:    i.cfg.Name,
+<a href="#l237" class="line" id="l237">    237</a> 				&quot;address&quot;: i.cfg.Address.String(),
+<a href="#l238" class="line" id="l238">    238</a> 			},
+<a href="#l239" class="line" id="l239">    239</a> 			StackedError: err,
+<a href="#l240" class="line" id="l240">    240</a> 		}
+<a href="#l241" class="line" id="l241">    241</a> 	}
+<a href="#l242" class="line" id="l242">    242</a> 
+<a href="#l243" class="line" id="l243">    243</a> 	return i.server.Serve(ln)
+<a href="#l244" class="line" id="l244">    244</a> }
+<a href="#l245" class="line" id="l245">    245</a> 
+<a href="#l246" class="line" id="l246">    246</a> // close requests shutdown of the underlying http.Server.
+<a href="#l247" class="line" id="l247">    247</a> func (i *instance) close() error {
+<a href="#l248" class="line" id="l248">    248</a> 	return i.server.Close()
+<a href="#l249" class="line" id="l249">    249</a> }
+</pre>
+</div>
+</body>
+</html>

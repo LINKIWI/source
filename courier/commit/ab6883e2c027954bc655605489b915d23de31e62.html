@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/log: Migrate to zap.L() built-in global logger - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/ab6883e2c027954bc655605489b915d23de31e62">ab6883e2c027954bc655605489b915d23de31e62</a>
+<b>parent</b> <a href="../commit/245c4082b60be4e8e942748d48e17593d9caac6c">245c4082b60be4e8e942748d48e17593d9caac6c</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Wed  3 Feb 2021 22:41:30 -0800
+
+internal/log: Migrate to zap.L() built-in global logger
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">cmd/courier/main.go</a></td><td> | </td><td class="num">26</td><td><span class="i">+++++++++++++</span><span class="d">-------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">internal/log/logger.go</a></td><td> | </td><td class="num">7</td><td><span class="i">+</span><span class="d">------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">internal/server/proxy.go</a></td><td> | </td><td class="num">11</td><td><span class="i">+++++</span><span class="d">------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">internal/server/server.go</a></td><td> | </td><td class="num">5</td><td><span class="i">++</span><span class="d">---</span></td></tr>
+</table></pre><pre>4 files changed, 21 insertions(+), 28 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/cmd/courier/main.go">cmd/courier/main.go</a> b/<a href="../file/cmd/courier/main.go">cmd/courier/main.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -41,11 +41,11 @@ func init() {
+</a> }
+ 
+ func main() {
+<a href="#h0-0-3" id="h0-0-3" class="d">-	log.Logger.Info(&quot;initializing courier&quot;, zap.String(&quot;version&quot;, meta.Version))
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+	zap.L().Info(&quot;initializing courier&quot;, zap.String(&quot;version&quot;, meta.Version))
+</a> 
+<a href="#h0-0-6" id="h0-0-6" class="d">-	log.Logger.Info(&quot;successfully loaded configuration&quot;, zap.String(&quot;config&quot;, *flagConfig))
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+	zap.L().Info(&quot;successfully loaded configuration&quot;, zap.String(&quot;config&quot;, *flagConfig))
+</a> 	for _, listener := range cfg.Server.Listeners {
+<a href="#h0-0-9" id="h0-0-9" class="d">-		log.Logger.Info(
+</a><a href="#h0-0-10" id="h0-0-10" class="i">+		zap.L().Info(
+</a> 			&quot;registered server listener&quot;,
+ 			zap.String(&quot;name&quot;, listener.Name),
+ 			zap.String(&quot;address&quot;, listener.Address.String()),
+<a href="#h0-1" id="h0-1" class="h">@@ -53,7 +53,7 @@ func main() {
+</a> 		)
+ 	}
+ 	for _, vhost := range cfg.Server.VirtualHosts {
+<a href="#h0-1-3" id="h0-1-3" class="d">-		log.Logger.Info(
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+		zap.L().Info(
+</a> 			&quot;registered virtual host&quot;,
+ 			zap.String(&quot;name&quot;, vhost.Name),
+ 			zap.String(&quot;host&quot;, vhost.Host.String()),
+<a href="#h0-2" id="h0-2" class="h">@@ -64,12 +64,12 @@ func main() {
+</a> 	}
+ 
+ 	if *flagValidate {
+<a href="#h0-2-3" id="h0-2-3" class="d">-		log.Logger.Info(&quot;config file successfully validated&quot;, zap.String(&quot;config&quot;, *flagConfig))
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+		zap.L().Info(&quot;config file successfully validated&quot;, zap.String(&quot;config&quot;, *flagConfig))
+</a> 		return
+ 	}
+ 
+ 	if cfg.Application.Metrics != nil {
+<a href="#h0-2-9" id="h0-2-9" class="d">-		log.Logger.Info(
+</a><a href="#h0-2-10" id="h0-2-10" class="i">+		zap.L().Info(
+</a> 			&quot;initializing metrics subsystem&quot;,
+ 			zap.String(&quot;address&quot;, cfg.Application.Metrics.Address),
+ 			zap.String(&quot;prefix&quot;, cfg.Application.Metrics.Prefix),
+<a href="#h0-3" id="h0-3" class="h">@@ -77,12 +77,12 @@ func main() {
+</a> 		)
+ 
+ 		if err := metrics.Init(cfg); err != nil {
+<a href="#h0-3-3" id="h0-3-3" class="d">-			log.Logger.Fatal(&quot;failed to initialize metrics subsystem&quot;, zap.Error(err))
+</a><a href="#h0-3-4" id="h0-3-4" class="i">+			zap.L().Fatal(&quot;failed to initialize metrics subsystem&quot;, zap.Error(err))
+</a> 		}
+ 	}
+ 
+ 	if cfg.Application.SentryDSN != nil {
+<a href="#h0-3-9" id="h0-3-9" class="d">-		log.Logger.Info(
+</a><a href="#h0-3-10" id="h0-3-10" class="i">+		zap.L().Info(
+</a> 			&quot;enabling error reporting&quot;,
+ 			zap.String(&quot;sentry_dsn&quot;, cfg.Application.SentryDSN.String()),
+ 		)
+<a href="#h0-4" id="h0-4" class="h">@@ -95,20 +95,20 @@ func main() {
+</a> 		}
+ 
+ 		if err := sentry.Init(opts); err != nil {
+<a href="#h0-4-3" id="h0-4-3" class="d">-			log.Logger.Fatal(&quot;failed to create Sentry client&quot;, zap.Error(err))
+</a><a href="#h0-4-4" id="h0-4-4" class="i">+			zap.L().Fatal(&quot;failed to create Sentry client&quot;, zap.Error(err))
+</a> 		}
+ 
+ 		defer sentry.Recover()
+ 	}
+ 
+<a href="#h0-4-10" id="h0-4-10" class="d">-	log.Logger.Info(&quot;initializing HTTP server&quot;)
+</a><a href="#h0-4-11" id="h0-4-11" class="i">+	zap.L().Info(&quot;initializing HTTP server&quot;)
+</a> 	srv, err := server.New(cfg)
+ 	if err != nil {
+<a href="#h0-4-14" id="h0-4-14" class="d">-		log.Logger.Fatal(&quot;failed to start server&quot;, zap.Error(err))
+</a><a href="#h0-4-15" id="h0-4-15" class="i">+		zap.L().Fatal(&quot;failed to start server&quot;, zap.Error(err))
+</a> 	}
+ 
+<a href="#h0-4-18" id="h0-4-18" class="d">-	log.Logger.Info(&quot;starting indefinite serving&quot;)
+</a><a href="#h0-4-19" id="h0-4-19" class="i">+	zap.L().Info(&quot;starting indefinite serving&quot;)
+</a> 	if err := srv.Serve(); err != nil {
+<a href="#h0-4-21" id="h0-4-21" class="d">-		log.Logger.Fatal(&quot;failed to serve&quot;, zap.Error(err))
+</a><a href="#h0-4-22" id="h0-4-22" class="i">+		zap.L().Fatal(&quot;failed to serve&quot;, zap.Error(err))
+</a> 	}
+ }
+<b>diff --git a/<a id="h1" href="../file/internal/log/logger.go">internal/log/logger.go</a> b/<a href="../file/internal/log/logger.go">internal/log/logger.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -10,11 +10,6 @@ import (
+</a> )
+ 
+ var (
+<a href="#h1-0-3" id="h1-0-3" class="d">-	// Logger is a globally available zap logger.
+</a><a href="#h1-0-4" id="h1-0-4" class="d">-	Logger = zap.NewNop()
+</a><a href="#h1-0-5" id="h1-0-5" class="d">-)
+</a><a href="#h1-0-6" id="h1-0-6" class="d">-
+</a><a href="#h1-0-7" id="h1-0-7" class="d">-var (
+</a> 	mutex sync.Mutex
+ )
+ 
+<a href="#h1-1" id="h1-1" class="h">@@ -52,7 +47,7 @@ func Init(cfg *config.Config) error {
+</a> 		}
+ 	}
+ 
+<a href="#h1-1-3" id="h1-1-3" class="d">-	Logger = logger
+</a><a href="#h1-1-4" id="h1-1-4" class="i">+	zap.ReplaceGlobals(logger)
+</a> 
+ 	return nil
+ }
+<b>diff --git a/<a id="h2" href="../file/internal/server/proxy.go">internal/server/proxy.go</a> b/<a href="../file/internal/server/proxy.go">internal/server/proxy.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -15,7 +15,6 @@ import (
+</a> 	&quot;golang.org/x/net/proxy&quot;
+ 
+ 	&quot;courier/internal/config&quot;
+<a href="#h2-0-3" id="h2-0-3" class="d">-	&quot;courier/internal/log&quot;
+</a> 	&quot;courier/internal/middleware&quot;
+ 	&quot;courier/internal/util&quot;
+ )
+<a href="#h2-1" id="h2-1" class="h">@@ -60,14 +59,14 @@ func newReverseProxy(vhosts []*config.VirtualHost) (http.Handler, error) {
+</a> 	for _, vhost := range vhosts {
+ 		var vhostFilters []middleware.Filter
+ 
+<a href="#h2-1-3" id="h2-1-3" class="d">-		log.Logger.Debug(
+</a><a href="#h2-1-4" id="h2-1-4" class="i">+		zap.L().Debug(
+</a> 			&quot;assembling virtual host filter chain&quot;,
+ 			zap.String(&quot;vhost&quot;, vhost.Name),
+ 			zap.Int(&quot;filters&quot;, len(vhost.Filters)),
+ 		)
+ 
+ 		for _, cfgFilter := range vhost.Filters {
+<a href="#h2-1-11" id="h2-1-11" class="d">-			log.Logger.Debug(
+</a><a href="#h2-1-12" id="h2-1-12" class="i">+			zap.L().Debug(
+</a> 				&quot;initializing filter&quot;,
+ 				zap.String(&quot;vhost&quot;, vhost.Name),
+ 				zap.String(&quot;name&quot;, cfgFilter.Name),
+<a href="#h2-2" id="h2-2" class="h">@@ -124,7 +123,7 @@ func (rp *reverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+</a> 	// Match virtual host
+ 	vhost, ok := rp.matchHost(proxyReq.Host)
+ 	if !ok {
+<a href="#h2-2-3" id="h2-2-3" class="d">-		log.Logger.Debug(&quot;unknown virtual host&quot;, zap.String(&quot;host&quot;, proxyReq.Host))
+</a><a href="#h2-2-4" id="h2-2-4" class="i">+		zap.L().Debug(&quot;unknown virtual host&quot;, zap.String(&quot;host&quot;, proxyReq.Host))
+</a> 		rp.respond(rw, errUnknownHost.response())
+ 		return
+ 	}
+<a href="#h2-3" id="h2-3" class="h">@@ -136,7 +135,7 @@ func (rp *reverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+</a> 	}
+ 	rpErrorHandler := func(errResp *response) func(proxyRW http.ResponseWriter, proxyReq *http.Request, err error) {
+ 		return func(proxyRW http.ResponseWriter, proxyReq *http.Request, err error) {
+<a href="#h2-3-3" id="h2-3-3" class="d">-			log.Logger.Debug(
+</a><a href="#h2-3-4" id="h2-3-4" class="i">+			zap.L().Debug(
+</a> 				&quot;proxy encountered an error&quot;,
+ 				zap.Int(&quot;status&quot;, errResp.statusCode),
+ 				zap.String(&quot;message&quot;, errResp.message),
+<a href="#h2-4" id="h2-4" class="h">@@ -158,7 +157,7 @@ func (rp *reverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+</a> 		rpErrorHandler(errFilterProcess)(rw, proxyReq, err)
+ 		return
+ 	} else if abortResp != nil {
+<a href="#h2-4-3" id="h2-4-3" class="d">-		log.Logger.Debug(
+</a><a href="#h2-4-4" id="h2-4-4" class="i">+		zap.L().Debug(
+</a> 			&quot;early termination of request lifecycle before proxy&quot;,
+ 			zap.Int(&quot;status&quot;, abortResp.StatusCode),
+ 		)
+<b>diff --git a/<a id="h3" href="../file/internal/server/server.go">internal/server/server.go</a> b/<a href="../file/internal/server/server.go">internal/server/server.go</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -12,7 +12,6 @@ import (
+</a> 	&quot;golang.org/x/net/http2/h2c&quot;
+ 
+ 	&quot;courier/internal/config&quot;
+<a href="#h3-0-3" id="h3-0-3" class="d">-	&quot;courier/internal/log&quot;
+</a> 	&quot;courier/internal/util&quot;
+ )
+ 
+<a href="#h3-1" id="h3-1" class="h">@@ -52,7 +51,7 @@ func (s *Server) Serve() error {
+</a> 			}
+ 
+ 			listenNet, listenAddr := listener.Address.Address()
+<a href="#h3-1-3" id="h3-1-3" class="d">-			log.Logger.Debug(
+</a><a href="#h3-1-4" id="h3-1-4" class="i">+			zap.L().Debug(
+</a> 				&quot;created server listener&quot;,
+ 				zap.String(&quot;net&quot;, listenNet),
+ 				zap.String(&quot;addr&quot;, listenAddr),
+<a href="#h3-2" id="h3-2" class="h">@@ -88,7 +87,7 @@ func (s *Server) Serve() error {
+</a> 				}
+ 
+ 				server.TLSConfig = tlsCfg
+<a href="#h3-2-3" id="h3-2-3" class="d">-				log.Logger.Debug(
+</a><a href="#h3-2-4" id="h3-2-4" class="i">+				zap.L().Debug(
+</a> 					&quot;enabled server TLS termination&quot;,
+ 					zap.String(&quot;listener&quot;, listener.Address.String()),
+ 					zap.Any(&quot;context&quot;, listener.TLSContext),
+</pre>
+</div>
+</body>
+</html>

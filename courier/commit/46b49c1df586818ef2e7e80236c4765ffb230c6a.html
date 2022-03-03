@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/middleware/filters: Support formatted line logger in log filter - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/46b49c1df586818ef2e7e80236c4765ffb230c6a">46b49c1df586818ef2e7e80236c4765ffb230c6a</a>
+<b>parent</b> <a href="../commit/eea2cb7d17aa994b027c1b564cb9cae6f07962d6">eea2cb7d17aa994b027c1b564cb9cae6f07962d6</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sun 31 Jan 2021 21:31:08 -0800
+
+internal/middleware/filters: Support formatted line logger in log filter
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/middleware/filters/log.go</a></td><td> | </td><td class="num">96</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">------------</span></td></tr>
+</table></pre><pre>1 file changed, 82 insertions(+), 14 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/middleware/filters/log.go">internal/middleware/filters/log.go</a> b/<a href="../file/internal/middleware/filters/log.go">internal/middleware/filters/log.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -2,9 +2,12 @@ package filters
+</a> 
+ import (
+ 	&quot;encoding/json&quot;
+<a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;fmt&quot;
+</a> 	&quot;net&quot;
+ 	&quot;net/http&quot;
+ 	&quot;os&quot;
+<a href="#h0-0-7" id="h0-0-7" class="i">+	&quot;reflect&quot;
+</a><a href="#h0-0-8" id="h0-0-8" class="i">+	&quot;strings&quot;
+</a> 	&quot;sync&quot;
+ 	&quot;syscall&quot;
+ 	&quot;time&quot;
+<a href="#h0-1" id="h0-1" class="h">@@ -17,23 +20,39 @@ import (
+</a> 	&quot;courier/internal/util&quot;
+ )
+ 
+<a href="#h0-1-3" id="h0-1-3" class="i">+const (
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+	logSerializerJSON = &quot;json&quot;
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+	logSerializerLine = &quot;line&quot;
+</a><a href="#h0-1-6" id="h0-1-6" class="i">+)
+</a><a href="#h0-1-7" id="h0-1-7" class="i">+
+</a><a href="#h0-1-8" id="h0-1-8" class="i">+// jsonLogEntry is an alias type for a log entry that can be serialized as JSON.
+</a><a href="#h0-1-9" id="h0-1-9" class="i">+type jsonLogEntry logEntry
+</a><a href="#h0-1-10" id="h0-1-10" class="i">+
+</a><a href="#h0-1-11" id="h0-1-11" class="i">+// lineLogEntry is an alias type for a log entry that can be serialized as a formatted line.
+</a><a href="#h0-1-12" id="h0-1-12" class="i">+type lineLogEntry logEntry
+</a><a href="#h0-1-13" id="h0-1-13" class="i">+
+</a> // logEntry is a structured container for information relevant in a log trace.
+ type logEntry struct {
+<a href="#h0-1-16" id="h0-1-16" class="d">-	Timestamp    time.Time `json:&quot;timestamp&quot;`
+</a><a href="#h0-1-17" id="h0-1-17" class="d">-	RequestID    uuid.UUID `json:&quot;request_id&quot;`
+</a><a href="#h0-1-18" id="h0-1-18" class="d">-	URL          string    `json:&quot;url&quot;`
+</a><a href="#h0-1-19" id="h0-1-19" class="d">-	Host         string    `json:&quot;host&quot;`
+</a><a href="#h0-1-20" id="h0-1-20" class="d">-	StatusCode   int       `json:&quot;status&quot;`
+</a><a href="#h0-1-21" id="h0-1-21" class="d">-	RemoteIP     string    `json:&quot;remote_ip&quot;`
+</a><a href="#h0-1-22" id="h0-1-22" class="d">-	RequestSize  int64     `json:&quot;request_size&quot;`
+</a><a href="#h0-1-23" id="h0-1-23" class="d">-	ResponseSize int64     `json:&quot;response_size&quot;`
+</a><a href="#h0-1-24" id="h0-1-24" class="d">-	UserAgent    string    `json:&quot;user_agent&quot;`
+</a><a href="#h0-1-25" id="h0-1-25" class="d">-	Duration     int64     `json:&quot;duration&quot;`
+</a><a href="#h0-1-26" id="h0-1-26" class="i">+	Timestamp    time.Time `json:&quot;timestamp&quot; format:&quot;timestamp&quot;`
+</a><a href="#h0-1-27" id="h0-1-27" class="i">+	RequestID    uuid.UUID `json:&quot;request_id&quot; format:&quot;request_id&quot;`
+</a><a href="#h0-1-28" id="h0-1-28" class="i">+	URL          string    `json:&quot;url&quot; format:&quot;url&quot;`
+</a><a href="#h0-1-29" id="h0-1-29" class="i">+	Host         string    `json:&quot;host&quot; format:&quot;host&quot;`
+</a><a href="#h0-1-30" id="h0-1-30" class="i">+	StatusCode   int       `json:&quot;status&quot; format:&quot;status&quot;`
+</a><a href="#h0-1-31" id="h0-1-31" class="i">+	RemoteIP     string    `json:&quot;remote_ip&quot; format:&quot;remote_ip&quot;`
+</a><a href="#h0-1-32" id="h0-1-32" class="i">+	RequestSize  int64     `json:&quot;request_size&quot; format:&quot;request_size&quot;`
+</a><a href="#h0-1-33" id="h0-1-33" class="i">+	ResponseSize int64     `json:&quot;response_size&quot; format:&quot;response_size&quot;`
+</a><a href="#h0-1-34" id="h0-1-34" class="i">+	UserAgent    string    `json:&quot;user_agent&quot; format:&quot;user_agent&quot;`
+</a><a href="#h0-1-35" id="h0-1-35" class="i">+	Duration     int64     `json:&quot;duration&quot; format:&quot;duration&quot;`
+</a> }
+ 
+ // logParams is the configuration descriptor for the log filter.
+ type logParams struct {
+<a href="#h0-1-40" id="h0-1-40" class="d">-	Path string `yaml:&quot;path&quot;`
+</a><a href="#h0-1-41" id="h0-1-41" class="i">+	Path       string   `yaml:&quot;path&quot;`
+</a><a href="#h0-1-42" id="h0-1-42" class="i">+	Serializer string   `yaml:&quot;serializer&quot;`
+</a><a href="#h0-1-43" id="h0-1-43" class="i">+	JSON       struct{} `yaml:&quot;json&quot;`
+</a><a href="#h0-1-44" id="h0-1-44" class="i">+	Line       struct {
+</a><a href="#h0-1-45" id="h0-1-45" class="i">+		Format string `yaml:&quot;format&quot;`
+</a><a href="#h0-1-46" id="h0-1-46" class="i">+	} `yaml:&quot;line&quot;`
+</a> }
+ 
+ // log is a filter that logs completed requests to a file on disk.
+<a href="#h0-2" id="h0-2" class="h">@@ -60,13 +79,23 @@ func NewLog(cfg *config.Filter) (middleware.Filter, error) {
+</a> 			Namespace: &quot;filters&quot;,
+ 			Message:   &quot;missing log file path&quot;,
+ 		}
+<a href="#h0-2-3" id="h0-2-3" class="i">+	} else if len(params.Serializer) &gt; 0 &amp;&amp;
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+		params.Serializer != logSerializerJSON &amp;&amp;
+</a><a href="#h0-2-5" id="h0-2-5" class="i">+		params.Serializer != logSerializerLine {
+</a><a href="#h0-2-6" id="h0-2-6" class="i">+		return nil, &amp;util.Error{
+</a><a href="#h0-2-7" id="h0-2-7" class="i">+			Namespace: &quot;filters&quot;,
+</a><a href="#h0-2-8" id="h0-2-8" class="i">+			Message:   &quot;unknown log serializer&quot;,
+</a><a href="#h0-2-9" id="h0-2-9" class="i">+			Tags: map[string]interface{}{
+</a><a href="#h0-2-10" id="h0-2-10" class="i">+				&quot;serializer&quot;: params.Serializer,
+</a><a href="#h0-2-11" id="h0-2-11" class="i">+			},
+</a><a href="#h0-2-12" id="h0-2-12" class="i">+		}
+</a> 	}
+ 
+ 	file, err := os.OpenFile(params.Path, syscall.O_WRONLY|syscall.O_APPEND|syscall.O_CREAT, 0664)
+ 	if err != nil {
+ 		return nil, &amp;util.Error{
+ 			Namespace: &quot;filters&quot;,
+<a href="#h0-2-19" id="h0-2-19" class="d">-			Message:   &quot;failed to create log file&quot;,
+</a><a href="#h0-2-20" id="h0-2-20" class="i">+			Message:   &quot;failed to open log file for writing&quot;,
+</a> 			Tags: map[string]interface{}{
+ 				&quot;path&quot;: params.Path,
+ 			},
+<a href="#h0-3" id="h0-3" class="h">@@ -96,12 +125,14 @@ func (l *log) ProcessResponse(proxyResp *http.Response) (*http.Response, error) 
+</a> 	l.mutex.Lock()
+ 	defer l.mutex.Unlock()
+ 
+<a href="#h0-3-3" id="h0-3-3" class="i">+	var serialized []byte
+</a><a href="#h0-3-4" id="h0-3-4" class="i">+
+</a> 	ip, _, err := net.SplitHostPort(proxyResp.Request.RemoteAddr)
+ 	if err != nil {
+ 		return proxyResp, err
+ 	}
+ 
+<a href="#h0-3-10" id="h0-3-10" class="d">-	entry := &amp;logEntry{
+</a><a href="#h0-3-11" id="h0-3-11" class="i">+	entry := logEntry{
+</a> 		Timestamp:    time.Now(),
+ 		RequestID:    l.requestID,
+ 		URL:          proxyResp.Request.URL.String(),
+<a href="#h0-4" id="h0-4" class="h">@@ -114,7 +145,13 @@ func (l *log) ProcessResponse(proxyResp *http.Response) (*http.Response, error) 
+</a> 		Duration:     l.stopwatch.Elapsed().Milliseconds(),
+ 	}
+ 
+<a href="#h0-4-3" id="h0-4-3" class="d">-	serialized, err := json.Marshal(entry)
+</a><a href="#h0-4-4" id="h0-4-4" class="i">+	switch l.params.Serializer {
+</a><a href="#h0-4-5" id="h0-4-5" class="i">+	case logSerializerLine:
+</a><a href="#h0-4-6" id="h0-4-6" class="i">+		serialized, err = lineLogEntry(entry).serialize(l.params.Line.Format)
+</a><a href="#h0-4-7" id="h0-4-7" class="i">+	default:
+</a><a href="#h0-4-8" id="h0-4-8" class="i">+		serialized, err = jsonLogEntry(entry).serialize()
+</a><a href="#h0-4-9" id="h0-4-9" class="i">+	}
+</a><a href="#h0-4-10" id="h0-4-10" class="i">+
+</a> 	if err != nil {
+ 		return proxyResp, err
+ 	}
+<a href="#h0-5" id="h0-5" class="h">@@ -125,3 +162,34 @@ func (l *log) ProcessResponse(proxyResp *http.Response) (*http.Response, error) 
+</a> 
+ 	return proxyResp, nil
+ }
+<a href="#h0-5-3" id="h0-5-3" class="i">+
+</a><a href="#h0-5-4" id="h0-5-4" class="i">+// serialize formats the log trace in accordance with the config-specified format string, replacing
+</a><a href="#h0-5-5" id="h0-5-5" class="i">+// struct values with corresponding tag keys for tag `format`.
+</a><a href="#h0-5-6" id="h0-5-6" class="i">+func (ll lineLogEntry) serialize(format string) ([]byte, error) {
+</a><a href="#h0-5-7" id="h0-5-7" class="i">+	var replace []string
+</a><a href="#h0-5-8" id="h0-5-8" class="i">+
+</a><a href="#h0-5-9" id="h0-5-9" class="i">+	t := reflect.TypeOf(ll)
+</a><a href="#h0-5-10" id="h0-5-10" class="i">+	v := reflect.ValueOf(ll)
+</a><a href="#h0-5-11" id="h0-5-11" class="i">+
+</a><a href="#h0-5-12" id="h0-5-12" class="i">+	for i := 0; i &lt; t.NumField(); i++ {
+</a><a href="#h0-5-13" id="h0-5-13" class="i">+		field := t.Field(i)
+</a><a href="#h0-5-14" id="h0-5-14" class="i">+
+</a><a href="#h0-5-15" id="h0-5-15" class="i">+		format, ok := field.Tag.Lookup(&quot;format&quot;)
+</a><a href="#h0-5-16" id="h0-5-16" class="i">+		if !ok {
+</a><a href="#h0-5-17" id="h0-5-17" class="i">+			continue
+</a><a href="#h0-5-18" id="h0-5-18" class="i">+		}
+</a><a href="#h0-5-19" id="h0-5-19" class="i">+
+</a><a href="#h0-5-20" id="h0-5-20" class="i">+		replace = append(
+</a><a href="#h0-5-21" id="h0-5-21" class="i">+			replace,
+</a><a href="#h0-5-22" id="h0-5-22" class="i">+			fmt.Sprintf(&quot;{%s}&quot;, format),
+</a><a href="#h0-5-23" id="h0-5-23" class="i">+			fmt.Sprintf(&quot;%v&quot;, v.Field(i).Interface()),
+</a><a href="#h0-5-24" id="h0-5-24" class="i">+		)
+</a><a href="#h0-5-25" id="h0-5-25" class="i">+	}
+</a><a href="#h0-5-26" id="h0-5-26" class="i">+
+</a><a href="#h0-5-27" id="h0-5-27" class="i">+	return []byte(strings.NewReplacer(replace...).Replace(format)), nil
+</a><a href="#h0-5-28" id="h0-5-28" class="i">+}
+</a><a href="#h0-5-29" id="h0-5-29" class="i">+
+</a><a href="#h0-5-30" id="h0-5-30" class="i">+// serialize serializes the log entry as JSON.
+</a><a href="#h0-5-31" id="h0-5-31" class="i">+func (jl jsonLogEntry) serialize() ([]byte, error) {
+</a><a href="#h0-5-32" id="h0-5-32" class="i">+	return json.Marshal(&amp;jl)
+</a><a href="#h0-5-33" id="h0-5-33" class="i">+}
+</a></pre>
+</div>
+</body>
+</html>

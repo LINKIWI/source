@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/server: Support SOCKS5 proxy for upstreams - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/6926b4edbc9e66505b4722df4ac9b57aafd8395b">6926b4edbc9e66505b4722df4ac9b57aafd8395b</a>
+<b>parent</b> <a href="../commit/73c025a4b95254b4047e3eb726e0b05a532eae60">73c025a4b95254b4047e3eb726e0b05a532eae60</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sat 30 Jan 2021 20:08:32 -0800
+
+internal/server: Support SOCKS5 proxy for upstreams
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">go.mod</a></td><td> | </td><td class="num">1</td><td><span class="i">+</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">internal/server/proxy.go</a></td><td> | </td><td class="num">16</td><td><span class="i">++++++++++++++</span><span class="d">--</span></td></tr>
+</table></pre><pre>2 files changed, 15 insertions(+), 2 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/go.mod">go.mod</a> b/<a href="../file/go.mod">go.mod</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -6,6 +6,7 @@ require (
+</a> 	github.com/google/uuid v1.2.0
+ 	go.uber.org/zap v1.16.0
+ 	golang.org/x/lint v0.0.0-20201208152925-83fdc39ff7b5
+<a href="#h0-0-3" id="h0-0-3" class="i">+	golang.org/x/net v0.0.0-20201021035429-f5854403a974
+</a> 	golang.org/x/tools v0.1.0
+ 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
+ )
+<b>diff --git a/<a id="h1" href="../file/internal/server/proxy.go">internal/server/proxy.go</a> b/<a href="../file/internal/server/proxy.go">internal/server/proxy.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -7,6 +7,8 @@ import (
+</a> 	&quot;net/http&quot;
+ 	&quot;net/http/httputil&quot;
+ 
+<a href="#h1-0-3" id="h1-0-3" class="i">+	&quot;golang.org/x/net/proxy&quot;
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+
+</a> 	&quot;courier/internal/config&quot;
+ 	&quot;courier/internal/middleware&quot;
+ 	&quot;courier/internal/middleware/filters&quot;
+<a href="#h1-1" id="h1-1" class="h">@@ -136,8 +138,18 @@ func (rp *reverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+</a> 	backend := httputil.ReverseProxy{
+ 		Transport: &amp;http.Transport{
+ 			DialContext: func(ctx context.Context, network string, addr string) (net.Conn, error) {
+<a href="#h1-1-3" id="h1-1-3" class="d">-				dialer := net.Dialer{Timeout: vhost.Connection.ConnectTimeout}
+</a><a href="#h1-1-4" id="h1-1-4" class="d">-				return dialer.DialContext(ctx, network, addr)
+</a><a href="#h1-1-5" id="h1-1-5" class="i">+				dialer := &amp;net.Dialer{Timeout: vhost.Connection.ConnectTimeout}
+</a><a href="#h1-1-6" id="h1-1-6" class="i">+
+</a><a href="#h1-1-7" id="h1-1-7" class="i">+				if vhost.Proxy == nil {
+</a><a href="#h1-1-8" id="h1-1-8" class="i">+					return dialer.DialContext(ctx, network, addr)
+</a><a href="#h1-1-9" id="h1-1-9" class="i">+				}
+</a><a href="#h1-1-10" id="h1-1-10" class="i">+
+</a><a href="#h1-1-11" id="h1-1-11" class="i">+				socksDialer, err := proxy.SOCKS5(&quot;tcp&quot;, vhost.Proxy.String(), nil, dialer)
+</a><a href="#h1-1-12" id="h1-1-12" class="i">+				if err != nil {
+</a><a href="#h1-1-13" id="h1-1-13" class="i">+					return nil, err
+</a><a href="#h1-1-14" id="h1-1-14" class="i">+				}
+</a><a href="#h1-1-15" id="h1-1-15" class="i">+
+</a><a href="#h1-1-16" id="h1-1-16" class="i">+				return socksDialer.Dial(network, addr)
+</a> 			},
+ 			TLSHandshakeTimeout: 0,
+ 		},
+</pre>
+</div>
+</body>
+</html>

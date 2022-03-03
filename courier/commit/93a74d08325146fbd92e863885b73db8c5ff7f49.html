@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/middleware/filters: Support source IP CIDR blocks in match specification - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/93a74d08325146fbd92e863885b73db8c5ff7f49">93a74d08325146fbd92e863885b73db8c5ff7f49</a>
+<b>parent</b> <a href="../commit/2094593584cb8f9f613bbbfd47b7517492794743">2094593584cb8f9f613bbbfd47b7517492794743</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sat 17 Apr 2021 14:28:09 -0700
+
+internal/middleware/filters: Support source IP CIDR blocks in match specification
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/middleware/filters/match.go</a></td><td> | </td><td class="num">36</td><td><span class="i">++++++++++++++++++++++++++++</span><span class="d">--------</span></td></tr>
+</table></pre><pre>1 file changed, 28 insertions(+), 8 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/middleware/filters/match.go">internal/middleware/filters/match.go</a> b/<a href="../file/internal/middleware/filters/match.go">internal/middleware/filters/match.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -2,6 +2,7 @@ package filters
+</a> 
+ import (
+ 	&quot;context&quot;
+<a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;net&quot;
+</a> 	&quot;net/http&quot;
+ 
+ 	&quot;go.uber.org/zap&quot;
+<a href="#h0-1" id="h0-1" class="h">@@ -24,6 +25,7 @@ type matchSpec struct {
+</a> 	Method *config.Regex `yaml:&quot;method&quot;`
+ 	Host   *config.Regex `yaml:&quot;host&quot;`
+ 	Path   *config.Regex `yaml:&quot;path&quot;`
+<a href="#h0-1-3" id="h0-1-3" class="i">+	Source *config.CIDR  `yaml:&quot;source&quot;`
+</a> 	Header *struct {
+ 		Key   string        `yaml:&quot;key&quot;`
+ 		Value *config.Regex `yaml:&quot;value&quot;`
+<a href="#h0-2" id="h0-2" class="h">@@ -59,7 +61,16 @@ func (m *match) ProcessRequest(clientReq *http.Request) (*http.Request, *http.Re
+</a> 	}
+ 
+ 	ctx := clientReq.Context()
+<a href="#h0-2-3" id="h0-2-3" class="d">-	passthrough := m.match(clientReq)
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+
+</a><a href="#h0-2-5" id="h0-2-5" class="i">+	passthrough, err := m.match(clientReq)
+</a><a href="#h0-2-6" id="h0-2-6" class="i">+	if err != nil {
+</a><a href="#h0-2-7" id="h0-2-7" class="i">+		return nil, nil, &amp;util.Error{
+</a><a href="#h0-2-8" id="h0-2-8" class="i">+			Namespace:    &quot;filters&quot;,
+</a><a href="#h0-2-9" id="h0-2-9" class="i">+			Message:      &quot;error evaluating request against match specification&quot;,
+</a><a href="#h0-2-10" id="h0-2-10" class="i">+			Tags:         map[string]interface{}{&quot;match&quot;: m.spec},
+</a><a href="#h0-2-11" id="h0-2-11" class="i">+			StackedError: err,
+</a><a href="#h0-2-12" id="h0-2-12" class="i">+		}
+</a><a href="#h0-2-13" id="h0-2-13" class="i">+	}
+</a> 
+ 	// Maintain request lifecycle-attached state on whether the request matched the
+ 	// specification, and thus was eligible for filter processing.
+<a href="#h0-3" id="h0-3" class="h">@@ -102,7 +113,7 @@ func (m *match) ProcessRequest(clientReq *http.Request) (*http.Request, *http.Re
+</a> func (m *match) ProcessResponse(proxyResp *http.Response) (*http.Response, error) {
+ 	status := proxyResp.Request.Context().Value(ctxMatchStatus).(map[middleware.Filter]bool)
+ 
+<a href="#h0-3-3" id="h0-3-3" class="d">-	if passthrough, ok := status[m.Filter]; passthrough &amp;&amp; ok {
+</a><a href="#h0-3-4" id="h0-3-4" class="i">+	if passthrough, ok := status[m.Filter]; ok &amp;&amp; passthrough {
+</a> 		return m.Filter.ProcessResponse(proxyResp)
+ 	}
+ 
+<a href="#h0-4" id="h0-4" class="h">@@ -110,19 +121,28 @@ func (m *match) ProcessResponse(proxyResp *http.Response) (*http.Response, error
+</a> }
+ 
+ // match evaluates the incoming client request against the match specification.
+<a href="#h0-4-3" id="h0-4-3" class="d">-func (m *match) match(clientReq *http.Request) bool {
+</a><a href="#h0-4-4" id="h0-4-4" class="i">+func (m *match) match(clientReq *http.Request) (bool, error) {
+</a> 	if m.spec.Method != nil &amp;&amp; !m.spec.Method.MatchString(clientReq.Method) {
+<a href="#h0-4-6" id="h0-4-6" class="d">-		return false
+</a><a href="#h0-4-7" id="h0-4-7" class="i">+		return false, nil
+</a> 	} else if m.spec.Host != nil &amp;&amp; !m.spec.Host.MatchString(clientReq.Host) {
+<a href="#h0-4-9" id="h0-4-9" class="d">-		return false
+</a><a href="#h0-4-10" id="h0-4-10" class="i">+		return false, nil
+</a> 	} else if m.spec.Path != nil &amp;&amp; !m.spec.Path.MatchString(clientReq.URL.Path) {
+<a href="#h0-4-12" id="h0-4-12" class="d">-		return false
+</a><a href="#h0-4-13" id="h0-4-13" class="i">+		return false, nil
+</a> 	} else if m.spec.Header != nil {
+ 		value := clientReq.Header.Get(m.spec.Header.Key)
+ 		if value == &quot;&quot; || !m.spec.Header.Value.MatchString(value) {
+<a href="#h0-4-17" id="h0-4-17" class="d">-			return false
+</a><a href="#h0-4-18" id="h0-4-18" class="i">+			return false, nil
+</a><a href="#h0-4-19" id="h0-4-19" class="i">+		}
+</a><a href="#h0-4-20" id="h0-4-20" class="i">+	} else if m.spec.Source != nil {
+</a><a href="#h0-4-21" id="h0-4-21" class="i">+		clientIP, _, err := net.SplitHostPort(clientReq.RemoteAddr)
+</a><a href="#h0-4-22" id="h0-4-22" class="i">+		if err != nil {
+</a><a href="#h0-4-23" id="h0-4-23" class="i">+			return false, err
+</a><a href="#h0-4-24" id="h0-4-24" class="i">+		}
+</a><a href="#h0-4-25" id="h0-4-25" class="i">+
+</a><a href="#h0-4-26" id="h0-4-26" class="i">+		if !m.spec.Source.Contains(net.ParseIP(clientIP)) {
+</a><a href="#h0-4-27" id="h0-4-27" class="i">+			return false, nil
+</a> 		}
+ 	}
+ 
+<a href="#h0-4-31" id="h0-4-31" class="d">-	return true
+</a><a href="#h0-4-32" id="h0-4-32" class="i">+	return true, nil
+</a> }
+</pre>
+</div>
+</body>
+</html>

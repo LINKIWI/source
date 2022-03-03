@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/server: Move request scheme/host preparation to internal filter - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/0f62b7f215b08badd27f14665835170042fbdf48">0f62b7f215b08badd27f14665835170042fbdf48</a>
+<b>parent</b> <a href="../commit/866d72de88fb0d5769c59061cbb832f98a468f32">866d72de88fb0d5769c59061cbb832f98a468f32</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sun  2 May 2021 12:33:54 -0700
+
+internal/server: Move request scheme/host preparation to internal filter
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/server/proxy.go</a></td><td> | </td><td class="num">21</td><td><span class="i">++++++++++++++</span><span class="d">-------</span></td></tr>
+</table></pre><pre>1 file changed, 14 insertions(+), 7 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/server/proxy.go">internal/server/proxy.go</a> b/<a href="../file/internal/server/proxy.go">internal/server/proxy.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -16,6 +16,7 @@ import (
+</a> 	&quot;courier/internal/log&quot;
+ 	&quot;courier/internal/metrics&quot;
+ 	&quot;courier/internal/middleware&quot;
+<a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;courier/internal/middleware/filters&quot;
+</a> 	&quot;courier/internal/util&quot;
+ )
+ 
+<a href="#h0-1" id="h0-1" class="h">@@ -124,6 +125,19 @@ func newReverseProxy(vhosts []*config.VirtualHost, opts config.Proxy) (http.Hand
+</a> 			zap.Int(&quot;filters&quot;, len(vhost.Filters)),
+ 		)
+ 
+<a href="#h0-1-3" id="h0-1-3" class="i">+		internal, err := filters.NewInternal(nil)
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+		if err != nil {
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+			return nil, &amp;util.Error{
+</a><a href="#h0-1-6" id="h0-1-6" class="i">+				Namespace: &quot;server&quot;,
+</a><a href="#h0-1-7" id="h0-1-7" class="i">+				Message:   &quot;error creating internal filter&quot;,
+</a><a href="#h0-1-8" id="h0-1-8" class="i">+				Tags: map[string]interface{}{
+</a><a href="#h0-1-9" id="h0-1-9" class="i">+					&quot;vhost&quot;: vhost.Name,
+</a><a href="#h0-1-10" id="h0-1-10" class="i">+				},
+</a><a href="#h0-1-11" id="h0-1-11" class="i">+			}
+</a><a href="#h0-1-12" id="h0-1-12" class="i">+		}
+</a><a href="#h0-1-13" id="h0-1-13" class="i">+
+</a><a href="#h0-1-14" id="h0-1-14" class="i">+		vhostFilters = append(vhostFilters, internal)
+</a><a href="#h0-1-15" id="h0-1-15" class="i">+
+</a> 		for _, cfgFilter := range vhost.Filters {
+ 			zap.L().Debug(
+ 				&quot;initializing filter&quot;,
+<a href="#h0-2" id="h0-2" class="h">@@ -237,13 +251,6 @@ func (rp *reverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+</a> 		return
+ 	}
+ 
+<a href="#h0-2-3" id="h0-2-3" class="d">-	// Populate scheme and host in original URL
+</a><a href="#h0-2-4" id="h0-2-4" class="d">-	proxyReq.URL.Scheme = &quot;http&quot;
+</a><a href="#h0-2-5" id="h0-2-5" class="d">-	proxyReq.URL.Host = proxyReq.Host
+</a><a href="#h0-2-6" id="h0-2-6" class="d">-	if proxyReq.TLS != nil {
+</a><a href="#h0-2-7" id="h0-2-7" class="d">-		proxyReq.URL.Scheme = &quot;https&quot;
+</a><a href="#h0-2-8" id="h0-2-8" class="d">-	}
+</a><a href="#h0-2-9" id="h0-2-9" class="d">-
+</a> 	tags = util.MergeMaps(tags, map[string]interface{}{
+ 		&quot;virtual_host&quot;: vhost.Name,
+ 		&quot;upstream&quot;:     upstream.Name,
+</pre>
+</div>
+</body>
+</html>

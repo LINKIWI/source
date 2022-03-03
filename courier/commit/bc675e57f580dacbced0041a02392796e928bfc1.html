@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/config, internal/server: Use dedicated host parameter in health check configuration - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/bc675e57f580dacbced0041a02392796e928bfc1">bc675e57f580dacbced0041a02392796e928bfc1</a>
+<b>parent</b> <a href="../commit/e5daec678a5d561a8ec47b142d3ce9768313d62c">e5daec678a5d561a8ec47b142d3ce9768313d62c</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sat 27 Feb 2021 15:25:18 -0800
+
+internal/config, internal/server: Use dedicated host parameter in health check configuration
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">cmd/courier/main.go</a></td><td> | </td><td class="num">12</td><td><span class="i">+++++++</span><span class="d">-----</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">internal/config/config.go</a></td><td> | </td><td class="num">10</td><td><span class="i">+++++</span><span class="d">-----</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">internal/config/types.go</a></td><td> | </td><td class="num">1</td><td><span class="i">+</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">internal/server/health.go</a></td><td> | </td><td class="num">11</td><td><span class="i">+++++++</span><span class="d">----</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h4">internal/server/proxy.go</a></td><td> | </td><td class="num">2</td><td><span class="i">+</span><span class="d">-</span></td></tr>
+</table></pre><pre>5 files changed, 21 insertions(+), 15 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/cmd/courier/main.go">cmd/courier/main.go</a> b/<a href="../file/cmd/courier/main.go">cmd/courier/main.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -66,11 +66,13 @@ func main() {
+</a> 			zap.L().Debug(
+ 				&quot;registered virtual host upstream&quot;,
+ 				zap.String(&quot;vhost&quot;, vhost.Name),
+<a href="#h0-0-3" id="h0-0-3" class="d">-				zap.Stringer(&quot;upstream_address&quot;, upstream.Address),
+</a><a href="#h0-0-4" id="h0-0-4" class="d">-				zap.String(&quot;upstream_host&quot;, upstream.Host),
+</a><a href="#h0-0-5" id="h0-0-5" class="d">-				zap.Stringer(&quot;upstream_proxy&quot;, upstream.Proxy),
+</a><a href="#h0-0-6" id="h0-0-6" class="d">-				zap.Any(&quot;upstream_connection&quot;, upstream.Connection),
+</a><a href="#h0-0-7" id="h0-0-7" class="d">-				zap.Any(&quot;upstream_tls_context&quot;, upstream.TLSContext),
+</a><a href="#h0-0-8" id="h0-0-8" class="i">+				zap.String(&quot;name&quot;, upstream.Name),
+</a><a href="#h0-0-9" id="h0-0-9" class="i">+				zap.Stringer(&quot;address&quot;, upstream.Address),
+</a><a href="#h0-0-10" id="h0-0-10" class="i">+				zap.String(&quot;host&quot;, upstream.Host),
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+				zap.Stringer(&quot;proxy&quot;, upstream.Proxy),
+</a><a href="#h0-0-12" id="h0-0-12" class="i">+				zap.String(&quot;transport&quot;, upstream.Transport),
+</a><a href="#h0-0-13" id="h0-0-13" class="i">+				zap.Any(&quot;connection&quot;, upstream.Connection),
+</a><a href="#h0-0-14" id="h0-0-14" class="i">+				zap.Any(&quot;tls_context&quot;, upstream.TLSContext),
+</a> 			)
+ 		}
+ 
+<b>diff --git a/<a id="h1" href="../file/internal/config/config.go">internal/config/config.go</a> b/<a href="../file/internal/config/config.go">internal/config/config.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -246,23 +246,23 @@ func (c *Config) Validate() error {
+</a> 							&quot;method&quot;:   upstream.HealthCheck.Method,
+ 						},
+ 					}
+<a href="#h1-0-3" id="h1-0-3" class="d">-				} else if upstream.HealthCheck.Interval &lt;= 0 {
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+				} else if upstream.HealthCheck.Host == &quot;&quot; {
+</a> 					return &amp;util.Error{
+ 						Namespace: &quot;config&quot;,
+<a href="#h1-0-7" id="h1-0-7" class="d">-						Message:   &quot;health check interval must be a positive value&quot;,
+</a><a href="#h1-0-8" id="h1-0-8" class="i">+						Message:   &quot;health check host is missing&quot;,
+</a> 						Tags: map[string]interface{}{
+ 							&quot;vhost&quot;:    vhost.Name,
+ 							&quot;upstream&quot;: upstream.Name,
+<a href="#h1-0-12" id="h1-0-12" class="d">-							&quot;interval&quot;: upstream.HealthCheck.Interval,
+</a> 						},
+ 					}
+<a href="#h1-0-15" id="h1-0-15" class="d">-				} else if upstream.Host == &quot;&quot; {
+</a><a href="#h1-0-16" id="h1-0-16" class="i">+				} else if upstream.HealthCheck.Interval &lt;= 0 {
+</a> 					return &amp;util.Error{
+ 						Namespace: &quot;config&quot;,
+<a href="#h1-0-19" id="h1-0-19" class="d">-						Message:   &quot;upstream host must be configured when health checks are enabled&quot;,
+</a><a href="#h1-0-20" id="h1-0-20" class="i">+						Message:   &quot;health check interval must be a positive value&quot;,
+</a> 						Tags: map[string]interface{}{
+ 							&quot;vhost&quot;:    vhost.Name,
+ 							&quot;upstream&quot;: upstream.Name,
+<a href="#h1-0-24" id="h1-0-24" class="i">+							&quot;interval&quot;: upstream.HealthCheck.Interval,
+</a> 						},
+ 					}
+ 				}
+<b>diff --git a/<a id="h2" href="../file/internal/config/types.go">internal/config/types.go</a> b/<a href="../file/internal/config/types.go">internal/config/types.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -84,6 +84,7 @@ type ServerConnection struct {
+</a> 
+ // HealthCheck describes parameters for an upstream health check.
+ type HealthCheck struct {
+<a href="#h2-0-3" id="h2-0-3" class="i">+	Host               string        `yaml:&quot;host&quot;`
+</a> 	Method             string        `yaml:&quot;method&quot;`
+ 	Path               string        `yaml:&quot;path&quot;`
+ 	Interval           time.Duration `yaml:&quot;interval&quot;`
+<b>diff --git a/<a id="h3" href="../file/internal/server/health.go">internal/server/health.go</a> b/<a href="../file/internal/server/health.go">internal/server/health.go</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -79,7 +79,8 @@ func (hp *healthProbe) start() {
+</a> 			&quot;executing health check against upstream&quot;,
+ 			zap.String(&quot;upstream&quot;, hp.upstream.Name),
+ 			zap.Stringer(&quot;address&quot;, hp.upstream.Address),
+<a href="#h3-0-3" id="h3-0-3" class="d">-			zap.String(&quot;host&quot;, hp.upstream.Host),
+</a><a href="#h3-0-4" id="h3-0-4" class="i">+			zap.String(&quot;host&quot;, hp.upstream.HealthCheck.Host),
+</a><a href="#h3-0-5" id="h3-0-5" class="i">+			zap.String(&quot;method&quot;, hp.upstream.HealthCheck.Method),
+</a> 			zap.String(&quot;path&quot;, hp.upstream.HealthCheck.Path),
+ 		)
+ 
+<a href="#h3-1" id="h3-1" class="h">@@ -99,7 +100,8 @@ func (hp *healthProbe) start() {
+</a> 				&quot;upstream health check fail&quot;,
+ 				zap.String(&quot;upstream&quot;, hp.upstream.Name),
+ 				zap.Stringer(&quot;address&quot;, hp.upstream.Address),
+<a href="#h3-1-3" id="h3-1-3" class="d">-				zap.String(&quot;host&quot;, hp.upstream.Host),
+</a><a href="#h3-1-4" id="h3-1-4" class="i">+				zap.String(&quot;host&quot;, hp.upstream.HealthCheck.Host),
+</a><a href="#h3-1-5" id="h3-1-5" class="i">+				zap.String(&quot;method&quot;, hp.upstream.HealthCheck.Method),
+</a> 				zap.String(&quot;path&quot;, hp.upstream.HealthCheck.Path),
+ 				zap.Duration(&quot;duration&quot;, stopwatch.Elapsed()),
+ 				zap.Error(err),
+<a href="#h3-2" id="h3-2" class="h">@@ -114,7 +116,8 @@ func (hp *healthProbe) start() {
+</a> 				&quot;upstream health check pass&quot;,
+ 				zap.String(&quot;upstream&quot;, hp.upstream.Name),
+ 				zap.Stringer(&quot;address&quot;, hp.upstream.Address),
+<a href="#h3-2-3" id="h3-2-3" class="d">-				zap.String(&quot;host&quot;, hp.upstream.Host),
+</a><a href="#h3-2-4" id="h3-2-4" class="i">+				zap.String(&quot;host&quot;, hp.upstream.HealthCheck.Host),
+</a><a href="#h3-2-5" id="h3-2-5" class="i">+				zap.String(&quot;method&quot;, hp.upstream.HealthCheck.Method),
+</a> 				zap.String(&quot;path&quot;, hp.upstream.HealthCheck.Path),
+ 				zap.Duration(&quot;duration&quot;, stopwatch.Elapsed()),
+ 			)
+<a href="#h3-3" id="h3-3" class="h">@@ -138,7 +141,7 @@ func (hp *healthProbe) probe() error {
+</a> 
+ 	u := &amp;url.URL{
+ 		Scheme: scheme,
+<a href="#h3-3-3" id="h3-3-3" class="d">-		Host:   hp.upstream.Host,
+</a><a href="#h3-3-4" id="h3-3-4" class="i">+		Host:   hp.upstream.HealthCheck.Host,
+</a> 		Path:   path,
+ 	}
+ 
+<b>diff --git a/<a id="h4" href="../file/internal/server/proxy.go">internal/server/proxy.go</a> b/<a href="../file/internal/server/proxy.go">internal/server/proxy.go</a></b>
+<a href="#h4-0" id="h4-0" class="h">@@ -172,7 +172,7 @@ func newReverseProxy(vhosts []*config.VirtualHost, opts config.Proxy) (http.Hand
+</a> 					zap.String(&quot;vhost&quot;, vhost.Name),
+ 					zap.String(&quot;upstream&quot;, upstream.Name),
+ 					zap.Stringer(&quot;address&quot;, upstream.Address),
+<a href="#h4-0-3" id="h4-0-3" class="d">-					zap.String(&quot;host&quot;, upstream.Host),
+</a><a href="#h4-0-4" id="h4-0-4" class="i">+					zap.String(&quot;host&quot;, upstream.HealthCheck.Host),
+</a> 					zap.String(&quot;path&quot;, upstream.HealthCheck.Path),
+ 					zap.Duration(&quot;interval&quot;, upstream.HealthCheck.Interval),
+ 					zap.Duration(&quot;jitter&quot;, upstream.HealthCheck.Jitter),
+</pre>
+</div>
+</body>
+</html>

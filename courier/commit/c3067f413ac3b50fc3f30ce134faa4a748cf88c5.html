@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/server: Tag proxy error metrics with semantic code - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/c3067f413ac3b50fc3f30ce134faa4a748cf88c5">c3067f413ac3b50fc3f30ce134faa4a748cf88c5</a>
+<b>parent</b> <a href="../commit/6887a6598ca9411f6ec0a07d165bf177405e7bc1">6887a6598ca9411f6ec0a07d165bf177405e7bc1</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sat 27 Feb 2021 15:08:04 -0800
+
+internal/server: Tag proxy error metrics with semantic code
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/server/proxy.go</a></td><td> | </td><td class="num">53</td><td><span class="i">+++++++++++++++++++++++++++++++++</span><span class="d">--------------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">internal/server/schema.go</a></td><td> | </td><td class="num">11</td><td><span class="i">++++++</span><span class="d">-----</span></td></tr>
+</table></pre><pre>2 files changed, 39 insertions(+), 25 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/server/proxy.go">internal/server/proxy.go</a> b/<a href="../file/internal/server/proxy.go">internal/server/proxy.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -36,52 +36,61 @@ var (
+</a> 	// errUnknownHost is returned when the request targets a virtual host that is not registered
+ 	// in configuration.
+ 	errUnknownHost = &amp;response{
+<a href="#h0-0-3" id="h0-0-3" class="d">-		statusCode: http.StatusNotFound,
+</a><a href="#h0-0-4" id="h0-0-4" class="d">-		message:    &quot;unknown virtual host&quot;,
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+		status:  http.StatusNotFound,
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+		code:    &quot;UNKNOWN_VIRTUAL_HOST&quot;,
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+		message: &quot;unknown virtual host&quot;,
+</a> 	}
+ 	// errUnknownRoute is returned when the request does not match any configured route.
+ 	errUnknownRoute = &amp;response{
+<a href="#h0-0-11" id="h0-0-11" class="d">-		statusCode: http.StatusBadRequest,
+</a><a href="#h0-0-12" id="h0-0-12" class="d">-		message:    &quot;no upstream for route&quot;,
+</a><a href="#h0-0-13" id="h0-0-13" class="i">+		status:  http.StatusBadRequest,
+</a><a href="#h0-0-14" id="h0-0-14" class="i">+		code:    &quot;UNKNOWN_ROUTE&quot;,
+</a><a href="#h0-0-15" id="h0-0-15" class="i">+		message: &quot;no upstream for route&quot;,
+</a> 	}
+ 	// errBadTransport is returned when the proxy encounters an error initializing the HTTP
+ 	// client transport to an upstream.
+ 	errBadTransport = &amp;response{
+<a href="#h0-0-20" id="h0-0-20" class="d">-		statusCode: http.StatusInternalServerError,
+</a><a href="#h0-0-21" id="h0-0-21" class="d">-		message:    &quot;failed to initialize upstream transport&quot;,
+</a><a href="#h0-0-22" id="h0-0-22" class="i">+		status:  http.StatusInternalServerError,
+</a><a href="#h0-0-23" id="h0-0-23" class="i">+		code:    &quot;BAD_TRANSPORT&quot;,
+</a><a href="#h0-0-24" id="h0-0-24" class="i">+		message: &quot;failed to initialize upstream transport&quot;,
+</a> 	}
+ 	// errFilterProcess is returned when the filter chain raises an error.
+ 	errFilterProcess = &amp;response{
+<a href="#h0-0-28" id="h0-0-28" class="d">-		statusCode: http.StatusInternalServerError,
+</a><a href="#h0-0-29" id="h0-0-29" class="d">-		message:    &quot;failed in filter chain processing&quot;,
+</a><a href="#h0-0-30" id="h0-0-30" class="i">+		status:  http.StatusInternalServerError,
+</a><a href="#h0-0-31" id="h0-0-31" class="i">+		code:    &quot;FILTER_PROCESS&quot;,
+</a><a href="#h0-0-32" id="h0-0-32" class="i">+		message: &quot;failed in filter chain processing&quot;,
+</a> 	}
+ 	// errUpstreamUnhealthy is returned when the upstream health check is in a failing state, as
+ 	// a fail-fast behavior when health check-based circuit breaking is enabled.
+ 	errUpstreamUnhealthy = &amp;response{
+<a href="#h0-0-37" id="h0-0-37" class="d">-		statusCode: http.StatusBadGateway,
+</a><a href="#h0-0-38" id="h0-0-38" class="d">-		message:    &quot;upstream is marked unhealthy&quot;,
+</a><a href="#h0-0-39" id="h0-0-39" class="i">+		status:  http.StatusBadGateway,
+</a><a href="#h0-0-40" id="h0-0-40" class="i">+		code:    &quot;UPSTREAM_UNHEALTHY&quot;,
+</a><a href="#h0-0-41" id="h0-0-41" class="i">+		message: &quot;upstream is marked unhealthy&quot;,
+</a> 	}
+ 	// errUpstreamTimeout is returned when the upstream service duration exceeds a provisioned
+ 	// network-level timeout.
+ 	errUpstreamTimeout = &amp;response{
+<a href="#h0-0-46" id="h0-0-46" class="d">-		statusCode: http.StatusGatewayTimeout,
+</a><a href="#h0-0-47" id="h0-0-47" class="d">-		message:    &quot;upstream request timeout&quot;,
+</a><a href="#h0-0-48" id="h0-0-48" class="i">+		status:  http.StatusGatewayTimeout,
+</a><a href="#h0-0-49" id="h0-0-49" class="i">+		code:    &quot;UPSTREAM_TIMEOUT&quot;,
+</a><a href="#h0-0-50" id="h0-0-50" class="i">+		message: &quot;upstream request timeout&quot;,
+</a> 	}
+ 	// errUpstreamUnavailable is returned for non-transient upstream network connection errors.
+ 	errUpstreamUnavailable = &amp;response{
+<a href="#h0-0-54" id="h0-0-54" class="d">-		statusCode: http.StatusBadGateway,
+</a><a href="#h0-0-55" id="h0-0-55" class="d">-		message:    &quot;upstream connection error&quot;,
+</a><a href="#h0-0-56" id="h0-0-56" class="i">+		status:  http.StatusBadGateway,
+</a><a href="#h0-0-57" id="h0-0-57" class="i">+		code:    &quot;UPSTREAM_UNAVAILABLE&quot;,
+</a><a href="#h0-0-58" id="h0-0-58" class="i">+		message: &quot;upstream connection error&quot;,
+</a> 	}
+ 	// errProxyInternal is returned when the HTTP proxy itself raises an error.
+ 	errProxyInternal = &amp;response{
+<a href="#h0-0-62" id="h0-0-62" class="d">-		statusCode: http.StatusServiceUnavailable,
+</a><a href="#h0-0-63" id="h0-0-63" class="d">-		message:    &quot;unknown internal proxy failure&quot;,
+</a><a href="#h0-0-64" id="h0-0-64" class="i">+		status:  http.StatusServiceUnavailable,
+</a><a href="#h0-0-65" id="h0-0-65" class="i">+		code:    &quot;INTERNAL&quot;,
+</a><a href="#h0-0-66" id="h0-0-66" class="i">+		message: &quot;unknown internal proxy failure&quot;,
+</a> 	}
+ 	// errObscuredInternal is returned when semantically meaningful errors are disabled and the
+ 	// proxy encounters any processing error.
+ 	errObscuredInternal = &amp;response{
+<a href="#h0-0-71" id="h0-0-71" class="d">-		statusCode: http.StatusInternalServerError,
+</a><a href="#h0-0-72" id="h0-0-72" class="d">-		message:    &quot;internal server error&quot;,
+</a><a href="#h0-0-73" id="h0-0-73" class="i">+		status:  http.StatusInternalServerError,
+</a><a href="#h0-0-74" id="h0-0-74" class="i">+		code:    &quot;OBSCURED&quot;,
+</a><a href="#h0-0-75" id="h0-0-75" class="i">+		message: &quot;internal server error&quot;,
+</a> 	}
+ )
+ 
+<a href="#h0-1" id="h0-1" class="h">@@ -246,7 +255,10 @@ func (rp *reverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+</a> 	}
+ 	rpErrorHandler := func(errResp *response) internalErrorHandler {
+ 		return func(proxyRW http.ResponseWriter, proxyReq *http.Request, err error) {
+<a href="#h0-1-3" id="h0-1-3" class="d">-			metrics.Client.Incr(metricProxyError, tags)
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+			metrics.Client.Incr(
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+				metricProxyError,
+</a><a href="#h0-1-6" id="h0-1-6" class="i">+				util.MergeMaps(tags, map[string]interface{}{&quot;code&quot;: errResp.code}),
+</a><a href="#h0-1-7" id="h0-1-7" class="i">+			)
+</a> 
+ 			hub := sentry.CurrentHub().Clone()
+ 			hub.ConfigureScope(func(scope *sentry.Scope) {
+<a href="#h0-2" id="h0-2" class="h">@@ -262,7 +274,8 @@ func (rp *reverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+</a> 
+ 			zap.L().Debug(
+ 				&quot;proxy encountered an error&quot;,
+<a href="#h0-2-3" id="h0-2-3" class="d">-				zap.Int(&quot;status&quot;, errResp.statusCode),
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+				zap.Int(&quot;status&quot;, errResp.status),
+</a><a href="#h0-2-5" id="h0-2-5" class="i">+				zap.String(&quot;code&quot;, errResp.code),
+</a> 				zap.String(&quot;message&quot;, errResp.message),
+ 				zap.Error(err),
+ 			)
+<b>diff --git a/<a id="h1" href="../file/internal/server/schema.go">internal/server/schema.go</a> b/<a href="../file/internal/server/schema.go">internal/server/schema.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -9,9 +9,10 @@ import (
+</a> 
+ // response is a structured container for a generic response.
+ type response struct {
+<a href="#h1-0-3" id="h1-0-3" class="d">-	statusCode int
+</a><a href="#h1-0-4" id="h1-0-4" class="d">-	message    string
+</a><a href="#h1-0-5" id="h1-0-5" class="d">-	tags       map[string]string
+</a><a href="#h1-0-6" id="h1-0-6" class="i">+	status  int
+</a><a href="#h1-0-7" id="h1-0-7" class="i">+	code    string
+</a><a href="#h1-0-8" id="h1-0-8" class="i">+	message string
+</a><a href="#h1-0-9" id="h1-0-9" class="i">+	tags    map[string]string
+</a> }
+ 
+ // response creates an http.Response from the response metadata.
+<a href="#h1-1" id="h1-1" class="h">@@ -24,7 +25,7 @@ func (e *response) response() *http.Response {
+</a> 	}
+ 
+ 	return &amp;http.Response{
+<a href="#h1-1-3" id="h1-1-3" class="d">-		StatusCode: e.statusCode,
+</a><a href="#h1-1-4" id="h1-1-4" class="i">+		StatusCode: e.status,
+</a> 		Body:       io.NopCloser(strings.NewReader(strings.Join(body, &quot;\n&quot;))),
+ 		Header:     make(http.Header),
+ 	}
+<a href="#h1-2" id="h1-2" class="h">@@ -32,7 +33,7 @@ func (e *response) response() *http.Response {
+</a> 
+ // String provides a string representation of the response.
+ func (e *response) String() string {
+<a href="#h1-2-3" id="h1-2-3" class="d">-	return fmt.Sprintf(&quot;[%d] %s&quot;, e.statusCode, e.message)
+</a><a href="#h1-2-4" id="h1-2-4" class="i">+	return fmt.Sprintf(&quot;[%d] %s: %s&quot;, e.status, e.code, e.message)
+</a> }
+ 
+ // Error provides a string representation of the response.
+</pre>
+</div>
+</body>
+</html>

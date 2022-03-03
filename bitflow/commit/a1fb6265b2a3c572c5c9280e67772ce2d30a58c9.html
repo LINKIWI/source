@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/config: Support server ALPN negotiation during handshake - bitflow - Layer 4 TCP proxy for secure interconnection of isolated networks</title>
+<meta name="description" content="Layer 4 TCP proxy for secure interconnection of isolated networks" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="bitflow Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="bitflow Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>bitflow</h1><span class="desc">Layer 4 TCP proxy for secure interconnection of isolated networks</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/bitflow.git">https://source.static.kevinlin.info/bitflow.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/a1fb6265b2a3c572c5c9280e67772ce2d30a58c9">a1fb6265b2a3c572c5c9280e67772ce2d30a58c9</a>
+<b>parent</b> <a href="../commit/73d0bea7eb78702fa8500977219ec76912ec15c2">73d0bea7eb78702fa8500977219ec76912ec15c2</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Thu 23 Dec 2021 16:54:43 -0800
+
+internal/config: Support server ALPN negotiation during handshake
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">README.md</a></td><td> | </td><td class="num">1</td><td><span class="i">+</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">internal/config/config.go</a></td><td> | </td><td class="num">1</td><td><span class="i">+</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">internal/config/types.go</a></td><td> | </td><td class="num">5</td><td><span class="i">+++</span><span class="d">--</span></td></tr>
+</table></pre><pre>3 files changed, 5 insertions(+), 2 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/README.md">README.md</a> b/<a href="../file/README.md">README.md</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -45,6 +45,7 @@ The following configuration directives are recognized:
+</a> |`server.proxies[].listener.tls_context.certificates[].key`|No|Path to a PEM-format TLS server private key|
+ |`server.proxies[].listener.tls_context.certificates[].certificate`|No|Path to a PEM-format TLS server certificate|
+ |`server.proxies[].listener.tls_context.certificates[].authority`|No|Path to a PEM-format TLS CA certificate for client certificate validation|
+<a href="#h0-0-3" id="h0-0-3" class="i">+|`server.proxies[].listener.tls_context.application_protocols[]`|No|List of server-supported application protocols to advertise for ALPN at handshake time|
+</a> |`server.proxies[].targets[].name`|Yes|Proxy target name|
+ |`server.proxies[].targets[].address`|Yes|Proxy target address|
+ |`server.proxies[].targets[].proxy`|No|SOCKS5 proxy for the target connection|
+<b>diff --git a/<a id="h1" href="../file/internal/config/config.go">internal/config/config.go</a> b/<a href="../file/internal/config/config.go">internal/config/config.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -158,6 +158,7 @@ func (t *TLSContext) ServerConfig() (*tls.Config, error) {
+</a> 		Certificates: certificates,
+ 		ClientCAs:    caPool,
+ 		ClientAuth:   verifyMode,
+<a href="#h1-0-3" id="h1-0-3" class="i">+		NextProtos:   t.ApplicationProtocols,
+</a> 		MinVersion:   tls.VersionTLS13,
+ 	}, nil
+ }
+<b>diff --git a/<a id="h2" href="../file/internal/config/types.go">internal/config/types.go</a> b/<a href="../file/internal/config/types.go">internal/config/types.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -43,8 +43,9 @@ type TLSCertificate struct {
+</a> 
+ // TLSContext describes TLS termination properties for the local server listener.
+ type TLSContext struct {
+<a href="#h2-0-3" id="h2-0-3" class="d">-	Certificates []TLSCertificate `yaml:&quot;certificates&quot;`
+</a><a href="#h2-0-4" id="h2-0-4" class="d">-	VerifyMode   string           `yaml:&quot;verify_mode&quot;`
+</a><a href="#h2-0-5" id="h2-0-5" class="i">+	Certificates         []TLSCertificate `yaml:&quot;certificates&quot;`
+</a><a href="#h2-0-6" id="h2-0-6" class="i">+	ApplicationProtocols []string         `yaml:&quot;application_protocols&quot;`
+</a><a href="#h2-0-7" id="h2-0-7" class="i">+	VerifyMode           string           `yaml:&quot;verify_mode&quot;`
+</a> }
+ 
+ // Listener describes the local server listener.
+</pre>
+</div>
+</body>
+</html>

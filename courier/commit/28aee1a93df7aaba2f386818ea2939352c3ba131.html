@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/config: Schema for virtual host routes and multiple named upstreams - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/28aee1a93df7aaba2f386818ea2939352c3ba131">28aee1a93df7aaba2f386818ea2939352c3ba131</a>
+<b>parent</b> <a href="../commit/9a7fd15de23235062524938c3476ec06760babdc">9a7fd15de23235062524938c3476ec06760babdc</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sat 27 Feb 2021 11:33:08 -0800
+
+internal/config: Schema for virtual host routes and multiple named upstreams
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">config.example.yaml</a></td><td> | </td><td class="num">76</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">-----------------------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">internal/config/config.go</a></td><td> | </td><td class="num">109</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">----------------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">internal/config/types.go</a></td><td> | </td><td class="num">19</td><td><span class="i">+++++++++++++++</span><span class="d">----</span></td></tr>
+</table></pre><pre>3 files changed, 141 insertions(+), 63 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/config.example.yaml">config.example.yaml</a> b/<a href="../file/config.example.yaml">config.example.yaml</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -32,20 +32,24 @@ server:
+</a>   virtual_hosts:
+     - name: foo
+       host: foo.example.com
+<a href="#h0-0-3" id="h0-0-3" class="d">-      upstream:
+</a><a href="#h0-0-4" id="h0-0-4" class="d">-        address: unix:/var/run/http/http.sock
+</a><a href="#h0-0-5" id="h0-0-5" class="d">-        connection:
+</a><a href="#h0-0-6" id="h0-0-6" class="d">-          connect_timeout: 4s
+</a><a href="#h0-0-7" id="h0-0-7" class="d">-          read_timeout: 10s
+</a><a href="#h0-0-8" id="h0-0-8" class="d">-          write_timeout: 10s
+</a><a href="#h0-0-9" id="h0-0-9" class="d">-        health_check:
+</a><a href="#h0-0-10" id="h0-0-10" class="d">-          interval: 10s
+</a><a href="#h0-0-11" id="h0-0-11" class="d">-          jitter: 3s
+</a><a href="#h0-0-12" id="h0-0-12" class="d">-          path: /status
+</a><a href="#h0-0-13" id="h0-0-13" class="d">-          enable_circuit_break: true
+</a><a href="#h0-0-14" id="h0-0-14" class="d">-          status:
+</a><a href="#h0-0-15" id="h0-0-15" class="d">-            lower: 200
+</a><a href="#h0-0-16" id="h0-0-16" class="d">-            upper: 300
+</a><a href="#h0-0-17" id="h0-0-17" class="i">+      upstreams:
+</a><a href="#h0-0-18" id="h0-0-18" class="i">+        - name: foo
+</a><a href="#h0-0-19" id="h0-0-19" class="i">+          address: unix:/var/run/http/http.sock
+</a><a href="#h0-0-20" id="h0-0-20" class="i">+          host: foo
+</a><a href="#h0-0-21" id="h0-0-21" class="i">+          connection:
+</a><a href="#h0-0-22" id="h0-0-22" class="i">+            connect_timeout: 4s
+</a><a href="#h0-0-23" id="h0-0-23" class="i">+            read_timeout: 10s
+</a><a href="#h0-0-24" id="h0-0-24" class="i">+            write_timeout: 10s
+</a><a href="#h0-0-25" id="h0-0-25" class="i">+          health_check:
+</a><a href="#h0-0-26" id="h0-0-26" class="i">+            interval: 10s
+</a><a href="#h0-0-27" id="h0-0-27" class="i">+            jitter: 3s
+</a><a href="#h0-0-28" id="h0-0-28" class="i">+            path: /status
+</a><a href="#h0-0-29" id="h0-0-29" class="i">+            enable_circuit_break: true
+</a><a href="#h0-0-30" id="h0-0-30" class="i">+            status:
+</a><a href="#h0-0-31" id="h0-0-31" class="i">+              lower: 200
+</a><a href="#h0-0-32" id="h0-0-32" class="i">+              upper: 300
+</a><a href="#h0-0-33" id="h0-0-33" class="i">+      routes:
+</a><a href="#h0-0-34" id="h0-0-34" class="i">+        - upstream: foo
+</a>       filters:
+         - name: metadata
+           type: metadata
+<a href="#h0-1" id="h0-1" class="h">@@ -55,17 +59,28 @@ server:
+</a>             path: /var/log/courier/foo.log
+     - name: bar
+       host: bar.example.com
+<a href="#h0-1-3" id="h0-1-3" class="d">-      upstream:
+</a><a href="#h0-1-4" id="h0-1-4" class="d">-        address: 10.1.0.1:8200
+</a><a href="#h0-1-5" id="h0-1-5" class="d">-        host: bar.local
+</a><a href="#h0-1-6" id="h0-1-6" class="d">-        connection:
+</a><a href="#h0-1-7" id="h0-1-7" class="d">-          connect_timeout: 1s
+</a><a href="#h0-1-8" id="h0-1-8" class="d">-          tls_handshake_timeout: 1s
+</a><a href="#h0-1-9" id="h0-1-9" class="d">-      tls_context:
+</a><a href="#h0-1-10" id="h0-1-10" class="d">-        certificates:
+</a><a href="#h0-1-11" id="h0-1-11" class="d">-          - key: /etc/ssl/service/key.pem
+</a><a href="#h0-1-12" id="h0-1-12" class="d">-            certificate: /etc/ssl/service/cert.pem
+</a><a href="#h0-1-13" id="h0-1-13" class="d">-            authority: /etc/ssl/service/ca.pem
+</a><a href="#h0-1-14" id="h0-1-14" class="i">+      upstreams:
+</a><a href="#h0-1-15" id="h0-1-15" class="i">+        - name: bar
+</a><a href="#h0-1-16" id="h0-1-16" class="i">+          address: 10.1.0.1:8200
+</a><a href="#h0-1-17" id="h0-1-17" class="i">+          host: bar.local
+</a><a href="#h0-1-18" id="h0-1-18" class="i">+          connection:
+</a><a href="#h0-1-19" id="h0-1-19" class="i">+            connect_timeout: 1s
+</a><a href="#h0-1-20" id="h0-1-20" class="i">+            tls_handshake_timeout: 1s
+</a><a href="#h0-1-21" id="h0-1-21" class="i">+          tls_context:
+</a><a href="#h0-1-22" id="h0-1-22" class="i">+            certificates:
+</a><a href="#h0-1-23" id="h0-1-23" class="i">+              - key: /etc/ssl/service/key.pem
+</a><a href="#h0-1-24" id="h0-1-24" class="i">+                certificate: /etc/ssl/service/cert.pem
+</a><a href="#h0-1-25" id="h0-1-25" class="i">+                authority: /etc/ssl/service/ca.pem
+</a><a href="#h0-1-26" id="h0-1-26" class="i">+        - name: baz
+</a><a href="#h0-1-27" id="h0-1-27" class="i">+          address: 10.1.0.2:8200
+</a><a href="#h0-1-28" id="h0-1-28" class="i">+          host: baz.local
+</a><a href="#h0-1-29" id="h0-1-29" class="i">+      routes:
+</a><a href="#h0-1-30" id="h0-1-30" class="i">+        - upstream: bar
+</a><a href="#h0-1-31" id="h0-1-31" class="i">+          match:
+</a><a href="#h0-1-32" id="h0-1-32" class="i">+            path: /^\/bar/
+</a><a href="#h0-1-33" id="h0-1-33" class="i">+        - upstream: baz
+</a><a href="#h0-1-34" id="h0-1-34" class="i">+          match:
+</a><a href="#h0-1-35" id="h0-1-35" class="i">+            path: /^\/baz/
+</a>       filters:
+         - name: localhost-filter
+           type: ip
+<a href="#h0-2" id="h0-2" class="h">@@ -95,7 +110,10 @@ server:
+</a>                 value: bar
+     - name: grpc
+       host: baz.example.com
+<a href="#h0-2-3" id="h0-2-3" class="d">-      upstream:
+</a><a href="#h0-2-4" id="h0-2-4" class="d">-        address: localhost:9090
+</a><a href="#h0-2-5" id="h0-2-5" class="d">-        proxy: socks5://localhost:3125
+</a><a href="#h0-2-6" id="h0-2-6" class="d">-        transport: http2
+</a><a href="#h0-2-7" id="h0-2-7" class="i">+      upstreams:
+</a><a href="#h0-2-8" id="h0-2-8" class="i">+        - name: grpc
+</a><a href="#h0-2-9" id="h0-2-9" class="i">+          address: localhost:9090
+</a><a href="#h0-2-10" id="h0-2-10" class="i">+          proxy: socks5://localhost:3125
+</a><a href="#h0-2-11" id="h0-2-11" class="i">+          transport: http2
+</a><a href="#h0-2-12" id="h0-2-12" class="i">+      routes:
+</a><a href="#h0-2-13" id="h0-2-13" class="i">+        - upstream: grpc
+</a><b>diff --git a/<a id="h1" href="../file/internal/config/config.go">internal/config/config.go</a> b/<a href="../file/internal/config/config.go">internal/config/config.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -166,6 +166,8 @@ func (c *Config) Validate() error {
+</a> 	}
+ 
+ 	for _, vhost := range c.Server.VirtualHosts {
+<a href="#h1-0-3" id="h1-0-3" class="i">+		upstreams := make(map[string]bool)
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+
+</a> 		if _, ok := vhosts[vhost.Name]; ok {
+ 			return &amp;util.Error{
+ 				Namespace: &quot;config&quot;,
+<a href="#h1-1" id="h1-1" class="h">@@ -174,11 +176,7 @@ func (c *Config) Validate() error {
+</a> 					&quot;name&quot;: vhost.Name,
+ 				},
+ 			}
+<a href="#h1-1-3" id="h1-1-3" class="d">-		}
+</a><a href="#h1-1-4" id="h1-1-4" class="d">-
+</a><a href="#h1-1-5" id="h1-1-5" class="d">-		vhosts[vhost.Name] = true
+</a><a href="#h1-1-6" id="h1-1-6" class="d">-
+</a><a href="#h1-1-7" id="h1-1-7" class="d">-		if vhost.Upstream == nil {
+</a><a href="#h1-1-8" id="h1-1-8" class="i">+		} else if len(vhost.Upstreams) == 0 {
+</a> 			return &amp;util.Error{
+ 				Namespace: &quot;config&quot;,
+ 				Message:   &quot;virtual host missing upstream configuration&quot;,
+<a href="#h1-2" id="h1-2" class="h">@@ -186,51 +184,102 @@ func (c *Config) Validate() error {
+</a> 					&quot;name&quot;: vhost.Name,
+ 				},
+ 			}
+<a href="#h1-2-3" id="h1-2-3" class="d">-		} else if vhost.Upstream.Address == nil {
+</a><a href="#h1-2-4" id="h1-2-4" class="d">-			return &amp;util.Error{
+</a><a href="#h1-2-5" id="h1-2-5" class="d">-				Namespace: &quot;config&quot;,
+</a><a href="#h1-2-6" id="h1-2-6" class="d">-				Message:   &quot;virtual host missing upstream address&quot;,
+</a><a href="#h1-2-7" id="h1-2-7" class="d">-				Tags: map[string]interface{}{
+</a><a href="#h1-2-8" id="h1-2-8" class="d">-					&quot;vhost&quot;: vhost.Name,
+</a><a href="#h1-2-9" id="h1-2-9" class="d">-				},
+</a><a href="#h1-2-10" id="h1-2-10" class="d">-				StackedError: nil,
+</a><a href="#h1-2-11" id="h1-2-11" class="d">-			}
+</a><a href="#h1-2-12" id="h1-2-12" class="d">-		} else if _, ok := upstreamTransports[vhost.Upstream.Transport]; !ok {
+</a><a href="#h1-2-13" id="h1-2-13" class="i">+		} else if len(vhost.Routes) == 0 {
+</a> 			return &amp;util.Error{
+ 				Namespace: &quot;config&quot;,
+<a href="#h1-2-16" id="h1-2-16" class="d">-				Message:   &quot;unknown virtual host transport&quot;,
+</a><a href="#h1-2-17" id="h1-2-17" class="i">+				Message:   &quot;virtual host missing route configuration&quot;,
+</a> 				Tags: map[string]interface{}{
+<a href="#h1-2-19" id="h1-2-19" class="d">-					&quot;name&quot;:      vhost.Name,
+</a><a href="#h1-2-20" id="h1-2-20" class="d">-					&quot;transport&quot;: vhost.Upstream.Transport,
+</a><a href="#h1-2-21" id="h1-2-21" class="i">+					&quot;name&quot;: vhost.Name,
+</a> 				},
+ 			}
+ 		}
+ 
+<a href="#h1-2-26" id="h1-2-26" class="d">-		if vhost.Upstream.HealthCheck != nil {
+</a><a href="#h1-2-27" id="h1-2-27" class="d">-			if _, ok := healthCheckMethods[vhost.Upstream.HealthCheck.Method]; !ok {
+</a><a href="#h1-2-28" id="h1-2-28" class="i">+		vhosts[vhost.Name] = true
+</a><a href="#h1-2-29" id="h1-2-29" class="i">+
+</a><a href="#h1-2-30" id="h1-2-30" class="i">+		for _, upstream := range vhost.Upstreams {
+</a><a href="#h1-2-31" id="h1-2-31" class="i">+			if upstream.Name == &quot;&quot; {
+</a><a href="#h1-2-32" id="h1-2-32" class="i">+				return &amp;util.Error{
+</a><a href="#h1-2-33" id="h1-2-33" class="i">+					Namespace: &quot;config&quot;,
+</a><a href="#h1-2-34" id="h1-2-34" class="i">+					Message:   &quot;upstream missing name&quot;,
+</a><a href="#h1-2-35" id="h1-2-35" class="i">+					Tags: map[string]interface{}{
+</a><a href="#h1-2-36" id="h1-2-36" class="i">+						&quot;vhost&quot;: vhost.Name,
+</a><a href="#h1-2-37" id="h1-2-37" class="i">+					},
+</a><a href="#h1-2-38" id="h1-2-38" class="i">+				}
+</a><a href="#h1-2-39" id="h1-2-39" class="i">+			} else if upstream.Address == nil {
+</a><a href="#h1-2-40" id="h1-2-40" class="i">+				return &amp;util.Error{
+</a><a href="#h1-2-41" id="h1-2-41" class="i">+					Namespace: &quot;config&quot;,
+</a><a href="#h1-2-42" id="h1-2-42" class="i">+					Message:   &quot;upstream missing address&quot;,
+</a><a href="#h1-2-43" id="h1-2-43" class="i">+					Tags: map[string]interface{}{
+</a><a href="#h1-2-44" id="h1-2-44" class="i">+						&quot;vhost&quot;:    vhost.Name,
+</a><a href="#h1-2-45" id="h1-2-45" class="i">+						&quot;upstream&quot;: upstream.Name,
+</a><a href="#h1-2-46" id="h1-2-46" class="i">+					},
+</a><a href="#h1-2-47" id="h1-2-47" class="i">+				}
+</a><a href="#h1-2-48" id="h1-2-48" class="i">+			} else if _, ok := upstreamTransports[upstream.Transport]; !ok {
+</a> 				return &amp;util.Error{
+ 					Namespace: &quot;config&quot;,
+<a href="#h1-2-51" id="h1-2-51" class="d">-					Message:   &quot;unknown HTTP health check method&quot;,
+</a><a href="#h1-2-52" id="h1-2-52" class="i">+					Message:   &quot;unknown virtual host transport&quot;,
+</a> 					Tags: map[string]interface{}{
+<a href="#h1-2-54" id="h1-2-54" class="d">-						&quot;name&quot;:   vhost.Name,
+</a><a href="#h1-2-55" id="h1-2-55" class="d">-						&quot;method&quot;: vhost.Upstream.HealthCheck.Method,
+</a><a href="#h1-2-56" id="h1-2-56" class="i">+						&quot;vhost&quot;:     vhost.Name,
+</a><a href="#h1-2-57" id="h1-2-57" class="i">+						&quot;upstream&quot;:  upstream.Name,
+</a><a href="#h1-2-58" id="h1-2-58" class="i">+						&quot;transport&quot;: upstream.Transport,
+</a> 					},
+ 				}
+<a href="#h1-2-61" id="h1-2-61" class="d">-			} else if vhost.Upstream.HealthCheck.Interval &lt;= 0 {
+</a><a href="#h1-2-62" id="h1-2-62" class="i">+			}
+</a><a href="#h1-2-63" id="h1-2-63" class="i">+
+</a><a href="#h1-2-64" id="h1-2-64" class="i">+			if upstream.HealthCheck != nil {
+</a><a href="#h1-2-65" id="h1-2-65" class="i">+				if _, ok := healthCheckMethods[upstream.HealthCheck.Method]; !ok {
+</a><a href="#h1-2-66" id="h1-2-66" class="i">+					return &amp;util.Error{
+</a><a href="#h1-2-67" id="h1-2-67" class="i">+						Namespace: &quot;config&quot;,
+</a><a href="#h1-2-68" id="h1-2-68" class="i">+						Message:   &quot;unknown HTTP health check method&quot;,
+</a><a href="#h1-2-69" id="h1-2-69" class="i">+						Tags: map[string]interface{}{
+</a><a href="#h1-2-70" id="h1-2-70" class="i">+							&quot;vhost&quot;:    vhost.Name,
+</a><a href="#h1-2-71" id="h1-2-71" class="i">+							&quot;upstream&quot;: upstream.Name,
+</a><a href="#h1-2-72" id="h1-2-72" class="i">+							&quot;method&quot;:   upstream.HealthCheck.Method,
+</a><a href="#h1-2-73" id="h1-2-73" class="i">+						},
+</a><a href="#h1-2-74" id="h1-2-74" class="i">+					}
+</a><a href="#h1-2-75" id="h1-2-75" class="i">+				} else if upstream.HealthCheck.Interval &lt;= 0 {
+</a><a href="#h1-2-76" id="h1-2-76" class="i">+					return &amp;util.Error{
+</a><a href="#h1-2-77" id="h1-2-77" class="i">+						Namespace: &quot;config&quot;,
+</a><a href="#h1-2-78" id="h1-2-78" class="i">+						Message:   &quot;health check interval must be a positive value&quot;,
+</a><a href="#h1-2-79" id="h1-2-79" class="i">+						Tags: map[string]interface{}{
+</a><a href="#h1-2-80" id="h1-2-80" class="i">+							&quot;vhost&quot;:    vhost.Name,
+</a><a href="#h1-2-81" id="h1-2-81" class="i">+							&quot;upstream&quot;: upstream.Name,
+</a><a href="#h1-2-82" id="h1-2-82" class="i">+							&quot;interval&quot;: upstream.HealthCheck.Interval,
+</a><a href="#h1-2-83" id="h1-2-83" class="i">+						},
+</a><a href="#h1-2-84" id="h1-2-84" class="i">+					}
+</a><a href="#h1-2-85" id="h1-2-85" class="i">+				} else if upstream.Host == &quot;&quot; {
+</a><a href="#h1-2-86" id="h1-2-86" class="i">+					return &amp;util.Error{
+</a><a href="#h1-2-87" id="h1-2-87" class="i">+						Namespace: &quot;config&quot;,
+</a><a href="#h1-2-88" id="h1-2-88" class="i">+						Message:   &quot;upstream host must be configured when health checks are enabled&quot;,
+</a><a href="#h1-2-89" id="h1-2-89" class="i">+						Tags: map[string]interface{}{
+</a><a href="#h1-2-90" id="h1-2-90" class="i">+							&quot;vhost&quot;:    vhost.Name,
+</a><a href="#h1-2-91" id="h1-2-91" class="i">+							&quot;upstream&quot;: upstream.Name,
+</a><a href="#h1-2-92" id="h1-2-92" class="i">+						},
+</a><a href="#h1-2-93" id="h1-2-93" class="i">+					}
+</a><a href="#h1-2-94" id="h1-2-94" class="i">+				}
+</a><a href="#h1-2-95" id="h1-2-95" class="i">+			}
+</a><a href="#h1-2-96" id="h1-2-96" class="i">+
+</a><a href="#h1-2-97" id="h1-2-97" class="i">+			upstreams[upstream.Name] = true
+</a><a href="#h1-2-98" id="h1-2-98" class="i">+		}
+</a><a href="#h1-2-99" id="h1-2-99" class="i">+
+</a><a href="#h1-2-100" id="h1-2-100" class="i">+		for _, route := range vhost.Routes {
+</a><a href="#h1-2-101" id="h1-2-101" class="i">+			if route.Upstream == &quot;&quot; {
+</a> 				return &amp;util.Error{
+ 					Namespace: &quot;config&quot;,
+<a href="#h1-2-104" id="h1-2-104" class="d">-					Message:   &quot;health check interval must be a positive value&quot;,
+</a><a href="#h1-2-105" id="h1-2-105" class="i">+					Message:   &quot;route upstream name is missing&quot;,
+</a> 					Tags: map[string]interface{}{
+<a href="#h1-2-107" id="h1-2-107" class="d">-						&quot;name&quot;:     vhost.Name,
+</a><a href="#h1-2-108" id="h1-2-108" class="d">-						&quot;interval&quot;: vhost.Upstream.HealthCheck.Interval,
+</a><a href="#h1-2-109" id="h1-2-109" class="i">+						&quot;vhost&quot;:      vhost.Name,
+</a><a href="#h1-2-110" id="h1-2-110" class="i">+						&quot;candidates&quot;: upstreams,
+</a> 					},
+ 				}
+<a href="#h1-2-113" id="h1-2-113" class="d">-			} else if vhost.Upstream.Host == &quot;&quot; {
+</a><a href="#h1-2-114" id="h1-2-114" class="i">+			} else if _, ok := upstreams[route.Upstream]; !ok {
+</a> 				return &amp;util.Error{
+ 					Namespace: &quot;config&quot;,
+<a href="#h1-2-117" id="h1-2-117" class="d">-					Message:   &quot;upstream host must be configured when health checks are enabled&quot;,
+</a><a href="#h1-2-118" id="h1-2-118" class="i">+					Message:   &quot;unknown route upstream&quot;,
+</a> 					Tags: map[string]interface{}{
+<a href="#h1-2-120" id="h1-2-120" class="d">-						&quot;name&quot;: vhost.Name,
+</a><a href="#h1-2-121" id="h1-2-121" class="i">+						&quot;vhost&quot;:      vhost.Name,
+</a><a href="#h1-2-122" id="h1-2-122" class="i">+						&quot;upstream&quot;:   route.Upstream,
+</a><a href="#h1-2-123" id="h1-2-123" class="i">+						&quot;candidates&quot;: upstreams,
+</a> 					},
+ 				}
+ 			}
+<b>diff --git a/<a id="h2" href="../file/internal/config/types.go">internal/config/types.go</a> b/<a href="../file/internal/config/types.go">internal/config/types.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -97,6 +97,7 @@ type HealthCheck struct {
+</a> 
+ // Upstream describes one upstream HTTP server.
+ type Upstream struct {
+<a href="#h2-0-3" id="h2-0-3" class="i">+	Name        string             `yaml:&quot;name&quot;`
+</a> 	Address     *Address           `yaml:&quot;address&quot;`
+ 	Host        string             `yaml:&quot;host&quot;`
+ 	Proxy       *URL               `yaml:&quot;proxy&quot;`
+<a href="#h2-1" id="h2-1" class="h">@@ -106,12 +107,22 @@ type Upstream struct {
+</a> 	HealthCheck *HealthCheck       `yaml:&quot;health_check&quot;`
+ }
+ 
+<a href="#h2-1-3" id="h2-1-3" class="i">+// Route describes a routing policy for a request to an available upstream.
+</a><a href="#h2-1-4" id="h2-1-4" class="i">+type Route struct {
+</a><a href="#h2-1-5" id="h2-1-5" class="i">+	Upstream string `yaml:&quot;upstream&quot;`
+</a><a href="#h2-1-6" id="h2-1-6" class="i">+	Match    *struct {
+</a><a href="#h2-1-7" id="h2-1-7" class="i">+		Method *Regex `yaml:&quot;method&quot;`
+</a><a href="#h2-1-8" id="h2-1-8" class="i">+		Path   *Regex `yaml:&quot;path&quot;`
+</a><a href="#h2-1-9" id="h2-1-9" class="i">+	} `yaml:&quot;match&quot;`
+</a><a href="#h2-1-10" id="h2-1-10" class="i">+}
+</a><a href="#h2-1-11" id="h2-1-11" class="i">+
+</a> // VirtualHost describes one virtual host served by the server.
+ type VirtualHost struct {
+<a href="#h2-1-14" id="h2-1-14" class="d">-	Name     string    `yaml:&quot;name&quot;`
+</a><a href="#h2-1-15" id="h2-1-15" class="d">-	Host     *Regex    `yaml:&quot;host&quot;`
+</a><a href="#h2-1-16" id="h2-1-16" class="d">-	Upstream *Upstream `yaml:&quot;upstream&quot;`
+</a><a href="#h2-1-17" id="h2-1-17" class="d">-	Filters  []*Filter `yaml:&quot;filters&quot;`
+</a><a href="#h2-1-18" id="h2-1-18" class="i">+	Name      string      `yaml:&quot;name&quot;`
+</a><a href="#h2-1-19" id="h2-1-19" class="i">+	Host      *Regex      `yaml:&quot;host&quot;`
+</a><a href="#h2-1-20" id="h2-1-20" class="i">+	Upstreams []*Upstream `yaml:&quot;upstreams&quot;`
+</a><a href="#h2-1-21" id="h2-1-21" class="i">+	Routes    []*Route    `yaml:&quot;routes&quot;`
+</a><a href="#h2-1-22" id="h2-1-22" class="i">+	Filters   []*Filter   `yaml:&quot;filters&quot;`
+</a> }
+ 
+ // TLSCertificate describes a the paths to a single TLS server key and certificate.
+</pre>
+</div>
+</body>
+</html>

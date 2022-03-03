@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/middleware/filters: Represent Unix socket client transports with remote IP @ in log filter - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/3cdbe85788806c195209993e898652921b7faf67">3cdbe85788806c195209993e898652921b7faf67</a>
+<b>parent</b> <a href="../commit/a3911f1250e313e9e090c5b41c31abcf9bd03ba3">a3911f1250e313e9e090c5b41c31abcf9bd03ba3</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sun 14 Nov 2021 10:56:57 -0800
+
+internal/middleware/filters: Represent Unix socket client transports with remote IP @ in log filter
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/middleware/filters/log.go</a></td><td> | </td><td class="num">18</td><td><span class="i">+++++++++++</span><span class="d">-------</span></td></tr>
+</table></pre><pre>1 file changed, 11 insertions(+), 7 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/middleware/filters/log.go">internal/middleware/filters/log.go</a> b/<a href="../file/internal/middleware/filters/log.go">internal/middleware/filters/log.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -155,13 +155,17 @@ func (l *log) ProcessResponse(proxyResp *http.Response) (*http.Response, error) 
+</a> 	stopwatch := proxyResp.Request.Context().Value(ctxLogStopwatch).(*lib.Stopwatch)
+ 	originalURL := proxyResp.Request.Context().Value(ctxLogOriginalURL).(*url.URL)
+ 
+<a href="#h0-0-3" id="h0-0-3" class="d">-	clientIP, _, err := net.SplitHostPort(proxyResp.Request.RemoteAddr)
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+	remoteIP, _, err := net.SplitHostPort(proxyResp.Request.RemoteAddr)
+</a> 	if err != nil {
+<a href="#h0-0-6" id="h0-0-6" class="d">-		return proxyResp, &amp;util.Error{
+</a><a href="#h0-0-7" id="h0-0-7" class="d">-			Namespace:    &quot;filters&quot;,
+</a><a href="#h0-0-8" id="h0-0-8" class="d">-			Message:      &quot;unable to parse client remote address&quot;,
+</a><a href="#h0-0-9" id="h0-0-9" class="d">-			Tags:         map[string]interface{}{&quot;address&quot;: proxyResp.Request.RemoteAddr},
+</a><a href="#h0-0-10" id="h0-0-10" class="d">-			StackedError: err,
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+		if proxyResp.Request.RemoteAddr == &quot;@&quot; {
+</a><a href="#h0-0-12" id="h0-0-12" class="i">+			remoteIP = &quot;@&quot; // Special address for Unix socket transports
+</a><a href="#h0-0-13" id="h0-0-13" class="i">+		} else {
+</a><a href="#h0-0-14" id="h0-0-14" class="i">+			return proxyResp, &amp;util.Error{
+</a><a href="#h0-0-15" id="h0-0-15" class="i">+				Namespace:    &quot;filters&quot;,
+</a><a href="#h0-0-16" id="h0-0-16" class="i">+				Message:      &quot;unable to parse client remote address&quot;,
+</a><a href="#h0-0-17" id="h0-0-17" class="i">+				Tags:         map[string]interface{}{&quot;address&quot;: proxyResp.Request.RemoteAddr},
+</a><a href="#h0-0-18" id="h0-0-18" class="i">+				StackedError: err,
+</a><a href="#h0-0-19" id="h0-0-19" class="i">+			}
+</a> 		}
+ 	}
+ 
+<a href="#h0-1" id="h0-1" class="h">@@ -180,7 +184,7 @@ func (l *log) ProcessResponse(proxyResp *http.Response) (*http.Response, error) 
+</a> 		Host:         originalURL.Host,
+ 		Path:         originalURL.Path,
+ 		StatusCode:   proxyResp.StatusCode,
+<a href="#h0-1-3" id="h0-1-3" class="d">-		RemoteIP:     clientIP,
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+		RemoteIP:     remoteIP,
+</a> 		RequestSize:  proxyResp.Request.ContentLength,
+ 		ResponseSize: proxyResp.ContentLength,
+ 		UserAgent:    proxyResp.Request.UserAgent(),
+</pre>
+</div>
+</body>
+</html>

@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/config: Application config schema - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/e1ce0209a4601ed20f411c4d3d227598341a953d">e1ce0209a4601ed20f411c4d3d227598341a953d</a>
+<b>parent</b> <a href="../commit/80dac9834f4363556bf9aaeda7788525408442b4">80dac9834f4363556bf9aaeda7788525408442b4</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sat 30 Jan 2021 14:56:24 -0800
+
+internal/config: Application config schema
+
+<b>Diffstat:</b>
+<table><tr><td class="A">A</td><td><a href="#h0">internal/config/config.go</a></td><td> | </td><td class="num">66</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="A">A</td><td><a href="#h1">internal/config/data.go</a></td><td> | </td><td class="num">70</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="A">A</td><td><a href="#h2">internal/config/types.go</a></td><td> | </td><td class="num">56</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+</table></pre><pre>3 files changed, 192 insertions(+), 0 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/config/config.go">internal/config/config.go</a> b/<a href="../file/internal/config/config.go">internal/config/config.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -0,0 +1,66 @@
+</a><a href="#h0-0-0" id="h0-0-0" class="i">+package config
+</a><a href="#h0-0-1" id="h0-0-1" class="i">+
+</a><a href="#h0-0-2" id="h0-0-2" class="i">+import (
+</a><a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;io/ioutil&quot;
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+	&quot;gopkg.in/yaml.v3&quot;
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+	&quot;courier/internal/util&quot;
+</a><a href="#h0-0-8" id="h0-0-8" class="i">+)
+</a><a href="#h0-0-9" id="h0-0-9" class="i">+
+</a><a href="#h0-0-10" id="h0-0-10" class="i">+// New creates a configuration object from a path on disk.
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+func New(path string) (*Config, error) {
+</a><a href="#h0-0-12" id="h0-0-12" class="i">+	data, err := ioutil.ReadFile(path)
+</a><a href="#h0-0-13" id="h0-0-13" class="i">+	if err != nil {
+</a><a href="#h0-0-14" id="h0-0-14" class="i">+		return nil, &amp;util.Error{
+</a><a href="#h0-0-15" id="h0-0-15" class="i">+			Namespace: &quot;config&quot;,
+</a><a href="#h0-0-16" id="h0-0-16" class="i">+			Message:   &quot;error reading config file from disk&quot;,
+</a><a href="#h0-0-17" id="h0-0-17" class="i">+			Tags: map[string]interface{}{
+</a><a href="#h0-0-18" id="h0-0-18" class="i">+				&quot;path&quot;: path,
+</a><a href="#h0-0-19" id="h0-0-19" class="i">+			},
+</a><a href="#h0-0-20" id="h0-0-20" class="i">+			StackedError: err,
+</a><a href="#h0-0-21" id="h0-0-21" class="i">+		}
+</a><a href="#h0-0-22" id="h0-0-22" class="i">+	}
+</a><a href="#h0-0-23" id="h0-0-23" class="i">+
+</a><a href="#h0-0-24" id="h0-0-24" class="i">+	var cfg *Config
+</a><a href="#h0-0-25" id="h0-0-25" class="i">+	if err := yaml.Unmarshal(data, &amp;cfg); err != nil {
+</a><a href="#h0-0-26" id="h0-0-26" class="i">+		return nil, &amp;util.Error{
+</a><a href="#h0-0-27" id="h0-0-27" class="i">+			Namespace: &quot;config&quot;,
+</a><a href="#h0-0-28" id="h0-0-28" class="i">+			Message:   &quot;error deserializing config file contents&quot;,
+</a><a href="#h0-0-29" id="h0-0-29" class="i">+			Tags: map[string]interface{}{
+</a><a href="#h0-0-30" id="h0-0-30" class="i">+				&quot;path&quot;: path,
+</a><a href="#h0-0-31" id="h0-0-31" class="i">+			},
+</a><a href="#h0-0-32" id="h0-0-32" class="i">+			StackedError: err,
+</a><a href="#h0-0-33" id="h0-0-33" class="i">+		}
+</a><a href="#h0-0-34" id="h0-0-34" class="i">+	}
+</a><a href="#h0-0-35" id="h0-0-35" class="i">+
+</a><a href="#h0-0-36" id="h0-0-36" class="i">+	if err := cfg.Validate(); err != nil {
+</a><a href="#h0-0-37" id="h0-0-37" class="i">+		return nil, &amp;util.Error{
+</a><a href="#h0-0-38" id="h0-0-38" class="i">+			Namespace: &quot;config&quot;,
+</a><a href="#h0-0-39" id="h0-0-39" class="i">+			Message:   &quot;error validating config&quot;,
+</a><a href="#h0-0-40" id="h0-0-40" class="i">+			Tags: map[string]interface{}{
+</a><a href="#h0-0-41" id="h0-0-41" class="i">+				&quot;path&quot;: path,
+</a><a href="#h0-0-42" id="h0-0-42" class="i">+			},
+</a><a href="#h0-0-43" id="h0-0-43" class="i">+			StackedError: err,
+</a><a href="#h0-0-44" id="h0-0-44" class="i">+		}
+</a><a href="#h0-0-45" id="h0-0-45" class="i">+	}
+</a><a href="#h0-0-46" id="h0-0-46" class="i">+
+</a><a href="#h0-0-47" id="h0-0-47" class="i">+	return cfg, nil
+</a><a href="#h0-0-48" id="h0-0-48" class="i">+}
+</a><a href="#h0-0-49" id="h0-0-49" class="i">+
+</a><a href="#h0-0-50" id="h0-0-50" class="i">+// Validate validates the configuration.
+</a><a href="#h0-0-51" id="h0-0-51" class="i">+func (c *Config) Validate() error {
+</a><a href="#h0-0-52" id="h0-0-52" class="i">+	if c.Server == nil {
+</a><a href="#h0-0-53" id="h0-0-53" class="i">+		return &amp;util.Error{
+</a><a href="#h0-0-54" id="h0-0-54" class="i">+			Namespace: &quot;config&quot;,
+</a><a href="#h0-0-55" id="h0-0-55" class="i">+			Message:   &quot;missing server configuration&quot;,
+</a><a href="#h0-0-56" id="h0-0-56" class="i">+		}
+</a><a href="#h0-0-57" id="h0-0-57" class="i">+	} else if c.Server.ListenAddr == &quot;&quot; {
+</a><a href="#h0-0-58" id="h0-0-58" class="i">+		return &amp;util.Error{
+</a><a href="#h0-0-59" id="h0-0-59" class="i">+			Namespace: &quot;config&quot;,
+</a><a href="#h0-0-60" id="h0-0-60" class="i">+			Message:   &quot;missing server listen address&quot;,
+</a><a href="#h0-0-61" id="h0-0-61" class="i">+		}
+</a><a href="#h0-0-62" id="h0-0-62" class="i">+	}
+</a><a href="#h0-0-63" id="h0-0-63" class="i">+
+</a><a href="#h0-0-64" id="h0-0-64" class="i">+	return nil
+</a><a href="#h0-0-65" id="h0-0-65" class="i">+}
+</a><b>diff --git a/<a id="h1" href="../file/internal/config/data.go">internal/config/data.go</a> b/<a href="../file/internal/config/data.go">internal/config/data.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -0,0 +1,70 @@
+</a><a href="#h1-0-0" id="h1-0-0" class="i">+package config
+</a><a href="#h1-0-1" id="h1-0-1" class="i">+
+</a><a href="#h1-0-2" id="h1-0-2" class="i">+import (
+</a><a href="#h1-0-3" id="h1-0-3" class="i">+	&quot;net/url&quot;
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+	&quot;regexp&quot;
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+	&quot;strings&quot;
+</a><a href="#h1-0-6" id="h1-0-6" class="i">+
+</a><a href="#h1-0-7" id="h1-0-7" class="i">+	&quot;gopkg.in/yaml.v3&quot;
+</a><a href="#h1-0-8" id="h1-0-8" class="i">+
+</a><a href="#h1-0-9" id="h1-0-9" class="i">+	&quot;courier/internal/util&quot;
+</a><a href="#h1-0-10" id="h1-0-10" class="i">+)
+</a><a href="#h1-0-11" id="h1-0-11" class="i">+
+</a><a href="#h1-0-12" id="h1-0-12" class="i">+// Regex is YAML node with a regular expression.
+</a><a href="#h1-0-13" id="h1-0-13" class="i">+type Regex struct {
+</a><a href="#h1-0-14" id="h1-0-14" class="i">+	*regexp.Regexp
+</a><a href="#h1-0-15" id="h1-0-15" class="i">+}
+</a><a href="#h1-0-16" id="h1-0-16" class="i">+
+</a><a href="#h1-0-17" id="h1-0-17" class="i">+// URL is a YAML node with a URL.
+</a><a href="#h1-0-18" id="h1-0-18" class="i">+type URL struct {
+</a><a href="#h1-0-19" id="h1-0-19" class="i">+	*url.URL
+</a><a href="#h1-0-20" id="h1-0-20" class="i">+}
+</a><a href="#h1-0-21" id="h1-0-21" class="i">+
+</a><a href="#h1-0-22" id="h1-0-22" class="i">+// UnmarshalYAML attempts to parse the node&#39;s string contents as either a regular expression or a
+</a><a href="#h1-0-23" id="h1-0-23" class="i">+// string literal.
+</a><a href="#h1-0-24" id="h1-0-24" class="i">+func (r *Regex) UnmarshalYAML(node *yaml.Node) error {
+</a><a href="#h1-0-25" id="h1-0-25" class="i">+	var value string
+</a><a href="#h1-0-26" id="h1-0-26" class="i">+
+</a><a href="#h1-0-27" id="h1-0-27" class="i">+	// By convention, regex-interpreted hostnames in config are surrounded with forward slashes.
+</a><a href="#h1-0-28" id="h1-0-28" class="i">+	// Hostnames that lack this structure should be treated as literals for exact matching.
+</a><a href="#h1-0-29" id="h1-0-29" class="i">+	if len(node.Value) &gt; 2 &amp;&amp; strings.HasPrefix(node.Value, &quot;/&quot;) &amp;&amp; strings.HasSuffix(node.Value, &quot;/&quot;) {
+</a><a href="#h1-0-30" id="h1-0-30" class="i">+		value = node.Value[1 : len(node.Value)-1]
+</a><a href="#h1-0-31" id="h1-0-31" class="i">+	} else {
+</a><a href="#h1-0-32" id="h1-0-32" class="i">+		value = regexp.QuoteMeta(node.Value)
+</a><a href="#h1-0-33" id="h1-0-33" class="i">+	}
+</a><a href="#h1-0-34" id="h1-0-34" class="i">+
+</a><a href="#h1-0-35" id="h1-0-35" class="i">+	re, err := regexp.Compile(value)
+</a><a href="#h1-0-36" id="h1-0-36" class="i">+	if err != nil {
+</a><a href="#h1-0-37" id="h1-0-37" class="i">+		return &amp;util.Error{
+</a><a href="#h1-0-38" id="h1-0-38" class="i">+			Namespace: &quot;config&quot;,
+</a><a href="#h1-0-39" id="h1-0-39" class="i">+			Message:   &quot;failed to parse regular expression&quot;,
+</a><a href="#h1-0-40" id="h1-0-40" class="i">+			Tags: map[string]interface{}{
+</a><a href="#h1-0-41" id="h1-0-41" class="i">+				&quot;host&quot;: value,
+</a><a href="#h1-0-42" id="h1-0-42" class="i">+			},
+</a><a href="#h1-0-43" id="h1-0-43" class="i">+			StackedError: err,
+</a><a href="#h1-0-44" id="h1-0-44" class="i">+		}
+</a><a href="#h1-0-45" id="h1-0-45" class="i">+	}
+</a><a href="#h1-0-46" id="h1-0-46" class="i">+
+</a><a href="#h1-0-47" id="h1-0-47" class="i">+	r.Regexp = re
+</a><a href="#h1-0-48" id="h1-0-48" class="i">+
+</a><a href="#h1-0-49" id="h1-0-49" class="i">+	return nil
+</a><a href="#h1-0-50" id="h1-0-50" class="i">+}
+</a><a href="#h1-0-51" id="h1-0-51" class="i">+
+</a><a href="#h1-0-52" id="h1-0-52" class="i">+// UnmarshalYAML attempts to parse the node&#39;s string contents as a URL.
+</a><a href="#h1-0-53" id="h1-0-53" class="i">+func (u *URL) UnmarshalYAML(node *yaml.Node) error {
+</a><a href="#h1-0-54" id="h1-0-54" class="i">+	parsed, err := url.Parse(node.Value)
+</a><a href="#h1-0-55" id="h1-0-55" class="i">+	if err != nil {
+</a><a href="#h1-0-56" id="h1-0-56" class="i">+		return &amp;util.Error{
+</a><a href="#h1-0-57" id="h1-0-57" class="i">+			Namespace: &quot;config&quot;,
+</a><a href="#h1-0-58" id="h1-0-58" class="i">+			Message:   &quot;failed to parse upstream URL&quot;,
+</a><a href="#h1-0-59" id="h1-0-59" class="i">+			Tags: map[string]interface{}{
+</a><a href="#h1-0-60" id="h1-0-60" class="i">+				&quot;upstream&quot;: node.Value,
+</a><a href="#h1-0-61" id="h1-0-61" class="i">+			},
+</a><a href="#h1-0-62" id="h1-0-62" class="i">+			StackedError: err,
+</a><a href="#h1-0-63" id="h1-0-63" class="i">+		}
+</a><a href="#h1-0-64" id="h1-0-64" class="i">+	}
+</a><a href="#h1-0-65" id="h1-0-65" class="i">+
+</a><a href="#h1-0-66" id="h1-0-66" class="i">+	u.URL = parsed
+</a><a href="#h1-0-67" id="h1-0-67" class="i">+
+</a><a href="#h1-0-68" id="h1-0-68" class="i">+	return nil
+</a><a href="#h1-0-69" id="h1-0-69" class="i">+}
+</a><b>diff --git a/<a id="h2" href="../file/internal/config/types.go">internal/config/types.go</a> b/<a href="../file/internal/config/types.go">internal/config/types.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -0,0 +1,56 @@
+</a><a href="#h2-0-0" id="h2-0-0" class="i">+package config
+</a><a href="#h2-0-1" id="h2-0-1" class="i">+
+</a><a href="#h2-0-2" id="h2-0-2" class="i">+import (
+</a><a href="#h2-0-3" id="h2-0-3" class="i">+	&quot;time&quot;
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+
+</a><a href="#h2-0-5" id="h2-0-5" class="i">+	&quot;gopkg.in/yaml.v3&quot;
+</a><a href="#h2-0-6" id="h2-0-6" class="i">+)
+</a><a href="#h2-0-7" id="h2-0-7" class="i">+
+</a><a href="#h2-0-8" id="h2-0-8" class="i">+// Filter describes universal configuration for a request filter.
+</a><a href="#h2-0-9" id="h2-0-9" class="i">+type Filter struct {
+</a><a href="#h2-0-10" id="h2-0-10" class="i">+	Name   string    `yaml:&quot;name&quot;`
+</a><a href="#h2-0-11" id="h2-0-11" class="i">+	Type   string    `yaml:&quot;type&quot;`
+</a><a href="#h2-0-12" id="h2-0-12" class="i">+	Params yaml.Node `yaml:&quot;params&quot;`
+</a><a href="#h2-0-13" id="h2-0-13" class="i">+}
+</a><a href="#h2-0-14" id="h2-0-14" class="i">+
+</a><a href="#h2-0-15" id="h2-0-15" class="i">+// UpstreamConnection describes configuration for an upstream connection from the server.
+</a><a href="#h2-0-16" id="h2-0-16" class="i">+type UpstreamConnection struct {
+</a><a href="#h2-0-17" id="h2-0-17" class="i">+	ConnectTimeout      time.Duration `yaml:&quot;connect_timeout&quot;`
+</a><a href="#h2-0-18" id="h2-0-18" class="i">+	TLSHandshakeTimeout time.Duration `yaml:&quot;tls_handshake_timeout&quot;`
+</a><a href="#h2-0-19" id="h2-0-19" class="i">+	ReadTimeout         time.Duration `yaml:&quot;read_timeout&quot;`
+</a><a href="#h2-0-20" id="h2-0-20" class="i">+	WriteTimeout        time.Duration `yaml:&quot;write_timeout&quot;`
+</a><a href="#h2-0-21" id="h2-0-21" class="i">+}
+</a><a href="#h2-0-22" id="h2-0-22" class="i">+
+</a><a href="#h2-0-23" id="h2-0-23" class="i">+// ServerConnection describes configuration for a downstream connection from a client.
+</a><a href="#h2-0-24" id="h2-0-24" class="i">+type ServerConnection struct {
+</a><a href="#h2-0-25" id="h2-0-25" class="i">+	ReadTimeout  time.Duration `yaml:&quot;read_timeout&quot;`
+</a><a href="#h2-0-26" id="h2-0-26" class="i">+	WriteTimeout time.Duration `yaml:&quot;write_timeout&quot;`
+</a><a href="#h2-0-27" id="h2-0-27" class="i">+}
+</a><a href="#h2-0-28" id="h2-0-28" class="i">+
+</a><a href="#h2-0-29" id="h2-0-29" class="i">+// VirtualHost describes one virtual host served by the server.
+</a><a href="#h2-0-30" id="h2-0-30" class="i">+type VirtualHost struct {
+</a><a href="#h2-0-31" id="h2-0-31" class="i">+	Name       string              `yaml:&quot;name&quot;`
+</a><a href="#h2-0-32" id="h2-0-32" class="i">+	Host       *Regex              `yaml:&quot;host&quot;`
+</a><a href="#h2-0-33" id="h2-0-33" class="i">+	Upstream   *URL                `yaml:&quot;upstream&quot;`
+</a><a href="#h2-0-34" id="h2-0-34" class="i">+	Connection *UpstreamConnection `yaml:&quot;connection&quot;`
+</a><a href="#h2-0-35" id="h2-0-35" class="i">+	Filters    []*Filter           `yaml:&quot;filters&quot;`
+</a><a href="#h2-0-36" id="h2-0-36" class="i">+}
+</a><a href="#h2-0-37" id="h2-0-37" class="i">+
+</a><a href="#h2-0-38" id="h2-0-38" class="i">+// TLSContext describes the keys and certificates for TLS origination or termination.
+</a><a href="#h2-0-39" id="h2-0-39" class="i">+type TLSContext struct {
+</a><a href="#h2-0-40" id="h2-0-40" class="i">+	Key         string `yaml:&quot;key&quot;`
+</a><a href="#h2-0-41" id="h2-0-41" class="i">+	Certificate string `yaml:&quot;certificate&quot;`
+</a><a href="#h2-0-42" id="h2-0-42" class="i">+}
+</a><a href="#h2-0-43" id="h2-0-43" class="i">+
+</a><a href="#h2-0-44" id="h2-0-44" class="i">+// Server describes configuration for the server.
+</a><a href="#h2-0-45" id="h2-0-45" class="i">+type Server struct {
+</a><a href="#h2-0-46" id="h2-0-46" class="i">+	ListenAddr string            `yaml:&quot;listen_addr&quot;`
+</a><a href="#h2-0-47" id="h2-0-47" class="i">+	Connection *ServerConnection `yaml:&quot;connection&quot;`
+</a><a href="#h2-0-48" id="h2-0-48" class="i">+	TLSContext *TLSContext       `yaml:&quot;tls_context&quot;`
+</a><a href="#h2-0-49" id="h2-0-49" class="i">+}
+</a><a href="#h2-0-50" id="h2-0-50" class="i">+
+</a><a href="#h2-0-51" id="h2-0-51" class="i">+// Config is the top-level application config.
+</a><a href="#h2-0-52" id="h2-0-52" class="i">+type Config struct {
+</a><a href="#h2-0-53" id="h2-0-53" class="i">+	Server       *Server        `yaml:&quot;server&quot;`
+</a><a href="#h2-0-54" id="h2-0-54" class="i">+	VirtualHosts []*VirtualHost `yaml:&quot;virtual_hosts&quot;`
+</a><a href="#h2-0-55" id="h2-0-55" class="i">+}
+</a></pre>
+</div>
+</body>
+</html>

@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/middleware/filters: Pluggable compression interface and support for deflate/zlib - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/ee7dceb930f37c11d16f00789861c099c67cf71a">ee7dceb930f37c11d16f00789861c099c67cf71a</a>
+<b>parent</b> <a href="../commit/14157e3f98c41ed5b2accda12e1ea35db076351c">14157e3f98c41ed5b2accda12e1ea35db076351c</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Fri 26 Feb 2021 23:20:12 -0800
+
+internal/middleware/filters: Pluggable compression interface and support for deflate/zlib
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/middleware/filters/compression.go</a></td><td> | </td><td class="num">46</td><td><span class="i">++++++++++++++++++++++++++++++++++</span><span class="d">------------</span></td></tr>
+</table></pre><pre>1 file changed, 34 insertions(+), 12 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/middleware/filters/compression.go">internal/middleware/filters/compression.go</a> b/<a href="../file/internal/middleware/filters/compression.go">internal/middleware/filters/compression.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -2,6 +2,7 @@ package filters
+</a> 
+ import (
+ 	&quot;compress/gzip&quot;
+<a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;compress/zlib&quot;
+</a> 	&quot;io&quot;
+ 	&quot;net/http&quot;
+ 	&quot;sort&quot;
+<a href="#h0-1" id="h0-1" class="h">@@ -18,6 +19,7 @@ const (
+</a> 	algorithmWildcard = &quot;*&quot;
+ 	algorithmIdentity = &quot;identity&quot;
+ 	algorithmGzip     = &quot;gzip&quot;
+<a href="#h0-1-3" id="h0-1-3" class="i">+	algorithmDeflate  = &quot;deflate&quot;
+</a> )
+ 
+ // compressionParams is the configuration descriptor for the compression filter.
+<a href="#h0-2" id="h0-2" class="h">@@ -79,7 +81,21 @@ func (c *compression) ProcessResponse(proxyResp *http.Response) (*http.Response,
+</a> 	for _, encoding := range encodings {
+ 		switch encoding.Value {
+ 		case algorithmWildcard, algorithmGzip:
+<a href="#h0-2-3" id="h0-2-3" class="d">-			return c.processGzipResponse(proxyResp)
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+			return c.processCompressedResponse(
+</a><a href="#h0-2-5" id="h0-2-5" class="i">+				proxyResp,
+</a><a href="#h0-2-6" id="h0-2-6" class="i">+				algorithmGzip,
+</a><a href="#h0-2-7" id="h0-2-7" class="i">+				func(writer io.Writer, level int) (io.WriteCloser, error) {
+</a><a href="#h0-2-8" id="h0-2-8" class="i">+					return gzip.NewWriterLevel(writer, level)
+</a><a href="#h0-2-9" id="h0-2-9" class="i">+				},
+</a><a href="#h0-2-10" id="h0-2-10" class="i">+			)
+</a><a href="#h0-2-11" id="h0-2-11" class="i">+		case algorithmDeflate:
+</a><a href="#h0-2-12" id="h0-2-12" class="i">+			return c.processCompressedResponse(
+</a><a href="#h0-2-13" id="h0-2-13" class="i">+				proxyResp,
+</a><a href="#h0-2-14" id="h0-2-14" class="i">+				algorithmDeflate,
+</a><a href="#h0-2-15" id="h0-2-15" class="i">+				func(writer io.Writer, level int) (io.WriteCloser, error) {
+</a><a href="#h0-2-16" id="h0-2-16" class="i">+					return zlib.NewWriterLevel(writer, level)
+</a><a href="#h0-2-17" id="h0-2-17" class="i">+				},
+</a><a href="#h0-2-18" id="h0-2-18" class="i">+			)
+</a> 		case algorithmIdentity:
+ 			return proxyResp, nil
+ 		}
+<a href="#h0-3" id="h0-3" class="h">@@ -95,35 +111,41 @@ func (c *compression) ProcessResponse(proxyResp *http.Response) (*http.Response,
+</a> 	return proxyResp, nil
+ }
+ 
+<a href="#h0-3-3" id="h0-3-3" class="d">-// processGzipResponse applies gzip compression to the response.
+</a><a href="#h0-3-4" id="h0-3-4" class="d">-func (c *compression) processGzipResponse(proxyResp *http.Response) (*http.Response, error) {
+</a><a href="#h0-3-5" id="h0-3-5" class="d">-	var gzipWriter io.WriteCloser
+</a><a href="#h0-3-6" id="h0-3-6" class="i">+// processCompressedResponse applies compression to the response body based on the pluggable
+</a><a href="#h0-3-7" id="h0-3-7" class="i">+// compressor factory.
+</a><a href="#h0-3-8" id="h0-3-8" class="i">+func (c *compression) processCompressedResponse(
+</a><a href="#h0-3-9" id="h0-3-9" class="i">+	proxyResp *http.Response,
+</a><a href="#h0-3-10" id="h0-3-10" class="i">+	name string,
+</a><a href="#h0-3-11" id="h0-3-11" class="i">+	compressorFactory func(io.Writer, int) (io.WriteCloser, error),
+</a><a href="#h0-3-12" id="h0-3-12" class="i">+) (*http.Response, error) {
+</a><a href="#h0-3-13" id="h0-3-13" class="i">+	var compressionWriter io.WriteCloser
+</a> 
+ 	proxyResp.Header.Del(&quot;Content-Length&quot;) // The original body length is no longer accurate.
+<a href="#h0-3-16" id="h0-3-16" class="d">-	proxyResp.Header.Set(&quot;Content-Encoding&quot;, algorithmGzip)
+</a><a href="#h0-3-17" id="h0-3-17" class="i">+	proxyResp.Header.Set(&quot;Content-Encoding&quot;, name)
+</a> 
+ 	respBody := proxyResp.Body
+<a href="#h0-3-20" id="h0-3-20" class="d">-	proxyResp.Body, gzipWriter = io.Pipe()
+</a><a href="#h0-3-21" id="h0-3-21" class="d">-	rawWriter, err := gzip.NewWriterLevel(gzipWriter, c.params.Level)
+</a><a href="#h0-3-22" id="h0-3-22" class="i">+	proxyResp.Body, compressionWriter = io.Pipe()
+</a><a href="#h0-3-23" id="h0-3-23" class="i">+	rawWriter, err := compressorFactory(compressionWriter, c.params.Level)
+</a> 
+ 	if err != nil {
+ 		return nil, &amp;util.Error{
+ 			Namespace:    &quot;filters&quot;,
+<a href="#h0-3-28" id="h0-3-28" class="d">-			Message:      &quot;error creating gzip compression writer&quot;,
+</a><a href="#h0-3-29" id="h0-3-29" class="i">+			Message:      &quot;error creating compression writer&quot;,
+</a> 			StackedError: err,
+ 		}
+ 	}
+ 
+ 	go func() {
+<a href="#h0-3-35" id="h0-3-35" class="d">-		// Directly pipe the original response body into a gzip writer. The output of the
+</a><a href="#h0-3-36" id="h0-3-36" class="d">-		// gzip writer is then piped directly into a reader for the final response body.
+</a><a href="#h0-3-37" id="h0-3-37" class="i">+		// Directly pipe the original response body into the compression writer. The output
+</a><a href="#h0-3-38" id="h0-3-38" class="i">+		// of the compression writer is then piped directly into a reader for the final
+</a><a href="#h0-3-39" id="h0-3-39" class="i">+		// compressed response body.
+</a> 		_, err := io.Copy(rawWriter, respBody)
+ 		if err != nil {
+<a href="#h0-3-42" id="h0-3-42" class="d">-			zap.L().Error(&quot;error during gzip response pipe&quot;, zap.Error(err))
+</a><a href="#h0-3-43" id="h0-3-43" class="i">+			zap.L().Error(&quot;error during compression response pipe&quot;, zap.Error(err))
+</a> 		}
+ 
+ 		rawWriter.Close()
+<a href="#h0-3-47" id="h0-3-47" class="d">-		gzipWriter.Close()
+</a><a href="#h0-3-48" id="h0-3-48" class="i">+		compressionWriter.Close()
+</a> 		respBody.Close()
+ 	}()
+ 
+</pre>
+</div>
+</body>
+</html>

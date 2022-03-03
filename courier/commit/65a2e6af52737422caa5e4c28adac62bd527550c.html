@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/server: Classify internal proxy errors as upstream timeouts or unavailability - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/65a2e6af52737422caa5e4c28adac62bd527550c">65a2e6af52737422caa5e4c28adac62bd527550c</a>
+<b>parent</b> <a href="../commit/16cc6cb99cc10890db2059136625e68cd36ba961">16cc6cb99cc10890db2059136625e68cd36ba961</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Thu 18 Feb 2021 22:51:05 -0800
+
+internal/server: Classify internal proxy errors as upstream timeouts or unavailability
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/server/proxy.go</a></td><td> | </td><td class="num">45</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++</span><span class="d">---</span></td></tr>
+</table></pre><pre>1 file changed, 42 insertions(+), 3 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/server/proxy.go">internal/server/proxy.go</a> b/<a href="../file/internal/server/proxy.go">internal/server/proxy.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -2,7 +2,9 @@ package server
+</a> 
+ import (
+ 	&quot;context&quot;
+<a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;errors&quot;
+</a> 	&quot;io&quot;
+<a href="#h0-0-5" id="h0-0-5" class="i">+	&quot;net&quot;
+</a> 	&quot;net/http&quot;
+ 	&quot;net/http/httputil&quot;
+ 	&quot;sync/atomic&quot;
+<a href="#h0-1" id="h0-1" class="h">@@ -53,13 +55,27 @@ var (
+</a> 		statusCode: http.StatusBadGateway,
+ 		message:    &quot;upstream is marked unhealthy&quot;,
+ 	}
+<a href="#h0-1-3" id="h0-1-3" class="i">+	// errUpstreamTimeout is returned when the upstream service duration exceeds a provisioned
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+	// network-level timeout.
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+	errUpstreamTimeout = &amp;response{
+</a><a href="#h0-1-6" id="h0-1-6" class="i">+		statusCode: http.StatusGatewayTimeout,
+</a><a href="#h0-1-7" id="h0-1-7" class="i">+		message:    &quot;upstream request timeout&quot;,
+</a><a href="#h0-1-8" id="h0-1-8" class="i">+	}
+</a><a href="#h0-1-9" id="h0-1-9" class="i">+	// errUpstreamUnavailable is returned for non-transient upstream network connection errors.
+</a><a href="#h0-1-10" id="h0-1-10" class="i">+	errUpstreamUnavailable = &amp;response{
+</a><a href="#h0-1-11" id="h0-1-11" class="i">+		statusCode: http.StatusBadGateway,
+</a><a href="#h0-1-12" id="h0-1-12" class="i">+		message:    &quot;upstream connection error&quot;,
+</a><a href="#h0-1-13" id="h0-1-13" class="i">+	}
+</a> 	// errProxyInternal is returned when the HTTP proxy itself raises an error.
+ 	errProxyInternal = &amp;response{
+ 		statusCode: http.StatusServiceUnavailable,
+<a href="#h0-1-17" id="h0-1-17" class="d">-		message:    &quot;proxy request failed&quot;,
+</a><a href="#h0-1-18" id="h0-1-18" class="i">+		message:    &quot;unknown internal proxy failure&quot;,
+</a> 	}
+ )
+ 
+<a href="#h0-1-22" id="h0-1-22" class="i">+// internalErrorHandler is a convenience alias for httputil.ReverseProxy&#39;s ErrorHandler function.
+</a><a href="#h0-1-23" id="h0-1-23" class="i">+type internalErrorHandler func(proxyRW http.ResponseWriter, proxyReq *http.Request, err error)
+</a><a href="#h0-1-24" id="h0-1-24" class="i">+
+</a> // reverseProxy is an http.Handler that abstracts an httputil.ReverseProxy.
+ type reverseProxy struct {
+ 	vhosts []*config.VirtualHost
+<a href="#h0-2" id="h0-2" class="h">@@ -204,7 +220,7 @@ func (rp *reverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+</a> 		proxyResp, err = rp.filterChains[vhost.Name].ProcessResponse(proxyResp)
+ 		return err
+ 	}
+<a href="#h0-2-3" id="h0-2-3" class="d">-	rpErrorHandler := func(errResp *response) func(proxyRW http.ResponseWriter, proxyReq *http.Request, err error) {
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+	rpErrorHandler := func(errResp *response) internalErrorHandler {
+</a> 		return func(proxyRW http.ResponseWriter, proxyReq *http.Request, err error) {
+ 			metrics.Client.Incr(metricProxyError, tags)
+ 
+<a href="#h0-3" id="h0-3" class="h">@@ -301,7 +317,7 @@ func (rp *reverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+</a> 			// proxy has already been cascaded through all request filters.
+ 		},
+ 		ModifyResponse: rpModifyResponse,
+<a href="#h0-3-3" id="h0-3-3" class="d">-		ErrorHandler:   rpErrorHandler(errProxyInternal),
+</a><a href="#h0-3-4" id="h0-3-4" class="i">+		ErrorHandler:   rp.errorClassifierHandler(rpErrorHandler),
+</a> 		ErrorLog:       log.StdWarnLogger,
+ 	}
+ 
+<a href="#h0-4" id="h0-4" class="h">@@ -336,3 +352,26 @@ func (rp *reverseProxy) respond(rw http.ResponseWriter, resp *http.Response) err
+</a> 
+ 	return resp.Body.Close()
+ }
+<a href="#h0-4-3" id="h0-4-3" class="i">+
+</a><a href="#h0-4-4" id="h0-4-4" class="i">+// errorClassifierHandler is an internalErrorHandler that attempts to select the most semantically
+</a><a href="#h0-4-5" id="h0-4-5" class="i">+// meaningful response for an internal error raised by the reverse proxy.
+</a><a href="#h0-4-6" id="h0-4-6" class="i">+func (rp *reverseProxy) errorClassifierHandler(handler func(errResp *response) internalErrorHandler) internalErrorHandler {
+</a><a href="#h0-4-7" id="h0-4-7" class="i">+	var classifier func(error) *response
+</a><a href="#h0-4-8" id="h0-4-8" class="i">+
+</a><a href="#h0-4-9" id="h0-4-9" class="i">+	classifier = func(err error) *response {
+</a><a href="#h0-4-10" id="h0-4-10" class="i">+		if netErr, ok := err.(net.Error); ok &amp;&amp; netErr.Timeout() {
+</a><a href="#h0-4-11" id="h0-4-11" class="i">+			return errUpstreamTimeout
+</a><a href="#h0-4-12" id="h0-4-12" class="i">+		} else if _, ok := err.(*net.OpError); ok {
+</a><a href="#h0-4-13" id="h0-4-13" class="i">+			return errUpstreamUnavailable
+</a><a href="#h0-4-14" id="h0-4-14" class="i">+		} else if unwrapped := errors.Unwrap(err); unwrapped != nil {
+</a><a href="#h0-4-15" id="h0-4-15" class="i">+			// Identify the first meaningful error in the error stack.
+</a><a href="#h0-4-16" id="h0-4-16" class="i">+			return classifier(unwrapped)
+</a><a href="#h0-4-17" id="h0-4-17" class="i">+		}
+</a><a href="#h0-4-18" id="h0-4-18" class="i">+
+</a><a href="#h0-4-19" id="h0-4-19" class="i">+		return errProxyInternal
+</a><a href="#h0-4-20" id="h0-4-20" class="i">+	}
+</a><a href="#h0-4-21" id="h0-4-21" class="i">+
+</a><a href="#h0-4-22" id="h0-4-22" class="i">+	return func(proxyRW http.ResponseWriter, proxyReq *http.Request, err error) {
+</a><a href="#h0-4-23" id="h0-4-23" class="i">+		handler(classifier(err))(proxyRW, proxyReq, err)
+</a><a href="#h0-4-24" id="h0-4-24" class="i">+	}
+</a><a href="#h0-4-25" id="h0-4-25" class="i">+}
+</a></pre>
+</div>
+</body>
+</html>

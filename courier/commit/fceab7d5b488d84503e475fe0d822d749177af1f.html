@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/server: Change connection metric to report total cumulative in state - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/fceab7d5b488d84503e475fe0d822d749177af1f">fceab7d5b488d84503e475fe0d822d749177af1f</a>
+<b>parent</b> <a href="../commit/3fe2724a121b91d486f1a2b68f44f2c176ba1694">3fe2724a121b91d486f1a2b68f44f2c176ba1694</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Tue 16 Feb 2021 12:04:16 -0800
+
+internal/server: Change connection metric to report total cumulative in state
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/server/server.go</a></td><td> | </td><td class="num">38</td><td><span class="i">++++++++++++++++++</span><span class="d">--------------------</span></td></tr>
+</table></pre><pre>1 file changed, 18 insertions(+), 20 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/server/server.go">internal/server/server.go</a> b/<a href="../file/internal/server/server.go">internal/server/server.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -4,6 +4,7 @@ import (
+</a> 	&quot;context&quot;
+ 	&quot;net&quot;
+ 	&quot;net/http&quot;
+<a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;sync/atomic&quot;
+</a> 
+ 	&quot;go.uber.org/zap&quot;
+ 	&quot;golang.org/x/net/http2&quot;
+<a href="#h0-1" id="h0-1" class="h">@@ -17,7 +18,7 @@ import (
+</a> 
+ const (
+ 	metricConnectionStateTransition = &quot;server.connection.transition&quot;
+<a href="#h0-1-3" id="h0-1-3" class="d">-	metricConnectionVolume          = &quot;server.connection.volume&quot;
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+	metricConnectionStateTotal      = &quot;server.connection.total&quot;
+</a> )
+ 
+ // Server is the main Courier server entry point.
+<a href="#h0-2" id="h0-2" class="h">@@ -58,7 +59,12 @@ func (s *Server) Serve() error {
+</a> 
+ // serve starts a server for one listener specification.
+ func (s *Server) serve(listener *config.Listener) error {
+<a href="#h0-2-3" id="h0-2-3" class="d">-	activeConns := util.NewConcurrentMap()
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+	connStats := util.NewConcurrentMap()
+</a><a href="#h0-2-5" id="h0-2-5" class="i">+	connStats.Set(http.StateNew, new(int64))
+</a><a href="#h0-2-6" id="h0-2-6" class="i">+	connStats.Set(http.StateActive, new(int64))
+</a><a href="#h0-2-7" id="h0-2-7" class="i">+	connStats.Set(http.StateIdle, new(int64))
+</a><a href="#h0-2-8" id="h0-2-8" class="i">+	connStats.Set(http.StateHijacked, new(int64))
+</a><a href="#h0-2-9" id="h0-2-9" class="i">+	connStats.Set(http.StateClosed, new(int64))
+</a> 
+ 	handler := log.NewRequestLogHandler(h2c.NewHandler(s.rp, &amp;http2.Server{}))
+ 	server := &amp;http.Server{
+<a href="#h0-3" id="h0-3" class="h">@@ -69,27 +75,19 @@ func (s *Server) serve(listener *config.Listener) error {
+</a> 		IdleTimeout:       listener.Connection.IdleTimeout,
+ 		ErrorLog:          log.StdErrorLogger,
+ 		ConnState: func(conn net.Conn, state http.ConnState) {
+<a href="#h0-3-3" id="h0-3-3" class="d">-			switch state {
+</a><a href="#h0-3-4" id="h0-3-4" class="d">-			case http.StateActive:
+</a><a href="#h0-3-5" id="h0-3-5" class="d">-				activeConns.Set(conn, true)
+</a><a href="#h0-3-6" id="h0-3-6" class="d">-			case http.StateIdle, http.StateClosed:
+</a><a href="#h0-3-7" id="h0-3-7" class="d">-				activeConns.Delete(conn)
+</a><a href="#h0-3-8" id="h0-3-8" class="i">+			tags := map[string]interface{}{
+</a><a href="#h0-3-9" id="h0-3-9" class="i">+				&quot;listener&quot;: listener.Name,
+</a><a href="#h0-3-10" id="h0-3-10" class="i">+				&quot;state&quot;:    state.String(),
+</a> 			}
+ 
+<a href="#h0-3-13" id="h0-3-13" class="d">-			metrics.Client.Incr(
+</a><a href="#h0-3-14" id="h0-3-14" class="d">-				metricConnectionStateTransition,
+</a><a href="#h0-3-15" id="h0-3-15" class="d">-				map[string]interface{}{
+</a><a href="#h0-3-16" id="h0-3-16" class="d">-					&quot;listener&quot;: listener.Name,
+</a><a href="#h0-3-17" id="h0-3-17" class="d">-					&quot;state&quot;:    state.String(),
+</a><a href="#h0-3-18" id="h0-3-18" class="d">-				},
+</a><a href="#h0-3-19" id="h0-3-19" class="d">-			)
+</a><a href="#h0-3-20" id="h0-3-20" class="i">+			stateTotal, _ := connStats.Get(state)
+</a><a href="#h0-3-21" id="h0-3-21" class="i">+			atomic.AddInt64(stateTotal.(*int64), 1)
+</a><a href="#h0-3-22" id="h0-3-22" class="i">+
+</a><a href="#h0-3-23" id="h0-3-23" class="i">+			metrics.Client.Incr(metricConnectionStateTransition, tags)
+</a> 			metrics.Client.Gauge(
+<a href="#h0-3-25" id="h0-3-25" class="d">-				metricConnectionVolume,
+</a><a href="#h0-3-26" id="h0-3-26" class="d">-				float64(activeConns.Size()),
+</a><a href="#h0-3-27" id="h0-3-27" class="d">-				map[string]interface{}{
+</a><a href="#h0-3-28" id="h0-3-28" class="d">-					&quot;listener&quot;: listener.Name,
+</a><a href="#h0-3-29" id="h0-3-29" class="d">-					&quot;state&quot;:    &quot;active&quot;,
+</a><a href="#h0-3-30" id="h0-3-30" class="d">-				},
+</a><a href="#h0-3-31" id="h0-3-31" class="i">+				metricConnectionStateTotal,
+</a><a href="#h0-3-32" id="h0-3-32" class="i">+				float64(atomic.LoadInt64(stateTotal.(*int64))),
+</a><a href="#h0-3-33" id="h0-3-33" class="i">+				tags,
+</a> 			)
+ 		},
+ 		ConnContext: func(ctx context.Context, conn net.Conn) context.Context {
+</pre>
+</div>
+</body>
+</html>

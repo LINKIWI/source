@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/middleware/filters: Enhance metadata filter with proxy request headers - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/0e9ce62664e9112d0349eae5728710d7e4f88863">0e9ce62664e9112d0349eae5728710d7e4f88863</a>
+<b>parent</b> <a href="../commit/539c5d220f279f9f11e45921efda202538aecf9a">539c5d220f279f9f11e45921efda202538aecf9a</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Thu  4 Feb 2021 23:17:05 -0800
+
+internal/middleware/filters: Enhance metadata filter with proxy request headers
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/middleware/filters/metadata.go</a></td><td> | </td><td class="num">75</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">internal/middleware/filters/types.go</a></td><td> | </td><td class="num">2</td><td><span class="i">++</span><span class="d"></span></td></tr>
+</table></pre><pre>2 files changed, 65 insertions(+), 12 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/middleware/filters/metadata.go">internal/middleware/filters/metadata.go</a> b/<a href="../file/internal/middleware/filters/metadata.go">internal/middleware/filters/metadata.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -1,42 +1,93 @@
+</a> package filters
+ 
+ import (
+<a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;context&quot;
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+	&quot;net&quot;
+</a> 	&quot;net/http&quot;
+ 	&quot;os&quot;
+ 
+<a href="#h0-0-8" id="h0-0-8" class="i">+	&quot;go.uber.org/zap&quot;
+</a><a href="#h0-0-9" id="h0-0-9" class="i">+	&quot;lib.kevinlin.info/aperture/lib&quot;
+</a><a href="#h0-0-10" id="h0-0-10" class="i">+
+</a> 	&quot;courier/internal/config&quot;
+ 	&quot;courier/internal/meta&quot;
+ 	&quot;courier/internal/middleware&quot;
+ )
+ 
+<a href="#h0-0-16" id="h0-0-16" class="d">-// metadata adds Courier metadata to the outgoing response.
+</a><a href="#h0-0-17" id="h0-0-17" class="i">+const (
+</a><a href="#h0-0-18" id="h0-0-18" class="i">+	// Proxy request headers
+</a><a href="#h0-0-19" id="h0-0-19" class="i">+	headerHost           = &quot;X-Courier-Host&quot;
+</a><a href="#h0-0-20" id="h0-0-20" class="i">+	headerClientIP       = &quot;X-Courier-Client-IP&quot;
+</a><a href="#h0-0-21" id="h0-0-21" class="i">+	headerClientIdentity = &quot;X-Courier-Client-Identity&quot;
+</a><a href="#h0-0-22" id="h0-0-22" class="i">+	// Client response headers
+</a><a href="#h0-0-23" id="h0-0-23" class="i">+	headerVersion          = &quot;X-Courier-Version&quot;
+</a><a href="#h0-0-24" id="h0-0-24" class="i">+	headerServer           = &quot;X-Courier-Server&quot;
+</a><a href="#h0-0-25" id="h0-0-25" class="i">+	headerUpstreamDuration = &quot;X-Courier-Upstream-Duration&quot;
+</a><a href="#h0-0-26" id="h0-0-26" class="i">+)
+</a><a href="#h0-0-27" id="h0-0-27" class="i">+
+</a><a href="#h0-0-28" id="h0-0-28" class="i">+// metadata adds useful metadata as headers in the proxied request and outgoing response.
+</a> type metadata struct {
+ 	tags map[string]string
+<a href="#h0-0-31" id="h0-0-31" class="d">-	noop
+</a> }
+ 
+ // NewMetadata creates a new metadata filter.
+<a href="#h0-0-35" id="h0-0-35" class="d">-// Metadata information is retrieved once during initialization and reused for all proxied requests.
+</a> func NewMetadata(_ *config.Filter) (middleware.Filter, error) {
+ 	tags := map[string]string{
+<a href="#h0-0-38" id="h0-0-38" class="d">-		&quot;X-Courier-Version&quot;: meta.Version,
+</a><a href="#h0-0-39" id="h0-0-39" class="i">+		headerVersion: meta.Version,
+</a> 	}
+ 
+ 	if hostname, err := os.Hostname(); err == nil {
+<a href="#h0-0-43" id="h0-0-43" class="d">-		tags[&quot;X-Courier-Server&quot;] = hostname
+</a><a href="#h0-0-44" id="h0-0-44" class="i">+		tags[headerServer] = hostname
+</a><a href="#h0-0-45" id="h0-0-45" class="i">+	}
+</a><a href="#h0-0-46" id="h0-0-46" class="i">+
+</a><a href="#h0-0-47" id="h0-0-47" class="i">+	return &amp;metadata{tags: tags}, nil
+</a><a href="#h0-0-48" id="h0-0-48" class="i">+}
+</a><a href="#h0-0-49" id="h0-0-49" class="i">+
+</a><a href="#h0-0-50" id="h0-0-50" class="i">+// ProcessRequest sets headers in the outgoing proxy request with pertinent client request metadata.
+</a><a href="#h0-0-51" id="h0-0-51" class="i">+func (m *metadata) ProcessRequest(clientReq *http.Request) (*http.Request, *http.Response, error) {
+</a><a href="#h0-0-52" id="h0-0-52" class="i">+	ctx := context.WithValue(clientReq.Context(), ctxMetadataStopwatch, lib.NewStopwatch())
+</a><a href="#h0-0-53" id="h0-0-53" class="i">+
+</a><a href="#h0-0-54" id="h0-0-54" class="i">+	// First, strip any potential existing header values sent by mischievous clients seeking to
+</a><a href="#h0-0-55" id="h0-0-55" class="i">+	// override the headers generated by the proxy
+</a><a href="#h0-0-56" id="h0-0-56" class="i">+	clientReq.Header.Del(headerHost)
+</a><a href="#h0-0-57" id="h0-0-57" class="i">+	clientReq.Header.Del(headerClientIP)
+</a><a href="#h0-0-58" id="h0-0-58" class="i">+	clientReq.Header.Del(headerClientIdentity)
+</a><a href="#h0-0-59" id="h0-0-59" class="i">+
+</a><a href="#h0-0-60" id="h0-0-60" class="i">+	clientReq.Header.Set(headerHost, clientReq.Host)
+</a><a href="#h0-0-61" id="h0-0-61" class="i">+
+</a><a href="#h0-0-62" id="h0-0-62" class="i">+	clientIP, _, err := net.SplitHostPort(clientReq.RemoteAddr)
+</a><a href="#h0-0-63" id="h0-0-63" class="i">+	if err != nil {
+</a><a href="#h0-0-64" id="h0-0-64" class="i">+		zap.L().Error(
+</a><a href="#h0-0-65" id="h0-0-65" class="i">+			&quot;failed to parse client remote address&quot;,
+</a><a href="#h0-0-66" id="h0-0-66" class="i">+			zap.String(&quot;address&quot;, clientReq.RemoteAddr),
+</a><a href="#h0-0-67" id="h0-0-67" class="i">+		)
+</a><a href="#h0-0-68" id="h0-0-68" class="i">+	} else {
+</a><a href="#h0-0-69" id="h0-0-69" class="i">+		clientReq.Header.Set(headerClientIP, clientIP)
+</a> 	}
+ 
+<a href="#h0-0-72" id="h0-0-72" class="d">-	return &amp;metadata{
+</a><a href="#h0-0-73" id="h0-0-73" class="d">-		tags: tags,
+</a><a href="#h0-0-74" id="h0-0-74" class="d">-	}, nil
+</a><a href="#h0-0-75" id="h0-0-75" class="i">+	if clientReq.TLS != nil {
+</a><a href="#h0-0-76" id="h0-0-76" class="i">+		for _, peerCert := range clientReq.TLS.PeerCertificates {
+</a><a href="#h0-0-77" id="h0-0-77" class="i">+			for _, name := range peerCert.DNSNames {
+</a><a href="#h0-0-78" id="h0-0-78" class="i">+				clientReq.Header.Set(headerClientIdentity, name)
+</a><a href="#h0-0-79" id="h0-0-79" class="i">+			}
+</a><a href="#h0-0-80" id="h0-0-80" class="i">+		}
+</a><a href="#h0-0-81" id="h0-0-81" class="i">+	}
+</a><a href="#h0-0-82" id="h0-0-82" class="i">+
+</a><a href="#h0-0-83" id="h0-0-83" class="i">+	return clientReq.WithContext(ctx), nil, nil
+</a> }
+ 
+ // ProcessResponse adds Courier metadata as outgoing response headers.
+ func (m *metadata) ProcessResponse(proxyResp *http.Response) (*http.Response, error) {
+<a href="#h0-0-88" id="h0-0-88" class="d">-	if proxyResp.Header != nil {
+</a><a href="#h0-0-89" id="h0-0-89" class="d">-		for header, value := range m.tags {
+</a><a href="#h0-0-90" id="h0-0-90" class="d">-			proxyResp.Header.Set(header, value)
+</a><a href="#h0-0-91" id="h0-0-91" class="d">-		}
+</a><a href="#h0-0-92" id="h0-0-92" class="i">+	if proxyResp.Header == nil {
+</a><a href="#h0-0-93" id="h0-0-93" class="i">+		return proxyResp, nil
+</a><a href="#h0-0-94" id="h0-0-94" class="i">+	}
+</a><a href="#h0-0-95" id="h0-0-95" class="i">+
+</a><a href="#h0-0-96" id="h0-0-96" class="i">+	stopwatch := proxyResp.Request.Context().Value(ctxMetadataStopwatch).(*lib.Stopwatch)
+</a><a href="#h0-0-97" id="h0-0-97" class="i">+
+</a><a href="#h0-0-98" id="h0-0-98" class="i">+	proxyResp.Header.Set(headerUpstreamDuration, stopwatch.Elapsed().String())
+</a><a href="#h0-0-99" id="h0-0-99" class="i">+
+</a><a href="#h0-0-100" id="h0-0-100" class="i">+	for header, value := range m.tags {
+</a><a href="#h0-0-101" id="h0-0-101" class="i">+		proxyResp.Header.Set(header, value)
+</a> 	}
+ 
+ 	return proxyResp, nil
+<b>diff --git a/<a id="h1" href="../file/internal/middleware/filters/types.go">internal/middleware/filters/types.go</a> b/<a href="../file/internal/middleware/filters/types.go">internal/middleware/filters/types.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -9,6 +9,8 @@ import (
+</a> const (
+ 	ctxInstrumentationStopwatch middleware.RequestContextKey = iota
+ 
+<a href="#h1-0-3" id="h1-0-3" class="i">+	ctxMetadataStopwatch
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+
+</a> 	ctxLogRequestID
+ 	ctxLogStopwatch
+ 	ctxLogOriginalURL
+</pre>
+</div>
+</body>
+</html>

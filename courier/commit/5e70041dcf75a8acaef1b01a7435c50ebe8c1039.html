@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/server: Eager TLS listener instrumentation - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/5e70041dcf75a8acaef1b01a7435c50ebe8c1039">5e70041dcf75a8acaef1b01a7435c50ebe8c1039</a>
+<b>parent</b> <a href="../commit/d7e8350c4781fb69f8ab8a70c2e64de93138168d">d7e8350c4781fb69f8ab8a70c2e64de93138168d</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sun 12 Dec 2021 22:46:52 -0800
+
+internal/server: Eager TLS listener instrumentation
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/server/listener.go</a></td><td> | </td><td class="num">24</td><td><span class="i">+++++++++++++++++++++</span><span class="d">---</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">internal/server/server.go</a></td><td> | </td><td class="num">2</td><td><span class="i">+</span><span class="d">-</span></td></tr>
+</table></pre><pre>2 files changed, 22 insertions(+), 4 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/server/listener.go">internal/server/listener.go</a> b/<a href="../file/internal/server/listener.go">internal/server/listener.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -7,6 +7,7 @@ import (
+</a> 	&quot;time&quot;
+ 
+ 	&quot;go.uber.org/zap&quot;
+<a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;lib.kevinlin.info/aperture/lib&quot;
+</a> 
+ 	&quot;courier/internal/config&quot;
+ 	&quot;courier/internal/metrics&quot;
+<a href="#h0-1" id="h0-1" class="h">@@ -14,8 +15,11 @@ import (
+</a> )
+ 
+ const (
+<a href="#h0-1-3" id="h0-1-3" class="d">-	metricRestrictedListenerAccept    = &quot;server.listener.restricted.accept&quot;
+</a><a href="#h0-1-4" id="h0-1-4" class="d">-	metricRestrictedListenerAuthorize = &quot;server.listener.restricted.authorize&quot;
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+	metricRestrictedListenerAccept          = &quot;server.listener.restricted.accept&quot;
+</a><a href="#h0-1-6" id="h0-1-6" class="i">+	metricRestrictedListenerAuthorize       = &quot;server.listener.restricted.authorize&quot;
+</a><a href="#h0-1-7" id="h0-1-7" class="i">+	metricEagerTLSListenerAccept            = &quot;server.listener.eager_tls.accept&quot;
+</a><a href="#h0-1-8" id="h0-1-8" class="i">+	metricEagerTLSListenerHandshakeError    = &quot;server.listener.eager_tls.handshake.error&quot;
+</a><a href="#h0-1-9" id="h0-1-9" class="i">+	metricEagerTLSListenerHandshakeDuration = &quot;server.listener.eager_tls.handshake.duration&quot;
+</a> )
+ 
+ // restrictedListener is a net.Listener that only accepts TCP connections from allowed remote IP
+<a href="#h0-2" id="h0-2" class="h">@@ -92,13 +96,15 @@ func (l *restrictedListener) Accept() (net.Conn, error) {
+</a> // eagerTLSListener is a net.Listener that wraps a TLS listener and eagerly completes a TLS
+ // handshake with the client when a connection is accepted.
+ type eagerTLSListener struct {
+<a href="#h0-2-3" id="h0-2-3" class="i">+	name             string
+</a> 	handshakeTimeout time.Duration
+ 	net.Listener
+ }
+ 
+ // newEagerTLSListener creates an eager TLS listener.
+<a href="#h0-2-9" id="h0-2-9" class="d">-func newEagerTLSListener(handshakeTimeout time.Duration, ln net.Listener) net.Listener {
+</a><a href="#h0-2-10" id="h0-2-10" class="i">+func newEagerTLSListener(name string, handshakeTimeout time.Duration, ln net.Listener) net.Listener {
+</a> 	return &amp;eagerTLSListener{
+<a href="#h0-2-12" id="h0-2-12" class="i">+		name:             name,
+</a> 		handshakeTimeout: handshakeTimeout,
+ 		Listener:         ln,
+ 	}
+<a href="#h0-3" id="h0-3" class="h">@@ -107,6 +113,8 @@ func newEagerTLSListener(handshakeTimeout time.Duration, ln net.Listener) net.Li
+</a> // Accept defers to the underlying net.Listener and additionally requests completion of a TLS
+ // handshake immediately. Connections that fail TLS handshakes are closed immediately.
+ func (l *eagerTLSListener) Accept() (net.Conn, error) {
+<a href="#h0-3-3" id="h0-3-3" class="i">+	tags := map[string]interface{}{&quot;name&quot;: l.name}
+</a><a href="#h0-3-4" id="h0-3-4" class="i">+
+</a> 	conn, err := l.Listener.Accept()
+ 	if err != nil {
+ 		return nil, &amp;util.Error{
+<a href="#h0-4" id="h0-4" class="h">@@ -116,16 +124,21 @@ func (l *eagerTLSListener) Accept() (net.Conn, error) {
+</a> 		}
+ 	}
+ 
+<a href="#h0-4-3" id="h0-4-3" class="i">+	metrics.Client.Incr(metricEagerTLSListenerAccept, tags)
+</a><a href="#h0-4-4" id="h0-4-4" class="i">+
+</a> 	tlsConn, ok := conn.(*tls.Conn)
+ 	if !ok {
+ 		zap.L().Warn(
+ 			&quot;eager TLS listener rejecting non-TLS accepted connection&quot;,
+ 			zap.Stringer(&quot;addr&quot;, conn.RemoteAddr()),
+ 		)
+<a href="#h0-4-11" id="h0-4-11" class="i">+		metrics.Client.Incr(metricEagerTLSListenerHandshakeError, tags)
+</a><a href="#h0-4-12" id="h0-4-12" class="i">+
+</a> 		conn.Close()
+ 		return conn, nil
+ 	}
+ 
+<a href="#h0-4-17" id="h0-4-17" class="i">+	stopwatch := lib.NewStopwatch()
+</a> 	ctx, cancel := context.WithTimeout(context.Background(), l.handshakeTimeout)
+ 	defer cancel()
+ 
+<a href="#h0-5" id="h0-5" class="h">@@ -136,8 +149,13 @@ func (l *eagerTLSListener) Accept() (net.Conn, error) {
+</a> 			zap.Duration(&quot;timeout&quot;, l.handshakeTimeout),
+ 			zap.Error(err),
+ 		)
+<a href="#h0-5-3" id="h0-5-3" class="i">+		metrics.Client.Incr(metricEagerTLSListenerHandshakeError, tags)
+</a><a href="#h0-5-4" id="h0-5-4" class="i">+
+</a> 		conn.Close()
+<a href="#h0-5-6" id="h0-5-6" class="i">+		return conn, nil
+</a> 	}
+ 
+<a href="#h0-5-9" id="h0-5-9" class="i">+	metrics.Client.Timing(metricEagerTLSListenerHandshakeDuration, stopwatch.Elapsed(), tags)
+</a><a href="#h0-5-10" id="h0-5-10" class="i">+
+</a> 	return conn, nil
+ }
+<b>diff --git a/<a id="h1" href="../file/internal/server/server.go">internal/server/server.go</a> b/<a href="../file/internal/server/server.go">internal/server/server.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -224,7 +224,7 @@ func (i *instance) serve() error {
+</a> 		ln = tls.NewListener(ln, tlsCfg)
+ 
+ 		if i.cfg.TLSContext.HandshakeTimeout &gt; 0 {
+<a href="#h1-0-3" id="h1-0-3" class="d">-			ln = newEagerTLSListener(i.cfg.TLSContext.HandshakeTimeout, ln)
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+			ln = newEagerTLSListener(i.cfg.Name, i.cfg.TLSContext.HandshakeTimeout, ln)
+</a> 		}
+ 	}
+ 
+</pre>
+</div>
+</body>
+</html>

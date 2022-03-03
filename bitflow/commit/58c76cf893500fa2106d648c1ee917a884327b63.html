@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>pkg/proxy: Support proxy graceful shutdown with connection drain - bitflow - Layer 4 TCP proxy for secure interconnection of isolated networks</title>
+<meta name="description" content="Layer 4 TCP proxy for secure interconnection of isolated networks" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="bitflow Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="bitflow Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>bitflow</h1><span class="desc">Layer 4 TCP proxy for secure interconnection of isolated networks</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/bitflow.git">https://source.static.kevinlin.info/bitflow.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/58c76cf893500fa2106d648c1ee917a884327b63">58c76cf893500fa2106d648c1ee917a884327b63</a>
+<b>parent</b> <a href="../commit/43c193bb8615bebc113a61e310e036e2b5ca287d">43c193bb8615bebc113a61e310e036e2b5ca287d</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sun 16 May 2021 12:29:39 -0700
+
+pkg/proxy: Support proxy graceful shutdown with connection drain
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">pkg/proxy/proxy.go</a></td><td> | </td><td class="num">34</td><td><span class="i">++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+</table></pre><pre>1 file changed, 34 insertions(+), 0 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/pkg/proxy/proxy.go">pkg/proxy/proxy.go</a> b/<a href="../file/pkg/proxy/proxy.go">pkg/proxy/proxy.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -5,6 +5,7 @@ import (
+</a> 	&quot;io&quot;
+ 	&quot;log&quot;
+ 	&quot;net&quot;
+<a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;sync&quot;
+</a> 	&quot;sync/atomic&quot;
+ 	&quot;time&quot;
+ 
+<a href="#h0-1" id="h0-1" class="h">@@ -33,10 +34,14 @@ type Proxy struct {
+</a> 	ErrorLog *log.Logger
+ 	// ConnectionLog is an optional io.Writer for writing JSON-formatted connection access logs.
+ 	ConnectionLog io.Writer
+<a href="#h0-1-3" id="h0-1-3" class="i">+
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+	closing bool
+</a> }
+ 
+ // Serve the TCP proxy on a listener.
+ func (p *Proxy) Serve(ln net.Listener) error {
+<a href="#h0-1-9" id="h0-1-9" class="i">+	var connections sync.WaitGroup
+</a><a href="#h0-1-10" id="h0-1-10" class="i">+
+</a> 	srcSentTotal := new(int64)
+ 	dstRecvTotal := new(int64)
+ 	serveTotal := new(int64)
+<a href="#h0-2" id="h0-2" class="h">@@ -49,6 +54,16 @@ func (p *Proxy) Serve(ln net.Listener) error {
+</a> 	for {
+ 		src, err := ln.Accept()
+ 		if err != nil {
+<a href="#h0-2-3" id="h0-2-3" class="i">+			if p.closing {
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+				p.Metrics.Incr(&quot;proxy.serve.accept.shutdown&quot;, tags)
+</a><a href="#h0-2-5" id="h0-2-5" class="i">+				p.DebugLog.Printf(
+</a><a href="#h0-2-6" id="h0-2-6" class="i">+					&quot;proxy: closing listener: name=%s addr=%v&quot;,
+</a><a href="#h0-2-7" id="h0-2-7" class="i">+					p.Name,
+</a><a href="#h0-2-8" id="h0-2-8" class="i">+					ln.Addr(),
+</a><a href="#h0-2-9" id="h0-2-9" class="i">+				)
+</a><a href="#h0-2-10" id="h0-2-10" class="i">+				break
+</a><a href="#h0-2-11" id="h0-2-11" class="i">+			}
+</a><a href="#h0-2-12" id="h0-2-12" class="i">+
+</a> 			p.Metrics.Incr(&quot;proxy.serve.accept.error&quot;, tags)
+ 			p.ErrorLog.Printf(
+ 				&quot;proxy: error accepting connection from listener: name=%s err=%v&quot;,
+<a href="#h0-3" id="h0-3" class="h">@@ -80,6 +95,9 @@ func (p *Proxy) Serve(ln net.Listener) error {
+</a> 		)
+ 
+ 		go func() {
+<a href="#h0-3-3" id="h0-3-3" class="i">+			connections.Add(1)
+</a><a href="#h0-3-4" id="h0-3-4" class="i">+			defer connections.Done()
+</a><a href="#h0-3-5" id="h0-3-5" class="i">+
+</a> 			timestamp := time.Now()
+ 			stopwatch := lib.NewStopwatch()
+ 
+<a href="#h0-4" id="h0-4" class="h">@@ -172,6 +190,22 @@ func (p *Proxy) Serve(ln net.Listener) error {
+</a> 			}
+ 		}()
+ 	}
+<a href="#h0-4-3" id="h0-4-3" class="i">+
+</a><a href="#h0-4-4" id="h0-4-4" class="i">+	p.DebugLog.Printf(
+</a><a href="#h0-4-5" id="h0-4-5" class="i">+		&quot;proxy: draining active connections before shutdown: name=%s connections=%d&quot;,
+</a><a href="#h0-4-6" id="h0-4-6" class="i">+		p.Name,
+</a><a href="#h0-4-7" id="h0-4-7" class="i">+		atomic.LoadInt64(activeConns),
+</a><a href="#h0-4-8" id="h0-4-8" class="i">+	)
+</a><a href="#h0-4-9" id="h0-4-9" class="i">+
+</a><a href="#h0-4-10" id="h0-4-10" class="i">+	connections.Wait()
+</a><a href="#h0-4-11" id="h0-4-11" class="i">+
+</a><a href="#h0-4-12" id="h0-4-12" class="i">+	return nil
+</a><a href="#h0-4-13" id="h0-4-13" class="i">+}
+</a><a href="#h0-4-14" id="h0-4-14" class="i">+
+</a><a href="#h0-4-15" id="h0-4-15" class="i">+// Close requests asynchronous graceful shutdown of the proxy by atomically setting a shutdown flag.
+</a><a href="#h0-4-16" id="h0-4-16" class="i">+// It is the responsibility of the caller to close the associated listener after closing the proxy.
+</a><a href="#h0-4-17" id="h0-4-17" class="i">+func (p *Proxy) Close() {
+</a><a href="#h0-4-18" id="h0-4-18" class="i">+	p.closing = true
+</a> }
+ 
+ // connLog describes a connection access log entry.
+</pre>
+</div>
+</body>
+</html>

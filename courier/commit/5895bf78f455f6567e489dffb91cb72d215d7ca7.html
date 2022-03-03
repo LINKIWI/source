@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/config: Add CIDR YAML config type - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/5895bf78f455f6567e489dffb91cb72d215d7ca7">5895bf78f455f6567e489dffb91cb72d215d7ca7</a>
+<b>parent</b> <a href="../commit/7fa53e4e52eee784de90e2c215de9344be1f7aec">7fa53e4e52eee784de90e2c215de9344be1f7aec</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sun 31 Jan 2021 23:10:17 -0800
+
+internal/config: Add CIDR YAML config type
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/config/data.go</a></td><td> | </td><td class="num">46</td><td><span class="i">+++++++++++++++++++++++++++++++</span><span class="d">---------------</span></td></tr>
+</table></pre><pre>1 file changed, 31 insertions(+), 15 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/config/data.go">internal/config/data.go</a> b/<a href="../file/internal/config/data.go">internal/config/data.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -29,6 +29,11 @@ type Address struct {
+</a> 	Socket string
+ }
+ 
+<a href="#h0-0-3" id="h0-0-3" class="i">+// CIDR is a YAML node representing an IP and subnet mask in CIDR notation.
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+type CIDR struct {
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+	IPNet *net.IPNet
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+}
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+
+</a> // UnmarshalYAML attempts to parse the node&#39;s string contents as either a regular expression or a
+ // string literal.
+ func (r *Regex) UnmarshalYAML(node *yaml.Node) error {
+<a href="#h0-1" id="h0-1" class="h">@@ -45,11 +50,9 @@ func (r *Regex) UnmarshalYAML(node *yaml.Node) error {
+</a> 	re, err := regexp.Compile(value)
+ 	if err != nil {
+ 		return &amp;util.Error{
+<a href="#h0-1-3" id="h0-1-3" class="d">-			Namespace: &quot;config&quot;,
+</a><a href="#h0-1-4" id="h0-1-4" class="d">-			Message:   &quot;failed to parse regular expression&quot;,
+</a><a href="#h0-1-5" id="h0-1-5" class="d">-			Tags: map[string]interface{}{
+</a><a href="#h0-1-6" id="h0-1-6" class="d">-				&quot;host&quot;: value,
+</a><a href="#h0-1-7" id="h0-1-7" class="d">-			},
+</a><a href="#h0-1-8" id="h0-1-8" class="i">+			Namespace:    &quot;config&quot;,
+</a><a href="#h0-1-9" id="h0-1-9" class="i">+			Message:      &quot;failed to parse regular expression&quot;,
+</a><a href="#h0-1-10" id="h0-1-10" class="i">+			Tags:         map[string]interface{}{&quot;host&quot;: value},
+</a> 			StackedError: err,
+ 		}
+ 	}
+<a href="#h0-2" id="h0-2" class="h">@@ -64,11 +67,9 @@ func (u *URL) UnmarshalYAML(node *yaml.Node) error {
+</a> 	parsed, err := url.Parse(node.Value)
+ 	if err != nil {
+ 		return &amp;util.Error{
+<a href="#h0-2-3" id="h0-2-3" class="d">-			Namespace: &quot;config&quot;,
+</a><a href="#h0-2-4" id="h0-2-4" class="d">-			Message:   &quot;failed to parse upstream URL&quot;,
+</a><a href="#h0-2-5" id="h0-2-5" class="d">-			Tags: map[string]interface{}{
+</a><a href="#h0-2-6" id="h0-2-6" class="d">-				&quot;upstream&quot;: node.Value,
+</a><a href="#h0-2-7" id="h0-2-7" class="d">-			},
+</a><a href="#h0-2-8" id="h0-2-8" class="i">+			Namespace:    &quot;config&quot;,
+</a><a href="#h0-2-9" id="h0-2-9" class="i">+			Message:      &quot;failed to parse upstream URL&quot;,
+</a><a href="#h0-2-10" id="h0-2-10" class="i">+			Tags:         map[string]interface{}{&quot;upstream&quot;: node.Value},
+</a> 			StackedError: err,
+ 		}
+ 	}
+<a href="#h0-3" id="h0-3" class="h">@@ -88,11 +89,9 @@ func (a *Address) UnmarshalYAML(node *yaml.Node) error {
+</a> 	host, port, err := net.SplitHostPort(node.Value)
+ 	if err != nil {
+ 		return &amp;util.Error{
+<a href="#h0-3-3" id="h0-3-3" class="d">-			Namespace: &quot;config&quot;,
+</a><a href="#h0-3-4" id="h0-3-4" class="d">-			Message:   &quot;failed to parse address&quot;,
+</a><a href="#h0-3-5" id="h0-3-5" class="d">-			Tags: map[string]interface{}{
+</a><a href="#h0-3-6" id="h0-3-6" class="d">-				&quot;address&quot;: node.Value,
+</a><a href="#h0-3-7" id="h0-3-7" class="d">-			},
+</a><a href="#h0-3-8" id="h0-3-8" class="i">+			Namespace:    &quot;config&quot;,
+</a><a href="#h0-3-9" id="h0-3-9" class="i">+			Message:      &quot;failed to parse address&quot;,
+</a><a href="#h0-3-10" id="h0-3-10" class="i">+			Tags:         map[string]interface{}{&quot;address&quot;: node.Value},
+</a> 			StackedError: err,
+ 		}
+ 	}
+<a href="#h0-4" id="h0-4" class="h">@@ -120,3 +119,20 @@ func (a *Address) String() string {
+</a> 
+ 	return net.JoinHostPort(a.Host, strconv.Itoa(a.Port))
+ }
+<a href="#h0-4-3" id="h0-4-3" class="i">+
+</a><a href="#h0-4-4" id="h0-4-4" class="i">+// UnmarshalYAML attempts to parse the node&#39;s string contents as an IP address and subnet mask.
+</a><a href="#h0-4-5" id="h0-4-5" class="i">+func (c *CIDR) UnmarshalYAML(node *yaml.Node) error {
+</a><a href="#h0-4-6" id="h0-4-6" class="i">+	_, ipnet, err := net.ParseCIDR(node.Value)
+</a><a href="#h0-4-7" id="h0-4-7" class="i">+	if err != nil {
+</a><a href="#h0-4-8" id="h0-4-8" class="i">+		return &amp;util.Error{
+</a><a href="#h0-4-9" id="h0-4-9" class="i">+			Namespace:    &quot;config&quot;,
+</a><a href="#h0-4-10" id="h0-4-10" class="i">+			Message:      &quot;failed to parse CIDR block&quot;,
+</a><a href="#h0-4-11" id="h0-4-11" class="i">+			Tags:         map[string]interface{}{&quot;cidr&quot;: node.Value},
+</a><a href="#h0-4-12" id="h0-4-12" class="i">+			StackedError: err,
+</a><a href="#h0-4-13" id="h0-4-13" class="i">+		}
+</a><a href="#h0-4-14" id="h0-4-14" class="i">+	}
+</a><a href="#h0-4-15" id="h0-4-15" class="i">+
+</a><a href="#h0-4-16" id="h0-4-16" class="i">+	c.IPNet = ipnet
+</a><a href="#h0-4-17" id="h0-4-17" class="i">+
+</a><a href="#h0-4-18" id="h0-4-18" class="i">+	return nil
+</a><a href="#h0-4-19" id="h0-4-19" class="i">+}
+</a></pre>
+</div>
+</body>
+</html>

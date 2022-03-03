@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/server: Support TLS origination for upstreams - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/9cdc2068d7c24df6a630ddbdbbd41e673fe963b9">9cdc2068d7c24df6a630ddbdbbd41e673fe963b9</a>
+<b>parent</b> <a href="../commit/e98c7dcf50c31a0e394db44f1e922390946b9ae6">e98c7dcf50c31a0e394db44f1e922390946b9ae6</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sun 31 Jan 2021 11:15:46 -0800
+
+internal/server: Support TLS origination for upstreams
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/server/proxy.go</a></td><td> | </td><td class="num">59</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">--------</span></td></tr>
+</table></pre><pre>1 file changed, 51 insertions(+), 8 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/server/proxy.go">internal/server/proxy.go</a> b/<a href="../file/internal/server/proxy.go">internal/server/proxy.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -3,7 +3,9 @@ package server
+</a> import (
+ 	&quot;context&quot;
+ 	&quot;crypto/tls&quot;
+<a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;crypto/x509&quot;
+</a> 	&quot;io&quot;
+<a href="#h0-0-5" id="h0-0-5" class="i">+	&quot;io/ioutil&quot;
+</a> 	&quot;net&quot;
+ 	&quot;net/http&quot;
+ 	&quot;net/http/httputil&quot;
+<a href="#h0-1" id="h0-1" class="h">@@ -37,8 +39,14 @@ var (
+</a> 		statusCode: http.StatusInternalServerError,
+ 		message:    &quot;failed in filter chain processing&quot;,
+ 	}
+<a href="#h0-1-3" id="h0-1-3" class="d">-	// errProxy is returned when the HTTP proxy itself raises an error.
+</a><a href="#h0-1-4" id="h0-1-4" class="d">-	errProxy = &amp;response{
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+	// errBadTLSConfig is returned when there is an error creating the client TLS configuration
+</a><a href="#h0-1-6" id="h0-1-6" class="i">+	// for TLS origination to an upstream.
+</a><a href="#h0-1-7" id="h0-1-7" class="i">+	errBadTLSConfig = &amp;response{
+</a><a href="#h0-1-8" id="h0-1-8" class="i">+		statusCode: http.StatusInternalServerError,
+</a><a href="#h0-1-9" id="h0-1-9" class="i">+		message:    &quot;failed to configure certificates for TLS origination&quot;,
+</a><a href="#h0-1-10" id="h0-1-10" class="i">+	}
+</a><a href="#h0-1-11" id="h0-1-11" class="i">+	// errProxyInternal is returned when the HTTP proxy itself raises an error.
+</a><a href="#h0-1-12" id="h0-1-12" class="i">+	errProxyInternal = &amp;response{
+</a> 		statusCode: http.StatusServiceUnavailable,
+ 		message:    &quot;proxy request failed&quot;,
+ 	}
+<a href="#h0-2" id="h0-2" class="h">@@ -102,6 +110,7 @@ func (rp *reverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+</a> 	var err error
+ 	var abortResp *http.Response
+ 	var transport http.RoundTripper
+<a href="#h0-2-3" id="h0-2-3" class="i">+	var tlsCfg *tls.Config
+</a> 
+ 	proxyReq := req.Clone(context.Background())
+ 
+<a href="#h0-3" id="h0-3" class="h">@@ -113,11 +122,8 @@ func (rp *reverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+</a> 	}
+ 
+ 	// Prepare proxy request
+<a href="#h0-3-3" id="h0-3-3" class="d">-	proxyReq.URL.Host = req.Host
+</a> 	proxyReq.URL.Scheme = &quot;http&quot;
+<a href="#h0-3-5" id="h0-3-5" class="d">-	if vhost.TLSContext != nil {
+</a><a href="#h0-3-6" id="h0-3-6" class="d">-		proxyReq.URL.Scheme = &quot;https&quot;
+</a><a href="#h0-3-7" id="h0-3-7" class="d">-	}
+</a><a href="#h0-3-8" id="h0-3-8" class="i">+	proxyReq.URL.Host = req.Host
+</a> 
+ 	// Apply request filters
+ 	proxyReq, abortResp, err = rp.filterChains[vhost.Name].ProcessRequest(proxyReq)
+<a href="#h0-4" id="h0-4" class="h">@@ -131,10 +137,19 @@ func (rp *reverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+</a> 		return
+ 	}
+ 
+<a href="#h0-4-3" id="h0-4-3" class="i">+	if vhost.TLSContext != nil {
+</a><a href="#h0-4-4" id="h0-4-4" class="i">+		proxyReq.URL.Scheme = &quot;https&quot;
+</a><a href="#h0-4-5" id="h0-4-5" class="i">+		if tlsCfg, err = clientTLSConfig(vhost.TLSContext); err != nil {
+</a><a href="#h0-4-6" id="h0-4-6" class="i">+			rp.respond(rw, errBadTLSConfig.response())
+</a><a href="#h0-4-7" id="h0-4-7" class="i">+			return
+</a><a href="#h0-4-8" id="h0-4-8" class="i">+		}
+</a><a href="#h0-4-9" id="h0-4-9" class="i">+	}
+</a><a href="#h0-4-10" id="h0-4-10" class="i">+
+</a> 	switch vhost.Transport {
+ 	case &quot;http2&quot;:
+ 		transport = &amp;http2.Transport{
+<a href="#h0-4-14" id="h0-4-14" class="d">-			AllowHTTP: true,
+</a><a href="#h0-4-15" id="h0-4-15" class="i">+			AllowHTTP:       true,
+</a><a href="#h0-4-16" id="h0-4-16" class="i">+			TLSClientConfig: tlsCfg,
+</a> 			DialTLS: func(network string, addr string, cfg *tls.Config) (net.Conn, error) {
+ 				var dialer proxy.Dialer
+ 
+<a href="#h0-5" id="h0-5" class="h">@@ -159,6 +174,7 @@ func (rp *reverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+</a> 	default:
+ 		transport = &amp;http.Transport{
+ 			TLSHandshakeTimeout: vhost.Connection.TLSHandshakeTimeout,
+<a href="#h0-5-3" id="h0-5-3" class="i">+			TLSClientConfig:     tlsCfg,
+</a> 			DialContext: func(ctx context.Context, network string, addr string) (net.Conn, error) {
+ 				var dialer proxy.Dialer
+ 
+<a href="#h0-6" id="h0-6" class="h">@@ -187,7 +203,7 @@ func (rp *reverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+</a> 			return err
+ 		},
+ 		ErrorHandler: func(proxyRW http.ResponseWriter, _ *http.Request, err error) {
+<a href="#h0-6-3" id="h0-6-3" class="d">-			resp := errProxy
+</a><a href="#h0-6-4" id="h0-6-4" class="i">+			resp := errProxyInternal
+</a> 			resp.tags = map[string]string{&quot;error&quot;: err.Error()}
+ 
+ 			clientResp, err := rp.filterChains[vhost.Name].ProcessResponse(resp.response())
+<a href="#h0-7" id="h0-7" class="h">@@ -228,3 +244,30 @@ func (rp *reverseProxy) respond(rw http.ResponseWriter, resp *http.Response) err
+</a> 
+ 	return resp.Body.Close()
+ }
+<a href="#h0-7-3" id="h0-7-3" class="i">+
+</a><a href="#h0-7-4" id="h0-7-4" class="i">+func clientTLSConfig(ctx *config.TLSContext) (*tls.Config, error) {
+</a><a href="#h0-7-5" id="h0-7-5" class="i">+	var certificates []tls.Certificate
+</a><a href="#h0-7-6" id="h0-7-6" class="i">+	authorities := x509.NewCertPool()
+</a><a href="#h0-7-7" id="h0-7-7" class="i">+
+</a><a href="#h0-7-8" id="h0-7-8" class="i">+	for _, cert := range ctx.Certificates {
+</a><a href="#h0-7-9" id="h0-7-9" class="i">+		keypair, err := tls.LoadX509KeyPair(cert.Certificate, cert.Key)
+</a><a href="#h0-7-10" id="h0-7-10" class="i">+		if err != nil {
+</a><a href="#h0-7-11" id="h0-7-11" class="i">+			return nil, err
+</a><a href="#h0-7-12" id="h0-7-12" class="i">+		}
+</a><a href="#h0-7-13" id="h0-7-13" class="i">+
+</a><a href="#h0-7-14" id="h0-7-14" class="i">+		ca, err := ioutil.ReadFile(cert.Authority)
+</a><a href="#h0-7-15" id="h0-7-15" class="i">+		if err != nil {
+</a><a href="#h0-7-16" id="h0-7-16" class="i">+			return nil, err
+</a><a href="#h0-7-17" id="h0-7-17" class="i">+		}
+</a><a href="#h0-7-18" id="h0-7-18" class="i">+
+</a><a href="#h0-7-19" id="h0-7-19" class="i">+		certificates = append(certificates, keypair)
+</a><a href="#h0-7-20" id="h0-7-20" class="i">+		authorities.AppendCertsFromPEM(ca)
+</a><a href="#h0-7-21" id="h0-7-21" class="i">+	}
+</a><a href="#h0-7-22" id="h0-7-22" class="i">+
+</a><a href="#h0-7-23" id="h0-7-23" class="i">+	return &amp;tls.Config{
+</a><a href="#h0-7-24" id="h0-7-24" class="i">+		Certificates:       certificates,
+</a><a href="#h0-7-25" id="h0-7-25" class="i">+		RootCAs:            authorities,
+</a><a href="#h0-7-26" id="h0-7-26" class="i">+		InsecureSkipVerify: ctx.VerifyMode == &quot;relaxed&quot;,
+</a><a href="#h0-7-27" id="h0-7-27" class="i">+		MinVersion:         tls.VersionTLS13,
+</a><a href="#h0-7-28" id="h0-7-28" class="i">+	}, nil
+</a><a href="#h0-7-29" id="h0-7-29" class="i">+}
+</a></pre>
+</div>
+</body>
+</html>

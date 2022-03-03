@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/config, internal/server: Allow override of upstream hostname in proxied URL - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/37758554ab7b1730e8deb8452d545cbb44c5fbe9">37758554ab7b1730e8deb8452d545cbb44c5fbe9</a>
+<b>parent</b> <a href="../commit/aafb3d547851e4c94f3e22acdb8b3fb9729aa161">aafb3d547851e4c94f3e22acdb8b3fb9729aa161</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Fri  5 Feb 2021 22:15:22 -0800
+
+internal/config, internal/server: Allow override of upstream hostname in proxied URL
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">cmd/courier/main.go</a></td><td> | </td><td class="num">3</td><td><span class="i">++</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">config.example.yaml</a></td><td> | </td><td class="num">10</td><td><span class="i">+++++++</span><span class="d">---</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">internal/config/config.go</a></td><td> | </td><td class="num">11</td><td><span class="i">++++++++++</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">internal/config/types.go</a></td><td> | </td><td class="num">8</td><td><span class="i">+++++++</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h4">internal/server/proxy.go</a></td><td> | </td><td class="num">7</td><td><span class="i">+++++</span><span class="d">--</span></td></tr>
+</table></pre><pre>5 files changed, 31 insertions(+), 8 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/cmd/courier/main.go">cmd/courier/main.go</a> b/<a href="../file/cmd/courier/main.go">cmd/courier/main.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -57,7 +57,8 @@ func main() {
+</a> 			&quot;registered virtual host&quot;,
+ 			zap.String(&quot;name&quot;, vhost.Name),
+ 			zap.String(&quot;host&quot;, vhost.Host.String()),
+<a href="#h0-0-3" id="h0-0-3" class="d">-			zap.String(&quot;upstream&quot;, vhost.Upstream.String()),
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+			zap.String(&quot;upstream_address&quot;, vhost.Upstream.Address.String()),
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+			zap.String(&quot;upstream_host&quot;, vhost.Upstream.Host),
+</a> 			zap.Any(&quot;proxy&quot;, vhost.Proxy),
+ 			zap.Any(&quot;tls_context&quot;, vhost.TLSContext),
+ 		)
+<b>diff --git a/<a id="h1" href="../file/config.example.yaml">config.example.yaml</a> b/<a href="../file/config.example.yaml">config.example.yaml</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -27,7 +27,8 @@ server:
+</a>   virtual_hosts:
+     - name: foo
+       host: foo.example.com
+<a href="#h1-0-3" id="h1-0-3" class="d">-      upstream: unix:/var/run/http/http.sock
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+      upstream:
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+        address: unix:/var/run/http/http.sock
+</a>       connection:
+         connect_timeout: 4s
+         read_timeout: 10s
+<a href="#h1-1" id="h1-1" class="h">@@ -41,7 +42,9 @@ server:
+</a>             path: /var/log/courier/foo.log
+     - name: bar
+       host: bar.example.com
+<a href="#h1-1-3" id="h1-1-3" class="d">-      upstream: 10.1.0.1:8200
+</a><a href="#h1-1-4" id="h1-1-4" class="i">+      upstream:
+</a><a href="#h1-1-5" id="h1-1-5" class="i">+        address: 10.1.0.1:8200
+</a><a href="#h1-1-6" id="h1-1-6" class="i">+        host: bar.local
+</a>       connection:
+         connect_timeout: 1s
+         tls_handshake_timeout: 1s
+<a href="#h1-2" id="h1-2" class="h">@@ -68,5 +71,6 @@ server:
+</a>                 replace: bar.upstream.example.com
+     - name: grpc
+       host: baz.example.com
+<a href="#h1-2-3" id="h1-2-3" class="d">-      upstream: localhost:9090
+</a><a href="#h1-2-4" id="h1-2-4" class="i">+      upstream:
+</a><a href="#h1-2-5" id="h1-2-5" class="i">+        address: localhost:9090
+</a>       transport: http2
+<b>diff --git a/<a id="h2" href="../file/internal/config/config.go">internal/config/config.go</a> b/<a href="../file/internal/config/config.go">internal/config/config.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -153,11 +153,20 @@ func (c *Config) Validate() error {
+</a> 		if vhost.Upstream == nil {
+ 			return &amp;util.Error{
+ 				Namespace: &quot;config&quot;,
+<a href="#h2-0-3" id="h2-0-3" class="d">-				Message:   &quot;virtual host missing upstream address&quot;,
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+				Message:   &quot;virtual host missing upstream configuration&quot;,
+</a> 				Tags: map[string]interface{}{
+ 					&quot;name&quot;: vhost.Name,
+ 				},
+ 			}
+<a href="#h2-0-9" id="h2-0-9" class="i">+		} else if vhost.Upstream.Address == nil {
+</a><a href="#h2-0-10" id="h2-0-10" class="i">+			return &amp;util.Error{
+</a><a href="#h2-0-11" id="h2-0-11" class="i">+				Namespace: &quot;config&quot;,
+</a><a href="#h2-0-12" id="h2-0-12" class="i">+				Message:   &quot;virtual host missing upstream address&quot;,
+</a><a href="#h2-0-13" id="h2-0-13" class="i">+				Tags: map[string]interface{}{
+</a><a href="#h2-0-14" id="h2-0-14" class="i">+					&quot;vhost&quot;: vhost.Name,
+</a><a href="#h2-0-15" id="h2-0-15" class="i">+				},
+</a><a href="#h2-0-16" id="h2-0-16" class="i">+				StackedError: nil,
+</a><a href="#h2-0-17" id="h2-0-17" class="i">+			}
+</a> 		} else if _, ok := upstreamTransports[vhost.Transport]; !ok {
+ 			return &amp;util.Error{
+ 				Namespace: &quot;config&quot;,
+<b>diff --git a/<a id="h3" href="../file/internal/config/types.go">internal/config/types.go</a> b/<a href="../file/internal/config/types.go">internal/config/types.go</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -55,11 +55,17 @@ type ServerConnection struct {
+</a> 	WriteTimeout time.Duration `yaml:&quot;write_timeout&quot;`
+ }
+ 
+<a href="#h3-0-3" id="h3-0-3" class="i">+// Upstream describes one upstream HTTP server.
+</a><a href="#h3-0-4" id="h3-0-4" class="i">+type Upstream struct {
+</a><a href="#h3-0-5" id="h3-0-5" class="i">+	Address *Address `yaml:&quot;address&quot;`
+</a><a href="#h3-0-6" id="h3-0-6" class="i">+	Host    string   `yaml:&quot;host&quot;`
+</a><a href="#h3-0-7" id="h3-0-7" class="i">+}
+</a><a href="#h3-0-8" id="h3-0-8" class="i">+
+</a> // VirtualHost describes one virtual host served by the server.
+ type VirtualHost struct {
+ 	Name       string             `yaml:&quot;name&quot;`
+ 	Host       *Regex             `yaml:&quot;host&quot;`
+<a href="#h3-0-13" id="h3-0-13" class="d">-	Upstream   *Address           `yaml:&quot;upstream&quot;`
+</a><a href="#h3-0-14" id="h3-0-14" class="i">+	Upstream   *Upstream          `yaml:&quot;upstream&quot;`
+</a> 	Proxy      *Address           `yaml:&quot;proxy&quot;`
+ 	Transport  string             `yaml:&quot;transport&quot;`
+ 	Connection UpstreamConnection `yaml:&quot;connection&quot;`
+<b>diff --git a/<a id="h4" href="../file/internal/server/proxy.go">internal/server/proxy.go</a> b/<a href="../file/internal/server/proxy.go">internal/server/proxy.go</a></b>
+<a href="#h4-0" id="h4-0" class="h">@@ -167,6 +167,9 @@ func (rp *reverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+</a> 	// Prepare proxy request
+ 	proxyReq.URL.Scheme = &quot;http&quot;
+ 	proxyReq.URL.Host = proxyReq.Host
+<a href="#h4-0-3" id="h4-0-3" class="i">+	if vhost.Upstream.Host != &quot;&quot; {
+</a><a href="#h4-0-4" id="h4-0-4" class="i">+		proxyReq.URL.Host = vhost.Upstream.Host
+</a><a href="#h4-0-5" id="h4-0-5" class="i">+	}
+</a> 
+ 	// Optional TLS origination configuration
+ 	if vhost.TLSContext != nil {
+<a href="#h4-1" id="h4-1" class="h">@@ -200,7 +203,7 @@ func (rp *reverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+</a> 					dialer, _ = proxy.SOCKS5(proxyNet, proxyAddr, nil, dialer)
+ 				}
+ 
+<a href="#h4-1-3" id="h4-1-3" class="d">-				network, addr = vhost.Upstream.Address()
+</a><a href="#h4-1-4" id="h4-1-4" class="i">+				network, addr = vhost.Upstream.Address.Address()
+</a> 				return dialer.Dial(network, addr)
+ 			},
+ 		}
+<a href="#h4-2" id="h4-2" class="h">@@ -218,7 +221,7 @@ func (rp *reverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+</a> 					dialer, _ = proxy.SOCKS5(proxyNet, proxyAddr, nil, dialer)
+ 				}
+ 
+<a href="#h4-2-3" id="h4-2-3" class="d">-				network, addr = vhost.Upstream.Address()
+</a><a href="#h4-2-4" id="h4-2-4" class="i">+				network, addr = vhost.Upstream.Address.Address()
+</a> 				return dialer.Dial(network, addr)
+ 			},
+ 		}
+</pre>
+</div>
+</body>
+</html>

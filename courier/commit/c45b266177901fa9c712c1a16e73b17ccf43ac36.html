@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/server: Emit counter metric on absence of virtual host match - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/c45b266177901fa9c712c1a16e73b17ccf43ac36">c45b266177901fa9c712c1a16e73b17ccf43ac36</a>
+<b>parent</b> <a href="../commit/68edd2911ae21f7871890f54c8d646e10eea6c5d">68edd2911ae21f7871890f54c8d646e10eea6c5d</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Wed 17 Feb 2021 20:46:29 -0800
+
+internal/server: Emit counter metric on absence of virtual host match
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/server/proxy.go</a></td><td> | </td><td class="num">16</td><td><span class="i">++++++++++</span><span class="d">------</span></td></tr>
+</table></pre><pre>1 file changed, 10 insertions(+), 6 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/server/proxy.go">internal/server/proxy.go</a> b/<a href="../file/internal/server/proxy.go">internal/server/proxy.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -23,6 +23,7 @@ const (
+</a> 	metricProxyError               = &quot;proxy.error&quot;
+ 	metricProxyTotalServed         = &quot;proxy.serve.total&quot;
+ 	metricProxyEarlyTerminate      = &quot;proxy.lifecycle.early_terminate&quot;
+<a href="#h0-0-3" id="h0-0-3" class="i">+	metricProxyUnknownHost         = &quot;proxy.lifecycle.unknown_host&quot;
+</a> 	metricProxyCircuitBreak        = &quot;proxy.lifecycle.health_circuit_break&quot;
+ 	metricProxyTransportInitialize = &quot;proxy.transport.initialize&quot;
+ 	metricProxyTransportRecycle    = &quot;proxy.transport.recycle&quot;
+<a href="#h0-1" id="h0-1" class="h">@@ -171,23 +172,26 @@ func (rp *reverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+</a> 	var transport http.RoundTripper
+ 
+ 	proxyReq := req.Clone(context.Background())
+<a href="#h0-1-3" id="h0-1-3" class="i">+	tags := map[string]interface{}{
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+		&quot;route_host&quot;: proxyReq.Host,
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+		&quot;method&quot;:     proxyReq.Method,
+</a><a href="#h0-1-6" id="h0-1-6" class="i">+		&quot;protocol&quot;:   proxyReq.Proto,
+</a><a href="#h0-1-7" id="h0-1-7" class="i">+		&quot;tls&quot;:        proxyReq.TLS != nil,
+</a><a href="#h0-1-8" id="h0-1-8" class="i">+	}
+</a> 
+ 	// Match virtual host
+ 	vhost, ok := rp.matchHost(proxyReq.Host)
+ 	if !ok {
+<a href="#h0-1-13" id="h0-1-13" class="i">+		metrics.Client.Incr(metricProxyUnknownHost, tags)
+</a> 		zap.L().Debug(&quot;unknown virtual host&quot;, zap.String(&quot;host&quot;, proxyReq.Host))
+ 		rp.respond(rw, errUnknownHost.response())
+ 		return
+ 	}
+ 
+<a href="#h0-1-19" id="h0-1-19" class="d">-	tags := map[string]interface{}{
+</a><a href="#h0-1-20" id="h0-1-20" class="i">+	tags = util.MergeMaps(tags, map[string]interface{}{
+</a> 		&quot;virtual_host&quot;: vhost.Name,
+ 		&quot;upstream&quot;:     vhost.Upstream.Address,
+<a href="#h0-1-23" id="h0-1-23" class="d">-		&quot;route_host&quot;:   proxyReq.Host,
+</a><a href="#h0-1-24" id="h0-1-24" class="d">-		&quot;method&quot;:       proxyReq.Method,
+</a><a href="#h0-1-25" id="h0-1-25" class="d">-		&quot;protocol&quot;:     proxyReq.Proto,
+</a><a href="#h0-1-26" id="h0-1-26" class="d">-		&quot;tls&quot;:          proxyReq.TLS != nil,
+</a><a href="#h0-1-27" id="h0-1-27" class="d">-	}
+</a><a href="#h0-1-28" id="h0-1-28" class="i">+	})
+</a> 
+ 	metrics.Client.Incr(metricProxyServe, tags)
+ 	metrics.Client.Gauge(metricProxyTotalServed, float64(atomic.LoadInt64(rp.sequenceID)), tags)
+</pre>
+</div>
+</body>
+</html>

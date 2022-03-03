@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/config: Support TLS context verify mode none to bypass all client authentication - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/3afc8ab64de700bd882a04301b2beceb498fb404">3afc8ab64de700bd882a04301b2beceb498fb404</a>
+<b>parent</b> <a href="../commit/112d7d27c28c39f8bbb57875b4d5080abd68e515">112d7d27c28c39f8bbb57875b4d5080abd68e515</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Fri 26 Nov 2021 14:06:41 -0800
+
+internal/config: Support TLS context verify mode none to bypass all client authentication
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/config/config.go</a></td><td> | </td><td class="num">15</td><td><span class="i">++++++++++++</span><span class="d">---</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">internal/config/types.go</a></td><td> | </td><td class="num">3</td><td><span class="i">++</span><span class="d">-</span></td></tr>
+</table></pre><pre>2 files changed, 14 insertions(+), 4 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/config/config.go">internal/config/config.go</a> b/<a href="../file/internal/config/config.go">internal/config/config.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -565,7 +565,9 @@ func (t *TLSContext) ClientConfig() (*tls.Config, error) {
+</a> 		RootCAs:              cs.cas,
+ 		// Defer to the overridden connection verification in place of default validation
+ 		// when explicit peer verification is enabled.
+<a href="#h0-0-3" id="h0-0-3" class="d">-		InsecureSkipVerify: t.VerifyMode == &quot;relaxed&quot; || t.VerifyPeer != nil,
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+		InsecureSkipVerify: t.VerifyMode == &quot;none&quot; ||
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+			t.VerifyMode == &quot;relaxed&quot; ||
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+			t.VerifyPeer != nil,
+</a> 		MinVersion:         tls.VersionTLS12,
+ 		ClientSessionCache: tls.NewLRUClientSessionCache(128),
+ 		VerifyConnection:   verifyConnection,
+<a href="#h0-1" id="h0-1" class="h">@@ -575,6 +577,7 @@ func (t *TLSContext) ClientConfig() (*tls.Config, error) {
+</a> // ServerConfig transforms the TLS context into a tls.Config appropriate for purposes of TLS
+ // termination at a server.
+ func (t *TLSContext) ServerConfig() (*tls.Config, error) {
+<a href="#h0-1-3" id="h0-1-3" class="i">+	var verifyMode tls.ClientAuthType
+</a> 	var verifyConnection func(tls.ConnectionState) error
+ 
+ 	// Explicitly use a nil (empty) seed CA certificate pool in order to use only the CAs
+<a href="#h0-2" id="h0-2" class="h">@@ -588,9 +591,15 @@ func (t *TLSContext) ServerConfig() (*tls.Config, error) {
+</a> 		}
+ 	}
+ 
+<a href="#h0-2-3" id="h0-2-3" class="d">-	verifyMode := tls.VerifyClientCertIfGiven
+</a><a href="#h0-2-4" id="h0-2-4" class="d">-	if t.VerifyMode == &quot;strict&quot; {
+</a><a href="#h0-2-5" id="h0-2-5" class="i">+	switch t.VerifyMode {
+</a><a href="#h0-2-6" id="h0-2-6" class="i">+	case &quot;none&quot;:
+</a><a href="#h0-2-7" id="h0-2-7" class="i">+		verifyMode = tls.NoClientCert
+</a><a href="#h0-2-8" id="h0-2-8" class="i">+	case &quot;relaxed&quot;:
+</a><a href="#h0-2-9" id="h0-2-9" class="i">+		verifyMode = tls.VerifyClientCertIfGiven
+</a><a href="#h0-2-10" id="h0-2-10" class="i">+	case &quot;strict&quot;:
+</a> 		verifyMode = tls.RequireAndVerifyClientCert
+<a href="#h0-2-12" id="h0-2-12" class="i">+	default:
+</a><a href="#h0-2-13" id="h0-2-13" class="i">+		verifyMode = tls.NoClientCert
+</a> 	}
+ 
+ 	if t.VerifyPeer != nil {
+<b>diff --git a/<a id="h1" href="../file/internal/config/types.go">internal/config/types.go</a> b/<a href="../file/internal/config/types.go">internal/config/types.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -35,8 +35,9 @@ var (
+</a> 	}
+ 	tlsVerifyModes = map[string]bool{
+ 		&quot;&quot;:        true,
+<a href="#h1-0-3" id="h1-0-3" class="d">-		&quot;strict&quot;:  true,
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+		&quot;none&quot;:    true,
+</a> 		&quot;relaxed&quot;: true,
+<a href="#h1-0-6" id="h1-0-6" class="i">+		&quot;strict&quot;:  true,
+</a> 	}
+ 	connectionProtocols = map[string]bool{
+ 		&quot;&quot;:        true,
+</pre>
+</div>
+</body>
+</html>

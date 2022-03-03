@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/middleware/filters: Concurrency limit filter evaluation and active metrics, convert to async filter - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/322191df7e9470383038a3a2a691c9a473ac1707">322191df7e9470383038a3a2a691c9a473ac1707</a>
+<b>parent</b> <a href="../commit/a738824d8ff62a63ca3824d4d6a76ce7acb55434">a738824d8ff62a63ca3824d4d6a76ce7acb55434</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sat 20 Feb 2021 13:50:02 -0800
+
+internal/middleware/filters: Concurrency limit filter evaluation and active metrics, convert to async filter
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/middleware/filters/concurrency.go</a></td><td> | </td><td class="num">45</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">-</span></td></tr>
+</table></pre><pre>1 file changed, 44 insertions(+), 1 deletion(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/middleware/filters/concurrency.go">internal/middleware/filters/concurrency.go</a> b/<a href="../file/internal/middleware/filters/concurrency.go">internal/middleware/filters/concurrency.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -10,10 +10,16 @@ import (
+</a> 	&quot;go.uber.org/zap&quot;
+ 
+ 	&quot;courier/internal/config&quot;
+<a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;courier/internal/metrics&quot;
+</a> 	&quot;courier/internal/middleware&quot;
+ 	&quot;courier/internal/util&quot;
+ )
+ 
+<a href="#h0-0-8" id="h0-0-8" class="i">+const (
+</a><a href="#h0-0-9" id="h0-0-9" class="i">+	metricConcurrencyLimitEvaluate = &quot;filter.concurrency.evaluate&quot;
+</a><a href="#h0-0-10" id="h0-0-10" class="i">+	metricConcurrencyLimitActive   = &quot;filter.concurrency.active&quot;
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+)
+</a><a href="#h0-0-12" id="h0-0-12" class="i">+
+</a> var (
+ 	errConcurrencyLimitExceeded = errors.New(&quot;request concurrency limit exceeded&quot;)
+ )
+<a href="#h0-1" id="h0-1" class="h">@@ -46,17 +52,31 @@ func NewConcurrencyLimit(cfg *config.Filter) (middleware.Filter, error) {
+</a> 		params:           &amp;params,
+ 	}
+ 
+<a href="#h0-1-3" id="h0-1-3" class="d">-	return middleware.NewInstrumentedFilter(&quot;concurrency&quot;, filter), nil
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+	return middleware.NewAsyncFilter(middleware.NewInstrumentedFilter(&quot;concurrency&quot;, filter)), nil
+</a> }
+ 
+ // ProcessRequest rejects the inbound request if the current number of in-flight requests exceeds
+ // the maximum allowed, and allows the request to pass otherwise.
+ func (c *concurrencyLimit) ProcessRequest(clientReq *http.Request) (*http.Request, *http.Response, error) {
+<a href="#h0-1-10" id="h0-1-10" class="i">+	tags := map[string]interface{}{
+</a><a href="#h0-1-11" id="h0-1-11" class="i">+		&quot;route_host&quot;: clientReq.Host,
+</a><a href="#h0-1-12" id="h0-1-12" class="i">+		&quot;method&quot;:     clientReq.Method,
+</a><a href="#h0-1-13" id="h0-1-13" class="i">+		&quot;protocol&quot;:   clientReq.Proto,
+</a><a href="#h0-1-14" id="h0-1-14" class="i">+	}
+</a><a href="#h0-1-15" id="h0-1-15" class="i">+
+</a> 	if c.params.MaxConcurrentRequests &lt;= 0 {
+<a href="#h0-1-17" id="h0-1-17" class="i">+		metrics.Client.Incr(
+</a><a href="#h0-1-18" id="h0-1-18" class="i">+			metricConcurrencyLimitEvaluate,
+</a><a href="#h0-1-19" id="h0-1-19" class="i">+			util.MergeMaps(tags, map[string]interface{}{&quot;action&quot;: &quot;noop&quot;}),
+</a><a href="#h0-1-20" id="h0-1-20" class="i">+		)
+</a> 		return clientReq, nil, nil
+ 	}
+ 
+ 	if atomic.LoadInt64(c.inFlightRequests) &gt;= c.params.MaxConcurrentRequests {
+<a href="#h0-1-25" id="h0-1-25" class="i">+		metrics.Client.Incr(
+</a><a href="#h0-1-26" id="h0-1-26" class="i">+			metricConcurrencyLimitEvaluate,
+</a><a href="#h0-1-27" id="h0-1-27" class="i">+			util.MergeMaps(tags, map[string]interface{}{&quot;action&quot;: &quot;reject&quot;}),
+</a><a href="#h0-1-28" id="h0-1-28" class="i">+		)
+</a> 		zap.L().Warn(
+ 			&quot;concurrency limit filter rejecting request due to quota overflow&quot;,
+ 			zap.Int64(&quot;in_flight_current&quot;, atomic.LoadInt64(c.inFlightRequests)),
+<a href="#h0-2" id="h0-2" class="h">@@ -73,14 +93,37 @@ func (c *concurrencyLimit) ProcessRequest(clientReq *http.Request) (*http.Reques
+</a> 		return nil, resp, nil
+ 	}
+ 
+<a href="#h0-2-3" id="h0-2-3" class="i">+	metrics.Client.Incr(
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+		metricConcurrencyLimitEvaluate,
+</a><a href="#h0-2-5" id="h0-2-5" class="i">+		util.MergeMaps(tags, map[string]interface{}{&quot;action&quot;: &quot;pass&quot;}),
+</a><a href="#h0-2-6" id="h0-2-6" class="i">+	)
+</a><a href="#h0-2-7" id="h0-2-7" class="i">+
+</a> 	atomic.AddInt64(c.inFlightRequests, 1)
+ 
+<a href="#h0-2-10" id="h0-2-10" class="i">+	metrics.Client.Gauge(
+</a><a href="#h0-2-11" id="h0-2-11" class="i">+		metricConcurrencyLimitActive,
+</a><a href="#h0-2-12" id="h0-2-12" class="i">+		float64(atomic.LoadInt64(c.inFlightRequests)),
+</a><a href="#h0-2-13" id="h0-2-13" class="i">+		tags,
+</a><a href="#h0-2-14" id="h0-2-14" class="i">+	)
+</a><a href="#h0-2-15" id="h0-2-15" class="i">+
+</a> 	return clientReq, nil, nil
+ }
+ 
+ // ProcessResponse releases the in-flight request counter for the current request.
+ func (c *concurrencyLimit) ProcessResponse(proxyResp *http.Response) (*http.Response, error) {
+<a href="#h0-2-21" id="h0-2-21" class="i">+	tags := map[string]interface{}{
+</a><a href="#h0-2-22" id="h0-2-22" class="i">+		&quot;route_host&quot;: proxyResp.Request.Host,
+</a><a href="#h0-2-23" id="h0-2-23" class="i">+		&quot;method&quot;:     proxyResp.Request.Method,
+</a><a href="#h0-2-24" id="h0-2-24" class="i">+		&quot;protocol&quot;:   proxyResp.Request.Proto,
+</a><a href="#h0-2-25" id="h0-2-25" class="i">+	}
+</a><a href="#h0-2-26" id="h0-2-26" class="i">+
+</a> 	atomic.AddInt64(c.inFlightRequests, -1)
+ 
+<a href="#h0-2-29" id="h0-2-29" class="i">+	metrics.Client.Gauge(
+</a><a href="#h0-2-30" id="h0-2-30" class="i">+		metricConcurrencyLimitActive,
+</a><a href="#h0-2-31" id="h0-2-31" class="i">+		float64(atomic.LoadInt64(c.inFlightRequests)),
+</a><a href="#h0-2-32" id="h0-2-32" class="i">+		tags,
+</a><a href="#h0-2-33" id="h0-2-33" class="i">+	)
+</a><a href="#h0-2-34" id="h0-2-34" class="i">+
+</a> 	return proxyResp, nil
+ }
+</pre>
+</div>
+</body>
+</html>

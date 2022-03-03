@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/config, internal/server: Proxy option for exposing internal error in HTTP response - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/2ee95434c948255e8601d6f269341b7b79f811a6">2ee95434c948255e8601d6f269341b7b79f811a6</a>
+<b>parent</b> <a href="../commit/dc89bd2a23d793195d4241300d6c5f94884e8808">dc89bd2a23d793195d4241300d6c5f94884e8808</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Mon  8 Feb 2021 21:25:44 -0800
+
+internal/config, internal/server: Proxy option for exposing internal error in HTTP response
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">config.example.yaml</a></td><td> | </td><td class="num">2</td><td><span class="i">++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">internal/config/types.go</a></td><td> | </td><td class="num">6</td><td><span class="i">++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">internal/server/proxy.go</a></td><td> | </td><td class="num">9</td><td><span class="i">+++++++</span><span class="d">--</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">internal/server/server.go</a></td><td> | </td><td class="num">2</td><td><span class="i">+</span><span class="d">-</span></td></tr>
+</table></pre><pre>4 files changed, 16 insertions(+), 3 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/config.example.yaml">config.example.yaml</a> b/<a href="../file/config.example.yaml">config.example.yaml</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -26,6 +26,8 @@ server:
+</a>           - key: /etc/ssl/service/key.pem
+             certificate: /etc/ssl/service/cert.pem
+             authority: /etc/ssl/service/ca.pem
+<a href="#h0-0-3" id="h0-0-3" class="i">+  proxy:
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+    enable_error_propagation: true
+</a>   virtual_hosts:
+     - name: foo
+       host: foo.example.com
+<b>diff --git a/<a id="h1" href="../file/internal/config/types.go">internal/config/types.go</a> b/<a href="../file/internal/config/types.go">internal/config/types.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -100,10 +100,16 @@ type Listener struct {
+</a> 	TLSContext *TLSContext      `yaml:&quot;tls_context&quot;`
+ }
+ 
+<a href="#h1-0-3" id="h1-0-3" class="i">+// Proxy describes proxy behavior options.
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+type Proxy struct {
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+	EnableErrorPropagation bool `yaml:&quot;enable_error_propagation&quot;`
+</a><a href="#h1-0-6" id="h1-0-6" class="i">+}
+</a><a href="#h1-0-7" id="h1-0-7" class="i">+
+</a> // Server describes configuration for the server.
+ type Server struct {
+ 	Listeners    []*Listener    `yaml:&quot;listeners&quot;`
+ 	VirtualHosts []*VirtualHost `yaml:&quot;virtual_hosts&quot;`
+<a href="#h1-0-12" id="h1-0-12" class="i">+	Proxy        Proxy          `yaml:&quot;proxy&quot;`
+</a> }
+ 
+ // Metrics describes metrics output configuration.
+<b>diff --git a/<a id="h2" href="../file/internal/server/proxy.go">internal/server/proxy.go</a> b/<a href="../file/internal/server/proxy.go">internal/server/proxy.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -54,6 +54,7 @@ var (
+</a> // reverseProxy is an http.Handler that abstracts an httputil.ReverseProxy.
+ type reverseProxy struct {
+ 	vhosts []*config.VirtualHost
+<a href="#h2-0-3" id="h2-0-3" class="i">+	opts   config.Proxy
+</a> 
+ 	filterChains map[string]middleware.Filter
+ 	transports   *util.ConcurrentMap
+<a href="#h2-1" id="h2-1" class="h">@@ -61,7 +62,7 @@ type reverseProxy struct {
+</a> }
+ 
+ // newReverseProxy creates a new reverseProxy from a list of virtual host configurations.
+<a href="#h2-1-3" id="h2-1-3" class="d">-func newReverseProxy(vhosts []*config.VirtualHost) (http.Handler, error) {
+</a><a href="#h2-1-4" id="h2-1-4" class="i">+func newReverseProxy(vhosts []*config.VirtualHost, opts config.Proxy) (http.Handler, error) {
+</a> 	filterChains := make(map[string]middleware.Filter)
+ 
+ 	// Set up the filter chains for each virtual host up front, so that they can be trivially
+<a href="#h2-2" id="h2-2" class="h">@@ -117,6 +118,7 @@ func newReverseProxy(vhosts []*config.VirtualHost) (http.Handler, error) {
+</a> 
+ 	return &amp;reverseProxy{
+ 		vhosts:       vhosts,
+<a href="#h2-2-3" id="h2-2-3" class="i">+		opts:         opts,
+</a> 		filterChains: filterChains,
+ 		transports:   util.NewConcurrentMap(),
+ 		sequenceID:   new(int64),
+<a href="#h2-3" id="h2-3" class="h">@@ -171,7 +173,10 @@ func (rp *reverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+</a> 				zap.Error(err),
+ 			)
+ 
+<a href="#h2-3-3" id="h2-3-3" class="d">-			errResp.tags = map[string]string{&quot;error&quot;: err.Error()}
+</a><a href="#h2-3-4" id="h2-3-4" class="i">+			if rp.opts.EnableErrorPropagation {
+</a><a href="#h2-3-5" id="h2-3-5" class="i">+				errResp.tags = map[string]string{&quot;error&quot;: err.Error()}
+</a><a href="#h2-3-6" id="h2-3-6" class="i">+			}
+</a><a href="#h2-3-7" id="h2-3-7" class="i">+
+</a> 			resp := errResp.response()
+ 			resp.Request = proxyReq
+ 
+<b>diff --git a/<a id="h3" href="../file/internal/server/server.go">internal/server/server.go</a> b/<a href="../file/internal/server/server.go">internal/server/server.go</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -22,7 +22,7 @@ type Server struct {
+</a> 
+ // New creates a new Courier server from the configuration.
+ func New(cfg *config.Config) (*Server, error) {
+<a href="#h3-0-3" id="h3-0-3" class="d">-	rp, err := newReverseProxy(cfg.Server.VirtualHosts)
+</a><a href="#h3-0-4" id="h3-0-4" class="i">+	rp, err := newReverseProxy(cfg.Server.VirtualHosts, cfg.Server.Proxy)
+</a> 	if err != nil {
+ 		return nil, &amp;util.Error{
+ 			Namespace:    &quot;server&quot;,
+</pre>
+</div>
+</body>
+</html>

@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>conn.go - bitflow - Layer 4 TCP proxy for secure interconnection of isolated networks</title>
+<meta name="description" content="Layer 4 TCP proxy for secure interconnection of isolated networks" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="bitflow Atom Feed" href="../../../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="bitflow Atom Feed (tags)" href="../../../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>bitflow</h1><span class="desc">Layer 4 TCP proxy for secure interconnection of isolated networks</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/bitflow.git">https://source.static.kevinlin.info/bitflow.git</a></td></tr><tr><td></td><td>
+<a href="../../../log">Log</a> | <a href="../../../files">Files</a> | <a href="../../../refs">Refs</a> | <a href="../../../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<p>internal/server/<strong>conn.go</strong> (3948B) (<a href="../../../raw/internal/server/conn.go">raw</a>) (<a href="../../../file/internal/server/conn.go">file</a>)</p><hr/>
+<table id="blob">
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l1" class="line" id="l1">      1</a> package server</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l2" class="line" id="l2">      2</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l3" class="line" id="l3">      3</a> import (</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l4" class="line" id="l4">      4</a> 	&quot;crypto/tls&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l5" class="line" id="l5">      5</a> 	&quot;fmt&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l6" class="line" id="l6">      6</a> 	&quot;net&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l7" class="line" id="l7">      7</a> 	&quot;sync/atomic&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l8" class="line" id="l8">      8</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l9" class="line" id="l9">      9</a> 	&quot;bitflow/internal/config&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l10" class="line" id="l10">     10</a> 	&quot;bitflow/pkg/proxy&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l11" class="line" id="l11">     11</a> )</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l12" class="line" id="l12">     12</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l13" class="line" id="l13">     13</a> // targetConnFactory is an alias for a factory that dials a target, given a net.Conn representing</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l14" class="line" id="l14">     14</a> // the source connection. It returns a net.Conn for the destination as well as an I/O pipe</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l15" class="line" id="l15">     15</a> // implementation of proxy.Pipe to use for the connection proxy.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l16" class="line" id="l16">     16</a> type targetConnFactory func(net.Conn) (net.Conn, proxy.Pipe, error)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l17" class="line" id="l17">     17</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l18" class="line" id="l18">     18</a> // targetCandidate is a pair of a target&#39;s configuration and its associated factory capable of</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l19" class="line" id="l19">     19</a> // supplying a connection for that target.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l20" class="line" id="l20">     20</a> type targetCandidate struct {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l21" class="line" id="l21">     21</a> 	cfg     *config.Target</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l22" class="line" id="l22">     22</a> 	factory targetConnFactory</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l23" class="line" id="l23">     23</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l24" class="line" id="l24">     24</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l25" class="line" id="l25">     25</a> // newFailoverLoadBalancer creates a load-balanced connection factory using a per-target failover</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l26" class="line" id="l26">     26</a> // policy. Each target is dialed in order until one successfully supplies a connection. An error is</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l27" class="line" id="l27">     27</a> // returned if all targets fail.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l28" class="line" id="l28">     28</a> func newFailoverLoadBalancer(candidates []targetCandidate) targetConnFactory {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l29" class="line" id="l29">     29</a> 	return func(src net.Conn) (conn net.Conn, pipe proxy.Pipe, err error) {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l30" class="line" id="l30">     30</a> 		for _, candidate := range candidates {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l31" class="line" id="l31">     31</a> 			conn, pipe, err = candidate.factory(src)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l32" class="line" id="l32">     32</a> 			if err == nil {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l33" class="line" id="l33">     33</a> 				return conn, pipe, nil</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l34" class="line" id="l34">     34</a> 			}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l35" class="line" id="l35">     35</a> 		}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l36" class="line" id="l36">     36</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l37" class="line" id="l37">     37</a> 		return nil, nil, fmt.Errorf(</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l38" class="line" id="l38">     38</a> 			&quot;server: failover load balancer exhausted all available candidate &quot;+</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l39" class="line" id="l39">     39</a> 				&quot;targets without a successful connection: targets=%d err=%v&quot;,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l40" class="line" id="l40">     40</a> 			len(candidates),</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l41" class="line" id="l41">     41</a> 			err,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l42" class="line" id="l42">     42</a> 		)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l43" class="line" id="l43">     43</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l44" class="line" id="l44">     44</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l45" class="line" id="l45">     45</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l46" class="line" id="l46">     46</a> // newRoundRobinBalancer creates a load-balanced connection factory with a round-robin rotation</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l47" class="line" id="l47">     47</a> // policy. The factory rotates through all targets fairly on each successive connection attempt.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l48" class="line" id="l48">     48</a> func newRoundRobinBalancer(candidates []targetCandidate) targetConnFactory {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l49" class="line" id="l49">     49</a> 	id := new(uint64)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l50" class="line" id="l50">     50</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l51" class="line" id="l51">     51</a> 	return func(src net.Conn) (net.Conn, proxy.Pipe, error) {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l52" class="line" id="l52">     52</a> 		defer atomic.AddUint64(id, 1)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l53" class="line" id="l53">     53</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l54" class="line" id="l54">     54</a> 		return candidates[int(atomic.LoadUint64(id))%len(candidates)].factory(src)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l55" class="line" id="l55">     55</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l56" class="line" id="l56">     56</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l57" class="line" id="l57">     57</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l58" class="line" id="l58">     58</a> // newSNILoadBalancer creates a load-balanced connection factory for TLS connections that routes</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l59" class="line" id="l59">     59</a> // requests to targets based on the SNI (Server Name Indication) header in the client hello</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l60" class="line" id="l60">     60</a> // information revealed during the TLS handshake. The first target whose name is an exact match</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l61" class="line" id="l61">     61</a> // with the SNI value is selected to provide a connection. An error is returned if no targets match</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l62" class="line" id="l62">     62</a> // the client-indicated SNI.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l63" class="line" id="l63">     63</a> func newSNILoadBalancer(candidates []targetCandidate) targetConnFactory {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l64" class="line" id="l64">     64</a> 	return func(src net.Conn) (net.Conn, proxy.Pipe, error) {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l65" class="line" id="l65">     65</a> 		srcTLSConn, ok := src.(*tls.Conn)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l66" class="line" id="l66">     66</a> 		if !ok {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l67" class="line" id="l67">     67</a> 			return nil, nil, fmt.Errorf(</pre></td></tr>
+<tr>
+<td><a href="../../../commit/4120de94566c23937f4f436644e3503b5e45c643">4120de94566c23937f4f436644e3503b5e45c643</a></td><td>[Sun  5 Dec 2021 11:26:06 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l68" class="line" id="l68">     68</a> 				&quot;server: cannot extract TLS metadata from source connection; &quot;+</pre></td></tr>
+<tr>
+<td><a href="../../../commit/4120de94566c23937f4f436644e3503b5e45c643">4120de94566c23937f4f436644e3503b5e45c643</a></td><td>[Sun  5 Dec 2021 11:26:06 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l69" class="line" id="l69">     69</a> 					&quot;client transport is most likely not TLS: src=%v&quot;,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/4120de94566c23937f4f436644e3503b5e45c643">4120de94566c23937f4f436644e3503b5e45c643</a></td><td>[Sun  5 Dec 2021 11:26:06 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l70" class="line" id="l70">     70</a> 				src.RemoteAddr(),</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l71" class="line" id="l71">     71</a> 			)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l72" class="line" id="l72">     72</a> 		}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l73" class="line" id="l73">     73</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l74" class="line" id="l74">     74</a> 		// At this point in the connection, a handshake most likely has not yet been</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l75" class="line" id="l75">     75</a> 		// executed as there has not yet been any user I/O on the source connection. Force</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l76" class="line" id="l76">     76</a> 		// completion of the TLS handshake at this stage in order to expose the SNI</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l77" class="line" id="l77">     77</a> 		// requested by the client in its hello payload for purposes of target routing.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l78" class="line" id="l78">     78</a> 		if err := srcTLSConn.Handshake(); err != nil {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/4120de94566c23937f4f436644e3503b5e45c643">4120de94566c23937f4f436644e3503b5e45c643</a></td><td>[Sun  5 Dec 2021 11:26:06 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l79" class="line" id="l79">     79</a> 			return nil, nil, fmt.Errorf(</pre></td></tr>
+<tr>
+<td><a href="../../../commit/4120de94566c23937f4f436644e3503b5e45c643">4120de94566c23937f4f436644e3503b5e45c643</a></td><td>[Sun  5 Dec 2021 11:26:06 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l80" class="line" id="l80">     80</a> 				&quot;server: error in TLS handshake: src=%v err=%v&quot;,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/4120de94566c23937f4f436644e3503b5e45c643">4120de94566c23937f4f436644e3503b5e45c643</a></td><td>[Sun  5 Dec 2021 11:26:06 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l81" class="line" id="l81">     81</a> 				src.RemoteAddr(),</pre></td></tr>
+<tr>
+<td><a href="../../../commit/4120de94566c23937f4f436644e3503b5e45c643">4120de94566c23937f4f436644e3503b5e45c643</a></td><td>[Sun  5 Dec 2021 11:26:06 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l82" class="line" id="l82">     82</a> 				err,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/4120de94566c23937f4f436644e3503b5e45c643">4120de94566c23937f4f436644e3503b5e45c643</a></td><td>[Sun  5 Dec 2021 11:26:06 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l83" class="line" id="l83">     83</a> 			)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l84" class="line" id="l84">     84</a> 		}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l85" class="line" id="l85">     85</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l86" class="line" id="l86">     86</a> 		state := srcTLSConn.ConnectionState()</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l87" class="line" id="l87">     87</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l88" class="line" id="l88">     88</a> 		if state.ServerName == &quot;&quot; {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l89" class="line" id="l89">     89</a> 			return nil, nil, fmt.Errorf(</pre></td></tr>
+<tr>
+<td><a href="../../../commit/4120de94566c23937f4f436644e3503b5e45c643">4120de94566c23937f4f436644e3503b5e45c643</a></td><td>[Sun  5 Dec 2021 11:26:06 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l90" class="line" id="l90">     90</a> 				&quot;server: no SNI available from client TLS handshake: src=%v&quot;,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/4120de94566c23937f4f436644e3503b5e45c643">4120de94566c23937f4f436644e3503b5e45c643</a></td><td>[Sun  5 Dec 2021 11:26:06 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l91" class="line" id="l91">     91</a> 				src.RemoteAddr(),</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l92" class="line" id="l92">     92</a> 			)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l93" class="line" id="l93">     93</a> 		}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l94" class="line" id="l94">     94</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l95" class="line" id="l95">     95</a> 		// Select the first matching target whose name is equal to the client-requested SNI.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l96" class="line" id="l96">     96</a> 		for _, candidate := range candidates {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l97" class="line" id="l97">     97</a> 			if candidate.cfg.Name == state.ServerName {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l98" class="line" id="l98">     98</a> 				return candidate.factory(src)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l99" class="line" id="l99">     99</a> 			}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l100" class="line" id="l100">    100</a> 		}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l101" class="line" id="l101">    101</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l102" class="line" id="l102">    102</a> 		return nil, nil, fmt.Errorf(</pre></td></tr>
+<tr>
+<td><a href="../../../commit/4120de94566c23937f4f436644e3503b5e45c643">4120de94566c23937f4f436644e3503b5e45c643</a></td><td>[Sun  5 Dec 2021 11:26:06 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l103" class="line" id="l103">    103</a> 			&quot;server: no targets match requested server name: src=%v sni=%s&quot;,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/4120de94566c23937f4f436644e3503b5e45c643">4120de94566c23937f4f436644e3503b5e45c643</a></td><td>[Sun  5 Dec 2021 11:26:06 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l104" class="line" id="l104">    104</a> 			src.RemoteAddr(),</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l105" class="line" id="l105">    105</a> 			state.ServerName,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l106" class="line" id="l106">    106</a> 		)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l107" class="line" id="l107">    107</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l108" class="line" id="l108">    108</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l109" class="line" id="l109">    109</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l110" class="line" id="l110">    110</a> // newStaticLoadBalancer creates a connection factory that always uses the first available target</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l111" class="line" id="l111">    111</a> // to provide a connection.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l112" class="line" id="l112">    112</a> func newStaticLoadBalancer(candidates []targetCandidate) targetConnFactory {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l113" class="line" id="l113">    113</a> 	return candidates[0].factory</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d440a8e51ab67d8fe760eda5736ba44a988c207c">d440a8e51ab67d8fe760eda5736ba44a988c207c</a></td><td>[Sat  4 Dec 2021 22:00:39 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l114" class="line" id="l114">    114</a> }</pre></td></tr>
+</table>
+</div>
+</body>
+</html>

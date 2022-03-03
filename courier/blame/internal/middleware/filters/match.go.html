@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>match.go - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../../../../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../../../../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../../../../log">Log</a> | <a href="../../../../files">Files</a> | <a href="../../../../refs">Refs</a> | <a href="../../../../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<p>internal/middleware/filters/<strong>match.go</strong> (5297B) (<a href="../../../../raw/internal/middleware/filters/match.go">raw</a>) (<a href="../../../../file/internal/middleware/filters/match.go">file</a>)</p><hr/>
+<table id="blob">
+<tr>
+<td><a href="../../../../commit/f4e4aeed91c6784c6f1fed36aeb68da31e751a22">f4e4aeed91c6784c6f1fed36aeb68da31e751a22</a></td><td>[Sat 20 Feb 2021 11:48:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l1" class="line" id="l1">      1</a> package filters</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/f4e4aeed91c6784c6f1fed36aeb68da31e751a22">f4e4aeed91c6784c6f1fed36aeb68da31e751a22</a></td><td>[Sat 20 Feb 2021 11:48:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l2" class="line" id="l2">      2</a> </pre></td></tr>
+<tr>
+<td><a href="../../../../commit/f4e4aeed91c6784c6f1fed36aeb68da31e751a22">f4e4aeed91c6784c6f1fed36aeb68da31e751a22</a></td><td>[Sat 20 Feb 2021 11:48:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l3" class="line" id="l3">      3</a> import (</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/2cc4a71cc05eee919bfc8835da4d62fb6296b2e0">2cc4a71cc05eee919bfc8835da4d62fb6296b2e0</a></td><td>[Mon  1 Mar 2021 23:18:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l4" class="line" id="l4">      4</a> 	&quot;context&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/93a74d08325146fbd92e863885b73db8c5ff7f49">93a74d08325146fbd92e863885b73db8c5ff7f49</a></td><td>[Sat 17 Apr 2021 14:28:09 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l5" class="line" id="l5">      5</a> 	&quot;net&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/f4e4aeed91c6784c6f1fed36aeb68da31e751a22">f4e4aeed91c6784c6f1fed36aeb68da31e751a22</a></td><td>[Sat 20 Feb 2021 11:48:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l6" class="line" id="l6">      6</a> 	&quot;net/http&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/f4e4aeed91c6784c6f1fed36aeb68da31e751a22">f4e4aeed91c6784c6f1fed36aeb68da31e751a22</a></td><td>[Sat 20 Feb 2021 11:48:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l7" class="line" id="l7">      7</a> </pre></td></tr>
+<tr>
+<td><a href="../../../../commit/f4e4aeed91c6784c6f1fed36aeb68da31e751a22">f4e4aeed91c6784c6f1fed36aeb68da31e751a22</a></td><td>[Sat 20 Feb 2021 11:48:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l8" class="line" id="l8">      8</a> 	&quot;go.uber.org/zap&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/f4e4aeed91c6784c6f1fed36aeb68da31e751a22">f4e4aeed91c6784c6f1fed36aeb68da31e751a22</a></td><td>[Sat 20 Feb 2021 11:48:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l9" class="line" id="l9">      9</a> </pre></td></tr>
+<tr>
+<td><a href="../../../../commit/f4e4aeed91c6784c6f1fed36aeb68da31e751a22">f4e4aeed91c6784c6f1fed36aeb68da31e751a22</a></td><td>[Sat 20 Feb 2021 11:48:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l10" class="line" id="l10">     10</a> 	&quot;courier/internal/config&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/c23ce6dca000d9f60cd2c7176e29350e70cc9127">c23ce6dca000d9f60cd2c7176e29350e70cc9127</a></td><td>[Mon  1 Mar 2021 23:29:55 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l11" class="line" id="l11">     11</a> 	&quot;courier/internal/metrics&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/f4e4aeed91c6784c6f1fed36aeb68da31e751a22">f4e4aeed91c6784c6f1fed36aeb68da31e751a22</a></td><td>[Sat 20 Feb 2021 11:48:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l12" class="line" id="l12">     12</a> 	&quot;courier/internal/middleware&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/c23ce6dca000d9f60cd2c7176e29350e70cc9127">c23ce6dca000d9f60cd2c7176e29350e70cc9127</a></td><td>[Mon  1 Mar 2021 23:29:55 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l13" class="line" id="l13">     13</a> 	&quot;courier/internal/util&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/c23ce6dca000d9f60cd2c7176e29350e70cc9127">c23ce6dca000d9f60cd2c7176e29350e70cc9127</a></td><td>[Mon  1 Mar 2021 23:29:55 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l14" class="line" id="l14">     14</a> )</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/c23ce6dca000d9f60cd2c7176e29350e70cc9127">c23ce6dca000d9f60cd2c7176e29350e70cc9127</a></td><td>[Mon  1 Mar 2021 23:29:55 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l15" class="line" id="l15">     15</a> </pre></td></tr>
+<tr>
+<td><a href="../../../../commit/c23ce6dca000d9f60cd2c7176e29350e70cc9127">c23ce6dca000d9f60cd2c7176e29350e70cc9127</a></td><td>[Mon  1 Mar 2021 23:29:55 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l16" class="line" id="l16">     16</a> const (</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/c23ce6dca000d9f60cd2c7176e29350e70cc9127">c23ce6dca000d9f60cd2c7176e29350e70cc9127</a></td><td>[Mon  1 Mar 2021 23:29:55 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l17" class="line" id="l17">     17</a> 	metricMatchEvaluate = &quot;filter.match.evaluate&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/f4e4aeed91c6784c6f1fed36aeb68da31e751a22">f4e4aeed91c6784c6f1fed36aeb68da31e751a22</a></td><td>[Sat 20 Feb 2021 11:48:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l18" class="line" id="l18">     18</a> )</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/f4e4aeed91c6784c6f1fed36aeb68da31e751a22">f4e4aeed91c6784c6f1fed36aeb68da31e751a22</a></td><td>[Sat 20 Feb 2021 11:48:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l19" class="line" id="l19">     19</a> </pre></td></tr>
+<tr>
+<td><a href="../../../../commit/f4e4aeed91c6784c6f1fed36aeb68da31e751a22">f4e4aeed91c6784c6f1fed36aeb68da31e751a22</a></td><td>[Sat 20 Feb 2021 11:48:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l20" class="line" id="l20">     20</a> // matchSpec is a specification of parameters against which the incoming request should match.</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/f4e4aeed91c6784c6f1fed36aeb68da31e751a22">f4e4aeed91c6784c6f1fed36aeb68da31e751a22</a></td><td>[Sat 20 Feb 2021 11:48:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l21" class="line" id="l21">     21</a> // All fields are optional; specification of no criteria indicates that all requests should be</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/f4e4aeed91c6784c6f1fed36aeb68da31e751a22">f4e4aeed91c6784c6f1fed36aeb68da31e751a22</a></td><td>[Sat 20 Feb 2021 11:48:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l22" class="line" id="l22">     22</a> // matched. Similarly, specification of multiple criteria indicates that all criteria need to be</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/f4e4aeed91c6784c6f1fed36aeb68da31e751a22">f4e4aeed91c6784c6f1fed36aeb68da31e751a22</a></td><td>[Sat 20 Feb 2021 11:48:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l23" class="line" id="l23">     23</a> // met for the request to be matched.</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/f4e4aeed91c6784c6f1fed36aeb68da31e751a22">f4e4aeed91c6784c6f1fed36aeb68da31e751a22</a></td><td>[Sat 20 Feb 2021 11:48:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l24" class="line" id="l24">     24</a> type matchSpec struct {</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/a3911f1250e313e9e090c5b41c31abcf9bd03ba3">a3911f1250e313e9e090c5b41c31abcf9bd03ba3</a></td><td>[Sun 14 Nov 2021 10:44:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l25" class="line" id="l25">     25</a> 	Scheme    *config.Regex `yaml:&quot;scheme&quot;`</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/a5bed929e13f9a46b6335be35e91a100a92abd55">a5bed929e13f9a46b6335be35e91a100a92abd55</a></td><td>[Sun 14 Nov 2021 10:38:00 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l26" class="line" id="l26">     26</a> 	Method    *config.Regex `yaml:&quot;method&quot;`</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/a5bed929e13f9a46b6335be35e91a100a92abd55">a5bed929e13f9a46b6335be35e91a100a92abd55</a></td><td>[Sun 14 Nov 2021 10:38:00 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l27" class="line" id="l27">     27</a> 	Host      *config.Regex `yaml:&quot;host&quot;`</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/a5bed929e13f9a46b6335be35e91a100a92abd55">a5bed929e13f9a46b6335be35e91a100a92abd55</a></td><td>[Sun 14 Nov 2021 10:38:00 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l28" class="line" id="l28">     28</a> 	Path      *config.Regex `yaml:&quot;path&quot;`</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/a5bed929e13f9a46b6335be35e91a100a92abd55">a5bed929e13f9a46b6335be35e91a100a92abd55</a></td><td>[Sun 14 Nov 2021 10:38:00 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l29" class="line" id="l29">     29</a> 	Transport *config.Regex `yaml:&quot;transport&quot;`</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/a5bed929e13f9a46b6335be35e91a100a92abd55">a5bed929e13f9a46b6335be35e91a100a92abd55</a></td><td>[Sun 14 Nov 2021 10:38:00 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l30" class="line" id="l30">     30</a> 	Source    *config.CIDR  `yaml:&quot;source&quot;`</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/a5bed929e13f9a46b6335be35e91a100a92abd55">a5bed929e13f9a46b6335be35e91a100a92abd55</a></td><td>[Sun 14 Nov 2021 10:38:00 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l31" class="line" id="l31">     31</a> 	Header    *struct {</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/f4e4aeed91c6784c6f1fed36aeb68da31e751a22">f4e4aeed91c6784c6f1fed36aeb68da31e751a22</a></td><td>[Sat 20 Feb 2021 11:48:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l32" class="line" id="l32">     32</a> 		Key   string        `yaml:&quot;key&quot;`</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/f4e4aeed91c6784c6f1fed36aeb68da31e751a22">f4e4aeed91c6784c6f1fed36aeb68da31e751a22</a></td><td>[Sat 20 Feb 2021 11:48:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l33" class="line" id="l33">     33</a> 		Value *config.Regex `yaml:&quot;value&quot;`</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/f4e4aeed91c6784c6f1fed36aeb68da31e751a22">f4e4aeed91c6784c6f1fed36aeb68da31e751a22</a></td><td>[Sat 20 Feb 2021 11:48:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l34" class="line" id="l34">     34</a> 	} `yaml:&quot;header&quot;`</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/f4e4aeed91c6784c6f1fed36aeb68da31e751a22">f4e4aeed91c6784c6f1fed36aeb68da31e751a22</a></td><td>[Sat 20 Feb 2021 11:48:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l35" class="line" id="l35">     35</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/f4e4aeed91c6784c6f1fed36aeb68da31e751a22">f4e4aeed91c6784c6f1fed36aeb68da31e751a22</a></td><td>[Sat 20 Feb 2021 11:48:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l36" class="line" id="l36">     36</a> </pre></td></tr>
+<tr>
+<td><a href="../../../../commit/f4e4aeed91c6784c6f1fed36aeb68da31e751a22">f4e4aeed91c6784c6f1fed36aeb68da31e751a22</a></td><td>[Sat 20 Feb 2021 11:48:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l37" class="line" id="l37">     37</a> // match is a meta filter that passes logic to another filter only if the request fulfills the match</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/f4e4aeed91c6784c6f1fed36aeb68da31e751a22">f4e4aeed91c6784c6f1fed36aeb68da31e751a22</a></td><td>[Sat 20 Feb 2021 11:48:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l38" class="line" id="l38">     38</a> // specification criteria.</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/f4e4aeed91c6784c6f1fed36aeb68da31e751a22">f4e4aeed91c6784c6f1fed36aeb68da31e751a22</a></td><td>[Sat 20 Feb 2021 11:48:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l39" class="line" id="l39">     39</a> type match struct {</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/c23ce6dca000d9f60cd2c7176e29350e70cc9127">c23ce6dca000d9f60cd2c7176e29350e70cc9127</a></td><td>[Mon  1 Mar 2021 23:29:55 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l40" class="line" id="l40">     40</a> 	name string</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/f4e4aeed91c6784c6f1fed36aeb68da31e751a22">f4e4aeed91c6784c6f1fed36aeb68da31e751a22</a></td><td>[Sat 20 Feb 2021 11:48:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l41" class="line" id="l41">     41</a> 	spec *matchSpec</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/f4e4aeed91c6784c6f1fed36aeb68da31e751a22">f4e4aeed91c6784c6f1fed36aeb68da31e751a22</a></td><td>[Sat 20 Feb 2021 11:48:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l42" class="line" id="l42">     42</a> 	middleware.Filter</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/f4e4aeed91c6784c6f1fed36aeb68da31e751a22">f4e4aeed91c6784c6f1fed36aeb68da31e751a22</a></td><td>[Sat 20 Feb 2021 11:48:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l43" class="line" id="l43">     43</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/f4e4aeed91c6784c6f1fed36aeb68da31e751a22">f4e4aeed91c6784c6f1fed36aeb68da31e751a22</a></td><td>[Sat 20 Feb 2021 11:48:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l44" class="line" id="l44">     44</a> </pre></td></tr>
+<tr>
+<td><a href="../../../../commit/c23ce6dca000d9f60cd2c7176e29350e70cc9127">c23ce6dca000d9f60cd2c7176e29350e70cc9127</a></td><td>[Mon  1 Mar 2021 23:29:55 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l45" class="line" id="l45">     45</a> // newMatch wraps another middleware.Filter with client request match criteria.</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/c23ce6dca000d9f60cd2c7176e29350e70cc9127">c23ce6dca000d9f60cd2c7176e29350e70cc9127</a></td><td>[Mon  1 Mar 2021 23:29:55 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l46" class="line" id="l46">     46</a> func newMatch(name string, spec *matchSpec, filter middleware.Filter) middleware.Filter {</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/f4e4aeed91c6784c6f1fed36aeb68da31e751a22">f4e4aeed91c6784c6f1fed36aeb68da31e751a22</a></td><td>[Sat 20 Feb 2021 11:48:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l47" class="line" id="l47">     47</a> 	return &amp;match{</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/c23ce6dca000d9f60cd2c7176e29350e70cc9127">c23ce6dca000d9f60cd2c7176e29350e70cc9127</a></td><td>[Mon  1 Mar 2021 23:29:55 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l48" class="line" id="l48">     48</a> 		name:   name,</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/f4e4aeed91c6784c6f1fed36aeb68da31e751a22">f4e4aeed91c6784c6f1fed36aeb68da31e751a22</a></td><td>[Sat 20 Feb 2021 11:48:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l49" class="line" id="l49">     49</a> 		spec:   spec,</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/f4e4aeed91c6784c6f1fed36aeb68da31e751a22">f4e4aeed91c6784c6f1fed36aeb68da31e751a22</a></td><td>[Sat 20 Feb 2021 11:48:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l50" class="line" id="l50">     50</a> 		Filter: filter,</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/f4e4aeed91c6784c6f1fed36aeb68da31e751a22">f4e4aeed91c6784c6f1fed36aeb68da31e751a22</a></td><td>[Sat 20 Feb 2021 11:48:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l51" class="line" id="l51">     51</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/f4e4aeed91c6784c6f1fed36aeb68da31e751a22">f4e4aeed91c6784c6f1fed36aeb68da31e751a22</a></td><td>[Sat 20 Feb 2021 11:48:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l52" class="line" id="l52">     52</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/f4e4aeed91c6784c6f1fed36aeb68da31e751a22">f4e4aeed91c6784c6f1fed36aeb68da31e751a22</a></td><td>[Sat 20 Feb 2021 11:48:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l53" class="line" id="l53">     53</a> </pre></td></tr>
+<tr>
+<td><a href="../../../../commit/f4e4aeed91c6784c6f1fed36aeb68da31e751a22">f4e4aeed91c6784c6f1fed36aeb68da31e751a22</a></td><td>[Sat 20 Feb 2021 11:48:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l54" class="line" id="l54">     54</a> // ProcessRequest returns the request as-is without modification if the request fails to meet all</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/a5bed929e13f9a46b6335be35e91a100a92abd55">a5bed929e13f9a46b6335be35e91a100a92abd55</a></td><td>[Sun 14 Nov 2021 10:38:00 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l55" class="line" id="l55">     55</a> // the specified criteria, and passes the request to the underlying filter if the request meets</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/a5bed929e13f9a46b6335be35e91a100a92abd55">a5bed929e13f9a46b6335be35e91a100a92abd55</a></td><td>[Sun 14 Nov 2021 10:38:00 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l56" class="line" id="l56">     56</a> // all the specified criteria.</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/f4e4aeed91c6784c6f1fed36aeb68da31e751a22">f4e4aeed91c6784c6f1fed36aeb68da31e751a22</a></td><td>[Sat 20 Feb 2021 11:48:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l57" class="line" id="l57">     57</a> func (m *match) ProcessRequest(clientReq *http.Request) (*http.Request, *http.Response, error) {</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/c23ce6dca000d9f60cd2c7176e29350e70cc9127">c23ce6dca000d9f60cd2c7176e29350e70cc9127</a></td><td>[Mon  1 Mar 2021 23:29:55 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l58" class="line" id="l58">     58</a> 	tags := map[string]interface{}{</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/c23ce6dca000d9f60cd2c7176e29350e70cc9127">c23ce6dca000d9f60cd2c7176e29350e70cc9127</a></td><td>[Mon  1 Mar 2021 23:29:55 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l59" class="line" id="l59">     59</a> 		&quot;filter&quot;:     m.name,</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/c23ce6dca000d9f60cd2c7176e29350e70cc9127">c23ce6dca000d9f60cd2c7176e29350e70cc9127</a></td><td>[Mon  1 Mar 2021 23:29:55 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l60" class="line" id="l60">     60</a> 		&quot;route_host&quot;: clientReq.Host,</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/c23ce6dca000d9f60cd2c7176e29350e70cc9127">c23ce6dca000d9f60cd2c7176e29350e70cc9127</a></td><td>[Mon  1 Mar 2021 23:29:55 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l61" class="line" id="l61">     61</a> 		&quot;method&quot;:     clientReq.Method,</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/c23ce6dca000d9f60cd2c7176e29350e70cc9127">c23ce6dca000d9f60cd2c7176e29350e70cc9127</a></td><td>[Mon  1 Mar 2021 23:29:55 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l62" class="line" id="l62">     62</a> 		&quot;protocol&quot;:   clientReq.Proto,</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/c23ce6dca000d9f60cd2c7176e29350e70cc9127">c23ce6dca000d9f60cd2c7176e29350e70cc9127</a></td><td>[Mon  1 Mar 2021 23:29:55 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l63" class="line" id="l63">     63</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/c23ce6dca000d9f60cd2c7176e29350e70cc9127">c23ce6dca000d9f60cd2c7176e29350e70cc9127</a></td><td>[Mon  1 Mar 2021 23:29:55 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l64" class="line" id="l64">     64</a> </pre></td></tr>
+<tr>
+<td><a href="../../../../commit/2cc4a71cc05eee919bfc8835da4d62fb6296b2e0">2cc4a71cc05eee919bfc8835da4d62fb6296b2e0</a></td><td>[Mon  1 Mar 2021 23:18:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l65" class="line" id="l65">     65</a> 	ctx := clientReq.Context()</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/93a74d08325146fbd92e863885b73db8c5ff7f49">93a74d08325146fbd92e863885b73db8c5ff7f49</a></td><td>[Sat 17 Apr 2021 14:28:09 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l66" class="line" id="l66">     66</a> </pre></td></tr>
+<tr>
+<td><a href="../../../../commit/93a74d08325146fbd92e863885b73db8c5ff7f49">93a74d08325146fbd92e863885b73db8c5ff7f49</a></td><td>[Sat 17 Apr 2021 14:28:09 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l67" class="line" id="l67">     67</a> 	passthrough, err := m.match(clientReq)</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/93a74d08325146fbd92e863885b73db8c5ff7f49">93a74d08325146fbd92e863885b73db8c5ff7f49</a></td><td>[Sat 17 Apr 2021 14:28:09 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l68" class="line" id="l68">     68</a> 	if err != nil {</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/93a74d08325146fbd92e863885b73db8c5ff7f49">93a74d08325146fbd92e863885b73db8c5ff7f49</a></td><td>[Sat 17 Apr 2021 14:28:09 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l69" class="line" id="l69">     69</a> 		return nil, nil, &amp;util.Error{</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/93a74d08325146fbd92e863885b73db8c5ff7f49">93a74d08325146fbd92e863885b73db8c5ff7f49</a></td><td>[Sat 17 Apr 2021 14:28:09 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l70" class="line" id="l70">     70</a> 			Namespace:    &quot;filters&quot;,</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/93a74d08325146fbd92e863885b73db8c5ff7f49">93a74d08325146fbd92e863885b73db8c5ff7f49</a></td><td>[Sat 17 Apr 2021 14:28:09 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l71" class="line" id="l71">     71</a> 			Message:      &quot;error evaluating request against match specification&quot;,</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/93a74d08325146fbd92e863885b73db8c5ff7f49">93a74d08325146fbd92e863885b73db8c5ff7f49</a></td><td>[Sat 17 Apr 2021 14:28:09 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l72" class="line" id="l72">     72</a> 			Tags:         map[string]interface{}{&quot;match&quot;: m.spec},</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/93a74d08325146fbd92e863885b73db8c5ff7f49">93a74d08325146fbd92e863885b73db8c5ff7f49</a></td><td>[Sat 17 Apr 2021 14:28:09 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l73" class="line" id="l73">     73</a> 			StackedError: err,</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/93a74d08325146fbd92e863885b73db8c5ff7f49">93a74d08325146fbd92e863885b73db8c5ff7f49</a></td><td>[Sat 17 Apr 2021 14:28:09 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l74" class="line" id="l74">     74</a> 		}</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/93a74d08325146fbd92e863885b73db8c5ff7f49">93a74d08325146fbd92e863885b73db8c5ff7f49</a></td><td>[Sat 17 Apr 2021 14:28:09 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l75" class="line" id="l75">     75</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/2cc4a71cc05eee919bfc8835da4d62fb6296b2e0">2cc4a71cc05eee919bfc8835da4d62fb6296b2e0</a></td><td>[Mon  1 Mar 2021 23:18:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l76" class="line" id="l76">     76</a> </pre></td></tr>
+<tr>
+<td><a href="../../../../commit/2cc4a71cc05eee919bfc8835da4d62fb6296b2e0">2cc4a71cc05eee919bfc8835da4d62fb6296b2e0</a></td><td>[Mon  1 Mar 2021 23:18:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l77" class="line" id="l77">     77</a> 	// Maintain request lifecycle-attached state on whether the request matched the</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/2cc4a71cc05eee919bfc8835da4d62fb6296b2e0">2cc4a71cc05eee919bfc8835da4d62fb6296b2e0</a></td><td>[Mon  1 Mar 2021 23:18:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l78" class="line" id="l78">     78</a> 	// specification, and thus was eligible for filter processing.</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/2cc4a71cc05eee919bfc8835da4d62fb6296b2e0">2cc4a71cc05eee919bfc8835da4d62fb6296b2e0</a></td><td>[Mon  1 Mar 2021 23:18:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l79" class="line" id="l79">     79</a> 	status, ok := ctx.Value(ctxMatchStatus).(map[middleware.Filter]bool)</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/2cc4a71cc05eee919bfc8835da4d62fb6296b2e0">2cc4a71cc05eee919bfc8835da4d62fb6296b2e0</a></td><td>[Mon  1 Mar 2021 23:18:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l80" class="line" id="l80">     80</a> 	if ok {</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/2cc4a71cc05eee919bfc8835da4d62fb6296b2e0">2cc4a71cc05eee919bfc8835da4d62fb6296b2e0</a></td><td>[Mon  1 Mar 2021 23:18:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l81" class="line" id="l81">     81</a> 		status[m.Filter] = passthrough</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/2cc4a71cc05eee919bfc8835da4d62fb6296b2e0">2cc4a71cc05eee919bfc8835da4d62fb6296b2e0</a></td><td>[Mon  1 Mar 2021 23:18:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l82" class="line" id="l82">     82</a> 	} else {</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/2cc4a71cc05eee919bfc8835da4d62fb6296b2e0">2cc4a71cc05eee919bfc8835da4d62fb6296b2e0</a></td><td>[Mon  1 Mar 2021 23:18:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l83" class="line" id="l83">     83</a> 		ctx = context.WithValue(</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/2cc4a71cc05eee919bfc8835da4d62fb6296b2e0">2cc4a71cc05eee919bfc8835da4d62fb6296b2e0</a></td><td>[Mon  1 Mar 2021 23:18:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l84" class="line" id="l84">     84</a> 			ctx,</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/2cc4a71cc05eee919bfc8835da4d62fb6296b2e0">2cc4a71cc05eee919bfc8835da4d62fb6296b2e0</a></td><td>[Mon  1 Mar 2021 23:18:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l85" class="line" id="l85">     85</a> 			ctxMatchStatus,</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/2cc4a71cc05eee919bfc8835da4d62fb6296b2e0">2cc4a71cc05eee919bfc8835da4d62fb6296b2e0</a></td><td>[Mon  1 Mar 2021 23:18:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l86" class="line" id="l86">     86</a> 			map[middleware.Filter]bool{m.Filter: passthrough},</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/2cc4a71cc05eee919bfc8835da4d62fb6296b2e0">2cc4a71cc05eee919bfc8835da4d62fb6296b2e0</a></td><td>[Mon  1 Mar 2021 23:18:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l87" class="line" id="l87">     87</a> 		)</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/2cc4a71cc05eee919bfc8835da4d62fb6296b2e0">2cc4a71cc05eee919bfc8835da4d62fb6296b2e0</a></td><td>[Mon  1 Mar 2021 23:18:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l88" class="line" id="l88">     88</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/2cc4a71cc05eee919bfc8835da4d62fb6296b2e0">2cc4a71cc05eee919bfc8835da4d62fb6296b2e0</a></td><td>[Mon  1 Mar 2021 23:18:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l89" class="line" id="l89">     89</a> </pre></td></tr>
+<tr>
+<td><a href="../../../../commit/2cc4a71cc05eee919bfc8835da4d62fb6296b2e0">2cc4a71cc05eee919bfc8835da4d62fb6296b2e0</a></td><td>[Mon  1 Mar 2021 23:18:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l90" class="line" id="l90">     90</a> 	if !passthrough {</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/c23ce6dca000d9f60cd2c7176e29350e70cc9127">c23ce6dca000d9f60cd2c7176e29350e70cc9127</a></td><td>[Mon  1 Mar 2021 23:29:55 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l91" class="line" id="l91">     91</a> 		metrics.Client.Incr(</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/c23ce6dca000d9f60cd2c7176e29350e70cc9127">c23ce6dca000d9f60cd2c7176e29350e70cc9127</a></td><td>[Mon  1 Mar 2021 23:29:55 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l92" class="line" id="l92">     92</a> 			metricMatchEvaluate,</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/c23ce6dca000d9f60cd2c7176e29350e70cc9127">c23ce6dca000d9f60cd2c7176e29350e70cc9127</a></td><td>[Mon  1 Mar 2021 23:29:55 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l93" class="line" id="l93">     93</a> 			util.MergeMaps(tags, map[string]interface{}{&quot;action&quot;: &quot;reject&quot;}),</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/c23ce6dca000d9f60cd2c7176e29350e70cc9127">c23ce6dca000d9f60cd2c7176e29350e70cc9127</a></td><td>[Mon  1 Mar 2021 23:29:55 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l94" class="line" id="l94">     94</a> 		)</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/2cc4a71cc05eee919bfc8835da4d62fb6296b2e0">2cc4a71cc05eee919bfc8835da4d62fb6296b2e0</a></td><td>[Mon  1 Mar 2021 23:18:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l95" class="line" id="l95">     95</a> 		return clientReq.WithContext(ctx), nil, nil</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/f4e4aeed91c6784c6f1fed36aeb68da31e751a22">f4e4aeed91c6784c6f1fed36aeb68da31e751a22</a></td><td>[Sat 20 Feb 2021 11:48:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l96" class="line" id="l96">     96</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/f4e4aeed91c6784c6f1fed36aeb68da31e751a22">f4e4aeed91c6784c6f1fed36aeb68da31e751a22</a></td><td>[Sat 20 Feb 2021 11:48:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l97" class="line" id="l97">     97</a> </pre></td></tr>
+<tr>
+<td><a href="../../../../commit/c23ce6dca000d9f60cd2c7176e29350e70cc9127">c23ce6dca000d9f60cd2c7176e29350e70cc9127</a></td><td>[Mon  1 Mar 2021 23:29:55 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l98" class="line" id="l98">     98</a> 	metrics.Client.Incr(</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/c23ce6dca000d9f60cd2c7176e29350e70cc9127">c23ce6dca000d9f60cd2c7176e29350e70cc9127</a></td><td>[Mon  1 Mar 2021 23:29:55 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l99" class="line" id="l99">     99</a> 		metricMatchEvaluate,</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/c23ce6dca000d9f60cd2c7176e29350e70cc9127">c23ce6dca000d9f60cd2c7176e29350e70cc9127</a></td><td>[Mon  1 Mar 2021 23:29:55 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l100" class="line" id="l100">    100</a> 		util.MergeMaps(tags, map[string]interface{}{&quot;action&quot;: &quot;pass&quot;}),</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/c23ce6dca000d9f60cd2c7176e29350e70cc9127">c23ce6dca000d9f60cd2c7176e29350e70cc9127</a></td><td>[Mon  1 Mar 2021 23:29:55 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l101" class="line" id="l101">    101</a> 	)</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/f4e4aeed91c6784c6f1fed36aeb68da31e751a22">f4e4aeed91c6784c6f1fed36aeb68da31e751a22</a></td><td>[Sat 20 Feb 2021 11:48:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l102" class="line" id="l102">    102</a> 	zap.L().Debug(</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/f4e4aeed91c6784c6f1fed36aeb68da31e751a22">f4e4aeed91c6784c6f1fed36aeb68da31e751a22</a></td><td>[Sat 20 Feb 2021 11:48:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l103" class="line" id="l103">    103</a> 		&quot;request matched specification criteria&quot;,</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/f4e4aeed91c6784c6f1fed36aeb68da31e751a22">f4e4aeed91c6784c6f1fed36aeb68da31e751a22</a></td><td>[Sat 20 Feb 2021 11:48:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l104" class="line" id="l104">    104</a> 		zap.Stringer(&quot;method&quot;, m.spec.Method),</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/f4e4aeed91c6784c6f1fed36aeb68da31e751a22">f4e4aeed91c6784c6f1fed36aeb68da31e751a22</a></td><td>[Sat 20 Feb 2021 11:48:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l105" class="line" id="l105">    105</a> 		zap.Stringer(&quot;host&quot;, m.spec.Host),</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/f4e4aeed91c6784c6f1fed36aeb68da31e751a22">f4e4aeed91c6784c6f1fed36aeb68da31e751a22</a></td><td>[Sat 20 Feb 2021 11:48:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l106" class="line" id="l106">    106</a> 		zap.Stringer(&quot;path&quot;, m.spec.Path),</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/f4e4aeed91c6784c6f1fed36aeb68da31e751a22">f4e4aeed91c6784c6f1fed36aeb68da31e751a22</a></td><td>[Sat 20 Feb 2021 11:48:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l107" class="line" id="l107">    107</a> 		zap.Any(&quot;header&quot;, m.spec.Header),</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/f4e4aeed91c6784c6f1fed36aeb68da31e751a22">f4e4aeed91c6784c6f1fed36aeb68da31e751a22</a></td><td>[Sat 20 Feb 2021 11:48:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l108" class="line" id="l108">    108</a> 	)</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/f4e4aeed91c6784c6f1fed36aeb68da31e751a22">f4e4aeed91c6784c6f1fed36aeb68da31e751a22</a></td><td>[Sat 20 Feb 2021 11:48:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l109" class="line" id="l109">    109</a> </pre></td></tr>
+<tr>
+<td><a href="../../../../commit/2cc4a71cc05eee919bfc8835da4d62fb6296b2e0">2cc4a71cc05eee919bfc8835da4d62fb6296b2e0</a></td><td>[Mon  1 Mar 2021 23:18:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l110" class="line" id="l110">    110</a> 	return m.Filter.ProcessRequest(clientReq.WithContext(ctx))</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/2cc4a71cc05eee919bfc8835da4d62fb6296b2e0">2cc4a71cc05eee919bfc8835da4d62fb6296b2e0</a></td><td>[Mon  1 Mar 2021 23:18:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l111" class="line" id="l111">    111</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/2cc4a71cc05eee919bfc8835da4d62fb6296b2e0">2cc4a71cc05eee919bfc8835da4d62fb6296b2e0</a></td><td>[Mon  1 Mar 2021 23:18:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l112" class="line" id="l112">    112</a> </pre></td></tr>
+<tr>
+<td><a href="../../../../commit/2cc4a71cc05eee919bfc8835da4d62fb6296b2e0">2cc4a71cc05eee919bfc8835da4d62fb6296b2e0</a></td><td>[Mon  1 Mar 2021 23:18:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l113" class="line" id="l113">    113</a> // ProcessResponse conditionally invokes the underlying filter&#39;s response processor if and only if</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/2cc4a71cc05eee919bfc8835da4d62fb6296b2e0">2cc4a71cc05eee919bfc8835da4d62fb6296b2e0</a></td><td>[Mon  1 Mar 2021 23:18:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l114" class="line" id="l114">    114</a> // the same request was eligible for the filter&#39;s request processing.</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/2cc4a71cc05eee919bfc8835da4d62fb6296b2e0">2cc4a71cc05eee919bfc8835da4d62fb6296b2e0</a></td><td>[Mon  1 Mar 2021 23:18:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l115" class="line" id="l115">    115</a> func (m *match) ProcessResponse(proxyResp *http.Response) (*http.Response, error) {</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/2cc4a71cc05eee919bfc8835da4d62fb6296b2e0">2cc4a71cc05eee919bfc8835da4d62fb6296b2e0</a></td><td>[Mon  1 Mar 2021 23:18:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l116" class="line" id="l116">    116</a> 	status := proxyResp.Request.Context().Value(ctxMatchStatus).(map[middleware.Filter]bool)</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/2cc4a71cc05eee919bfc8835da4d62fb6296b2e0">2cc4a71cc05eee919bfc8835da4d62fb6296b2e0</a></td><td>[Mon  1 Mar 2021 23:18:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l117" class="line" id="l117">    117</a> </pre></td></tr>
+<tr>
+<td><a href="../../../../commit/93a74d08325146fbd92e863885b73db8c5ff7f49">93a74d08325146fbd92e863885b73db8c5ff7f49</a></td><td>[Sat 17 Apr 2021 14:28:09 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l118" class="line" id="l118">    118</a> 	if passthrough, ok := status[m.Filter]; ok &amp;&amp; passthrough {</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/2cc4a71cc05eee919bfc8835da4d62fb6296b2e0">2cc4a71cc05eee919bfc8835da4d62fb6296b2e0</a></td><td>[Mon  1 Mar 2021 23:18:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l119" class="line" id="l119">    119</a> 		return m.Filter.ProcessResponse(proxyResp)</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/2cc4a71cc05eee919bfc8835da4d62fb6296b2e0">2cc4a71cc05eee919bfc8835da4d62fb6296b2e0</a></td><td>[Mon  1 Mar 2021 23:18:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l120" class="line" id="l120">    120</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/2cc4a71cc05eee919bfc8835da4d62fb6296b2e0">2cc4a71cc05eee919bfc8835da4d62fb6296b2e0</a></td><td>[Mon  1 Mar 2021 23:18:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l121" class="line" id="l121">    121</a> </pre></td></tr>
+<tr>
+<td><a href="../../../../commit/2cc4a71cc05eee919bfc8835da4d62fb6296b2e0">2cc4a71cc05eee919bfc8835da4d62fb6296b2e0</a></td><td>[Mon  1 Mar 2021 23:18:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l122" class="line" id="l122">    122</a> 	return proxyResp, nil</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/2cc4a71cc05eee919bfc8835da4d62fb6296b2e0">2cc4a71cc05eee919bfc8835da4d62fb6296b2e0</a></td><td>[Mon  1 Mar 2021 23:18:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l123" class="line" id="l123">    123</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/2cc4a71cc05eee919bfc8835da4d62fb6296b2e0">2cc4a71cc05eee919bfc8835da4d62fb6296b2e0</a></td><td>[Mon  1 Mar 2021 23:18:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l124" class="line" id="l124">    124</a> </pre></td></tr>
+<tr>
+<td><a href="../../../../commit/2cc4a71cc05eee919bfc8835da4d62fb6296b2e0">2cc4a71cc05eee919bfc8835da4d62fb6296b2e0</a></td><td>[Mon  1 Mar 2021 23:18:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l125" class="line" id="l125">    125</a> // match evaluates the incoming client request against the match specification.</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/93a74d08325146fbd92e863885b73db8c5ff7f49">93a74d08325146fbd92e863885b73db8c5ff7f49</a></td><td>[Sat 17 Apr 2021 14:28:09 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l126" class="line" id="l126">    126</a> func (m *match) match(clientReq *http.Request) (bool, error) {</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/a3911f1250e313e9e090c5b41c31abcf9bd03ba3">a3911f1250e313e9e090c5b41c31abcf9bd03ba3</a></td><td>[Sun 14 Nov 2021 10:44:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l127" class="line" id="l127">    127</a> 	if m.spec.Scheme != nil &amp;&amp; !m.spec.Scheme.MatchString(clientReq.URL.Scheme) {</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/a3911f1250e313e9e090c5b41c31abcf9bd03ba3">a3911f1250e313e9e090c5b41c31abcf9bd03ba3</a></td><td>[Sun 14 Nov 2021 10:44:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l128" class="line" id="l128">    128</a> 		return false, nil</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/a3911f1250e313e9e090c5b41c31abcf9bd03ba3">a3911f1250e313e9e090c5b41c31abcf9bd03ba3</a></td><td>[Sun 14 Nov 2021 10:44:47 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l129" class="line" id="l129">    129</a> 	} else if m.spec.Method != nil &amp;&amp; !m.spec.Method.MatchString(clientReq.Method) {</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/93a74d08325146fbd92e863885b73db8c5ff7f49">93a74d08325146fbd92e863885b73db8c5ff7f49</a></td><td>[Sat 17 Apr 2021 14:28:09 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l130" class="line" id="l130">    130</a> 		return false, nil</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/2cc4a71cc05eee919bfc8835da4d62fb6296b2e0">2cc4a71cc05eee919bfc8835da4d62fb6296b2e0</a></td><td>[Mon  1 Mar 2021 23:18:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l131" class="line" id="l131">    131</a> 	} else if m.spec.Host != nil &amp;&amp; !m.spec.Host.MatchString(clientReq.Host) {</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/93a74d08325146fbd92e863885b73db8c5ff7f49">93a74d08325146fbd92e863885b73db8c5ff7f49</a></td><td>[Sat 17 Apr 2021 14:28:09 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l132" class="line" id="l132">    132</a> 		return false, nil</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/2cc4a71cc05eee919bfc8835da4d62fb6296b2e0">2cc4a71cc05eee919bfc8835da4d62fb6296b2e0</a></td><td>[Mon  1 Mar 2021 23:18:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l133" class="line" id="l133">    133</a> 	} else if m.spec.Path != nil &amp;&amp; !m.spec.Path.MatchString(clientReq.URL.Path) {</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/93a74d08325146fbd92e863885b73db8c5ff7f49">93a74d08325146fbd92e863885b73db8c5ff7f49</a></td><td>[Sat 17 Apr 2021 14:28:09 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l134" class="line" id="l134">    134</a> 		return false, nil</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/2cc4a71cc05eee919bfc8835da4d62fb6296b2e0">2cc4a71cc05eee919bfc8835da4d62fb6296b2e0</a></td><td>[Mon  1 Mar 2021 23:18:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l135" class="line" id="l135">    135</a> 	} else if m.spec.Header != nil {</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/2cc4a71cc05eee919bfc8835da4d62fb6296b2e0">2cc4a71cc05eee919bfc8835da4d62fb6296b2e0</a></td><td>[Mon  1 Mar 2021 23:18:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l136" class="line" id="l136">    136</a> 		value := clientReq.Header.Get(m.spec.Header.Key)</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/7e0b65007109963e6210cd21129ae1319c740fcd">7e0b65007109963e6210cd21129ae1319c740fcd</a></td><td>[Sat 13 Nov 2021 20:37:50 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l137" class="line" id="l137">    137</a> 		if value == &quot;&quot; {</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/7e0b65007109963e6210cd21129ae1319c740fcd">7e0b65007109963e6210cd21129ae1319c740fcd</a></td><td>[Sat 13 Nov 2021 20:37:50 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l138" class="line" id="l138">    138</a> 			return false, nil</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/7e0b65007109963e6210cd21129ae1319c740fcd">7e0b65007109963e6210cd21129ae1319c740fcd</a></td><td>[Sat 13 Nov 2021 20:37:50 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l139" class="line" id="l139">    139</a> 		}</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/7e0b65007109963e6210cd21129ae1319c740fcd">7e0b65007109963e6210cd21129ae1319c740fcd</a></td><td>[Sat 13 Nov 2021 20:37:50 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l140" class="line" id="l140">    140</a> </pre></td></tr>
+<tr>
+<td><a href="../../../../commit/7e0b65007109963e6210cd21129ae1319c740fcd">7e0b65007109963e6210cd21129ae1319c740fcd</a></td><td>[Sat 13 Nov 2021 20:37:50 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l141" class="line" id="l141">    141</a> 		if m.spec.Header.Value != nil &amp;&amp; !m.spec.Header.Value.MatchString(value) {</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/93a74d08325146fbd92e863885b73db8c5ff7f49">93a74d08325146fbd92e863885b73db8c5ff7f49</a></td><td>[Sat 17 Apr 2021 14:28:09 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l142" class="line" id="l142">    142</a> 			return false, nil</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/93a74d08325146fbd92e863885b73db8c5ff7f49">93a74d08325146fbd92e863885b73db8c5ff7f49</a></td><td>[Sat 17 Apr 2021 14:28:09 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l143" class="line" id="l143">    143</a> 		}</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/a5bed929e13f9a46b6335be35e91a100a92abd55">a5bed929e13f9a46b6335be35e91a100a92abd55</a></td><td>[Sun 14 Nov 2021 10:38:00 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l144" class="line" id="l144">    144</a> 	} else if m.spec.Transport != nil {</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/a5bed929e13f9a46b6335be35e91a100a92abd55">a5bed929e13f9a46b6335be35e91a100a92abd55</a></td><td>[Sun 14 Nov 2021 10:38:00 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l145" class="line" id="l145">    145</a> 		if clientIP, _, err := net.SplitHostPort(clientReq.RemoteAddr); err == nil {</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/a5bed929e13f9a46b6335be35e91a100a92abd55">a5bed929e13f9a46b6335be35e91a100a92abd55</a></td><td>[Sun 14 Nov 2021 10:38:00 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l146" class="line" id="l146">    146</a> 			ip := net.ParseIP(clientIP)</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/a5bed929e13f9a46b6335be35e91a100a92abd55">a5bed929e13f9a46b6335be35e91a100a92abd55</a></td><td>[Sun 14 Nov 2021 10:38:00 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l147" class="line" id="l147">    147</a> </pre></td></tr>
+<tr>
+<td><a href="../../../../commit/a5bed929e13f9a46b6335be35e91a100a92abd55">a5bed929e13f9a46b6335be35e91a100a92abd55</a></td><td>[Sun 14 Nov 2021 10:38:00 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l148" class="line" id="l148">    148</a> 			// IPv4 addresses should match either &quot;tcp&quot; or &quot;tcp4&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/a5bed929e13f9a46b6335be35e91a100a92abd55">a5bed929e13f9a46b6335be35e91a100a92abd55</a></td><td>[Sun 14 Nov 2021 10:38:00 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l149" class="line" id="l149">    149</a> 			if ip.To4() != nil &amp;&amp;</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/a5bed929e13f9a46b6335be35e91a100a92abd55">a5bed929e13f9a46b6335be35e91a100a92abd55</a></td><td>[Sun 14 Nov 2021 10:38:00 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l150" class="line" id="l150">    150</a> 				!m.spec.Transport.MatchString(&quot;tcp&quot;) &amp;&amp;</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/a5bed929e13f9a46b6335be35e91a100a92abd55">a5bed929e13f9a46b6335be35e91a100a92abd55</a></td><td>[Sun 14 Nov 2021 10:38:00 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l151" class="line" id="l151">    151</a> 				!m.spec.Transport.MatchString(&quot;tcp4&quot;) {</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/a5bed929e13f9a46b6335be35e91a100a92abd55">a5bed929e13f9a46b6335be35e91a100a92abd55</a></td><td>[Sun 14 Nov 2021 10:38:00 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l152" class="line" id="l152">    152</a> 				return false, nil</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/a5bed929e13f9a46b6335be35e91a100a92abd55">a5bed929e13f9a46b6335be35e91a100a92abd55</a></td><td>[Sun 14 Nov 2021 10:38:00 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l153" class="line" id="l153">    153</a> 			}</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/a5bed929e13f9a46b6335be35e91a100a92abd55">a5bed929e13f9a46b6335be35e91a100a92abd55</a></td><td>[Sun 14 Nov 2021 10:38:00 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l154" class="line" id="l154">    154</a> </pre></td></tr>
+<tr>
+<td><a href="../../../../commit/a5bed929e13f9a46b6335be35e91a100a92abd55">a5bed929e13f9a46b6335be35e91a100a92abd55</a></td><td>[Sun 14 Nov 2021 10:38:00 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l155" class="line" id="l155">    155</a> 			// IPv6 addresses should match either &quot;tcp&quot; or &quot;tcp6&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/a5bed929e13f9a46b6335be35e91a100a92abd55">a5bed929e13f9a46b6335be35e91a100a92abd55</a></td><td>[Sun 14 Nov 2021 10:38:00 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l156" class="line" id="l156">    156</a> 			if ip.To4() == nil &amp;&amp;</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/a5bed929e13f9a46b6335be35e91a100a92abd55">a5bed929e13f9a46b6335be35e91a100a92abd55</a></td><td>[Sun 14 Nov 2021 10:38:00 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l157" class="line" id="l157">    157</a> 				!m.spec.Transport.MatchString(&quot;tcp&quot;) &amp;&amp;</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/a5bed929e13f9a46b6335be35e91a100a92abd55">a5bed929e13f9a46b6335be35e91a100a92abd55</a></td><td>[Sun 14 Nov 2021 10:38:00 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l158" class="line" id="l158">    158</a> 				!m.spec.Transport.MatchString(&quot;tcp6&quot;) {</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/a5bed929e13f9a46b6335be35e91a100a92abd55">a5bed929e13f9a46b6335be35e91a100a92abd55</a></td><td>[Sun 14 Nov 2021 10:38:00 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l159" class="line" id="l159">    159</a> 				return false, nil</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/a5bed929e13f9a46b6335be35e91a100a92abd55">a5bed929e13f9a46b6335be35e91a100a92abd55</a></td><td>[Sun 14 Nov 2021 10:38:00 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l160" class="line" id="l160">    160</a> 			}</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/a5bed929e13f9a46b6335be35e91a100a92abd55">a5bed929e13f9a46b6335be35e91a100a92abd55</a></td><td>[Sun 14 Nov 2021 10:38:00 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l161" class="line" id="l161">    161</a> 		}</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/a5bed929e13f9a46b6335be35e91a100a92abd55">a5bed929e13f9a46b6335be35e91a100a92abd55</a></td><td>[Sun 14 Nov 2021 10:38:00 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l162" class="line" id="l162">    162</a> </pre></td></tr>
+<tr>
+<td><a href="../../../../commit/a5bed929e13f9a46b6335be35e91a100a92abd55">a5bed929e13f9a46b6335be35e91a100a92abd55</a></td><td>[Sun 14 Nov 2021 10:38:00 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l163" class="line" id="l163">    163</a> 		if clientReq.RemoteAddr == &quot;@&quot; &amp;&amp; !m.spec.Transport.MatchString(&quot;unix&quot;) {</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/a5bed929e13f9a46b6335be35e91a100a92abd55">a5bed929e13f9a46b6335be35e91a100a92abd55</a></td><td>[Sun 14 Nov 2021 10:38:00 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l164" class="line" id="l164">    164</a> 			return false, nil</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/a5bed929e13f9a46b6335be35e91a100a92abd55">a5bed929e13f9a46b6335be35e91a100a92abd55</a></td><td>[Sun 14 Nov 2021 10:38:00 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l165" class="line" id="l165">    165</a> 		}</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/93a74d08325146fbd92e863885b73db8c5ff7f49">93a74d08325146fbd92e863885b73db8c5ff7f49</a></td><td>[Sat 17 Apr 2021 14:28:09 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l166" class="line" id="l166">    166</a> 	} else if m.spec.Source != nil {</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/93a74d08325146fbd92e863885b73db8c5ff7f49">93a74d08325146fbd92e863885b73db8c5ff7f49</a></td><td>[Sat 17 Apr 2021 14:28:09 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l167" class="line" id="l167">    167</a> 		clientIP, _, err := net.SplitHostPort(clientReq.RemoteAddr)</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/93a74d08325146fbd92e863885b73db8c5ff7f49">93a74d08325146fbd92e863885b73db8c5ff7f49</a></td><td>[Sat 17 Apr 2021 14:28:09 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l168" class="line" id="l168">    168</a> 		if err != nil {</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/93a74d08325146fbd92e863885b73db8c5ff7f49">93a74d08325146fbd92e863885b73db8c5ff7f49</a></td><td>[Sat 17 Apr 2021 14:28:09 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l169" class="line" id="l169">    169</a> 			return false, err</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/93a74d08325146fbd92e863885b73db8c5ff7f49">93a74d08325146fbd92e863885b73db8c5ff7f49</a></td><td>[Sat 17 Apr 2021 14:28:09 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l170" class="line" id="l170">    170</a> 		}</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/93a74d08325146fbd92e863885b73db8c5ff7f49">93a74d08325146fbd92e863885b73db8c5ff7f49</a></td><td>[Sat 17 Apr 2021 14:28:09 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l171" class="line" id="l171">    171</a> </pre></td></tr>
+<tr>
+<td><a href="../../../../commit/93a74d08325146fbd92e863885b73db8c5ff7f49">93a74d08325146fbd92e863885b73db8c5ff7f49</a></td><td>[Sat 17 Apr 2021 14:28:09 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l172" class="line" id="l172">    172</a> 		if !m.spec.Source.Contains(net.ParseIP(clientIP)) {</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/93a74d08325146fbd92e863885b73db8c5ff7f49">93a74d08325146fbd92e863885b73db8c5ff7f49</a></td><td>[Sat 17 Apr 2021 14:28:09 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l173" class="line" id="l173">    173</a> 			return false, nil</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/2cc4a71cc05eee919bfc8835da4d62fb6296b2e0">2cc4a71cc05eee919bfc8835da4d62fb6296b2e0</a></td><td>[Mon  1 Mar 2021 23:18:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l174" class="line" id="l174">    174</a> 		}</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/2cc4a71cc05eee919bfc8835da4d62fb6296b2e0">2cc4a71cc05eee919bfc8835da4d62fb6296b2e0</a></td><td>[Mon  1 Mar 2021 23:18:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l175" class="line" id="l175">    175</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/2cc4a71cc05eee919bfc8835da4d62fb6296b2e0">2cc4a71cc05eee919bfc8835da4d62fb6296b2e0</a></td><td>[Mon  1 Mar 2021 23:18:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l176" class="line" id="l176">    176</a> </pre></td></tr>
+<tr>
+<td><a href="../../../../commit/93a74d08325146fbd92e863885b73db8c5ff7f49">93a74d08325146fbd92e863885b73db8c5ff7f49</a></td><td>[Sat 17 Apr 2021 14:28:09 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l177" class="line" id="l177">    177</a> 	return true, nil</pre></td></tr>
+<tr>
+<td><a href="../../../../commit/f4e4aeed91c6784c6f1fed36aeb68da31e751a22">f4e4aeed91c6784c6f1fed36aeb68da31e751a22</a></td><td>[Sat 20 Feb 2021 11:48:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l178" class="line" id="l178">    178</a> }</pre></td></tr>
+</table>
+</div>
+</body>
+</html>

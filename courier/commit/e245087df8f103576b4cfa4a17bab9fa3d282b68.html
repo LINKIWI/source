@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/server: Refactor to abstract individual server instances, expose http.Server Close - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/e245087df8f103576b4cfa4a17bab9fa3d282b68">e245087df8f103576b4cfa4a17bab9fa3d282b68</a>
+<b>parent</b> <a href="../commit/050f58987d69379929356ee9f4af972bd2af209b">050f58987d69379929356ee9f4af972bd2af209b</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Wed  8 Dec 2021 21:54:42 -0800
+
+internal/server: Refactor to abstract individual server instances, expose http.Server Close
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/server/server.go</a></td><td> | </td><td class="num">132</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">-----------------------------</span></td></tr>
+</table></pre><pre>1 file changed, 84 insertions(+), 48 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/server/server.go">internal/server/server.go</a> b/<a href="../file/internal/server/server.go">internal/server/server.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -24,8 +24,9 @@ const (
+</a> 
+ // Server is the main Courier server entry point.
+ type Server struct {
+<a href="#h0-0-3" id="h0-0-3" class="d">-	cfg *config.Config
+</a><a href="#h0-0-4" id="h0-0-4" class="d">-	rp  http.Handler
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+	cfg     *config.Config
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+	rp      http.Handler
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+	servers []*instance
+</a> }
+ 
+ // New creates a new Courier server from the configuration.
+<a href="#h0-1" id="h0-1" class="h">@@ -40,28 +41,51 @@ func New(cfg *config.Config) (*Server, error) {
+</a> 	}
+ 
+ 	return &amp;Server{
+<a href="#h0-1-3" id="h0-1-3" class="d">-		cfg: cfg,
+</a><a href="#h0-1-4" id="h0-1-4" class="d">-		rp:  rp,
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+		cfg:     cfg,
+</a><a href="#h0-1-6" id="h0-1-6" class="i">+		rp:      rp,
+</a><a href="#h0-1-7" id="h0-1-7" class="i">+		servers: make([]*instance, len(cfg.Server.Listeners)),
+</a> 	}, nil
+ }
+ 
+<a href="#h0-1-11" id="h0-1-11" class="d">-// Serve starts the server and serves indefinitely.
+</a><a href="#h0-1-12" id="h0-1-12" class="i">+// Serve starts all individual server instances and serves indefinitely.
+</a> func (s *Server) Serve() error {
+ 	errs := make(chan error)
+ 
+<a href="#h0-1-16" id="h0-1-16" class="d">-	for _, listener := range s.cfg.Server.Listeners {
+</a><a href="#h0-1-17" id="h0-1-17" class="d">-		go func(listener *config.Listener) {
+</a><a href="#h0-1-18" id="h0-1-18" class="d">-			errs &lt;- s.serve(listener)
+</a><a href="#h0-1-19" id="h0-1-19" class="d">-		}(listener)
+</a><a href="#h0-1-20" id="h0-1-20" class="i">+	for i, listener := range s.cfg.Server.Listeners {
+</a><a href="#h0-1-21" id="h0-1-21" class="i">+		s.servers[i] = newInstance(listener, s.rp)
+</a><a href="#h0-1-22" id="h0-1-22" class="i">+
+</a><a href="#h0-1-23" id="h0-1-23" class="i">+		go func(inst *instance) {
+</a><a href="#h0-1-24" id="h0-1-24" class="i">+			errs &lt;- inst.serve()
+</a><a href="#h0-1-25" id="h0-1-25" class="i">+		}(s.servers[i])
+</a> 	}
+ 
+ 	return &lt;-errs
+ }
+ 
+<a href="#h0-1-31" id="h0-1-31" class="d">-// serve starts a server for one listener specification.
+</a><a href="#h0-1-32" id="h0-1-32" class="d">-func (s *Server) serve(listener *config.Listener) error {
+</a><a href="#h0-1-33" id="h0-1-33" class="d">-	var handler http.Handler
+</a><a href="#h0-1-34" id="h0-1-34" class="i">+// Close requests graceful shutdown of all server instances.
+</a><a href="#h0-1-35" id="h0-1-35" class="i">+func (s *Server) Close() error {
+</a><a href="#h0-1-36" id="h0-1-36" class="i">+	for _, inst := range s.servers {
+</a><a href="#h0-1-37" id="h0-1-37" class="i">+		if err := inst.close(); err != nil {
+</a><a href="#h0-1-38" id="h0-1-38" class="i">+			zap.L().Warn(
+</a><a href="#h0-1-39" id="h0-1-39" class="i">+				&quot;error closing server instance&quot;,
+</a><a href="#h0-1-40" id="h0-1-40" class="i">+				zap.String(&quot;name&quot;, inst.cfg.Name),
+</a><a href="#h0-1-41" id="h0-1-41" class="i">+				zap.Stringer(&quot;address&quot;, inst.cfg.Address),
+</a><a href="#h0-1-42" id="h0-1-42" class="i">+				zap.Error(err),
+</a><a href="#h0-1-43" id="h0-1-43" class="i">+			)
+</a><a href="#h0-1-44" id="h0-1-44" class="i">+		}
+</a><a href="#h0-1-45" id="h0-1-45" class="i">+	}
+</a><a href="#h0-1-46" id="h0-1-46" class="i">+
+</a><a href="#h0-1-47" id="h0-1-47" class="i">+	return nil
+</a><a href="#h0-1-48" id="h0-1-48" class="i">+}
+</a><a href="#h0-1-49" id="h0-1-49" class="i">+
+</a><a href="#h0-1-50" id="h0-1-50" class="i">+// instance represents a single server instance.
+</a><a href="#h0-1-51" id="h0-1-51" class="i">+type instance struct {
+</a><a href="#h0-1-52" id="h0-1-52" class="i">+	cfg    *config.Listener
+</a><a href="#h0-1-53" id="h0-1-53" class="i">+	server *http.Server
+</a><a href="#h0-1-54" id="h0-1-54" class="i">+}
+</a> 
+<a href="#h0-1-56" id="h0-1-56" class="i">+// newInstance creates an instance wrapping a single http.Server for one listener specification.
+</a><a href="#h0-1-57" id="h0-1-57" class="i">+func newInstance(cfg *config.Listener, handler http.Handler) *instance {
+</a> 	connStats := util.NewConcurrentMap()
+ 	connStats.Set(http.StateNew, new(int64))
+ 	connStats.Set(http.StateActive, new(int64))
+<a href="#h0-2" id="h0-2" class="h">@@ -69,19 +93,19 @@ func (s *Server) serve(listener *config.Listener) error {
+</a> 	connStats.Set(http.StateHijacked, new(int64))
+ 	connStats.Set(http.StateClosed, new(int64))
+ 
+<a href="#h0-2-3" id="h0-2-3" class="d">-	handler = h2c.NewHandler(s.rp, &amp;http2.Server{})
+</a><a href="#h0-2-4" id="h0-2-4" class="d">-	handler = log.NewRequestLogHandler(listener.Name, handler)
+</a><a href="#h0-2-5" id="h0-2-5" class="i">+	handler = h2c.NewHandler(handler, &amp;http2.Server{})
+</a><a href="#h0-2-6" id="h0-2-6" class="i">+	handler = log.NewRequestLogHandler(cfg.Name, handler)
+</a> 
+ 	server := &amp;http.Server{
+ 		Handler:           handler,
+<a href="#h0-2-10" id="h0-2-10" class="d">-		ReadTimeout:       listener.Connection.ReadTimeout,
+</a><a href="#h0-2-11" id="h0-2-11" class="d">-		ReadHeaderTimeout: listener.Connection.ReadHeaderTimeout,
+</a><a href="#h0-2-12" id="h0-2-12" class="d">-		WriteTimeout:      listener.Connection.WriteTimeout,
+</a><a href="#h0-2-13" id="h0-2-13" class="d">-		IdleTimeout:       listener.Connection.IdleTimeout,
+</a><a href="#h0-2-14" id="h0-2-14" class="i">+		ReadTimeout:       cfg.Connection.ReadTimeout,
+</a><a href="#h0-2-15" id="h0-2-15" class="i">+		ReadHeaderTimeout: cfg.Connection.ReadHeaderTimeout,
+</a><a href="#h0-2-16" id="h0-2-16" class="i">+		WriteTimeout:      cfg.Connection.WriteTimeout,
+</a><a href="#h0-2-17" id="h0-2-17" class="i">+		IdleTimeout:       cfg.Connection.IdleTimeout,
+</a> 		ErrorLog:          log.StdErrorLogger,
+ 		ConnState: func(conn net.Conn, state http.ConnState) {
+ 			tags := map[string]interface{}{
+<a href="#h0-2-21" id="h0-2-21" class="d">-				&quot;listener&quot;: listener.Name,
+</a><a href="#h0-2-22" id="h0-2-22" class="i">+				&quot;listener&quot;: cfg.Name,
+</a> 				&quot;state&quot;:    state.String(),
+ 			}
+ 
+<a href="#h0-3" id="h0-3" class="h">@@ -100,14 +124,20 @@ func (s *Server) serve(listener *config.Listener) error {
+</a> 		},
+ 	}
+ 
+<a href="#h0-3-3" id="h0-3-3" class="d">-	defer server.Close()
+</a><a href="#h0-3-4" id="h0-3-4" class="i">+	return &amp;instance{
+</a><a href="#h0-3-5" id="h0-3-5" class="i">+		cfg:    cfg,
+</a><a href="#h0-3-6" id="h0-3-6" class="i">+		server: server,
+</a><a href="#h0-3-7" id="h0-3-7" class="i">+	}
+</a><a href="#h0-3-8" id="h0-3-8" class="i">+}
+</a> 
+<a href="#h0-3-10" id="h0-3-10" class="d">-	listenNet, listenAddr := listener.Address.Address()
+</a><a href="#h0-3-11" id="h0-3-11" class="i">+// serve configures and creates the listener and starts the underlying http.Server.
+</a><a href="#h0-3-12" id="h0-3-12" class="i">+func (i *instance) serve() error {
+</a><a href="#h0-3-13" id="h0-3-13" class="i">+	listenNet, listenAddr := i.cfg.Address.Address()
+</a> 	zap.L().Debug(
+ 		&quot;created server listener&quot;,
+<a href="#h0-3-16" id="h0-3-16" class="d">-		zap.String(&quot;name&quot;, listener.Name),
+</a><a href="#h0-3-17" id="h0-3-17" class="i">+		zap.String(&quot;name&quot;, i.cfg.Name),
+</a> 		zap.String(&quot;net&quot;, listenNet),
+<a href="#h0-3-19" id="h0-3-19" class="d">-		zap.String(&quot;addr&quot;, listenAddr),
+</a><a href="#h0-3-20" id="h0-3-20" class="i">+		zap.String(&quot;address&quot;, listenAddr),
+</a> 	)
+ 
+ 	ln, err := net.Listen(listenNet, listenAddr)
+<a href="#h0-4" id="h0-4" class="h">@@ -116,73 +146,79 @@ func (s *Server) serve(listener *config.Listener) error {
+</a> 			Namespace: &quot;server&quot;,
+ 			Message:   &quot;failed to listen on address&quot;,
+ 			Tags: map[string]interface{}{
+<a href="#h0-4-3" id="h0-4-3" class="d">-				&quot;name&quot;:    listener.Name,
+</a><a href="#h0-4-4" id="h0-4-4" class="d">-				&quot;address&quot;: listener.Address.String(),
+</a><a href="#h0-4-5" id="h0-4-5" class="i">+				&quot;name&quot;:    i.cfg.Name,
+</a><a href="#h0-4-6" id="h0-4-6" class="i">+				&quot;address&quot;: i.cfg.Address.String(),
+</a> 			},
+ 			StackedError: err,
+ 		}
+ 	}
+ 
+<a href="#h0-4-12" id="h0-4-12" class="d">-	if listener.Connection.ActiveLimit &gt; 0 {
+</a><a href="#h0-4-13" id="h0-4-13" class="i">+	if i.cfg.Connection.ActiveLimit &gt; 0 {
+</a> 		zap.L().Debug(
+ 			&quot;enabling active connections limit for listener&quot;,
+<a href="#h0-4-16" id="h0-4-16" class="d">-			zap.String(&quot;name&quot;, listener.Name),
+</a><a href="#h0-4-17" id="h0-4-17" class="d">-			zap.Int(&quot;limit&quot;, listener.Connection.ActiveLimit),
+</a><a href="#h0-4-18" id="h0-4-18" class="i">+			zap.String(&quot;name&quot;, i.cfg.Name),
+</a><a href="#h0-4-19" id="h0-4-19" class="i">+			zap.Int(&quot;limit&quot;, i.cfg.Connection.ActiveLimit),
+</a> 		)
+ 
+<a href="#h0-4-22" id="h0-4-22" class="d">-		ln = netutil.LimitListener(ln, listener.Connection.ActiveLimit)
+</a><a href="#h0-4-23" id="h0-4-23" class="i">+		ln = netutil.LimitListener(ln, i.cfg.Connection.ActiveLimit)
+</a> 	}
+ 
+<a href="#h0-4-26" id="h0-4-26" class="d">-	if len(listener.AuthorizedSources) &gt; 0 {
+</a><a href="#h0-4-27" id="h0-4-27" class="d">-		for _, source := range listener.AuthorizedSources {
+</a><a href="#h0-4-28" id="h0-4-28" class="i">+	if len(i.cfg.AuthorizedSources) &gt; 0 {
+</a><a href="#h0-4-29" id="h0-4-29" class="i">+		for _, source := range i.cfg.AuthorizedSources {
+</a> 			zap.L().Debug(
+ 				&quot;enabling restricted IP source for listener&quot;,
+<a href="#h0-4-32" id="h0-4-32" class="d">-				zap.String(&quot;name&quot;, listener.Name),
+</a><a href="#h0-4-33" id="h0-4-33" class="i">+				zap.String(&quot;name&quot;, i.cfg.Name),
+</a> 				zap.Stringer(&quot;source&quot;, source),
+ 			)
+ 		}
+ 
+<a href="#h0-4-38" id="h0-4-38" class="d">-		ln = newRestrictedListener(listener.Name, listener.AuthorizedSources, ln)
+</a><a href="#h0-4-39" id="h0-4-39" class="i">+		ln = newRestrictedListener(i.cfg.Name, i.cfg.AuthorizedSources, ln)
+</a> 	}
+ 
+<a href="#h0-4-42" id="h0-4-42" class="d">-	switch listener.Protocol {
+</a><a href="#h0-4-43" id="h0-4-43" class="i">+	switch i.cfg.Protocol {
+</a> 	case &quot;haproxy&quot;:
+ 		zap.L().Debug(
+ 			&quot;enabling proxy protocol header parser for listener&quot;,
+<a href="#h0-4-47" id="h0-4-47" class="d">-			zap.String(&quot;name&quot;, listener.Name),
+</a><a href="#h0-4-48" id="h0-4-48" class="i">+			zap.String(&quot;name&quot;, i.cfg.Name),
+</a> 		)
+ 
+<a href="#h0-4-51" id="h0-4-51" class="d">-		headerTimeout := listener.Connection.ReadTimeout
+</a><a href="#h0-4-52" id="h0-4-52" class="d">-		if listener.Connection.ReadHeaderTimeout &gt; 0 {
+</a><a href="#h0-4-53" id="h0-4-53" class="d">-			headerTimeout = listener.Connection.ReadHeaderTimeout
+</a><a href="#h0-4-54" id="h0-4-54" class="i">+		headerTimeout := i.cfg.Connection.ReadTimeout
+</a><a href="#h0-4-55" id="h0-4-55" class="i">+		if i.cfg.Connection.ReadHeaderTimeout &gt; 0 {
+</a><a href="#h0-4-56" id="h0-4-56" class="i">+			headerTimeout = i.cfg.Connection.ReadHeaderTimeout
+</a> 		}
+ 
+<a href="#h0-4-59" id="h0-4-59" class="d">-		ln = newProxyListener(listener.Name, headerTimeout, ln)
+</a><a href="#h0-4-60" id="h0-4-60" class="i">+		ln = newProxyListener(i.cfg.Name, headerTimeout, ln)
+</a> 	}
+ 
+<a href="#h0-4-63" id="h0-4-63" class="d">-	if listener.TLSContext != nil {
+</a><a href="#h0-4-64" id="h0-4-64" class="d">-		tlsCfg, err := listener.TLSContext.ServerConfig()
+</a><a href="#h0-4-65" id="h0-4-65" class="i">+	if i.cfg.TLSContext != nil {
+</a><a href="#h0-4-66" id="h0-4-66" class="i">+		tlsCfg, err := i.cfg.TLSContext.ServerConfig()
+</a> 		if err != nil {
+ 			return &amp;util.Error{
+ 				Namespace: &quot;server&quot;,
+ 				Message:   &quot;failed to build server TLS context&quot;,
+ 				Tags: map[string]interface{}{
+<a href="#h0-4-72" id="h0-4-72" class="d">-					&quot;name&quot;: listener.Name,
+</a><a href="#h0-4-73" id="h0-4-73" class="d">-					&quot;ctx&quot;:  listener.TLSContext,
+</a><a href="#h0-4-74" id="h0-4-74" class="i">+					&quot;name&quot;: i.cfg.Name,
+</a><a href="#h0-4-75" id="h0-4-75" class="i">+					&quot;ctx&quot;:  i.cfg.TLSContext,
+</a> 				},
+ 				StackedError: err,
+ 			}
+ 		}
+ 
+<a href="#h0-4-81" id="h0-4-81" class="d">-		server.TLSConfig = tlsCfg
+</a><a href="#h0-4-82" id="h0-4-82" class="i">+		i.server.TLSConfig = tlsCfg
+</a> 		zap.L().Debug(
+ 			&quot;enabled server TLS termination&quot;,
+<a href="#h0-4-85" id="h0-4-85" class="d">-			zap.String(&quot;listener&quot;, listener.Address.String()),
+</a><a href="#h0-4-86" id="h0-4-86" class="d">-			zap.Any(&quot;context&quot;, listener.TLSContext),
+</a><a href="#h0-4-87" id="h0-4-87" class="i">+			zap.String(&quot;name&quot;, i.cfg.Name),
+</a><a href="#h0-4-88" id="h0-4-88" class="i">+			zap.Stringer(&quot;address&quot;, i.cfg.Address),
+</a><a href="#h0-4-89" id="h0-4-89" class="i">+			zap.Any(&quot;context&quot;, i.cfg.TLSContext),
+</a> 		)
+ 
+<a href="#h0-4-92" id="h0-4-92" class="d">-		return server.ServeTLS(ln, &quot;&quot;, &quot;&quot;)
+</a><a href="#h0-4-93" id="h0-4-93" class="i">+		return i.server.ServeTLS(ln, &quot;&quot;, &quot;&quot;)
+</a> 	}
+ 
+<a href="#h0-4-96" id="h0-4-96" class="d">-	return server.Serve(ln)
+</a><a href="#h0-4-97" id="h0-4-97" class="i">+	return i.server.Serve(ln)
+</a><a href="#h0-4-98" id="h0-4-98" class="i">+}
+</a><a href="#h0-4-99" id="h0-4-99" class="i">+
+</a><a href="#h0-4-100" id="h0-4-100" class="i">+// close requests shutdown of the underlying http.Server.
+</a><a href="#h0-4-101" id="h0-4-101" class="i">+func (i *instance) close() error {
+</a><a href="#h0-4-102" id="h0-4-102" class="i">+	return i.server.Close()
+</a> }
+</pre>
+</div>
+</body>
+</html>

@@ -1,0 +1,956 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>proxy.go - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../../../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../../../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../../../log">Log</a> | <a href="../../../files">Files</a> | <a href="../../../refs">Refs</a> | <a href="../../../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<p>internal/server/<strong>proxy.go</strong> (14250B) (<a href="../../../raw/internal/server/proxy.go">raw</a>) (<a href="../../../file/internal/server/proxy.go">file</a>)</p><hr/>
+<table id="blob">
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l1" class="line" id="l1">      1</a> package server</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l2" class="line" id="l2">      2</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l3" class="line" id="l3">      3</a> import (</pre></td></tr>
+<tr>
+<td><a href="../../../commit/65a2e6af52737422caa5e4c28adac62bd527550c">65a2e6af52737422caa5e4c28adac62bd527550c</a></td><td>[Thu 18 Feb 2021 22:51:05 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l4" class="line" id="l4">      4</a> 	&quot;errors&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l5" class="line" id="l5">      5</a> 	&quot;io&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/65a2e6af52737422caa5e4c28adac62bd527550c">65a2e6af52737422caa5e4c28adac62bd527550c</a></td><td>[Thu 18 Feb 2021 22:51:05 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l6" class="line" id="l6">      6</a> 	&quot;net&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l7" class="line" id="l7">      7</a> 	&quot;net/http&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l8" class="line" id="l8">      8</a> 	&quot;net/http/httputil&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/daa9bb64b6c8ae394b0ce2809234632570b6de4d">daa9bb64b6c8ae394b0ce2809234632570b6de4d</a></td><td>[Sun  7 Feb 2021 15:20:09 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l9" class="line" id="l9">      9</a> 	&quot;sync/atomic&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l10" class="line" id="l10">     10</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/dc89bd2a23d793195d4241300d6c5f94884e8808">dc89bd2a23d793195d4241300d6c5f94884e8808</a></td><td>[Mon  8 Feb 2021 21:12:32 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l11" class="line" id="l11">     11</a> 	&quot;github.com/getsentry/sentry-go&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/245c4082b60be4e8e942748d48e17593d9caac6c">245c4082b60be4e8e942748d48e17593d9caac6c</a></td><td>[Wed  3 Feb 2021 22:34:54 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l12" class="line" id="l12">     12</a> 	&quot;go.uber.org/zap&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/6926b4edbc9e66505b4722df4ac9b57aafd8395b">6926b4edbc9e66505b4722df4ac9b57aafd8395b</a></td><td>[Sat 30 Jan 2021 20:08:32 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l13" class="line" id="l13">     13</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l14" class="line" id="l14">     14</a> 	&quot;courier/internal/config&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/e66944a29bde6c3132ef2f98318e45bf1c7fb366">e66944a29bde6c3132ef2f98318e45bf1c7fb366</a></td><td>[Fri  5 Feb 2021 23:20:53 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l15" class="line" id="l15">     15</a> 	&quot;courier/internal/log&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/738a9741397e4d70ee668e95764c34b8ffba0435">738a9741397e4d70ee668e95764c34b8ffba0435</a></td><td>[Sat  6 Feb 2021 15:01:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l16" class="line" id="l16">     16</a> 	&quot;courier/internal/metrics&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l17" class="line" id="l17">     17</a> 	&quot;courier/internal/middleware&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/0f62b7f215b08badd27f14665835170042fbdf48">0f62b7f215b08badd27f14665835170042fbdf48</a></td><td>[Sun  2 May 2021 12:33:54 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l18" class="line" id="l18">     18</a> 	&quot;courier/internal/middleware/filters&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l19" class="line" id="l19">     19</a> 	&quot;courier/internal/util&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l20" class="line" id="l20">     20</a> )</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l21" class="line" id="l21">     21</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/738a9741397e4d70ee668e95764c34b8ffba0435">738a9741397e4d70ee668e95764c34b8ffba0435</a></td><td>[Sat  6 Feb 2021 15:01:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l22" class="line" id="l22">     22</a> const (</pre></td></tr>
+<tr>
+<td><a href="../../../commit/f7cd4db5eebf897fdf5b9f4bee3758ee6f042513">f7cd4db5eebf897fdf5b9f4bee3758ee6f042513</a></td><td>[Sat  6 Feb 2021 18:02:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l23" class="line" id="l23">     23</a> 	metricProxyServe               = &quot;proxy.serve&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/f7cd4db5eebf897fdf5b9f4bee3758ee6f042513">f7cd4db5eebf897fdf5b9f4bee3758ee6f042513</a></td><td>[Sat  6 Feb 2021 18:02:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l24" class="line" id="l24">     24</a> 	metricProxySuccess             = &quot;proxy.success&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/f7cd4db5eebf897fdf5b9f4bee3758ee6f042513">f7cd4db5eebf897fdf5b9f4bee3758ee6f042513</a></td><td>[Sat  6 Feb 2021 18:02:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l25" class="line" id="l25">     25</a> 	metricProxyError               = &quot;proxy.error&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/daa9bb64b6c8ae394b0ce2809234632570b6de4d">daa9bb64b6c8ae394b0ce2809234632570b6de4d</a></td><td>[Sun  7 Feb 2021 15:20:09 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l26" class="line" id="l26">     26</a> 	metricProxyTotalServed         = &quot;proxy.serve.total&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/8259ba1b538d219637673c07700c9bd8c8af722e">8259ba1b538d219637673c07700c9bd8c8af722e</a></td><td>[Tue 16 Feb 2021 20:51:54 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l27" class="line" id="l27">     27</a> 	metricProxyEarlyTerminate      = &quot;proxy.lifecycle.early_terminate&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c45b266177901fa9c712c1a16e73b17ccf43ac36">c45b266177901fa9c712c1a16e73b17ccf43ac36</a></td><td>[Wed 17 Feb 2021 20:46:29 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l28" class="line" id="l28">     28</a> 	metricProxyUnknownHost         = &quot;proxy.lifecycle.unknown_host&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l29" class="line" id="l29">     29</a> 	metricProxyUnknownRoute        = &quot;proxy.lifecycle.unknown_route&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/8259ba1b538d219637673c07700c9bd8c8af722e">8259ba1b538d219637673c07700c9bd8c8af722e</a></td><td>[Tue 16 Feb 2021 20:51:54 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l30" class="line" id="l30">     30</a> 	metricProxyCircuitBreak        = &quot;proxy.lifecycle.health_circuit_break&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/f7cd4db5eebf897fdf5b9f4bee3758ee6f042513">f7cd4db5eebf897fdf5b9f4bee3758ee6f042513</a></td><td>[Sat  6 Feb 2021 18:02:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l31" class="line" id="l31">     31</a> 	metricProxyTransportInitialize = &quot;proxy.transport.initialize&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/f7cd4db5eebf897fdf5b9f4bee3758ee6f042513">f7cd4db5eebf897fdf5b9f4bee3758ee6f042513</a></td><td>[Sat  6 Feb 2021 18:02:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l32" class="line" id="l32">     32</a> 	metricProxyTransportRecycle    = &quot;proxy.transport.recycle&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/738a9741397e4d70ee668e95764c34b8ffba0435">738a9741397e4d70ee668e95764c34b8ffba0435</a></td><td>[Sat  6 Feb 2021 15:01:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l33" class="line" id="l33">     33</a> )</pre></td></tr>
+<tr>
+<td><a href="../../../commit/738a9741397e4d70ee668e95764c34b8ffba0435">738a9741397e4d70ee668e95764c34b8ffba0435</a></td><td>[Sat  6 Feb 2021 15:01:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l34" class="line" id="l34">     34</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l35" class="line" id="l35">     35</a> var (</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l36" class="line" id="l36">     36</a> 	// errUnknownHost is returned when the request targets a virtual host that is not registered</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l37" class="line" id="l37">     37</a> 	// in configuration.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l38" class="line" id="l38">     38</a> 	errUnknownHost = &amp;response{</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c3067f413ac3b50fc3f30ce134faa4a748cf88c5">c3067f413ac3b50fc3f30ce134faa4a748cf88c5</a></td><td>[Sat 27 Feb 2021 15:08:04 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l39" class="line" id="l39">     39</a> 		status:  http.StatusNotFound,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c3067f413ac3b50fc3f30ce134faa4a748cf88c5">c3067f413ac3b50fc3f30ce134faa4a748cf88c5</a></td><td>[Sat 27 Feb 2021 15:08:04 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l40" class="line" id="l40">     40</a> 		code:    &quot;UNKNOWN_VIRTUAL_HOST&quot;,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c3067f413ac3b50fc3f30ce134faa4a748cf88c5">c3067f413ac3b50fc3f30ce134faa4a748cf88c5</a></td><td>[Sat 27 Feb 2021 15:08:04 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l41" class="line" id="l41">     41</a> 		message: &quot;unknown virtual host&quot;,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l42" class="line" id="l42">     42</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l43" class="line" id="l43">     43</a> 	// errUnknownRoute is returned when the request does not match any configured route.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l44" class="line" id="l44">     44</a> 	errUnknownRoute = &amp;response{</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c3067f413ac3b50fc3f30ce134faa4a748cf88c5">c3067f413ac3b50fc3f30ce134faa4a748cf88c5</a></td><td>[Sat 27 Feb 2021 15:08:04 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l45" class="line" id="l45">     45</a> 		status:  http.StatusBadRequest,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c3067f413ac3b50fc3f30ce134faa4a748cf88c5">c3067f413ac3b50fc3f30ce134faa4a748cf88c5</a></td><td>[Sat 27 Feb 2021 15:08:04 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l46" class="line" id="l46">     46</a> 		code:    &quot;UNKNOWN_ROUTE&quot;,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c3067f413ac3b50fc3f30ce134faa4a748cf88c5">c3067f413ac3b50fc3f30ce134faa4a748cf88c5</a></td><td>[Sat 27 Feb 2021 15:08:04 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l47" class="line" id="l47">     47</a> 		message: &quot;no upstream for route&quot;,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l48" class="line" id="l48">     48</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/775eae934fb9cf28dd6ec37c3e75dd9f6ee5549c">775eae934fb9cf28dd6ec37c3e75dd9f6ee5549c</a></td><td>[Sat  6 Feb 2021 17:58:33 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l49" class="line" id="l49">     49</a> 	// errBadTransport is returned when the proxy encounters an error initializing the HTTP</pre></td></tr>
+<tr>
+<td><a href="../../../commit/775eae934fb9cf28dd6ec37c3e75dd9f6ee5549c">775eae934fb9cf28dd6ec37c3e75dd9f6ee5549c</a></td><td>[Sat  6 Feb 2021 17:58:33 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l50" class="line" id="l50">     50</a> 	// client transport to an upstream.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/775eae934fb9cf28dd6ec37c3e75dd9f6ee5549c">775eae934fb9cf28dd6ec37c3e75dd9f6ee5549c</a></td><td>[Sat  6 Feb 2021 17:58:33 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l51" class="line" id="l51">     51</a> 	errBadTransport = &amp;response{</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c3067f413ac3b50fc3f30ce134faa4a748cf88c5">c3067f413ac3b50fc3f30ce134faa4a748cf88c5</a></td><td>[Sat 27 Feb 2021 15:08:04 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l52" class="line" id="l52">     52</a> 		status:  http.StatusInternalServerError,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c3067f413ac3b50fc3f30ce134faa4a748cf88c5">c3067f413ac3b50fc3f30ce134faa4a748cf88c5</a></td><td>[Sat 27 Feb 2021 15:08:04 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l53" class="line" id="l53">     53</a> 		code:    &quot;BAD_TRANSPORT&quot;,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c3067f413ac3b50fc3f30ce134faa4a748cf88c5">c3067f413ac3b50fc3f30ce134faa4a748cf88c5</a></td><td>[Sat 27 Feb 2021 15:08:04 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l54" class="line" id="l54">     54</a> 		message: &quot;failed to initialize upstream transport&quot;,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/775eae934fb9cf28dd6ec37c3e75dd9f6ee5549c">775eae934fb9cf28dd6ec37c3e75dd9f6ee5549c</a></td><td>[Sat  6 Feb 2021 17:58:33 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l55" class="line" id="l55">     55</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l56" class="line" id="l56">     56</a> 	// errFilterProcess is returned when the filter chain raises an error.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l57" class="line" id="l57">     57</a> 	errFilterProcess = &amp;response{</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c3067f413ac3b50fc3f30ce134faa4a748cf88c5">c3067f413ac3b50fc3f30ce134faa4a748cf88c5</a></td><td>[Sat 27 Feb 2021 15:08:04 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l58" class="line" id="l58">     58</a> 		status:  http.StatusInternalServerError,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c3067f413ac3b50fc3f30ce134faa4a748cf88c5">c3067f413ac3b50fc3f30ce134faa4a748cf88c5</a></td><td>[Sat 27 Feb 2021 15:08:04 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l59" class="line" id="l59">     59</a> 		code:    &quot;FILTER_PROCESS&quot;,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c3067f413ac3b50fc3f30ce134faa4a748cf88c5">c3067f413ac3b50fc3f30ce134faa4a748cf88c5</a></td><td>[Sat 27 Feb 2021 15:08:04 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l60" class="line" id="l60">     60</a> 		message: &quot;failed in filter chain processing&quot;,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l61" class="line" id="l61">     61</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c45a99cfc0aaf374247bc99c85d1892fe0901aac">c45a99cfc0aaf374247bc99c85d1892fe0901aac</a></td><td>[Tue  9 Feb 2021 22:43:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l62" class="line" id="l62">     62</a> 	// errUpstreamUnhealthy is returned when the upstream health check is in a failing state, as</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c45a99cfc0aaf374247bc99c85d1892fe0901aac">c45a99cfc0aaf374247bc99c85d1892fe0901aac</a></td><td>[Tue  9 Feb 2021 22:43:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l63" class="line" id="l63">     63</a> 	// a fail-fast behavior when health check-based circuit breaking is enabled.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c45a99cfc0aaf374247bc99c85d1892fe0901aac">c45a99cfc0aaf374247bc99c85d1892fe0901aac</a></td><td>[Tue  9 Feb 2021 22:43:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l64" class="line" id="l64">     64</a> 	errUpstreamUnhealthy = &amp;response{</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c3067f413ac3b50fc3f30ce134faa4a748cf88c5">c3067f413ac3b50fc3f30ce134faa4a748cf88c5</a></td><td>[Sat 27 Feb 2021 15:08:04 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l65" class="line" id="l65">     65</a> 		status:  http.StatusBadGateway,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c3067f413ac3b50fc3f30ce134faa4a748cf88c5">c3067f413ac3b50fc3f30ce134faa4a748cf88c5</a></td><td>[Sat 27 Feb 2021 15:08:04 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l66" class="line" id="l66">     66</a> 		code:    &quot;UPSTREAM_UNHEALTHY&quot;,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c3067f413ac3b50fc3f30ce134faa4a748cf88c5">c3067f413ac3b50fc3f30ce134faa4a748cf88c5</a></td><td>[Sat 27 Feb 2021 15:08:04 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l67" class="line" id="l67">     67</a> 		message: &quot;upstream is marked unhealthy&quot;,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c45a99cfc0aaf374247bc99c85d1892fe0901aac">c45a99cfc0aaf374247bc99c85d1892fe0901aac</a></td><td>[Tue  9 Feb 2021 22:43:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l68" class="line" id="l68">     68</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/65a2e6af52737422caa5e4c28adac62bd527550c">65a2e6af52737422caa5e4c28adac62bd527550c</a></td><td>[Thu 18 Feb 2021 22:51:05 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l69" class="line" id="l69">     69</a> 	// errUpstreamTimeout is returned when the upstream service duration exceeds a provisioned</pre></td></tr>
+<tr>
+<td><a href="../../../commit/65a2e6af52737422caa5e4c28adac62bd527550c">65a2e6af52737422caa5e4c28adac62bd527550c</a></td><td>[Thu 18 Feb 2021 22:51:05 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l70" class="line" id="l70">     70</a> 	// network-level timeout.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/65a2e6af52737422caa5e4c28adac62bd527550c">65a2e6af52737422caa5e4c28adac62bd527550c</a></td><td>[Thu 18 Feb 2021 22:51:05 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l71" class="line" id="l71">     71</a> 	errUpstreamTimeout = &amp;response{</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c3067f413ac3b50fc3f30ce134faa4a748cf88c5">c3067f413ac3b50fc3f30ce134faa4a748cf88c5</a></td><td>[Sat 27 Feb 2021 15:08:04 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l72" class="line" id="l72">     72</a> 		status:  http.StatusGatewayTimeout,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c3067f413ac3b50fc3f30ce134faa4a748cf88c5">c3067f413ac3b50fc3f30ce134faa4a748cf88c5</a></td><td>[Sat 27 Feb 2021 15:08:04 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l73" class="line" id="l73">     73</a> 		code:    &quot;UPSTREAM_TIMEOUT&quot;,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c3067f413ac3b50fc3f30ce134faa4a748cf88c5">c3067f413ac3b50fc3f30ce134faa4a748cf88c5</a></td><td>[Sat 27 Feb 2021 15:08:04 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l74" class="line" id="l74">     74</a> 		message: &quot;upstream request timeout&quot;,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/65a2e6af52737422caa5e4c28adac62bd527550c">65a2e6af52737422caa5e4c28adac62bd527550c</a></td><td>[Thu 18 Feb 2021 22:51:05 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l75" class="line" id="l75">     75</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/65a2e6af52737422caa5e4c28adac62bd527550c">65a2e6af52737422caa5e4c28adac62bd527550c</a></td><td>[Thu 18 Feb 2021 22:51:05 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l76" class="line" id="l76">     76</a> 	// errUpstreamUnavailable is returned for non-transient upstream network connection errors.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/65a2e6af52737422caa5e4c28adac62bd527550c">65a2e6af52737422caa5e4c28adac62bd527550c</a></td><td>[Thu 18 Feb 2021 22:51:05 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l77" class="line" id="l77">     77</a> 	errUpstreamUnavailable = &amp;response{</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c3067f413ac3b50fc3f30ce134faa4a748cf88c5">c3067f413ac3b50fc3f30ce134faa4a748cf88c5</a></td><td>[Sat 27 Feb 2021 15:08:04 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l78" class="line" id="l78">     78</a> 		status:  http.StatusBadGateway,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c3067f413ac3b50fc3f30ce134faa4a748cf88c5">c3067f413ac3b50fc3f30ce134faa4a748cf88c5</a></td><td>[Sat 27 Feb 2021 15:08:04 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l79" class="line" id="l79">     79</a> 		code:    &quot;UPSTREAM_UNAVAILABLE&quot;,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c3067f413ac3b50fc3f30ce134faa4a748cf88c5">c3067f413ac3b50fc3f30ce134faa4a748cf88c5</a></td><td>[Sat 27 Feb 2021 15:08:04 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l80" class="line" id="l80">     80</a> 		message: &quot;upstream connection error&quot;,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/65a2e6af52737422caa5e4c28adac62bd527550c">65a2e6af52737422caa5e4c28adac62bd527550c</a></td><td>[Thu 18 Feb 2021 22:51:05 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l81" class="line" id="l81">     81</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/9cdc2068d7c24df6a630ddbdbbd41e673fe963b9">9cdc2068d7c24df6a630ddbdbbd41e673fe963b9</a></td><td>[Sun 31 Jan 2021 11:15:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l82" class="line" id="l82">     82</a> 	// errProxyInternal is returned when the HTTP proxy itself raises an error.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/9cdc2068d7c24df6a630ddbdbbd41e673fe963b9">9cdc2068d7c24df6a630ddbdbbd41e673fe963b9</a></td><td>[Sun 31 Jan 2021 11:15:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l83" class="line" id="l83">     83</a> 	errProxyInternal = &amp;response{</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c3067f413ac3b50fc3f30ce134faa4a748cf88c5">c3067f413ac3b50fc3f30ce134faa4a748cf88c5</a></td><td>[Sat 27 Feb 2021 15:08:04 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l84" class="line" id="l84">     84</a> 		status:  http.StatusServiceUnavailable,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c3067f413ac3b50fc3f30ce134faa4a748cf88c5">c3067f413ac3b50fc3f30ce134faa4a748cf88c5</a></td><td>[Sat 27 Feb 2021 15:08:04 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l85" class="line" id="l85">     85</a> 		code:    &quot;INTERNAL&quot;,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c3067f413ac3b50fc3f30ce134faa4a748cf88c5">c3067f413ac3b50fc3f30ce134faa4a748cf88c5</a></td><td>[Sat 27 Feb 2021 15:08:04 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l86" class="line" id="l86">     86</a> 		message: &quot;unknown internal proxy failure&quot;,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l87" class="line" id="l87">     87</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/9a7fd15de23235062524938c3476ec06760babdc">9a7fd15de23235062524938c3476ec06760babdc</a></td><td>[Sat 27 Feb 2021 10:30:08 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l88" class="line" id="l88">     88</a> 	// errObscuredInternal is returned when semantically meaningful errors are disabled and the</pre></td></tr>
+<tr>
+<td><a href="../../../commit/9a7fd15de23235062524938c3476ec06760babdc">9a7fd15de23235062524938c3476ec06760babdc</a></td><td>[Sat 27 Feb 2021 10:30:08 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l89" class="line" id="l89">     89</a> 	// proxy encounters any processing error.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/9a7fd15de23235062524938c3476ec06760babdc">9a7fd15de23235062524938c3476ec06760babdc</a></td><td>[Sat 27 Feb 2021 10:30:08 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l90" class="line" id="l90">     90</a> 	errObscuredInternal = &amp;response{</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c3067f413ac3b50fc3f30ce134faa4a748cf88c5">c3067f413ac3b50fc3f30ce134faa4a748cf88c5</a></td><td>[Sat 27 Feb 2021 15:08:04 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l91" class="line" id="l91">     91</a> 		status:  http.StatusInternalServerError,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c3067f413ac3b50fc3f30ce134faa4a748cf88c5">c3067f413ac3b50fc3f30ce134faa4a748cf88c5</a></td><td>[Sat 27 Feb 2021 15:08:04 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l92" class="line" id="l92">     92</a> 		code:    &quot;OBSCURED&quot;,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c3067f413ac3b50fc3f30ce134faa4a748cf88c5">c3067f413ac3b50fc3f30ce134faa4a748cf88c5</a></td><td>[Sat 27 Feb 2021 15:08:04 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l93" class="line" id="l93">     93</a> 		message: &quot;internal server error&quot;,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/9a7fd15de23235062524938c3476ec06760babdc">9a7fd15de23235062524938c3476ec06760babdc</a></td><td>[Sat 27 Feb 2021 10:30:08 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l94" class="line" id="l94">     94</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l95" class="line" id="l95">     95</a> )</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l96" class="line" id="l96">     96</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/65a2e6af52737422caa5e4c28adac62bd527550c">65a2e6af52737422caa5e4c28adac62bd527550c</a></td><td>[Thu 18 Feb 2021 22:51:05 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l97" class="line" id="l97">     97</a> // internalErrorHandler is a convenience alias for httputil.ReverseProxy&#39;s ErrorHandler function.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/65a2e6af52737422caa5e4c28adac62bd527550c">65a2e6af52737422caa5e4c28adac62bd527550c</a></td><td>[Thu 18 Feb 2021 22:51:05 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l98" class="line" id="l98">     98</a> type internalErrorHandler func(proxyRW http.ResponseWriter, proxyReq *http.Request, err error)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/65a2e6af52737422caa5e4c28adac62bd527550c">65a2e6af52737422caa5e4c28adac62bd527550c</a></td><td>[Thu 18 Feb 2021 22:51:05 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l99" class="line" id="l99">     99</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l100" class="line" id="l100">    100</a> // reverseProxy is an http.Handler that abstracts an httputil.ReverseProxy.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l101" class="line" id="l101">    101</a> type reverseProxy struct {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/5a66f0a9afe19ee75ebeac44ac94a25aae9a54b6">5a66f0a9afe19ee75ebeac44ac94a25aae9a54b6</a></td><td>[Fri  5 Feb 2021 22:39:22 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l102" class="line" id="l102">    102</a> 	vhosts []*config.VirtualHost</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2ee95434c948255e8601d6f269341b7b79f811a6">2ee95434c948255e8601d6f269341b7b79f811a6</a></td><td>[Mon  8 Feb 2021 21:25:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l103" class="line" id="l103">    103</a> 	opts   config.Proxy</pre></td></tr>
+<tr>
+<td><a href="../../../commit/5a66f0a9afe19ee75ebeac44ac94a25aae9a54b6">5a66f0a9afe19ee75ebeac44ac94a25aae9a54b6</a></td><td>[Fri  5 Feb 2021 22:39:22 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l104" class="line" id="l104">    104</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l105" class="line" id="l105">    105</a> 	filterChains map[string]middleware.Filter</pre></td></tr>
+<tr>
+<td><a href="../../../commit/cabf187615e8e25dbb56faf8525ab0af96f81002">cabf187615e8e25dbb56faf8525ab0af96f81002</a></td><td>[Sun 28 Feb 2021 08:13:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l106" class="line" id="l106">    106</a> 	healthProbes map[*config.Upstream]*healthProbe</pre></td></tr>
+<tr>
+<td><a href="../../../commit/9bc790c488ef417ed1192f1bb520f8d24eda93f7">9bc790c488ef417ed1192f1bb520f8d24eda93f7</a></td><td>[Sat  6 Feb 2021 17:24:36 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l107" class="line" id="l107">    107</a> 	transports   *util.ConcurrentMap</pre></td></tr>
+<tr>
+<td><a href="../../../commit/7bf6fafbd9c02ddd18bc2820b3233e2227a10809">7bf6fafbd9c02ddd18bc2820b3233e2227a10809</a></td><td>[Sun  7 Feb 2021 22:02:24 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l108" class="line" id="l108">    108</a> 	sequenceID   *int64</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l109" class="line" id="l109">    109</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l110" class="line" id="l110">    110</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l111" class="line" id="l111">    111</a> // newReverseProxy creates a new reverseProxy from a list of virtual host configurations.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2ee95434c948255e8601d6f269341b7b79f811a6">2ee95434c948255e8601d6f269341b7b79f811a6</a></td><td>[Mon  8 Feb 2021 21:25:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l112" class="line" id="l112">    112</a> func newReverseProxy(vhosts []*config.VirtualHost, opts config.Proxy) (http.Handler, error) {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l113" class="line" id="l113">    113</a> 	filterChains := make(map[string]middleware.Filter)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/cabf187615e8e25dbb56faf8525ab0af96f81002">cabf187615e8e25dbb56faf8525ab0af96f81002</a></td><td>[Sun 28 Feb 2021 08:13:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l114" class="line" id="l114">    114</a> 	healthProbes := make(map[*config.Upstream]*healthProbe)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l115" class="line" id="l115">    115</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l116" class="line" id="l116">    116</a> 	// Set up the filter chains for each virtual host up front, so that they can be trivially</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l117" class="line" id="l117">    117</a> 	// accessed in hot request paths.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l118" class="line" id="l118">    118</a> 	for _, vhost := range vhosts {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l119" class="line" id="l119">    119</a> 		var vhostFilters []middleware.Filter</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l120" class="line" id="l120">    120</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/ab6883e2c027954bc655605489b915d23de31e62">ab6883e2c027954bc655605489b915d23de31e62</a></td><td>[Wed  3 Feb 2021 22:41:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l121" class="line" id="l121">    121</a> 		zap.L().Debug(</pre></td></tr>
+<tr>
+<td><a href="../../../commit/245c4082b60be4e8e942748d48e17593d9caac6c">245c4082b60be4e8e942748d48e17593d9caac6c</a></td><td>[Wed  3 Feb 2021 22:34:54 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l122" class="line" id="l122">    122</a> 			&quot;assembling virtual host filter chain&quot;,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/245c4082b60be4e8e942748d48e17593d9caac6c">245c4082b60be4e8e942748d48e17593d9caac6c</a></td><td>[Wed  3 Feb 2021 22:34:54 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l123" class="line" id="l123">    123</a> 			zap.String(&quot;vhost&quot;, vhost.Name),</pre></td></tr>
+<tr>
+<td><a href="../../../commit/245c4082b60be4e8e942748d48e17593d9caac6c">245c4082b60be4e8e942748d48e17593d9caac6c</a></td><td>[Wed  3 Feb 2021 22:34:54 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l124" class="line" id="l124">    124</a> 			zap.Int(&quot;filters&quot;, len(vhost.Filters)),</pre></td></tr>
+<tr>
+<td><a href="../../../commit/245c4082b60be4e8e942748d48e17593d9caac6c">245c4082b60be4e8e942748d48e17593d9caac6c</a></td><td>[Wed  3 Feb 2021 22:34:54 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l125" class="line" id="l125">    125</a> 		)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/245c4082b60be4e8e942748d48e17593d9caac6c">245c4082b60be4e8e942748d48e17593d9caac6c</a></td><td>[Wed  3 Feb 2021 22:34:54 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l126" class="line" id="l126">    126</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/0f62b7f215b08badd27f14665835170042fbdf48">0f62b7f215b08badd27f14665835170042fbdf48</a></td><td>[Sun  2 May 2021 12:33:54 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l127" class="line" id="l127">    127</a> 		internal, err := filters.NewInternal(nil)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/0f62b7f215b08badd27f14665835170042fbdf48">0f62b7f215b08badd27f14665835170042fbdf48</a></td><td>[Sun  2 May 2021 12:33:54 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l128" class="line" id="l128">    128</a> 		if err != nil {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/0f62b7f215b08badd27f14665835170042fbdf48">0f62b7f215b08badd27f14665835170042fbdf48</a></td><td>[Sun  2 May 2021 12:33:54 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l129" class="line" id="l129">    129</a> 			return nil, &amp;util.Error{</pre></td></tr>
+<tr>
+<td><a href="../../../commit/0f62b7f215b08badd27f14665835170042fbdf48">0f62b7f215b08badd27f14665835170042fbdf48</a></td><td>[Sun  2 May 2021 12:33:54 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l130" class="line" id="l130">    130</a> 				Namespace: &quot;server&quot;,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/0f62b7f215b08badd27f14665835170042fbdf48">0f62b7f215b08badd27f14665835170042fbdf48</a></td><td>[Sun  2 May 2021 12:33:54 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l131" class="line" id="l131">    131</a> 				Message:   &quot;error creating internal filter&quot;,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/0f62b7f215b08badd27f14665835170042fbdf48">0f62b7f215b08badd27f14665835170042fbdf48</a></td><td>[Sun  2 May 2021 12:33:54 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l132" class="line" id="l132">    132</a> 				Tags: map[string]interface{}{</pre></td></tr>
+<tr>
+<td><a href="../../../commit/0f62b7f215b08badd27f14665835170042fbdf48">0f62b7f215b08badd27f14665835170042fbdf48</a></td><td>[Sun  2 May 2021 12:33:54 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l133" class="line" id="l133">    133</a> 					&quot;vhost&quot;: vhost.Name,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/0f62b7f215b08badd27f14665835170042fbdf48">0f62b7f215b08badd27f14665835170042fbdf48</a></td><td>[Sun  2 May 2021 12:33:54 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l134" class="line" id="l134">    134</a> 				},</pre></td></tr>
+<tr>
+<td><a href="../../../commit/0f62b7f215b08badd27f14665835170042fbdf48">0f62b7f215b08badd27f14665835170042fbdf48</a></td><td>[Sun  2 May 2021 12:33:54 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l135" class="line" id="l135">    135</a> 			}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/0f62b7f215b08badd27f14665835170042fbdf48">0f62b7f215b08badd27f14665835170042fbdf48</a></td><td>[Sun  2 May 2021 12:33:54 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l136" class="line" id="l136">    136</a> 		}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/0f62b7f215b08badd27f14665835170042fbdf48">0f62b7f215b08badd27f14665835170042fbdf48</a></td><td>[Sun  2 May 2021 12:33:54 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l137" class="line" id="l137">    137</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/0f62b7f215b08badd27f14665835170042fbdf48">0f62b7f215b08badd27f14665835170042fbdf48</a></td><td>[Sun  2 May 2021 12:33:54 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l138" class="line" id="l138">    138</a> 		vhostFilters = append(vhostFilters, internal)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/0f62b7f215b08badd27f14665835170042fbdf48">0f62b7f215b08badd27f14665835170042fbdf48</a></td><td>[Sun  2 May 2021 12:33:54 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l139" class="line" id="l139">    139</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l140" class="line" id="l140">    140</a> 		for _, cfgFilter := range vhost.Filters {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/ab6883e2c027954bc655605489b915d23de31e62">ab6883e2c027954bc655605489b915d23de31e62</a></td><td>[Wed  3 Feb 2021 22:41:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l141" class="line" id="l141">    141</a> 			zap.L().Debug(</pre></td></tr>
+<tr>
+<td><a href="../../../commit/245c4082b60be4e8e942748d48e17593d9caac6c">245c4082b60be4e8e942748d48e17593d9caac6c</a></td><td>[Wed  3 Feb 2021 22:34:54 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l142" class="line" id="l142">    142</a> 				&quot;initializing filter&quot;,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/245c4082b60be4e8e942748d48e17593d9caac6c">245c4082b60be4e8e942748d48e17593d9caac6c</a></td><td>[Wed  3 Feb 2021 22:34:54 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l143" class="line" id="l143">    143</a> 				zap.String(&quot;vhost&quot;, vhost.Name),</pre></td></tr>
+<tr>
+<td><a href="../../../commit/245c4082b60be4e8e942748d48e17593d9caac6c">245c4082b60be4e8e942748d48e17593d9caac6c</a></td><td>[Wed  3 Feb 2021 22:34:54 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l144" class="line" id="l144">    144</a> 				zap.String(&quot;name&quot;, cfgFilter.Name),</pre></td></tr>
+<tr>
+<td><a href="../../../commit/245c4082b60be4e8e942748d48e17593d9caac6c">245c4082b60be4e8e942748d48e17593d9caac6c</a></td><td>[Wed  3 Feb 2021 22:34:54 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l145" class="line" id="l145">    145</a> 				zap.String(&quot;type&quot;, cfgFilter.Type),</pre></td></tr>
+<tr>
+<td><a href="../../../commit/245c4082b60be4e8e942748d48e17593d9caac6c">245c4082b60be4e8e942748d48e17593d9caac6c</a></td><td>[Wed  3 Feb 2021 22:34:54 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l146" class="line" id="l146">    146</a> 			)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/245c4082b60be4e8e942748d48e17593d9caac6c">245c4082b60be4e8e942748d48e17593d9caac6c</a></td><td>[Wed  3 Feb 2021 22:34:54 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l147" class="line" id="l147">    147</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/48f012efd2d0b14adc0d68395601f508d33917fd">48f012efd2d0b14adc0d68395601f508d33917fd</a></td><td>[Mon  1 Feb 2021 23:13:09 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l148" class="line" id="l148">    148</a> 			filterFactory, ok := filterFactories[cfgFilter.Type]</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l149" class="line" id="l149">    149</a> 			if !ok {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l150" class="line" id="l150">    150</a> 				return nil, &amp;util.Error{</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l151" class="line" id="l151">    151</a> 					Namespace: &quot;server&quot;,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/48f012efd2d0b14adc0d68395601f508d33917fd">48f012efd2d0b14adc0d68395601f508d33917fd</a></td><td>[Mon  1 Feb 2021 23:13:09 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l152" class="line" id="l152">    152</a> 					Message:   &quot;unknown filter type&quot;,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l153" class="line" id="l153">    153</a> 					Tags: map[string]interface{}{</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c45a99cfc0aaf374247bc99c85d1892fe0901aac">c45a99cfc0aaf374247bc99c85d1892fe0901aac</a></td><td>[Tue  9 Feb 2021 22:43:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l154" class="line" id="l154">    154</a> 						&quot;vhost&quot;:  vhost.Name,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l155" class="line" id="l155">    155</a> 						&quot;name&quot;:   cfgFilter.Name,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/48f012efd2d0b14adc0d68395601f508d33917fd">48f012efd2d0b14adc0d68395601f508d33917fd</a></td><td>[Mon  1 Feb 2021 23:13:09 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l156" class="line" id="l156">    156</a> 						&quot;type&quot;:   cfgFilter.Type,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l157" class="line" id="l157">    157</a> 						&quot;params&quot;: cfgFilter.Params.Value,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l158" class="line" id="l158">    158</a> 					},</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l159" class="line" id="l159">    159</a> 				}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l160" class="line" id="l160">    160</a> 			}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l161" class="line" id="l161">    161</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l162" class="line" id="l162">    162</a> 			filter, err := filterFactory(cfgFilter)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l163" class="line" id="l163">    163</a> 			if err != nil {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l164" class="line" id="l164">    164</a> 				return nil, &amp;util.Error{</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l165" class="line" id="l165">    165</a> 					Namespace: &quot;server&quot;,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l166" class="line" id="l166">    166</a> 					Message:   &quot;error creating filter&quot;,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l167" class="line" id="l167">    167</a> 					Tags: map[string]interface{}{</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c45a99cfc0aaf374247bc99c85d1892fe0901aac">c45a99cfc0aaf374247bc99c85d1892fe0901aac</a></td><td>[Tue  9 Feb 2021 22:43:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l168" class="line" id="l168">    168</a> 						&quot;vhost&quot;:  vhost.Name,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l169" class="line" id="l169">    169</a> 						&quot;name&quot;:   cfgFilter.Name,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l170" class="line" id="l170">    170</a> 						&quot;params&quot;: cfgFilter.Params.Value,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l171" class="line" id="l171">    171</a> 					},</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l172" class="line" id="l172">    172</a> 					StackedError: err,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l173" class="line" id="l173">    173</a> 				}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l174" class="line" id="l174">    174</a> 			}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l175" class="line" id="l175">    175</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l176" class="line" id="l176">    176</a> 			vhostFilters = append(vhostFilters, filter)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l177" class="line" id="l177">    177</a> 		}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l178" class="line" id="l178">    178</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/65d75b698e5453d6f24bf8d75e424fa6f787d237">65d75b698e5453d6f24bf8d75e424fa6f787d237</a></td><td>[Sun 31 Jan 2021 20:41:11 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l179" class="line" id="l179">    179</a> 		filterChains[vhost.Name] = middleware.NewComposedFilter(vhostFilters...)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c45a99cfc0aaf374247bc99c85d1892fe0901aac">c45a99cfc0aaf374247bc99c85d1892fe0901aac</a></td><td>[Tue  9 Feb 2021 22:43:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l180" class="line" id="l180">    180</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l181" class="line" id="l181">    181</a> 		for _, upstream := range vhost.Upstreams {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l182" class="line" id="l182">    182</a> 			if upstream.HealthCheck != nil {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l183" class="line" id="l183">    183</a> 				zap.L().Debug(</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l184" class="line" id="l184">    184</a> 					&quot;creating health check for virtual host upstream&quot;,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l185" class="line" id="l185">    185</a> 					zap.String(&quot;vhost&quot;, vhost.Name),</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l186" class="line" id="l186">    186</a> 					zap.String(&quot;upstream&quot;, upstream.Name),</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l187" class="line" id="l187">    187</a> 					zap.Stringer(&quot;address&quot;, upstream.Address),</pre></td></tr>
+<tr>
+<td><a href="../../../commit/bc675e57f580dacbced0041a02392796e928bfc1">bc675e57f580dacbced0041a02392796e928bfc1</a></td><td>[Sat 27 Feb 2021 15:25:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l188" class="line" id="l188">    188</a> 					zap.String(&quot;host&quot;, upstream.HealthCheck.Host),</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l189" class="line" id="l189">    189</a> 					zap.String(&quot;path&quot;, upstream.HealthCheck.Path),</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l190" class="line" id="l190">    190</a> 					zap.Duration(&quot;interval&quot;, upstream.HealthCheck.Interval),</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l191" class="line" id="l191">    191</a> 					zap.Duration(&quot;jitter&quot;, upstream.HealthCheck.Jitter),</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l192" class="line" id="l192">    192</a> 					zap.Bool(&quot;circuit_break&quot;, upstream.HealthCheck.EnableCircuitBreak),</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l193" class="line" id="l193">    193</a> 				)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l194" class="line" id="l194">    194</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l195" class="line" id="l195">    195</a> 				hp, err := newHealthProbe(vhost.Name, upstream)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l196" class="line" id="l196">    196</a> 				if err != nil {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l197" class="line" id="l197">    197</a> 					return nil, &amp;util.Error{</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l198" class="line" id="l198">    198</a> 						Namespace: &quot;server&quot;,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l199" class="line" id="l199">    199</a> 						Message:   &quot;error creating health check probe&quot;,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l200" class="line" id="l200">    200</a> 						Tags: map[string]interface{}{</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l201" class="line" id="l201">    201</a> 							&quot;vhost&quot;: vhost.Name,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l202" class="line" id="l202">    202</a> 						},</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l203" class="line" id="l203">    203</a> 					}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c45a99cfc0aaf374247bc99c85d1892fe0901aac">c45a99cfc0aaf374247bc99c85d1892fe0901aac</a></td><td>[Tue  9 Feb 2021 22:43:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l204" class="line" id="l204">    204</a> 				}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c45a99cfc0aaf374247bc99c85d1892fe0901aac">c45a99cfc0aaf374247bc99c85d1892fe0901aac</a></td><td>[Tue  9 Feb 2021 22:43:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l205" class="line" id="l205">    205</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/cabf187615e8e25dbb56faf8525ab0af96f81002">cabf187615e8e25dbb56faf8525ab0af96f81002</a></td><td>[Sun 28 Feb 2021 08:13:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l206" class="line" id="l206">    206</a> 				healthProbes[upstream] = hp</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l207" class="line" id="l207">    207</a> 			}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c45a99cfc0aaf374247bc99c85d1892fe0901aac">c45a99cfc0aaf374247bc99c85d1892fe0901aac</a></td><td>[Tue  9 Feb 2021 22:43:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l208" class="line" id="l208">    208</a> 		}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l209" class="line" id="l209">    209</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l210" class="line" id="l210">    210</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l211" class="line" id="l211">    211</a> 	return &amp;reverseProxy{</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l212" class="line" id="l212">    212</a> 		vhosts:       vhosts,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2ee95434c948255e8601d6f269341b7b79f811a6">2ee95434c948255e8601d6f269341b7b79f811a6</a></td><td>[Mon  8 Feb 2021 21:25:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l213" class="line" id="l213">    213</a> 		opts:         opts,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l214" class="line" id="l214">    214</a> 		healthProbes: healthProbes,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l215" class="line" id="l215">    215</a> 		filterChains: filterChains,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/9bc790c488ef417ed1192f1bb520f8d24eda93f7">9bc790c488ef417ed1192f1bb520f8d24eda93f7</a></td><td>[Sat  6 Feb 2021 17:24:36 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l216" class="line" id="l216">    216</a> 		transports:   util.NewConcurrentMap(),</pre></td></tr>
+<tr>
+<td><a href="../../../commit/7bf6fafbd9c02ddd18bc2820b3233e2227a10809">7bf6fafbd9c02ddd18bc2820b3233e2227a10809</a></td><td>[Sun  7 Feb 2021 22:02:24 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l217" class="line" id="l217">    217</a> 		sequenceID:   new(int64),</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l218" class="line" id="l218">    218</a> 	}, nil</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l219" class="line" id="l219">    219</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l220" class="line" id="l220">    220</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l221" class="line" id="l221">    221</a> // ServeHTTP serves a single HTTP request.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l222" class="line" id="l222">    222</a> func (rp *reverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l223" class="line" id="l223">    223</a> 	var err error</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l224" class="line" id="l224">    224</a> 	var abortResp *http.Response</pre></td></tr>
+<tr>
+<td><a href="../../../commit/a3a0419ca63778b2353f8f83421cb1a44904b034">a3a0419ca63778b2353f8f83421cb1a44904b034</a></td><td>[Sat 30 Jan 2021 22:43:24 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l225" class="line" id="l225">    225</a> 	var transport http.RoundTripper</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l226" class="line" id="l226">    226</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/bd3037728571ca56ae3c8e269744168f5cd32aad">bd3037728571ca56ae3c8e269744168f5cd32aad</a></td><td>[Sun 14 Nov 2021 11:01:29 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l227" class="line" id="l227">    227</a> 	proxyReq := req.Clone(req.Context())</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c45b266177901fa9c712c1a16e73b17ccf43ac36">c45b266177901fa9c712c1a16e73b17ccf43ac36</a></td><td>[Wed 17 Feb 2021 20:46:29 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l228" class="line" id="l228">    228</a> 	tags := map[string]interface{}{</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c45b266177901fa9c712c1a16e73b17ccf43ac36">c45b266177901fa9c712c1a16e73b17ccf43ac36</a></td><td>[Wed 17 Feb 2021 20:46:29 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l229" class="line" id="l229">    229</a> 		&quot;route_host&quot;: proxyReq.Host,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c45b266177901fa9c712c1a16e73b17ccf43ac36">c45b266177901fa9c712c1a16e73b17ccf43ac36</a></td><td>[Wed 17 Feb 2021 20:46:29 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l230" class="line" id="l230">    230</a> 		&quot;method&quot;:     proxyReq.Method,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c45b266177901fa9c712c1a16e73b17ccf43ac36">c45b266177901fa9c712c1a16e73b17ccf43ac36</a></td><td>[Wed 17 Feb 2021 20:46:29 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l231" class="line" id="l231">    231</a> 		&quot;protocol&quot;:   proxyReq.Proto,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c45b266177901fa9c712c1a16e73b17ccf43ac36">c45b266177901fa9c712c1a16e73b17ccf43ac36</a></td><td>[Wed 17 Feb 2021 20:46:29 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l232" class="line" id="l232">    232</a> 		&quot;tls&quot;:        proxyReq.TLS != nil,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c45b266177901fa9c712c1a16e73b17ccf43ac36">c45b266177901fa9c712c1a16e73b17ccf43ac36</a></td><td>[Wed 17 Feb 2021 20:46:29 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l233" class="line" id="l233">    233</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l234" class="line" id="l234">    234</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l235" class="line" id="l235">    235</a> 	// Match virtual host</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l236" class="line" id="l236">    236</a> 	vhost, ok := rp.matchHost(proxyReq.Host)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l237" class="line" id="l237">    237</a> 	if !ok {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c45b266177901fa9c712c1a16e73b17ccf43ac36">c45b266177901fa9c712c1a16e73b17ccf43ac36</a></td><td>[Wed 17 Feb 2021 20:46:29 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l238" class="line" id="l238">    238</a> 		metrics.Client.Incr(metricProxyUnknownHost, tags)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/ab6883e2c027954bc655605489b915d23de31e62">ab6883e2c027954bc655605489b915d23de31e62</a></td><td>[Wed  3 Feb 2021 22:41:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l239" class="line" id="l239">    239</a> 		zap.L().Debug(&quot;unknown virtual host&quot;, zap.String(&quot;host&quot;, proxyReq.Host))</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l240" class="line" id="l240">    240</a> 		rp.respond(rw, errUnknownHost.response())</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l241" class="line" id="l241">    241</a> 		return</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l242" class="line" id="l242">    242</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l243" class="line" id="l243">    243</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l244" class="line" id="l244">    244</a> 	// Match upstream from route</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l245" class="line" id="l245">    245</a> 	upstream, ok := rp.matchRoute(proxyReq, vhost.Upstreams, vhost.Routes)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l246" class="line" id="l246">    246</a> 	if !ok {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l247" class="line" id="l247">    247</a> 		metrics.Client.Incr(metricProxyUnknownRoute, tags)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l248" class="line" id="l248">    248</a> 		zap.L().Debug(&quot;unknown route&quot;, zap.String(&quot;virtual_host&quot;, vhost.Name))</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l249" class="line" id="l249">    249</a> 		rp.respond(rw, errUnknownRoute.response())</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l250" class="line" id="l250">    250</a> 		return</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l251" class="line" id="l251">    251</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l252" class="line" id="l252">    252</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/c45b266177901fa9c712c1a16e73b17ccf43ac36">c45b266177901fa9c712c1a16e73b17ccf43ac36</a></td><td>[Wed 17 Feb 2021 20:46:29 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l253" class="line" id="l253">    253</a> 	tags = util.MergeMaps(tags, map[string]interface{}{</pre></td></tr>
+<tr>
+<td><a href="../../../commit/738a9741397e4d70ee668e95764c34b8ffba0435">738a9741397e4d70ee668e95764c34b8ffba0435</a></td><td>[Sat  6 Feb 2021 15:01:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l254" class="line" id="l254">    254</a> 		&quot;virtual_host&quot;: vhost.Name,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l255" class="line" id="l255">    255</a> 		&quot;upstream&quot;:     upstream.Name,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c45b266177901fa9c712c1a16e73b17ccf43ac36">c45b266177901fa9c712c1a16e73b17ccf43ac36</a></td><td>[Wed 17 Feb 2021 20:46:29 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l256" class="line" id="l256">    256</a> 	})</pre></td></tr>
+<tr>
+<td><a href="../../../commit/738a9741397e4d70ee668e95764c34b8ffba0435">738a9741397e4d70ee668e95764c34b8ffba0435</a></td><td>[Sat  6 Feb 2021 15:01:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l257" class="line" id="l257">    257</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/c18eee591761fbb6f70dadde2ad8630e2d6ae4de">c18eee591761fbb6f70dadde2ad8630e2d6ae4de</a></td><td>[Sat  6 Feb 2021 15:03:26 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l258" class="line" id="l258">    258</a> 	metrics.Client.Incr(metricProxyServe, tags)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/7bf6fafbd9c02ddd18bc2820b3233e2227a10809">7bf6fafbd9c02ddd18bc2820b3233e2227a10809</a></td><td>[Sun  7 Feb 2021 22:02:24 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l259" class="line" id="l259">    259</a> 	metrics.Client.Gauge(metricProxyTotalServed, float64(atomic.LoadInt64(rp.sequenceID)), tags)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/7bf6fafbd9c02ddd18bc2820b3233e2227a10809">7bf6fafbd9c02ddd18bc2820b3233e2227a10809</a></td><td>[Sun  7 Feb 2021 22:02:24 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l260" class="line" id="l260">    260</a> 	defer func() { atomic.AddInt64(rp.sequenceID, 1) }()</pre></td></tr>
+<tr>
+<td><a href="../../../commit/738a9741397e4d70ee668e95764c34b8ffba0435">738a9741397e4d70ee668e95764c34b8ffba0435</a></td><td>[Sat  6 Feb 2021 15:01:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l261" class="line" id="l261">    261</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/137a8dcb06ef1b60c0f5146a8a787cfca9f4b3a5">137a8dcb06ef1b60c0f5146a8a787cfca9f4b3a5</a></td><td>[Mon  1 Feb 2021 20:49:25 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l262" class="line" id="l262">    262</a> 	// Reverse proxy callbacks</pre></td></tr>
+<tr>
+<td><a href="../../../commit/137a8dcb06ef1b60c0f5146a8a787cfca9f4b3a5">137a8dcb06ef1b60c0f5146a8a787cfca9f4b3a5</a></td><td>[Mon  1 Feb 2021 20:49:25 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l263" class="line" id="l263">    263</a> 	rpModifyResponse := func(proxyResp *http.Response) error {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c18eee591761fbb6f70dadde2ad8630e2d6ae4de">c18eee591761fbb6f70dadde2ad8630e2d6ae4de</a></td><td>[Sat  6 Feb 2021 15:03:26 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l264" class="line" id="l264">    264</a> 		metrics.Client.Incr(metricProxySuccess, tags)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/738a9741397e4d70ee668e95764c34b8ffba0435">738a9741397e4d70ee668e95764c34b8ffba0435</a></td><td>[Sat  6 Feb 2021 15:01:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l265" class="line" id="l265">    265</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/137a8dcb06ef1b60c0f5146a8a787cfca9f4b3a5">137a8dcb06ef1b60c0f5146a8a787cfca9f4b3a5</a></td><td>[Mon  1 Feb 2021 20:49:25 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l266" class="line" id="l266">    266</a> 		proxyResp, err = rp.filterChains[vhost.Name].ProcessResponse(proxyResp)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/137a8dcb06ef1b60c0f5146a8a787cfca9f4b3a5">137a8dcb06ef1b60c0f5146a8a787cfca9f4b3a5</a></td><td>[Mon  1 Feb 2021 20:49:25 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l267" class="line" id="l267">    267</a> 		return err</pre></td></tr>
+<tr>
+<td><a href="../../../commit/137a8dcb06ef1b60c0f5146a8a787cfca9f4b3a5">137a8dcb06ef1b60c0f5146a8a787cfca9f4b3a5</a></td><td>[Mon  1 Feb 2021 20:49:25 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l268" class="line" id="l268">    268</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/65a2e6af52737422caa5e4c28adac62bd527550c">65a2e6af52737422caa5e4c28adac62bd527550c</a></td><td>[Thu 18 Feb 2021 22:51:05 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l269" class="line" id="l269">    269</a> 	rpErrorHandler := func(errResp *response) internalErrorHandler {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/137a8dcb06ef1b60c0f5146a8a787cfca9f4b3a5">137a8dcb06ef1b60c0f5146a8a787cfca9f4b3a5</a></td><td>[Mon  1 Feb 2021 20:49:25 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l270" class="line" id="l270">    270</a> 		return func(proxyRW http.ResponseWriter, proxyReq *http.Request, err error) {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c3067f413ac3b50fc3f30ce134faa4a748cf88c5">c3067f413ac3b50fc3f30ce134faa4a748cf88c5</a></td><td>[Sat 27 Feb 2021 15:08:04 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l271" class="line" id="l271">    271</a> 			metrics.Client.Incr(</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c3067f413ac3b50fc3f30ce134faa4a748cf88c5">c3067f413ac3b50fc3f30ce134faa4a748cf88c5</a></td><td>[Sat 27 Feb 2021 15:08:04 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l272" class="line" id="l272">    272</a> 				metricProxyError,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c3067f413ac3b50fc3f30ce134faa4a748cf88c5">c3067f413ac3b50fc3f30ce134faa4a748cf88c5</a></td><td>[Sat 27 Feb 2021 15:08:04 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l273" class="line" id="l273">    273</a> 				util.MergeMaps(tags, map[string]interface{}{&quot;code&quot;: errResp.code}),</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c3067f413ac3b50fc3f30ce134faa4a748cf88c5">c3067f413ac3b50fc3f30ce134faa4a748cf88c5</a></td><td>[Sat 27 Feb 2021 15:08:04 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l274" class="line" id="l274">    274</a> 			)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/738a9741397e4d70ee668e95764c34b8ffba0435">738a9741397e4d70ee668e95764c34b8ffba0435</a></td><td>[Sat  6 Feb 2021 15:01:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l275" class="line" id="l275">    275</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/68edd2911ae21f7871890f54c8d646e10eea6c5d">68edd2911ae21f7871890f54c8d646e10eea6c5d</a></td><td>[Wed 17 Feb 2021 20:43:11 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l276" class="line" id="l276">    276</a> 			hub := sentry.CurrentHub().Clone()</pre></td></tr>
+<tr>
+<td><a href="../../../commit/68edd2911ae21f7871890f54c8d646e10eea6c5d">68edd2911ae21f7871890f54c8d646e10eea6c5d</a></td><td>[Wed 17 Feb 2021 20:43:11 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l277" class="line" id="l277">    277</a> 			hub.ConfigureScope(func(scope *sentry.Scope) {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/68edd2911ae21f7871890f54c8d646e10eea6c5d">68edd2911ae21f7871890f54c8d646e10eea6c5d</a></td><td>[Wed 17 Feb 2021 20:43:11 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l278" class="line" id="l278">    278</a> 				scope.SetTag(&quot;virtual_host&quot;, vhost.Name)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l279" class="line" id="l279">    279</a> 				scope.SetTag(&quot;upstream&quot;, upstream.Address.String())</pre></td></tr>
+<tr>
+<td><a href="../../../commit/68edd2911ae21f7871890f54c8d646e10eea6c5d">68edd2911ae21f7871890f54c8d646e10eea6c5d</a></td><td>[Wed 17 Feb 2021 20:43:11 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l280" class="line" id="l280">    280</a> 				scope.SetTag(&quot;route_host&quot;, proxyReq.Host)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/68edd2911ae21f7871890f54c8d646e10eea6c5d">68edd2911ae21f7871890f54c8d646e10eea6c5d</a></td><td>[Wed 17 Feb 2021 20:43:11 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l281" class="line" id="l281">    281</a> 				scope.SetTag(&quot;method&quot;, proxyReq.Method)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/68edd2911ae21f7871890f54c8d646e10eea6c5d">68edd2911ae21f7871890f54c8d646e10eea6c5d</a></td><td>[Wed 17 Feb 2021 20:43:11 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l282" class="line" id="l282">    282</a> 				scope.SetTag(&quot;protocol&quot;, proxyReq.Proto)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/68edd2911ae21f7871890f54c8d646e10eea6c5d">68edd2911ae21f7871890f54c8d646e10eea6c5d</a></td><td>[Wed 17 Feb 2021 20:43:11 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l283" class="line" id="l283">    283</a> 				scope.SetExtra(&quot;url&quot;, proxyReq.RequestURI)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/68edd2911ae21f7871890f54c8d646e10eea6c5d">68edd2911ae21f7871890f54c8d646e10eea6c5d</a></td><td>[Wed 17 Feb 2021 20:43:11 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l284" class="line" id="l284">    284</a> 				scope.SetExtra(&quot;client&quot;, proxyReq.RemoteAddr)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/678bf7e6f3c63d6c8f5b09491d41854f921b04a4">678bf7e6f3c63d6c8f5b09491d41854f921b04a4</a></td><td>[Sat 27 Feb 2021 17:10:07 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l285" class="line" id="l285">    285</a> 				scope.SetExtra(&quot;code&quot;, errResp.code)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/68edd2911ae21f7871890f54c8d646e10eea6c5d">68edd2911ae21f7871890f54c8d646e10eea6c5d</a></td><td>[Wed 17 Feb 2021 20:43:11 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l286" class="line" id="l286">    286</a> 			})</pre></td></tr>
+<tr>
+<td><a href="../../../commit/68edd2911ae21f7871890f54c8d646e10eea6c5d">68edd2911ae21f7871890f54c8d646e10eea6c5d</a></td><td>[Wed 17 Feb 2021 20:43:11 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l287" class="line" id="l287">    287</a> 			go hub.CaptureException(err)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/68edd2911ae21f7871890f54c8d646e10eea6c5d">68edd2911ae21f7871890f54c8d646e10eea6c5d</a></td><td>[Wed 17 Feb 2021 20:43:11 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l288" class="line" id="l288">    288</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/3fd2f927424afa5e0ad4157451f57f3d125cfb8f">3fd2f927424afa5e0ad4157451f57f3d125cfb8f</a></td><td>[Thu  4 Mar 2021 21:12:27 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l289" class="line" id="l289">    289</a> 			zap.L().Error(</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3fd2f927424afa5e0ad4157451f57f3d125cfb8f">3fd2f927424afa5e0ad4157451f57f3d125cfb8f</a></td><td>[Thu  4 Mar 2021 21:12:27 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l290" class="line" id="l290">    290</a> 				&quot;reverse proxy error&quot;,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/ec509791a19d952676c6ca65001f6f277888bc87">ec509791a19d952676c6ca65001f6f277888bc87</a></td><td>[Sat 24 Apr 2021 17:53:52 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l291" class="line" id="l291">    291</a> 				zap.String(&quot;virtual_host&quot;, vhost.Name),</pre></td></tr>
+<tr>
+<td><a href="../../../commit/ec509791a19d952676c6ca65001f6f277888bc87">ec509791a19d952676c6ca65001f6f277888bc87</a></td><td>[Sat 24 Apr 2021 17:53:52 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l292" class="line" id="l292">    292</a> 				zap.Stringer(&quot;upstream&quot;, upstream.Address),</pre></td></tr>
+<tr>
+<td><a href="../../../commit/ec509791a19d952676c6ca65001f6f277888bc87">ec509791a19d952676c6ca65001f6f277888bc87</a></td><td>[Sat 24 Apr 2021 17:53:52 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l293" class="line" id="l293">    293</a> 				zap.String(&quot;route_host&quot;, proxyReq.Host),</pre></td></tr>
+<tr>
+<td><a href="../../../commit/ec509791a19d952676c6ca65001f6f277888bc87">ec509791a19d952676c6ca65001f6f277888bc87</a></td><td>[Sat 24 Apr 2021 17:53:52 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l294" class="line" id="l294">    294</a> 				zap.String(&quot;method&quot;, proxyReq.Method),</pre></td></tr>
+<tr>
+<td><a href="../../../commit/ec509791a19d952676c6ca65001f6f277888bc87">ec509791a19d952676c6ca65001f6f277888bc87</a></td><td>[Sat 24 Apr 2021 17:53:52 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l295" class="line" id="l295">    295</a> 				zap.String(&quot;protocol&quot;, proxyReq.Proto),</pre></td></tr>
+<tr>
+<td><a href="../../../commit/ec509791a19d952676c6ca65001f6f277888bc87">ec509791a19d952676c6ca65001f6f277888bc87</a></td><td>[Sat 24 Apr 2021 17:53:52 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l296" class="line" id="l296">    296</a> 				zap.String(&quot;url&quot;, proxyReq.RequestURI),</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c3067f413ac3b50fc3f30ce134faa4a748cf88c5">c3067f413ac3b50fc3f30ce134faa4a748cf88c5</a></td><td>[Sat 27 Feb 2021 15:08:04 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l297" class="line" id="l297">    297</a> 				zap.Int(&quot;status&quot;, errResp.status),</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c3067f413ac3b50fc3f30ce134faa4a748cf88c5">c3067f413ac3b50fc3f30ce134faa4a748cf88c5</a></td><td>[Sat 27 Feb 2021 15:08:04 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l298" class="line" id="l298">    298</a> 				zap.String(&quot;code&quot;, errResp.code),</pre></td></tr>
+<tr>
+<td><a href="../../../commit/245c4082b60be4e8e942748d48e17593d9caac6c">245c4082b60be4e8e942748d48e17593d9caac6c</a></td><td>[Wed  3 Feb 2021 22:34:54 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l299" class="line" id="l299">    299</a> 				zap.String(&quot;message&quot;, errResp.message),</pre></td></tr>
+<tr>
+<td><a href="../../../commit/245c4082b60be4e8e942748d48e17593d9caac6c">245c4082b60be4e8e942748d48e17593d9caac6c</a></td><td>[Wed  3 Feb 2021 22:34:54 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l300" class="line" id="l300">    300</a> 				zap.Error(err),</pre></td></tr>
+<tr>
+<td><a href="../../../commit/245c4082b60be4e8e942748d48e17593d9caac6c">245c4082b60be4e8e942748d48e17593d9caac6c</a></td><td>[Wed  3 Feb 2021 22:34:54 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l301" class="line" id="l301">    301</a> 			)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/245c4082b60be4e8e942748d48e17593d9caac6c">245c4082b60be4e8e942748d48e17593d9caac6c</a></td><td>[Wed  3 Feb 2021 22:34:54 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l302" class="line" id="l302">    302</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/9a7fd15de23235062524938c3476ec06760babdc">9a7fd15de23235062524938c3476ec06760babdc</a></td><td>[Sat 27 Feb 2021 10:30:08 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l303" class="line" id="l303">    303</a> 			if !rp.opts.EnableErrorSemantics {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/9a7fd15de23235062524938c3476ec06760babdc">9a7fd15de23235062524938c3476ec06760babdc</a></td><td>[Sat 27 Feb 2021 10:30:08 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l304" class="line" id="l304">    304</a> 				errResp = errObscuredInternal</pre></td></tr>
+<tr>
+<td><a href="../../../commit/9a7fd15de23235062524938c3476ec06760babdc">9a7fd15de23235062524938c3476ec06760babdc</a></td><td>[Sat 27 Feb 2021 10:30:08 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l305" class="line" id="l305">    305</a> 			}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/9a7fd15de23235062524938c3476ec06760babdc">9a7fd15de23235062524938c3476ec06760babdc</a></td><td>[Sat 27 Feb 2021 10:30:08 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l306" class="line" id="l306">    306</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/2ee95434c948255e8601d6f269341b7b79f811a6">2ee95434c948255e8601d6f269341b7b79f811a6</a></td><td>[Mon  8 Feb 2021 21:25:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l307" class="line" id="l307">    307</a> 			if rp.opts.EnableErrorPropagation {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2ee95434c948255e8601d6f269341b7b79f811a6">2ee95434c948255e8601d6f269341b7b79f811a6</a></td><td>[Mon  8 Feb 2021 21:25:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l308" class="line" id="l308">    308</a> 				errResp.tags = map[string]string{&quot;error&quot;: err.Error()}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2ee95434c948255e8601d6f269341b7b79f811a6">2ee95434c948255e8601d6f269341b7b79f811a6</a></td><td>[Mon  8 Feb 2021 21:25:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l309" class="line" id="l309">    309</a> 			}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/2ee95434c948255e8601d6f269341b7b79f811a6">2ee95434c948255e8601d6f269341b7b79f811a6</a></td><td>[Mon  8 Feb 2021 21:25:44 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l310" class="line" id="l310">    310</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/137a8dcb06ef1b60c0f5146a8a787cfca9f4b3a5">137a8dcb06ef1b60c0f5146a8a787cfca9f4b3a5</a></td><td>[Mon  1 Feb 2021 20:49:25 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l311" class="line" id="l311">    311</a> 			resp := errResp.response()</pre></td></tr>
+<tr>
+<td><a href="../../../commit/137a8dcb06ef1b60c0f5146a8a787cfca9f4b3a5">137a8dcb06ef1b60c0f5146a8a787cfca9f4b3a5</a></td><td>[Mon  1 Feb 2021 20:49:25 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l312" class="line" id="l312">    312</a> 			resp.Request = proxyReq</pre></td></tr>
+<tr>
+<td><a href="../../../commit/137a8dcb06ef1b60c0f5146a8a787cfca9f4b3a5">137a8dcb06ef1b60c0f5146a8a787cfca9f4b3a5</a></td><td>[Mon  1 Feb 2021 20:49:25 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l313" class="line" id="l313">    313</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/137a8dcb06ef1b60c0f5146a8a787cfca9f4b3a5">137a8dcb06ef1b60c0f5146a8a787cfca9f4b3a5</a></td><td>[Mon  1 Feb 2021 20:49:25 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l314" class="line" id="l314">    314</a> 			rpModifyResponse(resp)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/137a8dcb06ef1b60c0f5146a8a787cfca9f4b3a5">137a8dcb06ef1b60c0f5146a8a787cfca9f4b3a5</a></td><td>[Mon  1 Feb 2021 20:49:25 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l315" class="line" id="l315">    315</a> 			rp.respond(proxyRW, resp)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/137a8dcb06ef1b60c0f5146a8a787cfca9f4b3a5">137a8dcb06ef1b60c0f5146a8a787cfca9f4b3a5</a></td><td>[Mon  1 Feb 2021 20:49:25 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l316" class="line" id="l316">    316</a> 		}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/137a8dcb06ef1b60c0f5146a8a787cfca9f4b3a5">137a8dcb06ef1b60c0f5146a8a787cfca9f4b3a5</a></td><td>[Mon  1 Feb 2021 20:49:25 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l317" class="line" id="l317">    317</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/137a8dcb06ef1b60c0f5146a8a787cfca9f4b3a5">137a8dcb06ef1b60c0f5146a8a787cfca9f4b3a5</a></td><td>[Mon  1 Feb 2021 20:49:25 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l318" class="line" id="l318">    318</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l319" class="line" id="l319">    319</a> 	// Apply request filters</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l320" class="line" id="l320">    320</a> 	proxyReq, abortResp, err = rp.filterChains[vhost.Name].ProcessRequest(proxyReq)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l321" class="line" id="l321">    321</a> 	if err != nil {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/137a8dcb06ef1b60c0f5146a8a787cfca9f4b3a5">137a8dcb06ef1b60c0f5146a8a787cfca9f4b3a5</a></td><td>[Mon  1 Feb 2021 20:49:25 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l322" class="line" id="l322">    322</a> 		rpErrorHandler(errFilterProcess)(rw, proxyReq, err)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l323" class="line" id="l323">    323</a> 		return</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l324" class="line" id="l324">    324</a> 	} else if abortResp != nil {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/8259ba1b538d219637673c07700c9bd8c8af722e">8259ba1b538d219637673c07700c9bd8c8af722e</a></td><td>[Tue 16 Feb 2021 20:51:54 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l325" class="line" id="l325">    325</a> 		metrics.Client.Incr(metricProxyEarlyTerminate, tags)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/ab6883e2c027954bc655605489b915d23de31e62">ab6883e2c027954bc655605489b915d23de31e62</a></td><td>[Wed  3 Feb 2021 22:41:30 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l326" class="line" id="l326">    326</a> 		zap.L().Debug(</pre></td></tr>
+<tr>
+<td><a href="../../../commit/245c4082b60be4e8e942748d48e17593d9caac6c">245c4082b60be4e8e942748d48e17593d9caac6c</a></td><td>[Wed  3 Feb 2021 22:34:54 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l327" class="line" id="l327">    327</a> 			&quot;early termination of request lifecycle before proxy&quot;,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/245c4082b60be4e8e942748d48e17593d9caac6c">245c4082b60be4e8e942748d48e17593d9caac6c</a></td><td>[Wed  3 Feb 2021 22:34:54 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l328" class="line" id="l328">    328</a> 			zap.Int(&quot;status&quot;, abortResp.StatusCode),</pre></td></tr>
+<tr>
+<td><a href="../../../commit/245c4082b60be4e8e942748d48e17593d9caac6c">245c4082b60be4e8e942748d48e17593d9caac6c</a></td><td>[Wed  3 Feb 2021 22:34:54 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l329" class="line" id="l329">    329</a> 		)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/8259ba1b538d219637673c07700c9bd8c8af722e">8259ba1b538d219637673c07700c9bd8c8af722e</a></td><td>[Tue 16 Feb 2021 20:51:54 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l330" class="line" id="l330">    330</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/137a8dcb06ef1b60c0f5146a8a787cfca9f4b3a5">137a8dcb06ef1b60c0f5146a8a787cfca9f4b3a5</a></td><td>[Mon  1 Feb 2021 20:49:25 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l331" class="line" id="l331">    331</a> 		rpModifyResponse(abortResp)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/137a8dcb06ef1b60c0f5146a8a787cfca9f4b3a5">137a8dcb06ef1b60c0f5146a8a787cfca9f4b3a5</a></td><td>[Mon  1 Feb 2021 20:49:25 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l332" class="line" id="l332">    332</a> 		rp.respond(rw, abortResp)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l333" class="line" id="l333">    333</a> 		return</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l334" class="line" id="l334">    334</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l335" class="line" id="l335">    335</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/c45a99cfc0aaf374247bc99c85d1892fe0901aac">c45a99cfc0aaf374247bc99c85d1892fe0901aac</a></td><td>[Tue  9 Feb 2021 22:43:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l336" class="line" id="l336">    336</a> 	// Conditionally fail-fast on upstream health check failures</pre></td></tr>
+<tr>
+<td><a href="../../../commit/cabf187615e8e25dbb56faf8525ab0af96f81002">cabf187615e8e25dbb56faf8525ab0af96f81002</a></td><td>[Sun 28 Feb 2021 08:13:18 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l337" class="line" id="l337">    337</a> 	if hp, ok := rp.healthProbes[upstream]; ok {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l338" class="line" id="l338">    338</a> 		if err := hp.error(); err != nil &amp;&amp; upstream.HealthCheck.EnableCircuitBreak {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/8259ba1b538d219637673c07700c9bd8c8af722e">8259ba1b538d219637673c07700c9bd8c8af722e</a></td><td>[Tue 16 Feb 2021 20:51:54 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l339" class="line" id="l339">    339</a> 			metrics.Client.Incr(metricProxyCircuitBreak, tags)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c45a99cfc0aaf374247bc99c85d1892fe0901aac">c45a99cfc0aaf374247bc99c85d1892fe0901aac</a></td><td>[Tue  9 Feb 2021 22:43:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l340" class="line" id="l340">    340</a> 			rpErrorHandler(errUpstreamUnhealthy)(rw, proxyReq, err)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c45a99cfc0aaf374247bc99c85d1892fe0901aac">c45a99cfc0aaf374247bc99c85d1892fe0901aac</a></td><td>[Tue  9 Feb 2021 22:43:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l341" class="line" id="l341">    341</a> 			return</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c45a99cfc0aaf374247bc99c85d1892fe0901aac">c45a99cfc0aaf374247bc99c85d1892fe0901aac</a></td><td>[Tue  9 Feb 2021 22:43:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l342" class="line" id="l342">    342</a> 		}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c45a99cfc0aaf374247bc99c85d1892fe0901aac">c45a99cfc0aaf374247bc99c85d1892fe0901aac</a></td><td>[Tue  9 Feb 2021 22:43:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l343" class="line" id="l343">    343</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/c45a99cfc0aaf374247bc99c85d1892fe0901aac">c45a99cfc0aaf374247bc99c85d1892fe0901aac</a></td><td>[Tue  9 Feb 2021 22:43:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l344" class="line" id="l344">    344</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/e230ef9d605565717eb6e1beb1df784b6ab48672">e230ef9d605565717eb6e1beb1df784b6ab48672</a></td><td>[Sat 24 Apr 2021 18:26:15 -0700]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l345" class="line" id="l345">    345</a> 	// Prepare proxy request to upstream</pre></td></tr>
+<tr>
+<td><a href="../../../commit/295ddf600c5a8959f5ea75dde79cd13e3d8c9f86">295ddf600c5a8959f5ea75dde79cd13e3d8c9f86</a></td><td>[Tue  2 Feb 2021 21:42:49 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l346" class="line" id="l346">    346</a> 	proxyReq.URL.Scheme = &quot;http&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l347" class="line" id="l347">    347</a> 	if upstream.TLSContext != nil {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/9cdc2068d7c24df6a630ddbdbbd41e673fe963b9">9cdc2068d7c24df6a630ddbdbbd41e673fe963b9</a></td><td>[Sun 31 Jan 2021 11:15:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l348" class="line" id="l348">    348</a> 		proxyReq.URL.Scheme = &quot;https&quot;</pre></td></tr>
+<tr>
+<td><a href="../../../commit/9cdc2068d7c24df6a630ddbdbbd41e673fe963b9">9cdc2068d7c24df6a630ddbdbbd41e673fe963b9</a></td><td>[Sun 31 Jan 2021 11:15:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l349" class="line" id="l349">    349</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/9cdc2068d7c24df6a630ddbdbbd41e673fe963b9">9cdc2068d7c24df6a630ddbdbbd41e673fe963b9</a></td><td>[Sun 31 Jan 2021 11:15:46 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l350" class="line" id="l350">    350</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/775eae934fb9cf28dd6ec37c3e75dd9f6ee5549c">775eae934fb9cf28dd6ec37c3e75dd9f6ee5549c</a></td><td>[Sat  6 Feb 2021 17:58:33 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l351" class="line" id="l351">    351</a> 	// Transport initialization</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l352" class="line" id="l352">    352</a> 	tr, ok := rp.transports.Get(upstream)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/9bc790c488ef417ed1192f1bb520f8d24eda93f7">9bc790c488ef417ed1192f1bb520f8d24eda93f7</a></td><td>[Sat  6 Feb 2021 17:24:36 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l353" class="line" id="l353">    353</a> 	if ok {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/9bc790c488ef417ed1192f1bb520f8d24eda93f7">9bc790c488ef417ed1192f1bb520f8d24eda93f7</a></td><td>[Sat  6 Feb 2021 17:24:36 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l354" class="line" id="l354">    354</a> 		transport = tr.(http.RoundTripper)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/f7cd4db5eebf897fdf5b9f4bee3758ee6f042513">f7cd4db5eebf897fdf5b9f4bee3758ee6f042513</a></td><td>[Sat  6 Feb 2021 18:02:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l355" class="line" id="l355">    355</a> 		metrics.Client.Incr(metricProxyTransportRecycle, tags)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/9bc790c488ef417ed1192f1bb520f8d24eda93f7">9bc790c488ef417ed1192f1bb520f8d24eda93f7</a></td><td>[Sat  6 Feb 2021 17:24:36 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l356" class="line" id="l356">    356</a> 	} else {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l357" class="line" id="l357">    357</a> 		transport, err = upstream.ClientTransport()</pre></td></tr>
+<tr>
+<td><a href="../../../commit/775eae934fb9cf28dd6ec37c3e75dd9f6ee5549c">775eae934fb9cf28dd6ec37c3e75dd9f6ee5549c</a></td><td>[Sat  6 Feb 2021 17:58:33 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l358" class="line" id="l358">    358</a> 		if err != nil {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/775eae934fb9cf28dd6ec37c3e75dd9f6ee5549c">775eae934fb9cf28dd6ec37c3e75dd9f6ee5549c</a></td><td>[Sat  6 Feb 2021 17:58:33 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l359" class="line" id="l359">    359</a> 			rpErrorHandler(errBadTransport)(rw, proxyReq, err)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/775eae934fb9cf28dd6ec37c3e75dd9f6ee5549c">775eae934fb9cf28dd6ec37c3e75dd9f6ee5549c</a></td><td>[Sat  6 Feb 2021 17:58:33 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l360" class="line" id="l360">    360</a> 			return</pre></td></tr>
+<tr>
+<td><a href="../../../commit/a3a0419ca63778b2353f8f83421cb1a44904b034">a3a0419ca63778b2353f8f83421cb1a44904b034</a></td><td>[Sat 30 Jan 2021 22:43:24 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l361" class="line" id="l361">    361</a> 		}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/9bc790c488ef417ed1192f1bb520f8d24eda93f7">9bc790c488ef417ed1192f1bb520f8d24eda93f7</a></td><td>[Sat  6 Feb 2021 17:24:36 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l362" class="line" id="l362">    362</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l363" class="line" id="l363">    363</a> 		rp.transports.Set(upstream, transport)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/f7cd4db5eebf897fdf5b9f4bee3758ee6f042513">f7cd4db5eebf897fdf5b9f4bee3758ee6f042513</a></td><td>[Sat  6 Feb 2021 18:02:41 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l364" class="line" id="l364">    364</a> 		metrics.Client.Incr(metricProxyTransportInitialize, tags)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/a3a0419ca63778b2353f8f83421cb1a44904b034">a3a0419ca63778b2353f8f83421cb1a44904b034</a></td><td>[Sat 30 Jan 2021 22:43:24 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l365" class="line" id="l365">    365</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/a3a0419ca63778b2353f8f83421cb1a44904b034">a3a0419ca63778b2353f8f83421cb1a44904b034</a></td><td>[Sat 30 Jan 2021 22:43:24 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l366" class="line" id="l366">    366</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/a3a0419ca63778b2353f8f83421cb1a44904b034">a3a0419ca63778b2353f8f83421cb1a44904b034</a></td><td>[Sat 30 Jan 2021 22:43:24 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l367" class="line" id="l367">    367</a> 	backend := httputil.ReverseProxy{</pre></td></tr>
+<tr>
+<td><a href="../../../commit/a3a0419ca63778b2353f8f83421cb1a44904b034">a3a0419ca63778b2353f8f83421cb1a44904b034</a></td><td>[Sat 30 Jan 2021 22:43:24 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l368" class="line" id="l368">    368</a> 		Transport: transport,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d5feb3b46eea0bdf8ba426b41464c654a08ea19f">d5feb3b46eea0bdf8ba426b41464c654a08ea19f</a></td><td>[Sun 31 Jan 2021 14:58:04 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l369" class="line" id="l369">    369</a> 		// Instruct the proxy to flush responses back to the client immediately, for</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d5feb3b46eea0bdf8ba426b41464c654a08ea19f">d5feb3b46eea0bdf8ba426b41464c654a08ea19f</a></td><td>[Sun 31 Jan 2021 14:58:04 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l370" class="line" id="l370">    370</a> 		// compatibility with gRPC streams.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d5feb3b46eea0bdf8ba426b41464c654a08ea19f">d5feb3b46eea0bdf8ba426b41464c654a08ea19f</a></td><td>[Sun 31 Jan 2021 14:58:04 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l371" class="line" id="l371">    371</a> 		FlushInterval: -1,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l372" class="line" id="l372">    372</a> 		Director: func(clientReq *http.Request) {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l373" class="line" id="l373">    373</a> 			// The Director routine is a noop because the request passed to the reverse</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l374" class="line" id="l374">    374</a> 			// proxy has already been cascaded through all request filters.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l375" class="line" id="l375">    375</a> 		},</pre></td></tr>
+<tr>
+<td><a href="../../../commit/137a8dcb06ef1b60c0f5146a8a787cfca9f4b3a5">137a8dcb06ef1b60c0f5146a8a787cfca9f4b3a5</a></td><td>[Mon  1 Feb 2021 20:49:25 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l376" class="line" id="l376">    376</a> 		ModifyResponse: rpModifyResponse,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/65a2e6af52737422caa5e4c28adac62bd527550c">65a2e6af52737422caa5e4c28adac62bd527550c</a></td><td>[Thu 18 Feb 2021 22:51:05 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l377" class="line" id="l377">    377</a> 		ErrorHandler:   rp.errorClassifierHandler(rpErrorHandler),</pre></td></tr>
+<tr>
+<td><a href="../../../commit/55ac5764e554a4eb70b51d519eeaaf2a1a29294b">55ac5764e554a4eb70b51d519eeaaf2a1a29294b</a></td><td>[Sat  6 Feb 2021 22:16:55 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l378" class="line" id="l378">    378</a> 		ErrorLog:       log.StdWarnLogger,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l379" class="line" id="l379">    379</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l380" class="line" id="l380">    380</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l381" class="line" id="l381">    381</a> 	backend.ServeHTTP(rw, proxyReq)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l382" class="line" id="l382">    382</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l383" class="line" id="l383">    383</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l384" class="line" id="l384">    384</a> // matchHost attempts to match the hostname requested by the client in its Host header with a</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l385" class="line" id="l385">    385</a> // virtual host entry in configuration.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l386" class="line" id="l386">    386</a> func (rp *reverseProxy) matchHost(reqHost string) (*config.VirtualHost, bool) {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l387" class="line" id="l387">    387</a> 	for _, vhost := range rp.vhosts {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l388" class="line" id="l388">    388</a> 		if vhost.Host.MatchString(reqHost) {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l389" class="line" id="l389">    389</a> 			return vhost, true</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l390" class="line" id="l390">    390</a> 		}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l391" class="line" id="l391">    391</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l392" class="line" id="l392">    392</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l393" class="line" id="l393">    393</a> 	return nil, false</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l394" class="line" id="l394">    394</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l395" class="line" id="l395">    395</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l396" class="line" id="l396">    396</a> // matchRoute attempts to match the inbound request to an upstream based on routing policy rules in</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l397" class="line" id="l397">    397</a> // configuration.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l398" class="line" id="l398">    398</a> func (rp *reverseProxy) matchRoute(</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l399" class="line" id="l399">    399</a> 	req *http.Request,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l400" class="line" id="l400">    400</a> 	upstreams []*config.Upstream,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l401" class="line" id="l401">    401</a> 	routes []*config.Route,</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l402" class="line" id="l402">    402</a> ) (*config.Upstream, bool) {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l403" class="line" id="l403">    403</a> 	for _, route := range routes {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d2dfab4c8fb359983fdfd3b99493c9fb75487f92">d2dfab4c8fb359983fdfd3b99493c9fb75487f92</a></td><td>[Sun 19 Dec 2021 16:11:38 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l404" class="line" id="l404">    404</a> 		if route.Match.Host != nil &amp;&amp; !route.Match.Host.MatchString(req.Host) {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d2dfab4c8fb359983fdfd3b99493c9fb75487f92">d2dfab4c8fb359983fdfd3b99493c9fb75487f92</a></td><td>[Sun 19 Dec 2021 16:11:38 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l405" class="line" id="l405">    405</a> 			continue</pre></td></tr>
+<tr>
+<td><a href="../../../commit/d2dfab4c8fb359983fdfd3b99493c9fb75487f92">d2dfab4c8fb359983fdfd3b99493c9fb75487f92</a></td><td>[Sun 19 Dec 2021 16:11:38 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l406" class="line" id="l406">    406</a> 		} else if route.Match.Method != nil &amp;&amp; !route.Match.Method.MatchString(req.Method) {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l407" class="line" id="l407">    407</a> 			continue</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l408" class="line" id="l408">    408</a> 		} else if route.Match.Path != nil &amp;&amp; !route.Match.Path.MatchString(req.URL.Path) {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l409" class="line" id="l409">    409</a> 			continue</pre></td></tr>
+<tr>
+<td><a href="../../../commit/ec4872316412fc41924e5d7c1a0ae8a7de7bef45">ec4872316412fc41924e5d7c1a0ae8a7de7bef45</a></td><td>[Sun 28 Feb 2021 08:22:56 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l410" class="line" id="l410">    410</a> 		} else if route.Match.Header != nil {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/ec4872316412fc41924e5d7c1a0ae8a7de7bef45">ec4872316412fc41924e5d7c1a0ae8a7de7bef45</a></td><td>[Sun 28 Feb 2021 08:22:56 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l411" class="line" id="l411">    411</a> 			value := req.Header.Get(route.Match.Header.Key)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/ec4872316412fc41924e5d7c1a0ae8a7de7bef45">ec4872316412fc41924e5d7c1a0ae8a7de7bef45</a></td><td>[Sun 28 Feb 2021 08:22:56 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l412" class="line" id="l412">    412</a> 			if value == &quot;&quot; || !route.Match.Header.Value.MatchString(value) {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/ec4872316412fc41924e5d7c1a0ae8a7de7bef45">ec4872316412fc41924e5d7c1a0ae8a7de7bef45</a></td><td>[Sun 28 Feb 2021 08:22:56 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l413" class="line" id="l413">    413</a> 				continue</pre></td></tr>
+<tr>
+<td><a href="../../../commit/ec4872316412fc41924e5d7c1a0ae8a7de7bef45">ec4872316412fc41924e5d7c1a0ae8a7de7bef45</a></td><td>[Sun 28 Feb 2021 08:22:56 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l414" class="line" id="l414">    414</a> 			}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l415" class="line" id="l415">    415</a> 		}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l416" class="line" id="l416">    416</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l417" class="line" id="l417">    417</a> 		for _, upstream := range upstreams {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l418" class="line" id="l418">    418</a> 			if upstream.Name == route.Upstream {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l419" class="line" id="l419">    419</a> 				return upstream, true</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l420" class="line" id="l420">    420</a> 			}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l421" class="line" id="l421">    421</a> 		}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l422" class="line" id="l422">    422</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l423" class="line" id="l423">    423</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l424" class="line" id="l424">    424</a> 	return nil, false</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l425" class="line" id="l425">    425</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a></td><td>[Sat 27 Feb 2021 12:16:17 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l426" class="line" id="l426">    426</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l427" class="line" id="l427">    427</a> // respond writes an HTTP response from a structured response struct.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l428" class="line" id="l428">    428</a> func (rp *reverseProxy) respond(rw http.ResponseWriter, resp *http.Response) error {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/7fa53e4e52eee784de90e2c215de9344be1f7aec">7fa53e4e52eee784de90e2c215de9344be1f7aec</a></td><td>[Sun 31 Jan 2021 23:06:33 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l429" class="line" id="l429">    429</a> 	if resp.Header != nil {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/7fa53e4e52eee784de90e2c215de9344be1f7aec">7fa53e4e52eee784de90e2c215de9344be1f7aec</a></td><td>[Sun 31 Jan 2021 23:06:33 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l430" class="line" id="l430">    430</a> 		for key, value := range resp.Header {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/7fa53e4e52eee784de90e2c215de9344be1f7aec">7fa53e4e52eee784de90e2c215de9344be1f7aec</a></td><td>[Sun 31 Jan 2021 23:06:33 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l431" class="line" id="l431">    431</a> 			rw.Header()[key] = value</pre></td></tr>
+<tr>
+<td><a href="../../../commit/7fa53e4e52eee784de90e2c215de9344be1f7aec">7fa53e4e52eee784de90e2c215de9344be1f7aec</a></td><td>[Sun 31 Jan 2021 23:06:33 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l432" class="line" id="l432">    432</a> 		}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/7fa53e4e52eee784de90e2c215de9344be1f7aec">7fa53e4e52eee784de90e2c215de9344be1f7aec</a></td><td>[Sun 31 Jan 2021 23:06:33 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l433" class="line" id="l433">    433</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/7fa53e4e52eee784de90e2c215de9344be1f7aec">7fa53e4e52eee784de90e2c215de9344be1f7aec</a></td><td>[Sun 31 Jan 2021 23:06:33 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l434" class="line" id="l434">    434</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l435" class="line" id="l435">    435</a> 	rw.WriteHeader(resp.StatusCode)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l436" class="line" id="l436">    436</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l437" class="line" id="l437">    437</a> 	if _, err := io.Copy(rw, resp.Body); err != nil {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l438" class="line" id="l438">    438</a> 		return err</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l439" class="line" id="l439">    439</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l440" class="line" id="l440">    440</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l441" class="line" id="l441">    441</a> 	return resp.Body.Close()</pre></td></tr>
+<tr>
+<td><a href="../../../commit/3aeb09673f56b7afb5f31702d102964348d6d015">3aeb09673f56b7afb5f31702d102964348d6d015</a></td><td>[Sat 30 Jan 2021 19:01:51 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l442" class="line" id="l442">    442</a> }</pre></td></tr>
+<tr>
+<td><a href="../../../commit/65a2e6af52737422caa5e4c28adac62bd527550c">65a2e6af52737422caa5e4c28adac62bd527550c</a></td><td>[Thu 18 Feb 2021 22:51:05 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l443" class="line" id="l443">    443</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/65a2e6af52737422caa5e4c28adac62bd527550c">65a2e6af52737422caa5e4c28adac62bd527550c</a></td><td>[Thu 18 Feb 2021 22:51:05 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l444" class="line" id="l444">    444</a> // errorClassifierHandler is an internalErrorHandler that attempts to select the most semantically</pre></td></tr>
+<tr>
+<td><a href="../../../commit/65a2e6af52737422caa5e4c28adac62bd527550c">65a2e6af52737422caa5e4c28adac62bd527550c</a></td><td>[Thu 18 Feb 2021 22:51:05 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l445" class="line" id="l445">    445</a> // meaningful response for an internal error raised by the reverse proxy.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/65a2e6af52737422caa5e4c28adac62bd527550c">65a2e6af52737422caa5e4c28adac62bd527550c</a></td><td>[Thu 18 Feb 2021 22:51:05 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l446" class="line" id="l446">    446</a> func (rp *reverseProxy) errorClassifierHandler(handler func(errResp *response) internalErrorHandler) internalErrorHandler {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/65a2e6af52737422caa5e4c28adac62bd527550c">65a2e6af52737422caa5e4c28adac62bd527550c</a></td><td>[Thu 18 Feb 2021 22:51:05 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l447" class="line" id="l447">    447</a> 	var classifier func(error) *response</pre></td></tr>
+<tr>
+<td><a href="../../../commit/65a2e6af52737422caa5e4c28adac62bd527550c">65a2e6af52737422caa5e4c28adac62bd527550c</a></td><td>[Thu 18 Feb 2021 22:51:05 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l448" class="line" id="l448">    448</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/65a2e6af52737422caa5e4c28adac62bd527550c">65a2e6af52737422caa5e4c28adac62bd527550c</a></td><td>[Thu 18 Feb 2021 22:51:05 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l449" class="line" id="l449">    449</a> 	classifier = func(err error) *response {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/65a2e6af52737422caa5e4c28adac62bd527550c">65a2e6af52737422caa5e4c28adac62bd527550c</a></td><td>[Thu 18 Feb 2021 22:51:05 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l450" class="line" id="l450">    450</a> 		if netErr, ok := err.(net.Error); ok &amp;&amp; netErr.Timeout() {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/65a2e6af52737422caa5e4c28adac62bd527550c">65a2e6af52737422caa5e4c28adac62bd527550c</a></td><td>[Thu 18 Feb 2021 22:51:05 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l451" class="line" id="l451">    451</a> 			return errUpstreamTimeout</pre></td></tr>
+<tr>
+<td><a href="../../../commit/65a2e6af52737422caa5e4c28adac62bd527550c">65a2e6af52737422caa5e4c28adac62bd527550c</a></td><td>[Thu 18 Feb 2021 22:51:05 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l452" class="line" id="l452">    452</a> 		} else if _, ok := err.(*net.OpError); ok {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/65a2e6af52737422caa5e4c28adac62bd527550c">65a2e6af52737422caa5e4c28adac62bd527550c</a></td><td>[Thu 18 Feb 2021 22:51:05 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l453" class="line" id="l453">    453</a> 			return errUpstreamUnavailable</pre></td></tr>
+<tr>
+<td><a href="../../../commit/65a2e6af52737422caa5e4c28adac62bd527550c">65a2e6af52737422caa5e4c28adac62bd527550c</a></td><td>[Thu 18 Feb 2021 22:51:05 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l454" class="line" id="l454">    454</a> 		} else if unwrapped := errors.Unwrap(err); unwrapped != nil {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/65a2e6af52737422caa5e4c28adac62bd527550c">65a2e6af52737422caa5e4c28adac62bd527550c</a></td><td>[Thu 18 Feb 2021 22:51:05 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l455" class="line" id="l455">    455</a> 			// Identify the first meaningful error in the error stack.</pre></td></tr>
+<tr>
+<td><a href="../../../commit/65a2e6af52737422caa5e4c28adac62bd527550c">65a2e6af52737422caa5e4c28adac62bd527550c</a></td><td>[Thu 18 Feb 2021 22:51:05 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l456" class="line" id="l456">    456</a> 			return classifier(unwrapped)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/65a2e6af52737422caa5e4c28adac62bd527550c">65a2e6af52737422caa5e4c28adac62bd527550c</a></td><td>[Thu 18 Feb 2021 22:51:05 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l457" class="line" id="l457">    457</a> 		}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/65a2e6af52737422caa5e4c28adac62bd527550c">65a2e6af52737422caa5e4c28adac62bd527550c</a></td><td>[Thu 18 Feb 2021 22:51:05 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l458" class="line" id="l458">    458</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/65a2e6af52737422caa5e4c28adac62bd527550c">65a2e6af52737422caa5e4c28adac62bd527550c</a></td><td>[Thu 18 Feb 2021 22:51:05 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l459" class="line" id="l459">    459</a> 		return errProxyInternal</pre></td></tr>
+<tr>
+<td><a href="../../../commit/65a2e6af52737422caa5e4c28adac62bd527550c">65a2e6af52737422caa5e4c28adac62bd527550c</a></td><td>[Thu 18 Feb 2021 22:51:05 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l460" class="line" id="l460">    460</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/65a2e6af52737422caa5e4c28adac62bd527550c">65a2e6af52737422caa5e4c28adac62bd527550c</a></td><td>[Thu 18 Feb 2021 22:51:05 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l461" class="line" id="l461">    461</a> </pre></td></tr>
+<tr>
+<td><a href="../../../commit/65a2e6af52737422caa5e4c28adac62bd527550c">65a2e6af52737422caa5e4c28adac62bd527550c</a></td><td>[Thu 18 Feb 2021 22:51:05 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l462" class="line" id="l462">    462</a> 	return func(proxyRW http.ResponseWriter, proxyReq *http.Request, err error) {</pre></td></tr>
+<tr>
+<td><a href="../../../commit/65a2e6af52737422caa5e4c28adac62bd527550c">65a2e6af52737422caa5e4c28adac62bd527550c</a></td><td>[Thu 18 Feb 2021 22:51:05 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l463" class="line" id="l463">    463</a> 		handler(classifier(err))(proxyRW, proxyReq, err)</pre></td></tr>
+<tr>
+<td><a href="../../../commit/65a2e6af52737422caa5e4c28adac62bd527550c">65a2e6af52737422caa5e4c28adac62bd527550c</a></td><td>[Thu 18 Feb 2021 22:51:05 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l464" class="line" id="l464">    464</a> 	}</pre></td></tr>
+<tr>
+<td><a href="../../../commit/65a2e6af52737422caa5e4c28adac62bd527550c">65a2e6af52737422caa5e4c28adac62bd527550c</a></td><td>[Thu 18 Feb 2021 22:51:05 -0800]</td><td>[Kevin Lin &lt;developer@kevinlin.info&gt;]</td><td><pre><a href="#l465" class="line" id="l465">    465</a> }</pre></td></tr>
+</table>
+</div>
+</body>
+</html>

@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/config, internal/server: Move client transport initialization to config - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/775eae934fb9cf28dd6ec37c3e75dd9f6ee5549c">775eae934fb9cf28dd6ec37c3e75dd9f6ee5549c</a>
+<b>parent</b> <a href="../commit/9bc790c488ef417ed1192f1bb520f8d24eda93f7">9bc790c488ef417ed1192f1bb520f8d24eda93f7</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sat  6 Feb 2021 17:58:33 -0800
+
+internal/config, internal/server: Move client transport initialization to config
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/config/config.go</a></td><td> | </td><td class="num">94</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">internal/server/proxy.go</a></td><td> | </td><td class="num">91</td><td><span class="i">++++++++++</span><span class="d">---------------------------------------------------------------------</span></td></tr>
+</table></pre><pre>2 files changed, 105 insertions(+), 80 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/config/config.go">internal/config/config.go</a> b/<a href="../file/internal/config/config.go">internal/config/config.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -1,10 +1,16 @@
+</a> package config
+ 
+ import (
+<a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;context&quot;
+</a> 	&quot;crypto/tls&quot;
+ 	&quot;crypto/x509&quot;
+<a href="#h0-0-6" id="h0-0-6" class="i">+	&quot;net&quot;
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+	&quot;net/http&quot;
+</a> 	&quot;os&quot;
+ 
+<a href="#h0-0-10" id="h0-0-10" class="i">+	&quot;go.uber.org/zap&quot;
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+	&quot;golang.org/x/net/http2&quot;
+</a><a href="#h0-0-12" id="h0-0-12" class="i">+	&quot;golang.org/x/net/proxy&quot;
+</a> 	&quot;gopkg.in/yaml.v3&quot;
+ 
+ 	&quot;courier/internal/util&quot;
+<a href="#h0-1" id="h0-1" class="h">@@ -212,6 +218,94 @@ func (c *Config) Validate() error {
+</a> 	return nil
+ }
+ 
+<a href="#h0-1-3" id="h0-1-3" class="i">+// ClientTransport creates a new http.RoundTripper transport derived from the upstream connection
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+// configuration. Note that this method initializes new resources and the returned transport should
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+// thus be reused across multiple connections for this upstream in order to avoid resource leaks.
+</a><a href="#h0-1-6" id="h0-1-6" class="i">+func (u *Upstream) ClientTransport() (http.RoundTripper, error) {
+</a><a href="#h0-1-7" id="h0-1-7" class="i">+	var err error
+</a><a href="#h0-1-8" id="h0-1-8" class="i">+	var tlsCfg *tls.Config
+</a><a href="#h0-1-9" id="h0-1-9" class="i">+
+</a><a href="#h0-1-10" id="h0-1-10" class="i">+	if u.TLSContext != nil {
+</a><a href="#h0-1-11" id="h0-1-11" class="i">+		zap.L().Debug(
+</a><a href="#h0-1-12" id="h0-1-12" class="i">+			&quot;creating client TLS origination context&quot;,
+</a><a href="#h0-1-13" id="h0-1-13" class="i">+			zap.String(&quot;upstream&quot;, u.Address.String()),
+</a><a href="#h0-1-14" id="h0-1-14" class="i">+		)
+</a><a href="#h0-1-15" id="h0-1-15" class="i">+
+</a><a href="#h0-1-16" id="h0-1-16" class="i">+		tlsCfg, err = u.TLSContext.ClientConfig()
+</a><a href="#h0-1-17" id="h0-1-17" class="i">+		if err != nil {
+</a><a href="#h0-1-18" id="h0-1-18" class="i">+			return nil, err
+</a><a href="#h0-1-19" id="h0-1-19" class="i">+		}
+</a><a href="#h0-1-20" id="h0-1-20" class="i">+	}
+</a><a href="#h0-1-21" id="h0-1-21" class="i">+
+</a><a href="#h0-1-22" id="h0-1-22" class="i">+	switch u.Transport {
+</a><a href="#h0-1-23" id="h0-1-23" class="i">+	case &quot;http2&quot;:
+</a><a href="#h0-1-24" id="h0-1-24" class="i">+		zap.L().Debug(
+</a><a href="#h0-1-25" id="h0-1-25" class="i">+			&quot;creating client HTTP/2 transport&quot;,
+</a><a href="#h0-1-26" id="h0-1-26" class="i">+			zap.String(&quot;upstream&quot;, u.Address.String()),
+</a><a href="#h0-1-27" id="h0-1-27" class="i">+			zap.Any(&quot;proxy&quot;, u.Proxy),
+</a><a href="#h0-1-28" id="h0-1-28" class="i">+			zap.Any(&quot;connection&quot;, u.Connection),
+</a><a href="#h0-1-29" id="h0-1-29" class="i">+		)
+</a><a href="#h0-1-30" id="h0-1-30" class="i">+
+</a><a href="#h0-1-31" id="h0-1-31" class="i">+		return &amp;http2.Transport{
+</a><a href="#h0-1-32" id="h0-1-32" class="i">+			AllowHTTP:       true,
+</a><a href="#h0-1-33" id="h0-1-33" class="i">+			TLSClientConfig: tlsCfg,
+</a><a href="#h0-1-34" id="h0-1-34" class="i">+			DialTLS: func(network string, addr string, cfg *tls.Config) (net.Conn, error) {
+</a><a href="#h0-1-35" id="h0-1-35" class="i">+				var dialer proxy.Dialer
+</a><a href="#h0-1-36" id="h0-1-36" class="i">+
+</a><a href="#h0-1-37" id="h0-1-37" class="i">+				dialer = &amp;net.Dialer{
+</a><a href="#h0-1-38" id="h0-1-38" class="i">+					Timeout:   u.Connection.ConnectTimeout,
+</a><a href="#h0-1-39" id="h0-1-39" class="i">+					KeepAlive: u.Connection.KeepaliveInterval,
+</a><a href="#h0-1-40" id="h0-1-40" class="i">+				}
+</a><a href="#h0-1-41" id="h0-1-41" class="i">+
+</a><a href="#h0-1-42" id="h0-1-42" class="i">+				if u.TLSContext != nil {
+</a><a href="#h0-1-43" id="h0-1-43" class="i">+					dialer = &amp;tls.Dialer{
+</a><a href="#h0-1-44" id="h0-1-44" class="i">+						NetDialer: dialer.(*net.Dialer),
+</a><a href="#h0-1-45" id="h0-1-45" class="i">+						Config:    cfg,
+</a><a href="#h0-1-46" id="h0-1-46" class="i">+					}
+</a><a href="#h0-1-47" id="h0-1-47" class="i">+				}
+</a><a href="#h0-1-48" id="h0-1-48" class="i">+
+</a><a href="#h0-1-49" id="h0-1-49" class="i">+				if u.Proxy != nil {
+</a><a href="#h0-1-50" id="h0-1-50" class="i">+					proxyNet, proxyAddr := u.Proxy.Address()
+</a><a href="#h0-1-51" id="h0-1-51" class="i">+					dialer, _ = proxy.SOCKS5(proxyNet, proxyAddr, nil, dialer)
+</a><a href="#h0-1-52" id="h0-1-52" class="i">+				}
+</a><a href="#h0-1-53" id="h0-1-53" class="i">+
+</a><a href="#h0-1-54" id="h0-1-54" class="i">+				network, addr = u.Address.Address()
+</a><a href="#h0-1-55" id="h0-1-55" class="i">+				return dialer.Dial(network, addr)
+</a><a href="#h0-1-56" id="h0-1-56" class="i">+			},
+</a><a href="#h0-1-57" id="h0-1-57" class="i">+		}, nil
+</a><a href="#h0-1-58" id="h0-1-58" class="i">+	default:
+</a><a href="#h0-1-59" id="h0-1-59" class="i">+		zap.L().Debug(
+</a><a href="#h0-1-60" id="h0-1-60" class="i">+			&quot;creating client HTTP/1.1 transport&quot;,
+</a><a href="#h0-1-61" id="h0-1-61" class="i">+			zap.String(&quot;upstream&quot;, u.Address.String()),
+</a><a href="#h0-1-62" id="h0-1-62" class="i">+			zap.Any(&quot;proxy&quot;, u.Proxy),
+</a><a href="#h0-1-63" id="h0-1-63" class="i">+			zap.Any(&quot;connection&quot;, u.Connection),
+</a><a href="#h0-1-64" id="h0-1-64" class="i">+		)
+</a><a href="#h0-1-65" id="h0-1-65" class="i">+
+</a><a href="#h0-1-66" id="h0-1-66" class="i">+		return &amp;http.Transport{
+</a><a href="#h0-1-67" id="h0-1-67" class="i">+			ResponseHeaderTimeout: u.Connection.ReadHeaderTimeout,
+</a><a href="#h0-1-68" id="h0-1-68" class="i">+			IdleConnTimeout:       u.Connection.IdleTimeout,
+</a><a href="#h0-1-69" id="h0-1-69" class="i">+			TLSHandshakeTimeout:   u.Connection.TLSHandshakeTimeout,
+</a><a href="#h0-1-70" id="h0-1-70" class="i">+			TLSClientConfig:       tlsCfg,
+</a><a href="#h0-1-71" id="h0-1-71" class="i">+			DialContext: func(ctx context.Context, network string, addr string) (net.Conn, error) {
+</a><a href="#h0-1-72" id="h0-1-72" class="i">+				var dialer proxy.Dialer
+</a><a href="#h0-1-73" id="h0-1-73" class="i">+
+</a><a href="#h0-1-74" id="h0-1-74" class="i">+				dialer = &amp;net.Dialer{
+</a><a href="#h0-1-75" id="h0-1-75" class="i">+					Timeout:   u.Connection.ConnectTimeout,
+</a><a href="#h0-1-76" id="h0-1-76" class="i">+					KeepAlive: u.Connection.KeepaliveInterval,
+</a><a href="#h0-1-77" id="h0-1-77" class="i">+				}
+</a><a href="#h0-1-78" id="h0-1-78" class="i">+
+</a><a href="#h0-1-79" id="h0-1-79" class="i">+				if u.Proxy != nil {
+</a><a href="#h0-1-80" id="h0-1-80" class="i">+					proxyNet, proxyAddr := u.Proxy.Address()
+</a><a href="#h0-1-81" id="h0-1-81" class="i">+					dialer, _ = proxy.SOCKS5(proxyNet, proxyAddr, nil, dialer)
+</a><a href="#h0-1-82" id="h0-1-82" class="i">+				}
+</a><a href="#h0-1-83" id="h0-1-83" class="i">+
+</a><a href="#h0-1-84" id="h0-1-84" class="i">+				network, addr = u.Address.Address()
+</a><a href="#h0-1-85" id="h0-1-85" class="i">+				return dialer.Dial(network, addr)
+</a><a href="#h0-1-86" id="h0-1-86" class="i">+			},
+</a><a href="#h0-1-87" id="h0-1-87" class="i">+		}, nil
+</a><a href="#h0-1-88" id="h0-1-88" class="i">+	}
+</a><a href="#h0-1-89" id="h0-1-89" class="i">+}
+</a><a href="#h0-1-90" id="h0-1-90" class="i">+
+</a> // ClientConfig transforms the TLS context into a tls.Config appropriate for purposes of TLS
+ // origination from a client.
+ func (t *TLSContext) ClientConfig() (*tls.Config, error) {
+<b>diff --git a/<a id="h1" href="../file/internal/server/proxy.go">internal/server/proxy.go</a> b/<a href="../file/internal/server/proxy.go">internal/server/proxy.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -2,15 +2,11 @@ package server
+</a> 
+ import (
+ 	&quot;context&quot;
+<a href="#h1-0-3" id="h1-0-3" class="d">-	&quot;crypto/tls&quot;
+</a> 	&quot;io&quot;
+<a href="#h1-0-5" id="h1-0-5" class="d">-	&quot;net&quot;
+</a> 	&quot;net/http&quot;
+ 	&quot;net/http/httputil&quot;
+ 
+ 	&quot;go.uber.org/zap&quot;
+<a href="#h1-0-10" id="h1-0-10" class="d">-	&quot;golang.org/x/net/http2&quot;
+</a><a href="#h1-0-11" id="h1-0-11" class="d">-	&quot;golang.org/x/net/proxy&quot;
+</a> 
+ 	&quot;courier/internal/config&quot;
+ 	&quot;courier/internal/log&quot;
+<a href="#h1-1" id="h1-1" class="h">@@ -32,6 +28,12 @@ var (
+</a> 		statusCode: http.StatusNotFound,
+ 		message:    &quot;unknown virtual host&quot;,
+ 	}
+<a href="#h1-1-3" id="h1-1-3" class="i">+	// errBadTransport is returned when the proxy encounters an error initializing the HTTP
+</a><a href="#h1-1-4" id="h1-1-4" class="i">+	// client transport to an upstream.
+</a><a href="#h1-1-5" id="h1-1-5" class="i">+	errBadTransport = &amp;response{
+</a><a href="#h1-1-6" id="h1-1-6" class="i">+		statusCode: http.StatusInternalServerError,
+</a><a href="#h1-1-7" id="h1-1-7" class="i">+		message:    &quot;failed to initialize upstream transport&quot;,
+</a><a href="#h1-1-8" id="h1-1-8" class="i">+	}
+</a> 	// errFilterProcess is returned when the filter chain raises an error.
+ 	errFilterProcess = &amp;response{
+ 		statusCode: http.StatusInternalServerError,
+<a href="#h1-2" id="h1-2" class="h">@@ -49,14 +51,12 @@ type reverseProxy struct {
+</a> 	vhosts []*config.VirtualHost
+ 
+ 	filterChains map[string]middleware.Filter
+<a href="#h1-2-3" id="h1-2-3" class="d">-	tlsCfgs      map[string]*tls.Config
+</a> 	transports   *util.ConcurrentMap
+ }
+ 
+ // newReverseProxy creates a new reverseProxy from a list of virtual host configurations.
+ func newReverseProxy(vhosts []*config.VirtualHost) (http.Handler, error) {
+ 	filterChains := make(map[string]middleware.Filter)
+<a href="#h1-2-10" id="h1-2-10" class="d">-	tlsCfgs := make(map[string]*tls.Config)
+</a> 
+ 	// Set up the filter chains for each virtual host up front, so that they can be trivially
+ 	// accessed in hot request paths.
+<a href="#h1-3" id="h1-3" class="h">@@ -107,30 +107,11 @@ func newReverseProxy(vhosts []*config.VirtualHost) (http.Handler, error) {
+</a> 		}
+ 
+ 		filterChains[vhost.Name] = middleware.NewComposedFilter(vhostFilters...)
+<a href="#h1-3-3" id="h1-3-3" class="d">-
+</a><a href="#h1-3-4" id="h1-3-4" class="d">-		if vhost.Upstream.TLSContext != nil {
+</a><a href="#h1-3-5" id="h1-3-5" class="d">-			zap.L().Debug(&quot;creating client TLS context&quot;)
+</a><a href="#h1-3-6" id="h1-3-6" class="d">-
+</a><a href="#h1-3-7" id="h1-3-7" class="d">-			tlsCfg, err := vhost.Upstream.TLSContext.ClientConfig()
+</a><a href="#h1-3-8" id="h1-3-8" class="d">-			if err != nil {
+</a><a href="#h1-3-9" id="h1-3-9" class="d">-				return nil, &amp;util.Error{
+</a><a href="#h1-3-10" id="h1-3-10" class="d">-					Namespace: &quot;server&quot;,
+</a><a href="#h1-3-11" id="h1-3-11" class="d">-					Message:   &quot;error creating client TLS config&quot;,
+</a><a href="#h1-3-12" id="h1-3-12" class="d">-					Tags: map[string]interface{}{
+</a><a href="#h1-3-13" id="h1-3-13" class="d">-						&quot;virtual_host&quot;: vhost.Name,
+</a><a href="#h1-3-14" id="h1-3-14" class="d">-					},
+</a><a href="#h1-3-15" id="h1-3-15" class="d">-					StackedError: err,
+</a><a href="#h1-3-16" id="h1-3-16" class="d">-				}
+</a><a href="#h1-3-17" id="h1-3-17" class="d">-			}
+</a><a href="#h1-3-18" id="h1-3-18" class="d">-
+</a><a href="#h1-3-19" id="h1-3-19" class="d">-			tlsCfgs[vhost.Name] = tlsCfg
+</a><a href="#h1-3-20" id="h1-3-20" class="d">-		}
+</a> 	}
+ 
+ 	return &amp;reverseProxy{
+ 		vhosts:       vhosts,
+ 		filterChains: filterChains,
+<a href="#h1-3-26" id="h1-3-26" class="d">-		tlsCfgs:      tlsCfgs,
+</a> 		transports:   util.NewConcurrentMap(),
+ 	}, nil
+ }
+<a href="#h1-4" id="h1-4" class="h">@@ -140,7 +121,6 @@ func (rp *reverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+</a> 	var err error
+ 	var abortResp *http.Response
+ 	var transport http.RoundTripper
+<a href="#h1-4-3" id="h1-4-3" class="d">-	var tlsCfg *tls.Config
+</a> 
+ 	proxyReq := req.Clone(context.Background())
+ 
+<a href="#h1-5" id="h1-5" class="h">@@ -215,66 +195,17 @@ func (rp *reverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+</a> 	}
+ 	if vhost.Upstream.TLSContext != nil {
+ 		proxyReq.URL.Scheme = &quot;https&quot;
+<a href="#h1-5-3" id="h1-5-3" class="d">-		tlsCfg = rp.tlsCfgs[vhost.Name]
+</a> 	}
+ 
+<a href="#h1-5-6" id="h1-5-6" class="d">-	// Transport and dialer selection
+</a><a href="#h1-5-7" id="h1-5-7" class="i">+	// Transport initialization
+</a> 	tr, ok := rp.transports.Get(vhost.Upstream.Address)
+ 	if ok {
+ 		transport = tr.(http.RoundTripper)
+ 	} else {
+<a href="#h1-5-12" id="h1-5-12" class="d">-		switch vhost.Upstream.Transport {
+</a><a href="#h1-5-13" id="h1-5-13" class="d">-		case &quot;http2&quot;:
+</a><a href="#h1-5-14" id="h1-5-14" class="d">-			transport = &amp;http2.Transport{
+</a><a href="#h1-5-15" id="h1-5-15" class="d">-				AllowHTTP:       true,
+</a><a href="#h1-5-16" id="h1-5-16" class="d">-				TLSClientConfig: tlsCfg,
+</a><a href="#h1-5-17" id="h1-5-17" class="d">-				DialTLS: func(network string, addr string, cfg *tls.Config) (net.Conn, error) {
+</a><a href="#h1-5-18" id="h1-5-18" class="d">-					var dialer proxy.Dialer
+</a><a href="#h1-5-19" id="h1-5-19" class="d">-
+</a><a href="#h1-5-20" id="h1-5-20" class="d">-					dialer = &amp;net.Dialer{
+</a><a href="#h1-5-21" id="h1-5-21" class="d">-						Timeout:   vhost.Upstream.Connection.ConnectTimeout,
+</a><a href="#h1-5-22" id="h1-5-22" class="d">-						KeepAlive: vhost.Upstream.Connection.KeepaliveInterval,
+</a><a href="#h1-5-23" id="h1-5-23" class="d">-					}
+</a><a href="#h1-5-24" id="h1-5-24" class="d">-
+</a><a href="#h1-5-25" id="h1-5-25" class="d">-					if vhost.Upstream.TLSContext != nil {
+</a><a href="#h1-5-26" id="h1-5-26" class="d">-						dialer = &amp;tls.Dialer{
+</a><a href="#h1-5-27" id="h1-5-27" class="d">-							NetDialer: dialer.(*net.Dialer),
+</a><a href="#h1-5-28" id="h1-5-28" class="d">-							Config:    cfg,
+</a><a href="#h1-5-29" id="h1-5-29" class="d">-						}
+</a><a href="#h1-5-30" id="h1-5-30" class="d">-					}
+</a><a href="#h1-5-31" id="h1-5-31" class="d">-
+</a><a href="#h1-5-32" id="h1-5-32" class="d">-					if vhost.Upstream.Proxy != nil {
+</a><a href="#h1-5-33" id="h1-5-33" class="d">-						proxyNet, proxyAddr := vhost.Upstream.Proxy.Address()
+</a><a href="#h1-5-34" id="h1-5-34" class="d">-						dialer, _ = proxy.SOCKS5(proxyNet, proxyAddr, nil, dialer)
+</a><a href="#h1-5-35" id="h1-5-35" class="d">-					}
+</a><a href="#h1-5-36" id="h1-5-36" class="d">-
+</a><a href="#h1-5-37" id="h1-5-37" class="d">-					network, addr = vhost.Upstream.Address.Address()
+</a><a href="#h1-5-38" id="h1-5-38" class="d">-					return dialer.Dial(network, addr)
+</a><a href="#h1-5-39" id="h1-5-39" class="d">-				},
+</a><a href="#h1-5-40" id="h1-5-40" class="d">-			}
+</a><a href="#h1-5-41" id="h1-5-41" class="d">-		default:
+</a><a href="#h1-5-42" id="h1-5-42" class="d">-			transport = &amp;http.Transport{
+</a><a href="#h1-5-43" id="h1-5-43" class="d">-				ResponseHeaderTimeout: vhost.Upstream.Connection.ReadHeaderTimeout,
+</a><a href="#h1-5-44" id="h1-5-44" class="d">-				IdleConnTimeout:       vhost.Upstream.Connection.IdleTimeout,
+</a><a href="#h1-5-45" id="h1-5-45" class="d">-				TLSHandshakeTimeout:   vhost.Upstream.Connection.TLSHandshakeTimeout,
+</a><a href="#h1-5-46" id="h1-5-46" class="d">-				TLSClientConfig:       tlsCfg,
+</a><a href="#h1-5-47" id="h1-5-47" class="d">-				DialContext: func(ctx context.Context, network string, addr string) (net.Conn, error) {
+</a><a href="#h1-5-48" id="h1-5-48" class="d">-					var dialer proxy.Dialer
+</a><a href="#h1-5-49" id="h1-5-49" class="d">-
+</a><a href="#h1-5-50" id="h1-5-50" class="d">-					dialer = &amp;net.Dialer{
+</a><a href="#h1-5-51" id="h1-5-51" class="d">-						Timeout:   vhost.Upstream.Connection.ConnectTimeout,
+</a><a href="#h1-5-52" id="h1-5-52" class="d">-						KeepAlive: vhost.Upstream.Connection.KeepaliveInterval,
+</a><a href="#h1-5-53" id="h1-5-53" class="d">-					}
+</a><a href="#h1-5-54" id="h1-5-54" class="d">-
+</a><a href="#h1-5-55" id="h1-5-55" class="d">-					if vhost.Upstream.Proxy != nil {
+</a><a href="#h1-5-56" id="h1-5-56" class="d">-						proxyNet, proxyAddr := vhost.Upstream.Proxy.Address()
+</a><a href="#h1-5-57" id="h1-5-57" class="d">-						dialer, _ = proxy.SOCKS5(proxyNet, proxyAddr, nil, dialer)
+</a><a href="#h1-5-58" id="h1-5-58" class="d">-					}
+</a><a href="#h1-5-59" id="h1-5-59" class="d">-
+</a><a href="#h1-5-60" id="h1-5-60" class="d">-					network, addr = vhost.Upstream.Address.Address()
+</a><a href="#h1-5-61" id="h1-5-61" class="d">-					return dialer.Dial(network, addr)
+</a><a href="#h1-5-62" id="h1-5-62" class="d">-				},
+</a><a href="#h1-5-63" id="h1-5-63" class="d">-			}
+</a><a href="#h1-5-64" id="h1-5-64" class="i">+		transport, err = vhost.Upstream.ClientTransport()
+</a><a href="#h1-5-65" id="h1-5-65" class="i">+		if err != nil {
+</a><a href="#h1-5-66" id="h1-5-66" class="i">+			rpErrorHandler(errBadTransport)(rw, proxyReq, err)
+</a><a href="#h1-5-67" id="h1-5-67" class="i">+			return
+</a> 		}
+ 
+ 		rp.transports.Set(vhost.Upstream.Address, transport)
+</pre>
+</div>
+</body>
+</html>

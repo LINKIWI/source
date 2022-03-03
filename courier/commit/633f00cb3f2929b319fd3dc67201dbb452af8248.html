@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/middleware/filters: Explicitly opt-in to enabled compression algorithms, metrics for compression negotiation - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/633f00cb3f2929b319fd3dc67201dbb452af8248">633f00cb3f2929b319fd3dc67201dbb452af8248</a>
+<b>parent</b> <a href="../commit/ee7dceb930f37c11d16f00789861c099c67cf71a">ee7dceb930f37c11d16f00789861c099c67cf71a</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Fri 26 Feb 2021 23:49:56 -0800
+
+internal/middleware/filters: Explicitly opt-in to enabled compression algorithms, metrics for compression negotiation
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/middleware/filters/compression.go</a></td><td> | </td><td class="num">118</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">------------------------</span></td></tr>
+</table></pre><pre>1 file changed, 83 insertions(+), 35 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/middleware/filters/compression.go">internal/middleware/filters/compression.go</a> b/<a href="../file/internal/middleware/filters/compression.go">internal/middleware/filters/compression.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -11,32 +11,45 @@ import (
+</a> 	&quot;go.uber.org/zap&quot;
+ 
+ 	&quot;courier/internal/config&quot;
+<a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;courier/internal/metrics&quot;
+</a> 	&quot;courier/internal/middleware&quot;
+ 	&quot;courier/internal/util&quot;
+ )
+ 
+ const (
+<a href="#h0-0-9" id="h0-0-9" class="i">+	metricCompressionAlgorithmNegotiate = &quot;filter.compression.negotiate&quot;
+</a><a href="#h0-0-10" id="h0-0-10" class="i">+)
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+
+</a><a href="#h0-0-12" id="h0-0-12" class="i">+const (
+</a> 	algorithmWildcard = &quot;*&quot;
+ 	algorithmIdentity = &quot;identity&quot;
+ 	algorithmGzip     = &quot;gzip&quot;
+ 	algorithmDeflate  = &quot;deflate&quot;
+ )
+ 
+<a href="#h0-0-19" id="h0-0-19" class="i">+// compressorFactory is a factory for generating a compressor that accepts raw writes and performs
+</a><a href="#h0-0-20" id="h0-0-20" class="i">+// streaming compression while writing to the underlying io.Writer.
+</a><a href="#h0-0-21" id="h0-0-21" class="i">+type compressorFactory func(raw io.Writer) (io.WriteCloser, error)
+</a><a href="#h0-0-22" id="h0-0-22" class="i">+
+</a> // compressionParams is the configuration descriptor for the compression filter.
+ type compressionParams struct {
+<a href="#h0-0-25" id="h0-0-25" class="d">-	Algorithm string `yaml:&quot;algorithm&quot;`
+</a><a href="#h0-0-26" id="h0-0-26" class="d">-	Level     int    `yaml:&quot;level&quot;`
+</a><a href="#h0-0-27" id="h0-0-27" class="i">+	Algorithms []struct {
+</a><a href="#h0-0-28" id="h0-0-28" class="i">+		Name  string `yaml:&quot;name&quot;`
+</a><a href="#h0-0-29" id="h0-0-29" class="i">+		Level int    `yaml:&quot;level&quot;`
+</a><a href="#h0-0-30" id="h0-0-30" class="i">+	} `yaml:&quot;algorithms&quot;`
+</a> }
+ 
+ // compression applies opt-in compression to the outgoing response.
+ type compression struct {
+<a href="#h0-0-35" id="h0-0-35" class="d">-	params *compressionParams
+</a><a href="#h0-0-36" id="h0-0-36" class="i">+	params      *compressionParams
+</a><a href="#h0-0-37" id="h0-0-37" class="i">+	compressors map[string]compressorFactory
+</a> 	noop
+ }
+ 
+ // NewCompression creates a new compression filter.
+ func NewCompression(cfg *config.Filter) (middleware.Filter, error) {
+ 	var params compressionParams
+<a href="#h0-0-44" id="h0-0-44" class="i">+	compressors := make(map[string]compressorFactory)
+</a> 
+ 	if err := cfg.Params.Decode(&amp;params); err != nil {
+ 		return nil, &amp;util.Error{
+<a href="#h0-1" id="h0-1" class="h">@@ -44,29 +57,58 @@ func NewCompression(cfg *config.Filter) (middleware.Filter, error) {
+</a> 			Message:      &quot;failed to parse compression filter params&quot;,
+ 			StackedError: err,
+ 		}
+<a href="#h0-1-3" id="h0-1-3" class="d">-	}
+</a><a href="#h0-1-4" id="h0-1-4" class="d">-
+</a><a href="#h0-1-5" id="h0-1-5" class="d">-	switch params.Algorithm {
+</a><a href="#h0-1-6" id="h0-1-6" class="d">-	case algorithmGzip:
+</a><a href="#h0-1-7" id="h0-1-7" class="d">-	case &quot;&quot;:
+</a><a href="#h0-1-8" id="h0-1-8" class="i">+	} else if len(params.Algorithms) == 0 {
+</a> 		return nil, &amp;util.Error{
+ 			Namespace: &quot;filters&quot;,
+<a href="#h0-1-11" id="h0-1-11" class="d">-			Message:   &quot;missing compression algorithm&quot;,
+</a><a href="#h0-1-12" id="h0-1-12" class="i">+			Message:   &quot;at least one compression algorithm must be enabled&quot;,
+</a> 		}
+<a href="#h0-1-14" id="h0-1-14" class="d">-	default:
+</a><a href="#h0-1-15" id="h0-1-15" class="d">-		return nil, &amp;util.Error{
+</a><a href="#h0-1-16" id="h0-1-16" class="d">-			Namespace: &quot;filters&quot;,
+</a><a href="#h0-1-17" id="h0-1-17" class="d">-			Message:   &quot;unknown compression algorithm&quot;,
+</a><a href="#h0-1-18" id="h0-1-18" class="d">-			Tags:      map[string]interface{}{&quot;algorithm&quot;: params.Algorithm},
+</a><a href="#h0-1-19" id="h0-1-19" class="i">+	}
+</a><a href="#h0-1-20" id="h0-1-20" class="i">+
+</a><a href="#h0-1-21" id="h0-1-21" class="i">+	for _, algorithm := range params.Algorithms {
+</a><a href="#h0-1-22" id="h0-1-22" class="i">+		if algorithm.Level == 0 {
+</a><a href="#h0-1-23" id="h0-1-23" class="i">+			return nil, &amp;util.Error{
+</a><a href="#h0-1-24" id="h0-1-24" class="i">+				Namespace: &quot;filters&quot;,
+</a><a href="#h0-1-25" id="h0-1-25" class="i">+				Message:   &quot;compression level must be nonzero (use -1 for default)&quot;,
+</a><a href="#h0-1-26" id="h0-1-26" class="i">+			}
+</a><a href="#h0-1-27" id="h0-1-27" class="i">+		}
+</a><a href="#h0-1-28" id="h0-1-28" class="i">+
+</a><a href="#h0-1-29" id="h0-1-29" class="i">+		switch algorithm.Name {
+</a><a href="#h0-1-30" id="h0-1-30" class="i">+		case algorithmGzip:
+</a><a href="#h0-1-31" id="h0-1-31" class="i">+			compressors[algorithmGzip] = func(writer io.Writer) (io.WriteCloser, error) {
+</a><a href="#h0-1-32" id="h0-1-32" class="i">+				return gzip.NewWriterLevel(writer, algorithm.Level)
+</a><a href="#h0-1-33" id="h0-1-33" class="i">+			}
+</a><a href="#h0-1-34" id="h0-1-34" class="i">+		case algorithmDeflate:
+</a><a href="#h0-1-35" id="h0-1-35" class="i">+			compressors[algorithmDeflate] = func(writer io.Writer) (io.WriteCloser, error) {
+</a><a href="#h0-1-36" id="h0-1-36" class="i">+				return zlib.NewWriterLevel(writer, algorithm.Level)
+</a><a href="#h0-1-37" id="h0-1-37" class="i">+			}
+</a><a href="#h0-1-38" id="h0-1-38" class="i">+		case &quot;&quot;:
+</a><a href="#h0-1-39" id="h0-1-39" class="i">+			return nil, &amp;util.Error{
+</a><a href="#h0-1-40" id="h0-1-40" class="i">+				Namespace: &quot;filters&quot;,
+</a><a href="#h0-1-41" id="h0-1-41" class="i">+				Message:   &quot;compression algorithm name missing&quot;,
+</a><a href="#h0-1-42" id="h0-1-42" class="i">+			}
+</a><a href="#h0-1-43" id="h0-1-43" class="i">+		default:
+</a><a href="#h0-1-44" id="h0-1-44" class="i">+			return nil, &amp;util.Error{
+</a><a href="#h0-1-45" id="h0-1-45" class="i">+				Namespace: &quot;filters&quot;,
+</a><a href="#h0-1-46" id="h0-1-46" class="i">+				Message:   &quot;unknown compression algorithm&quot;,
+</a><a href="#h0-1-47" id="h0-1-47" class="i">+				Tags:      map[string]interface{}{&quot;algorithm&quot;: algorithm},
+</a><a href="#h0-1-48" id="h0-1-48" class="i">+			}
+</a> 		}
+ 	}
+ 
+<a href="#h0-1-52" id="h0-1-52" class="d">-	return middleware.NewInstrumentedFilter(&quot;compression&quot;, &amp;compression{params: &amp;params}), nil
+</a><a href="#h0-1-53" id="h0-1-53" class="i">+	filter := &amp;compression{compressors: compressors, params: &amp;params}
+</a><a href="#h0-1-54" id="h0-1-54" class="i">+
+</a><a href="#h0-1-55" id="h0-1-55" class="i">+	return middleware.NewInstrumentedFilter(&quot;compression&quot;, filter), nil
+</a> }
+ 
+ // ProcessResponse applies streaming compression of the proxy response contingent on the compression
+ // algorithms supported by the client as advertised in the incoming Accept-Encoding header.
+ func (c *compression) ProcessResponse(proxyResp *http.Response) (*http.Response, error) {
+<a href="#h0-1-61" id="h0-1-61" class="i">+	tags := map[string]interface{}{
+</a><a href="#h0-1-62" id="h0-1-62" class="i">+		&quot;route_host&quot;: proxyResp.Request.Host,
+</a><a href="#h0-1-63" id="h0-1-63" class="i">+		&quot;method&quot;:     proxyResp.Request.Method,
+</a><a href="#h0-1-64" id="h0-1-64" class="i">+		&quot;protocol&quot;:   proxyResp.Request.Proto,
+</a><a href="#h0-1-65" id="h0-1-65" class="i">+	}
+</a><a href="#h0-1-66" id="h0-1-66" class="i">+
+</a> 	// Response compression is not supported for bidirectional streams, e.g. websockets or
+ 	// HTTP/2 streams.
+ 	if _, ok := proxyResp.Body.(io.Writer); ok {
+<a href="#h0-2" id="h0-2" class="h">@@ -79,26 +121,32 @@ func (c *compression) ProcessResponse(proxyResp *http.Response) (*http.Response,
+</a> 	sort.Slice(encodings, func(i int, j int) bool { return encodings[i].Q &gt; encodings[j].Q })
+ 
+ 	for _, encoding := range encodings {
+<a href="#h0-2-3" id="h0-2-3" class="d">-		switch encoding.Value {
+</a><a href="#h0-2-4" id="h0-2-4" class="d">-		case algorithmWildcard, algorithmGzip:
+</a><a href="#h0-2-5" id="h0-2-5" class="d">-			return c.processCompressedResponse(
+</a><a href="#h0-2-6" id="h0-2-6" class="d">-				proxyResp,
+</a><a href="#h0-2-7" id="h0-2-7" class="d">-				algorithmGzip,
+</a><a href="#h0-2-8" id="h0-2-8" class="d">-				func(writer io.Writer, level int) (io.WriteCloser, error) {
+</a><a href="#h0-2-9" id="h0-2-9" class="d">-					return gzip.NewWriterLevel(writer, level)
+</a><a href="#h0-2-10" id="h0-2-10" class="d">-				},
+</a><a href="#h0-2-11" id="h0-2-11" class="d">-			)
+</a><a href="#h0-2-12" id="h0-2-12" class="d">-		case algorithmDeflate:
+</a><a href="#h0-2-13" id="h0-2-13" class="d">-			return c.processCompressedResponse(
+</a><a href="#h0-2-14" id="h0-2-14" class="d">-				proxyResp,
+</a><a href="#h0-2-15" id="h0-2-15" class="d">-				algorithmDeflate,
+</a><a href="#h0-2-16" id="h0-2-16" class="d">-				func(writer io.Writer, level int) (io.WriteCloser, error) {
+</a><a href="#h0-2-17" id="h0-2-17" class="d">-					return zlib.NewWriterLevel(writer, level)
+</a><a href="#h0-2-18" id="h0-2-18" class="d">-				},
+</a><a href="#h0-2-19" id="h0-2-19" class="d">-			)
+</a><a href="#h0-2-20" id="h0-2-20" class="d">-		case algorithmIdentity:
+</a><a href="#h0-2-21" id="h0-2-21" class="i">+		if encoding.Value == algorithmIdentity {
+</a><a href="#h0-2-22" id="h0-2-22" class="i">+			// Explicitly apply no compression.
+</a> 			return proxyResp, nil
+<a href="#h0-2-24" id="h0-2-24" class="i">+		} else if encoding.Value == algorithmWildcard {
+</a><a href="#h0-2-25" id="h0-2-25" class="i">+			// Choose any available compression algorithm.
+</a><a href="#h0-2-26" id="h0-2-26" class="i">+			for algorithm := range c.compressors {
+</a><a href="#h0-2-27" id="h0-2-27" class="i">+				encoding.Value = algorithm
+</a><a href="#h0-2-28" id="h0-2-28" class="i">+				break
+</a><a href="#h0-2-29" id="h0-2-29" class="i">+			}
+</a> 		}
+<a href="#h0-2-31" id="h0-2-31" class="i">+
+</a><a href="#h0-2-32" id="h0-2-32" class="i">+		compressor, ok := c.compressors[encoding.Value]
+</a><a href="#h0-2-33" id="h0-2-33" class="i">+		if !ok {
+</a><a href="#h0-2-34" id="h0-2-34" class="i">+			// No implementation available for the requested compression.
+</a><a href="#h0-2-35" id="h0-2-35" class="i">+			continue
+</a><a href="#h0-2-36" id="h0-2-36" class="i">+		}
+</a><a href="#h0-2-37" id="h0-2-37" class="i">+
+</a><a href="#h0-2-38" id="h0-2-38" class="i">+		metrics.Client.Incr(
+</a><a href="#h0-2-39" id="h0-2-39" class="i">+			metricCompressionAlgorithmNegotiate,
+</a><a href="#h0-2-40" id="h0-2-40" class="i">+			util.MergeMaps(tags, map[string]interface{}{&quot;algorithm&quot;: encoding.Value}),
+</a><a href="#h0-2-41" id="h0-2-41" class="i">+		)
+</a><a href="#h0-2-42" id="h0-2-42" class="i">+		return c.processCompressedResponse(
+</a><a href="#h0-2-43" id="h0-2-43" class="i">+			proxyResp,
+</a><a href="#h0-2-44" id="h0-2-44" class="i">+			encoding.Value,
+</a><a href="#h0-2-45" id="h0-2-45" class="i">+			compressor,
+</a><a href="#h0-2-46" id="h0-2-46" class="i">+		)
+</a> 	}
+ 
+ 	if len(encodings) &gt; 0 {
+<a href="#h0-3" id="h0-3" class="h">@@ -116,7 +164,7 @@ func (c *compression) ProcessResponse(proxyResp *http.Response) (*http.Response,
+</a> func (c *compression) processCompressedResponse(
+ 	proxyResp *http.Response,
+ 	name string,
+<a href="#h0-3-3" id="h0-3-3" class="d">-	compressorFactory func(io.Writer, int) (io.WriteCloser, error),
+</a><a href="#h0-3-4" id="h0-3-4" class="i">+	compressor compressorFactory,
+</a> ) (*http.Response, error) {
+ 	var compressionWriter io.WriteCloser
+ 
+<a href="#h0-4" id="h0-4" class="h">@@ -125,7 +173,7 @@ func (c *compression) processCompressedResponse(
+</a> 
+ 	respBody := proxyResp.Body
+ 	proxyResp.Body, compressionWriter = io.Pipe()
+<a href="#h0-4-3" id="h0-4-3" class="d">-	rawWriter, err := compressorFactory(compressionWriter, c.params.Level)
+</a><a href="#h0-4-4" id="h0-4-4" class="i">+	rawWriter, err := compressor(compressionWriter)
+</a> 
+ 	if err != nil {
+ 		return nil, &amp;util.Error{
+</pre>
+</div>
+</body>
+</html>

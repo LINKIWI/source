@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/middleware/filters: Log filter: attach state to request instead of filter instance - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/c21f5d2a79973c5d273c4d50fccfdc7d04c1df6d">c21f5d2a79973c5d273c4d50fccfdc7d04c1df6d</a>
+<b>parent</b> <a href="../commit/024ec9e02a548c041dbcbef7540c45629973bd5d">024ec9e02a548c041dbcbef7540c45629973bd5d</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sun 31 Jan 2021 23:37:15 -0800
+
+internal/middleware/filters: Log filter: attach state to request instead of filter instance
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/middleware/filters/log.go</a></td><td> | </td><td class="num">32</td><td><span class="i">+++++++++++++++</span><span class="d">-----------------</span></td></tr>
+</table></pre><pre>1 file changed, 15 insertions(+), 17 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/middleware/filters/log.go">internal/middleware/filters/log.go</a> b/<a href="../file/internal/middleware/filters/log.go">internal/middleware/filters/log.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -1,6 +1,7 @@
+</a> package filters
+ 
+ import (
+<a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;context&quot;
+</a> 	&quot;encoding/json&quot;
+ 	&quot;fmt&quot;
+ 	&quot;net&quot;
+<a href="#h0-1" id="h0-1" class="h">@@ -8,7 +9,6 @@ import (
+</a> 	&quot;os&quot;
+ 	&quot;reflect&quot;
+ 	&quot;strings&quot;
+<a href="#h0-1-3" id="h0-1-3" class="d">-	&quot;sync&quot;
+</a> 	&quot;syscall&quot;
+ 	&quot;time&quot;
+ 
+<a href="#h0-2" id="h0-2" class="h">@@ -25,6 +25,11 @@ const (
+</a> 	logSerializerLine = &quot;line&quot;
+ )
+ 
+<a href="#h0-2-3" id="h0-2-3" class="i">+const (
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+	requestID middleware.RequestContextKey = iota
+</a><a href="#h0-2-5" id="h0-2-5" class="i">+	stopwatch
+</a><a href="#h0-2-6" id="h0-2-6" class="i">+)
+</a><a href="#h0-2-7" id="h0-2-7" class="i">+
+</a> // jsonLogEntry is an alias type for a log entry that can be serialized as JSON.
+ type jsonLogEntry logEntry
+ 
+<a href="#h0-3" id="h0-3" class="h">@@ -57,11 +62,8 @@ type logParams struct {
+</a> 
+ // log is a filter that logs completed requests to a file on disk.
+ type log struct {
+<a href="#h0-3-3" id="h0-3-3" class="d">-	file      *os.File
+</a><a href="#h0-3-4" id="h0-3-4" class="d">-	params    *logParams
+</a><a href="#h0-3-5" id="h0-3-5" class="d">-	requestID uuid.UUID
+</a><a href="#h0-3-6" id="h0-3-6" class="d">-	stopwatch *lib.Stopwatch
+</a><a href="#h0-3-7" id="h0-3-7" class="d">-	mutex     sync.Mutex
+</a><a href="#h0-3-8" id="h0-3-8" class="i">+	file   *os.File
+</a><a href="#h0-3-9" id="h0-3-9" class="i">+	params *logParams
+</a> }
+ 
+ // NewLog creates a new log filter.
+<a href="#h0-4" id="h0-4" class="h">@@ -111,22 +113,18 @@ func NewLog(cfg *config.Filter) (middleware.Filter, error) {
+</a> 
+ // ProcessRequest assigns the request a unique ID and starts a latency stopwatch.
+ func (l *log) ProcessRequest(clientReq *http.Request) (*http.Request, *http.Response, error) {
+<a href="#h0-4-3" id="h0-4-3" class="d">-	l.mutex.Lock()
+</a><a href="#h0-4-4" id="h0-4-4" class="d">-	defer l.mutex.Unlock()
+</a><a href="#h0-4-5" id="h0-4-5" class="i">+	ctx := context.WithValue(clientReq.Context(), requestID, uuid.New())
+</a><a href="#h0-4-6" id="h0-4-6" class="i">+	ctx = context.WithValue(ctx, stopwatch, lib.NewStopwatch())
+</a> 
+<a href="#h0-4-8" id="h0-4-8" class="d">-	l.requestID = uuid.New()
+</a><a href="#h0-4-9" id="h0-4-9" class="d">-	l.stopwatch = lib.NewStopwatch()
+</a><a href="#h0-4-10" id="h0-4-10" class="d">-
+</a><a href="#h0-4-11" id="h0-4-11" class="d">-	return clientReq, nil, nil
+</a><a href="#h0-4-12" id="h0-4-12" class="i">+	return clientReq.WithContext(ctx), nil, nil
+</a> }
+ 
+ // ProcessResponse assembles information about the request/response pair and logs the entry.
+ func (l *log) ProcessResponse(proxyResp *http.Response) (*http.Response, error) {
+<a href="#h0-4-17" id="h0-4-17" class="d">-	l.mutex.Lock()
+</a><a href="#h0-4-18" id="h0-4-18" class="d">-	defer l.mutex.Unlock()
+</a><a href="#h0-4-19" id="h0-4-19" class="d">-
+</a> 	var serialized []byte
+ 
+<a href="#h0-4-22" id="h0-4-22" class="i">+	ctx := proxyResp.Request.Context()
+</a><a href="#h0-4-23" id="h0-4-23" class="i">+
+</a> 	ip, _, err := net.SplitHostPort(proxyResp.Request.RemoteAddr)
+ 	if err != nil {
+ 		return proxyResp, err
+<a href="#h0-5" id="h0-5" class="h">@@ -134,7 +132,7 @@ func (l *log) ProcessResponse(proxyResp *http.Response) (*http.Response, error) 
+</a> 
+ 	entry := logEntry{
+ 		Timestamp:    time.Now(),
+<a href="#h0-5-3" id="h0-5-3" class="d">-		RequestID:    l.requestID,
+</a><a href="#h0-5-4" id="h0-5-4" class="i">+		RequestID:    ctx.Value(requestID).(uuid.UUID),
+</a> 		URL:          proxyResp.Request.URL.String(),
+ 		Host:         proxyResp.Request.Host,
+ 		StatusCode:   proxyResp.StatusCode,
+<a href="#h0-6" id="h0-6" class="h">@@ -142,7 +140,7 @@ func (l *log) ProcessResponse(proxyResp *http.Response) (*http.Response, error) 
+</a> 		RequestSize:  proxyResp.Request.ContentLength,
+ 		ResponseSize: proxyResp.ContentLength,
+ 		UserAgent:    proxyResp.Request.UserAgent(),
+<a href="#h0-6-3" id="h0-6-3" class="d">-		Duration:     float64(l.stopwatch.Elapsed().Microseconds()) / 1000.0,
+</a><a href="#h0-6-4" id="h0-6-4" class="i">+		Duration:     float64(ctx.Value(stopwatch).(*lib.Stopwatch).Elapsed().Microseconds()) / 1000.0,
+</a> 	}
+ 
+ 	switch l.params.Serializer {
+</pre>
+</div>
+</body>
+</html>

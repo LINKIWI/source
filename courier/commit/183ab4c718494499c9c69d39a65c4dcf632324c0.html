@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/metrics: Switch to Go 1.16 runtime/metrics package for runtime stats heartbeat - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/183ab4c718494499c9c69d39a65c4dcf632324c0">183ab4c718494499c9c69d39a65c4dcf632324c0</a>
+<b>parent</b> <a href="../commit/4e8bc66c19ff823f4b0fc502b144ce71f4e0fbbb">4e8bc66c19ff823f4b0fc502b144ce71f4e0fbbb</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Mon 22 Feb 2021 21:33:43 -0800
+
+internal/metrics: Switch to Go 1.16 runtime/metrics package for runtime stats heartbeat
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/metrics/default.go</a></td><td> | </td><td class="num">67</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">------------------</span></td></tr>
+</table></pre><pre>1 file changed, 49 insertions(+), 18 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/metrics/default.go">internal/metrics/default.go</a> b/<a href="../file/internal/metrics/default.go">internal/metrics/default.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -2,6 +2,7 @@ package metrics
+</a> 
+ import (
+ 	&quot;runtime&quot;
+<a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;runtime/metrics&quot;
+</a> 	&quot;time&quot;
+ 
+ 	&quot;lib.kevinlin.info/aperture&quot;
+<a href="#h0-1" id="h0-1" class="h">@@ -9,8 +10,8 @@ import (
+</a> 
+ // initDefaultHeartbeats registers a set of default heartbeats.
+ func initDefaultHeartbeats() {
+<a href="#h0-1-3" id="h0-1-3" class="d">-	uptime := &amp;uptimeHeartbeat{start: time.Now()}
+</a><a href="#h0-1-4" id="h0-1-4" class="d">-	runtimeStats := &amp;runtimeStatsHeartbeat{}
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+	uptime := newUptimeHeartbeat()
+</a><a href="#h0-1-6" id="h0-1-6" class="i">+	runtimeStats := newRuntimeStatsHeartbeat()
+</a> 
+ 	RegisterHeartbeat(&quot;uptime&quot;, DefaultHeartbeatInterval, uptime)
+ 	RegisterHeartbeat(&quot;runtime_stats&quot;, DefaultHeartbeatInterval, runtimeStats)
+<a href="#h0-2" id="h0-2" class="h">@@ -31,6 +32,11 @@ type uptimeHeartbeat struct {
+</a> 	start time.Time
+ }
+ 
+<a href="#h0-2-3" id="h0-2-3" class="i">+// newUptimeHeartbeat creates a new uptimeHeartbeat.
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+func newUptimeHeartbeat() Heartbeat {
+</a><a href="#h0-2-5" id="h0-2-5" class="i">+	return &amp;uptimeHeartbeat{start: time.Now()}
+</a><a href="#h0-2-6" id="h0-2-6" class="i">+}
+</a><a href="#h0-2-7" id="h0-2-7" class="i">+
+</a> // Run emits a gauge for the amount of time since the application started.
+ func (u *uptimeHeartbeat) Run(client aperture.Statsd) error {
+ 	client.Gauge(&quot;uptime.seconds&quot;, time.Since(u.start).Seconds(), nil)
+<a href="#h0-3" id="h0-3" class="h">@@ -38,27 +44,52 @@ func (u *uptimeHeartbeat) Run(client aperture.Statsd) error {
+</a> }
+ 
+ // runtimeStatsHeartbeat reports Go runtime stats.
+<a href="#h0-3-3" id="h0-3-3" class="d">-type runtimeStatsHeartbeat struct{}
+</a><a href="#h0-3-4" id="h0-3-4" class="i">+type runtimeStatsHeartbeat struct {
+</a><a href="#h0-3-5" id="h0-3-5" class="i">+	samples       []metrics.Sample
+</a><a href="#h0-3-6" id="h0-3-6" class="i">+	sampleMetrics map[string]string
+</a><a href="#h0-3-7" id="h0-3-7" class="i">+}
+</a><a href="#h0-3-8" id="h0-3-8" class="i">+
+</a><a href="#h0-3-9" id="h0-3-9" class="i">+// newRuntimeStatsHeartbeat creates a new runtimeStatsHeartbeat with a set of default runtime stats.
+</a><a href="#h0-3-10" id="h0-3-10" class="i">+func newRuntimeStatsHeartbeat() Heartbeat {
+</a><a href="#h0-3-11" id="h0-3-11" class="i">+	var samples []metrics.Sample
+</a><a href="#h0-3-12" id="h0-3-12" class="i">+
+</a><a href="#h0-3-13" id="h0-3-13" class="i">+	sampleMetrics := map[string]string{
+</a><a href="#h0-3-14" id="h0-3-14" class="i">+		&quot;/gc/cycles/total:gc-cycles&quot;:          &quot;runtime.gc.cycles&quot;,
+</a><a href="#h0-3-15" id="h0-3-15" class="i">+		&quot;/gc/heap/goal:bytes&quot;:                 &quot;runtime.gc.heap.goal_bytes&quot;,
+</a><a href="#h0-3-16" id="h0-3-16" class="i">+		&quot;/gc/heap/objects:objects&quot;:            &quot;runtime.gc.heap.objects&quot;,
+</a><a href="#h0-3-17" id="h0-3-17" class="i">+		&quot;/memory/classes/heap/free:bytes&quot;:     &quot;runtime.memory.heap.free_bytes&quot;,
+</a><a href="#h0-3-18" id="h0-3-18" class="i">+		&quot;/memory/classes/heap/objects:bytes&quot;:  &quot;runtime.memory.heap.object_bytes&quot;,
+</a><a href="#h0-3-19" id="h0-3-19" class="i">+		&quot;/memory/classes/heap/released:bytes&quot;: &quot;runtime.memory.heap.released_bytes&quot;,
+</a><a href="#h0-3-20" id="h0-3-20" class="i">+		&quot;/memory/classes/heap/stacks:bytes&quot;:   &quot;runtime.memory.heap.stack_bytes&quot;,
+</a><a href="#h0-3-21" id="h0-3-21" class="i">+		&quot;/memory/classes/heap/unused:bytes&quot;:   &quot;runtime.memory.heap.unused_bytes&quot;,
+</a><a href="#h0-3-22" id="h0-3-22" class="i">+		&quot;/memory/classes/total:bytes&quot;:         &quot;runtime.memory.total_bytes&quot;,
+</a><a href="#h0-3-23" id="h0-3-23" class="i">+		&quot;/sched/goroutines:goroutines&quot;:        &quot;runtime.scheduler.goroutines&quot;,
+</a><a href="#h0-3-24" id="h0-3-24" class="i">+	}
+</a><a href="#h0-3-25" id="h0-3-25" class="i">+
+</a><a href="#h0-3-26" id="h0-3-26" class="i">+	for name := range sampleMetrics {
+</a><a href="#h0-3-27" id="h0-3-27" class="i">+		samples = append(samples, metrics.Sample{Name: name})
+</a><a href="#h0-3-28" id="h0-3-28" class="i">+	}
+</a><a href="#h0-3-29" id="h0-3-29" class="i">+
+</a><a href="#h0-3-30" id="h0-3-30" class="i">+	return &amp;runtimeStatsHeartbeat{
+</a><a href="#h0-3-31" id="h0-3-31" class="i">+		samples:       samples,
+</a><a href="#h0-3-32" id="h0-3-32" class="i">+		sampleMetrics: sampleMetrics,
+</a><a href="#h0-3-33" id="h0-3-33" class="i">+	}
+</a><a href="#h0-3-34" id="h0-3-34" class="i">+}
+</a> 
+ // Run emits gauges describing goroutines and memory usage.
+ func (r *runtimeStatsHeartbeat) Run(client aperture.Statsd) error {
+<a href="#h0-3-38" id="h0-3-38" class="d">-	var memstats runtime.MemStats
+</a><a href="#h0-3-39" id="h0-3-39" class="i">+	tags := map[string]interface{}{&quot;go_version&quot;: runtime.Version()}
+</a> 
+<a href="#h0-3-41" id="h0-3-41" class="d">-	tags := map[string]interface{}{
+</a><a href="#h0-3-42" id="h0-3-42" class="d">-		&quot;go_version&quot;: runtime.Version(),
+</a><a href="#h0-3-43" id="h0-3-43" class="d">-	}
+</a><a href="#h0-3-44" id="h0-3-44" class="i">+	metrics.Read(r.samples)
+</a> 
+<a href="#h0-3-46" id="h0-3-46" class="d">-	runtime.ReadMemStats(&amp;memstats)
+</a><a href="#h0-3-47" id="h0-3-47" class="d">-
+</a><a href="#h0-3-48" id="h0-3-48" class="d">-	client.Gauge(&quot;runtime.goroutines&quot;, float64(runtime.NumGoroutine()), tags)
+</a><a href="#h0-3-49" id="h0-3-49" class="d">-	client.Gauge(&quot;runtime.memstats.heap_alloc_bytes&quot;, float64(memstats.HeapAlloc), tags)
+</a><a href="#h0-3-50" id="h0-3-50" class="d">-	client.Gauge(&quot;runtime.memstats.total_alloc_bytes&quot;, float64(memstats.TotalAlloc), tags)
+</a><a href="#h0-3-51" id="h0-3-51" class="d">-	client.Gauge(&quot;runtime.memstats.sys_bytes&quot;, float64(memstats.Sys), tags)
+</a><a href="#h0-3-52" id="h0-3-52" class="d">-	client.Gauge(&quot;runtime.memstats.mallocs&quot;, float64(memstats.Mallocs), tags)
+</a><a href="#h0-3-53" id="h0-3-53" class="d">-	client.Gauge(&quot;runtime.memstats.frees&quot;, float64(memstats.Frees), tags)
+</a><a href="#h0-3-54" id="h0-3-54" class="d">-	client.Gauge(&quot;runtime.memstats.num_gc&quot;, float64(memstats.NumGC), tags)
+</a><a href="#h0-3-55" id="h0-3-55" class="d">-	client.Gauge(&quot;runtime.memstats.last_gc&quot;, float64(memstats.LastGC), tags)
+</a><a href="#h0-3-56" id="h0-3-56" class="d">-	client.Gauge(&quot;runtime.memstats.total_gc_pause_ns&quot;, float64(memstats.PauseTotalNs), tags)
+</a><a href="#h0-3-57" id="h0-3-57" class="i">+	for _, sample := range r.samples {
+</a><a href="#h0-3-58" id="h0-3-58" class="i">+		switch sample.Value.Kind() {
+</a><a href="#h0-3-59" id="h0-3-59" class="i">+		case metrics.KindUint64:
+</a><a href="#h0-3-60" id="h0-3-60" class="i">+			client.Gauge(r.sampleMetrics[sample.Name], float64(sample.Value.Uint64()), tags)
+</a><a href="#h0-3-61" id="h0-3-61" class="i">+		case metrics.KindFloat64:
+</a><a href="#h0-3-62" id="h0-3-62" class="i">+			client.Gauge(r.sampleMetrics[sample.Name], sample.Value.Float64(), tags)
+</a><a href="#h0-3-63" id="h0-3-63" class="i">+		}
+</a><a href="#h0-3-64" id="h0-3-64" class="i">+	}
+</a> 
+ 	return nil
+ }
+</pre>
+</div>
+</body>
+</html>

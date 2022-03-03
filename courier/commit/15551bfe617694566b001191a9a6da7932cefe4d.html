@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/server: Support route configuration and multiple upstreams in reverse proxy - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/15551bfe617694566b001191a9a6da7932cefe4d">15551bfe617694566b001191a9a6da7932cefe4d</a>
+<b>parent</b> <a href="../commit/d1f0b1ffb761f8b3c677429e116eb4952956dc06">d1f0b1ffb761f8b3c677429e116eb4952956dc06</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sat 27 Feb 2021 12:16:17 -0800
+
+internal/server: Support route configuration and multiple upstreams in reverse proxy
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/server/proxy.go</a></td><td> | </td><td class="num">108</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">------------------------</span></td></tr>
+</table></pre><pre>1 file changed, 75 insertions(+), 33 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/server/proxy.go">internal/server/proxy.go</a> b/<a href="../file/internal/server/proxy.go">internal/server/proxy.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -26,6 +26,7 @@ const (
+</a> 	metricProxyTotalServed         = &quot;proxy.serve.total&quot;
+ 	metricProxyEarlyTerminate      = &quot;proxy.lifecycle.early_terminate&quot;
+ 	metricProxyUnknownHost         = &quot;proxy.lifecycle.unknown_host&quot;
+<a href="#h0-0-3" id="h0-0-3" class="i">+	metricProxyUnknownRoute        = &quot;proxy.lifecycle.unknown_route&quot;
+</a> 	metricProxyCircuitBreak        = &quot;proxy.lifecycle.health_circuit_break&quot;
+ 	metricProxyTransportInitialize = &quot;proxy.transport.initialize&quot;
+ 	metricProxyTransportRecycle    = &quot;proxy.transport.recycle&quot;
+<a href="#h0-1" id="h0-1" class="h">@@ -38,6 +39,11 @@ var (
+</a> 		statusCode: http.StatusNotFound,
+ 		message:    &quot;unknown virtual host&quot;,
+ 	}
+<a href="#h0-1-3" id="h0-1-3" class="i">+	// errUnknownRoute is returned when the request does not match any configured route.
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+	errUnknownRoute = &amp;response{
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+		statusCode: http.StatusBadRequest,
+</a><a href="#h0-1-6" id="h0-1-6" class="i">+		message:    &quot;no upstream for route&quot;,
+</a><a href="#h0-1-7" id="h0-1-7" class="i">+	}
+</a> 	// errBadTransport is returned when the proxy encounters an error initializing the HTTP
+ 	// client transport to an upstream.
+ 	errBadTransport = &amp;response{
+<a href="#h0-2" id="h0-2" class="h">@@ -150,37 +156,40 @@ func newReverseProxy(vhosts []*config.VirtualHost, opts config.Proxy) (http.Hand
+</a> 
+ 		filterChains[vhost.Name] = middleware.NewComposedFilter(vhostFilters...)
+ 
+<a href="#h0-2-3" id="h0-2-3" class="d">-		if vhost.Upstream.HealthCheck != nil {
+</a><a href="#h0-2-4" id="h0-2-4" class="d">-			zap.L().Debug(
+</a><a href="#h0-2-5" id="h0-2-5" class="d">-				&quot;creating health check for virtual host upstream&quot;,
+</a><a href="#h0-2-6" id="h0-2-6" class="d">-				zap.String(&quot;vhost&quot;, vhost.Name),
+</a><a href="#h0-2-7" id="h0-2-7" class="d">-				zap.String(&quot;address&quot;, vhost.Upstream.Address.String()),
+</a><a href="#h0-2-8" id="h0-2-8" class="d">-				zap.String(&quot;host&quot;, vhost.Upstream.Host),
+</a><a href="#h0-2-9" id="h0-2-9" class="d">-				zap.String(&quot;path&quot;, vhost.Upstream.HealthCheck.Path),
+</a><a href="#h0-2-10" id="h0-2-10" class="d">-				zap.Duration(&quot;interval&quot;, vhost.Upstream.HealthCheck.Interval),
+</a><a href="#h0-2-11" id="h0-2-11" class="d">-				zap.Duration(&quot;jitter&quot;, vhost.Upstream.HealthCheck.Jitter),
+</a><a href="#h0-2-12" id="h0-2-12" class="d">-				zap.Bool(&quot;circuit_break&quot;, vhost.Upstream.HealthCheck.EnableCircuitBreak),
+</a><a href="#h0-2-13" id="h0-2-13" class="d">-			)
+</a><a href="#h0-2-14" id="h0-2-14" class="d">-
+</a><a href="#h0-2-15" id="h0-2-15" class="d">-			hp, err := newHealthProbe(vhost.Name, vhost.Upstream)
+</a><a href="#h0-2-16" id="h0-2-16" class="d">-			if err != nil {
+</a><a href="#h0-2-17" id="h0-2-17" class="d">-				return nil, &amp;util.Error{
+</a><a href="#h0-2-18" id="h0-2-18" class="d">-					Namespace: &quot;server&quot;,
+</a><a href="#h0-2-19" id="h0-2-19" class="d">-					Message:   &quot;error creating health check probe&quot;,
+</a><a href="#h0-2-20" id="h0-2-20" class="d">-					Tags: map[string]interface{}{
+</a><a href="#h0-2-21" id="h0-2-21" class="d">-						&quot;vhost&quot;: vhost.Name,
+</a><a href="#h0-2-22" id="h0-2-22" class="d">-					},
+</a><a href="#h0-2-23" id="h0-2-23" class="i">+		for _, upstream := range vhost.Upstreams {
+</a><a href="#h0-2-24" id="h0-2-24" class="i">+			if upstream.HealthCheck != nil {
+</a><a href="#h0-2-25" id="h0-2-25" class="i">+				zap.L().Debug(
+</a><a href="#h0-2-26" id="h0-2-26" class="i">+					&quot;creating health check for virtual host upstream&quot;,
+</a><a href="#h0-2-27" id="h0-2-27" class="i">+					zap.String(&quot;vhost&quot;, vhost.Name),
+</a><a href="#h0-2-28" id="h0-2-28" class="i">+					zap.String(&quot;upstream&quot;, upstream.Name),
+</a><a href="#h0-2-29" id="h0-2-29" class="i">+					zap.Stringer(&quot;address&quot;, upstream.Address),
+</a><a href="#h0-2-30" id="h0-2-30" class="i">+					zap.String(&quot;host&quot;, upstream.Host),
+</a><a href="#h0-2-31" id="h0-2-31" class="i">+					zap.String(&quot;path&quot;, upstream.HealthCheck.Path),
+</a><a href="#h0-2-32" id="h0-2-32" class="i">+					zap.Duration(&quot;interval&quot;, upstream.HealthCheck.Interval),
+</a><a href="#h0-2-33" id="h0-2-33" class="i">+					zap.Duration(&quot;jitter&quot;, upstream.HealthCheck.Jitter),
+</a><a href="#h0-2-34" id="h0-2-34" class="i">+					zap.Bool(&quot;circuit_break&quot;, upstream.HealthCheck.EnableCircuitBreak),
+</a><a href="#h0-2-35" id="h0-2-35" class="i">+				)
+</a><a href="#h0-2-36" id="h0-2-36" class="i">+
+</a><a href="#h0-2-37" id="h0-2-37" class="i">+				hp, err := newHealthProbe(vhost.Name, upstream)
+</a><a href="#h0-2-38" id="h0-2-38" class="i">+				if err != nil {
+</a><a href="#h0-2-39" id="h0-2-39" class="i">+					return nil, &amp;util.Error{
+</a><a href="#h0-2-40" id="h0-2-40" class="i">+						Namespace: &quot;server&quot;,
+</a><a href="#h0-2-41" id="h0-2-41" class="i">+						Message:   &quot;error creating health check probe&quot;,
+</a><a href="#h0-2-42" id="h0-2-42" class="i">+						Tags: map[string]interface{}{
+</a><a href="#h0-2-43" id="h0-2-43" class="i">+							&quot;vhost&quot;: vhost.Name,
+</a><a href="#h0-2-44" id="h0-2-44" class="i">+						},
+</a><a href="#h0-2-45" id="h0-2-45" class="i">+					}
+</a> 				}
+<a href="#h0-2-47" id="h0-2-47" class="d">-			}
+</a> 
+<a href="#h0-2-49" id="h0-2-49" class="d">-			healthProbes[vhost.Name] = hp
+</a><a href="#h0-2-50" id="h0-2-50" class="i">+				healthProbes[upstream.Name] = hp
+</a><a href="#h0-2-51" id="h0-2-51" class="i">+			}
+</a> 		}
+ 	}
+ 
+ 	return &amp;reverseProxy{
+ 		vhosts:       vhosts,
+<a href="#h0-2-57" id="h0-2-57" class="d">-		healthProbes: healthProbes,
+</a> 		opts:         opts,
+<a href="#h0-2-59" id="h0-2-59" class="i">+		healthProbes: healthProbes,
+</a> 		filterChains: filterChains,
+ 		transports:   util.NewConcurrentMap(),
+ 		sequenceID:   new(int64),
+<a href="#h0-3" id="h0-3" class="h">@@ -210,9 +219,18 @@ func (rp *reverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+</a> 		return
+ 	}
+ 
+<a href="#h0-3-3" id="h0-3-3" class="i">+	// Match upstream from route
+</a><a href="#h0-3-4" id="h0-3-4" class="i">+	upstream, ok := rp.matchRoute(proxyReq, vhost.Upstreams, vhost.Routes)
+</a><a href="#h0-3-5" id="h0-3-5" class="i">+	if !ok {
+</a><a href="#h0-3-6" id="h0-3-6" class="i">+		metrics.Client.Incr(metricProxyUnknownRoute, tags)
+</a><a href="#h0-3-7" id="h0-3-7" class="i">+		zap.L().Debug(&quot;unknown route&quot;, zap.String(&quot;virtual_host&quot;, vhost.Name))
+</a><a href="#h0-3-8" id="h0-3-8" class="i">+		rp.respond(rw, errUnknownRoute.response())
+</a><a href="#h0-3-9" id="h0-3-9" class="i">+		return
+</a><a href="#h0-3-10" id="h0-3-10" class="i">+	}
+</a><a href="#h0-3-11" id="h0-3-11" class="i">+
+</a> 	tags = util.MergeMaps(tags, map[string]interface{}{
+ 		&quot;virtual_host&quot;: vhost.Name,
+<a href="#h0-3-14" id="h0-3-14" class="d">-		&quot;upstream&quot;:     vhost.Upstream.Address,
+</a><a href="#h0-3-15" id="h0-3-15" class="i">+		&quot;upstream&quot;:     upstream.Name,
+</a> 	})
+ 
+ 	metrics.Client.Incr(metricProxyServe, tags)
+<a href="#h0-4" id="h0-4" class="h">@@ -233,7 +251,7 @@ func (rp *reverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+</a> 			hub := sentry.CurrentHub().Clone()
+ 			hub.ConfigureScope(func(scope *sentry.Scope) {
+ 				scope.SetTag(&quot;virtual_host&quot;, vhost.Name)
+<a href="#h0-4-3" id="h0-4-3" class="d">-				scope.SetTag(&quot;upstream&quot;, vhost.Upstream.Address.String())
+</a><a href="#h0-4-4" id="h0-4-4" class="i">+				scope.SetTag(&quot;upstream&quot;, upstream.Address.String())
+</a> 				scope.SetTag(&quot;route_host&quot;, proxyReq.Host)
+ 				scope.SetTag(&quot;method&quot;, proxyReq.Method)
+ 				scope.SetTag(&quot;protocol&quot;, proxyReq.Proto)
+<a href="#h0-5" id="h0-5" class="h">@@ -283,8 +301,8 @@ func (rp *reverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+</a> 	}
+ 
+ 	// Conditionally fail-fast on upstream health check failures
+<a href="#h0-5-3" id="h0-5-3" class="d">-	if hp, ok := rp.healthProbes[vhost.Name]; ok {
+</a><a href="#h0-5-4" id="h0-5-4" class="d">-		if err := hp.error(); err != nil &amp;&amp; vhost.Upstream.HealthCheck.EnableCircuitBreak {
+</a><a href="#h0-5-5" id="h0-5-5" class="i">+	if hp, ok := rp.healthProbes[upstream.Name]; ok {
+</a><a href="#h0-5-6" id="h0-5-6" class="i">+		if err := hp.error(); err != nil &amp;&amp; upstream.HealthCheck.EnableCircuitBreak {
+</a> 			metrics.Client.Incr(metricProxyCircuitBreak, tags)
+ 			rpErrorHandler(errUpstreamUnhealthy)(rw, proxyReq, err)
+ 			return
+<a href="#h0-6" id="h0-6" class="h">@@ -294,26 +312,26 @@ func (rp *reverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+</a> 	// Prepare proxy request
+ 	proxyReq.URL.Scheme = &quot;http&quot;
+ 	proxyReq.URL.Host = proxyReq.Host
+<a href="#h0-6-3" id="h0-6-3" class="d">-	if vhost.Upstream.Host != &quot;&quot; {
+</a><a href="#h0-6-4" id="h0-6-4" class="d">-		proxyReq.URL.Host = vhost.Upstream.Host
+</a><a href="#h0-6-5" id="h0-6-5" class="i">+	if upstream.Host != &quot;&quot; {
+</a><a href="#h0-6-6" id="h0-6-6" class="i">+		proxyReq.URL.Host = upstream.Host
+</a> 	}
+<a href="#h0-6-8" id="h0-6-8" class="d">-	if vhost.Upstream.TLSContext != nil {
+</a><a href="#h0-6-9" id="h0-6-9" class="i">+	if upstream.TLSContext != nil {
+</a> 		proxyReq.URL.Scheme = &quot;https&quot;
+ 	}
+ 
+ 	// Transport initialization
+<a href="#h0-6-14" id="h0-6-14" class="d">-	tr, ok := rp.transports.Get(vhost.Upstream)
+</a><a href="#h0-6-15" id="h0-6-15" class="i">+	tr, ok := rp.transports.Get(upstream)
+</a> 	if ok {
+ 		transport = tr.(http.RoundTripper)
+ 		metrics.Client.Incr(metricProxyTransportRecycle, tags)
+ 	} else {
+<a href="#h0-6-20" id="h0-6-20" class="d">-		transport, err = vhost.Upstream.ClientTransport()
+</a><a href="#h0-6-21" id="h0-6-21" class="i">+		transport, err = upstream.ClientTransport()
+</a> 		if err != nil {
+ 			rpErrorHandler(errBadTransport)(rw, proxyReq, err)
+ 			return
+ 		}
+ 
+<a href="#h0-6-27" id="h0-6-27" class="d">-		rp.transports.Set(vhost.Upstream, transport)
+</a><a href="#h0-6-28" id="h0-6-28" class="i">+		rp.transports.Set(upstream, transport)
+</a> 		metrics.Client.Incr(metricProxyTransportInitialize, tags)
+ 	}
+ 
+<a href="#h0-7" id="h0-7" class="h">@@ -346,6 +364,30 @@ func (rp *reverseProxy) matchHost(reqHost string) (*config.VirtualHost, bool) {
+</a> 	return nil, false
+ }
+ 
+<a href="#h0-7-3" id="h0-7-3" class="i">+// matchRoute attempts to match the inbound request to an upstream based on routing policy rules in
+</a><a href="#h0-7-4" id="h0-7-4" class="i">+// configuration.
+</a><a href="#h0-7-5" id="h0-7-5" class="i">+func (rp *reverseProxy) matchRoute(
+</a><a href="#h0-7-6" id="h0-7-6" class="i">+	req *http.Request,
+</a><a href="#h0-7-7" id="h0-7-7" class="i">+	upstreams []*config.Upstream,
+</a><a href="#h0-7-8" id="h0-7-8" class="i">+	routes []*config.Route,
+</a><a href="#h0-7-9" id="h0-7-9" class="i">+) (*config.Upstream, bool) {
+</a><a href="#h0-7-10" id="h0-7-10" class="i">+	for _, route := range routes {
+</a><a href="#h0-7-11" id="h0-7-11" class="i">+		if route.Match.Method != nil &amp;&amp; !route.Match.Method.MatchString(req.Method) {
+</a><a href="#h0-7-12" id="h0-7-12" class="i">+			continue
+</a><a href="#h0-7-13" id="h0-7-13" class="i">+		} else if route.Match.Path != nil &amp;&amp; !route.Match.Path.MatchString(req.URL.Path) {
+</a><a href="#h0-7-14" id="h0-7-14" class="i">+			continue
+</a><a href="#h0-7-15" id="h0-7-15" class="i">+		}
+</a><a href="#h0-7-16" id="h0-7-16" class="i">+
+</a><a href="#h0-7-17" id="h0-7-17" class="i">+		for _, upstream := range upstreams {
+</a><a href="#h0-7-18" id="h0-7-18" class="i">+			if upstream.Name == route.Upstream {
+</a><a href="#h0-7-19" id="h0-7-19" class="i">+				return upstream, true
+</a><a href="#h0-7-20" id="h0-7-20" class="i">+			}
+</a><a href="#h0-7-21" id="h0-7-21" class="i">+		}
+</a><a href="#h0-7-22" id="h0-7-22" class="i">+	}
+</a><a href="#h0-7-23" id="h0-7-23" class="i">+
+</a><a href="#h0-7-24" id="h0-7-24" class="i">+	return nil, false
+</a><a href="#h0-7-25" id="h0-7-25" class="i">+}
+</a><a href="#h0-7-26" id="h0-7-26" class="i">+
+</a> // respond writes an HTTP response from a structured response struct.
+ func (rp *reverseProxy) respond(rw http.ResponseWriter, resp *http.Response) error {
+ 	if resp.Header != nil {
+</pre>
+</div>
+</body>
+</html>

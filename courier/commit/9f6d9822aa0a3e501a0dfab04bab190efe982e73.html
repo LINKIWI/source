@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/config: Move client TLS handshake timeout to TLS context config and apply during TLS dial - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/9f6d9822aa0a3e501a0dfab04bab190efe982e73">9f6d9822aa0a3e501a0dfab04bab190efe982e73</a>
+<b>parent</b> <a href="../commit/eb13d6bd96798282d1ceebd910fb0f253ad4ed9b">eb13d6bd96798282d1ceebd910fb0f253ad4ed9b</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sun 12 Dec 2021 08:49:17 -0800
+
+internal/config: Move client TLS handshake timeout to TLS context config and apply during TLS dial
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">config.example.yaml</a></td><td> | </td><td class="num">2</td><td><span class="i">+</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">internal/config/config.go</a></td><td> | </td><td class="num">29</td><td><span class="i">++++++++++++++++++++++++++++</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">internal/config/types.go</a></td><td> | </td><td class="num">12</td><td><span class="i">++++++</span><span class="d">------</span></td></tr>
+</table></pre><pre>3 files changed, 35 insertions(+), 8 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/config.example.yaml">config.example.yaml</a> b/<a href="../file/config.example.yaml">config.example.yaml</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -63,10 +63,10 @@ server:
+</a>           address: 10.1.0.1:8200
+           connection:
+             connect_timeout: 1s
+<a href="#h0-0-3" id="h0-0-3" class="d">-            tls_handshake_timeout: 1s
+</a>           tls_context:
+             verify_mode: strict
+             verify_peer: bar.local
+<a href="#h0-0-7" id="h0-0-7" class="i">+            handshake_timeout: 1s
+</a>             reload_interval: 12h
+             certificates:
+               - key: /etc/ssl/service/key.pem
+<b>diff --git a/<a id="h1" href="../file/internal/config/config.go">internal/config/config.go</a> b/<a href="../file/internal/config/config.go">internal/config/config.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -9,6 +9,7 @@ import (
+</a> 	&quot;net&quot;
+ 	&quot;net/http&quot;
+ 	&quot;os&quot;
+<a href="#h1-0-3" id="h1-0-3" class="i">+	&quot;time&quot;
+</a> 
+ 	&quot;go.uber.org/zap&quot;
+ 	&quot;golang.org/x/net/http2&quot;
+<a href="#h1-1" id="h1-1" class="h">@@ -481,6 +482,26 @@ func (u *Upstream) ClientTransport() (http.RoundTripper, error) {
+</a> 					}
+ 				}
+ 
+<a href="#h1-1-3" id="h1-1-3" class="i">+				if u.TLSContext != nil {
+</a><a href="#h1-1-4" id="h1-1-4" class="i">+					ctx, cancel := context.WithTimeout(
+</a><a href="#h1-1-5" id="h1-1-5" class="i">+						context.Background(),
+</a><a href="#h1-1-6" id="h1-1-6" class="i">+						u.TLSContext.HandshakeTimeout,
+</a><a href="#h1-1-7" id="h1-1-7" class="i">+					)
+</a><a href="#h1-1-8" id="h1-1-8" class="i">+					defer cancel()
+</a><a href="#h1-1-9" id="h1-1-9" class="i">+
+</a><a href="#h1-1-10" id="h1-1-10" class="i">+					if err := conn.(*tls.Conn).HandshakeContext(ctx); err != nil {
+</a><a href="#h1-1-11" id="h1-1-11" class="i">+						return nil, &amp;util.Error{
+</a><a href="#h1-1-12" id="h1-1-12" class="i">+							Namespace: &quot;config&quot;,
+</a><a href="#h1-1-13" id="h1-1-13" class="i">+							Message:   &quot;error during upstream TLS handshake&quot;,
+</a><a href="#h1-1-14" id="h1-1-14" class="i">+							Tags: map[string]interface{}{
+</a><a href="#h1-1-15" id="h1-1-15" class="i">+								&quot;name&quot;: u.Name,
+</a><a href="#h1-1-16" id="h1-1-16" class="i">+								&quot;addr&quot;: u.Address,
+</a><a href="#h1-1-17" id="h1-1-17" class="i">+							},
+</a><a href="#h1-1-18" id="h1-1-18" class="i">+							StackedError: err,
+</a><a href="#h1-1-19" id="h1-1-19" class="i">+						}
+</a><a href="#h1-1-20" id="h1-1-20" class="i">+					}
+</a><a href="#h1-1-21" id="h1-1-21" class="i">+				}
+</a><a href="#h1-1-22" id="h1-1-22" class="i">+
+</a> 				return newTimeoutConn(
+ 					u.Connection.ReadTimeout,
+ 					u.Connection.WriteTimeout,
+<a href="#h1-2" id="h1-2" class="h">@@ -489,6 +510,8 @@ func (u *Upstream) ClientTransport() (http.RoundTripper, error) {
+</a> 			},
+ 		}, nil
+ 	default:
+<a href="#h1-2-3" id="h1-2-3" class="i">+		var tlsHandshakeTimeout time.Duration
+</a><a href="#h1-2-4" id="h1-2-4" class="i">+
+</a> 		zap.L().Debug(
+ 			&quot;creating client HTTP/1.1 transport&quot;,
+ 			zap.String(&quot;upstream&quot;, u.Address.String()),
+<a href="#h1-3" id="h1-3" class="h">@@ -496,11 +519,15 @@ func (u *Upstream) ClientTransport() (http.RoundTripper, error) {
+</a> 			zap.Any(&quot;connection&quot;, u.Connection),
+ 		)
+ 
+<a href="#h1-3-3" id="h1-3-3" class="i">+		if u.TLSContext != nil {
+</a><a href="#h1-3-4" id="h1-3-4" class="i">+			tlsHandshakeTimeout = u.TLSContext.HandshakeTimeout
+</a><a href="#h1-3-5" id="h1-3-5" class="i">+		}
+</a><a href="#h1-3-6" id="h1-3-6" class="i">+
+</a> 		return &amp;http.Transport{
+ 			ResponseHeaderTimeout: u.Connection.ReadHeaderTimeout,
+ 			ExpectContinueTimeout: u.Connection.ExpectContinueTimeout,
+ 			IdleConnTimeout:       u.Connection.IdleTimeout,
+<a href="#h1-3-11" id="h1-3-11" class="d">-			TLSHandshakeTimeout:   u.Connection.TLSHandshakeTimeout,
+</a><a href="#h1-3-12" id="h1-3-12" class="i">+			TLSHandshakeTimeout:   tlsHandshakeTimeout,
+</a> 			MaxIdleConnsPerHost:   u.Connection.IdleLimit,
+ 			DisableKeepAlives:     u.Connection.KeepaliveInterval &lt; 0,
+ 			ReadBufferSize:        u.Connection.ReadBufferSize,
+<b>diff --git a/<a id="h2" href="../file/internal/config/types.go">internal/config/types.go</a> b/<a href="../file/internal/config/types.go">internal/config/types.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -73,7 +73,6 @@ type Filter struct {
+</a> // UpstreamConnection describes configuration for an upstream connection from the server.
+ type UpstreamConnection struct {
+ 	ConnectTimeout        time.Duration `yaml:&quot;connect_timeout&quot;`
+<a href="#h2-0-3" id="h2-0-3" class="d">-	TLSHandshakeTimeout   time.Duration `yaml:&quot;tls_handshake_timeout&quot;`
+</a> 	ReadTimeout           time.Duration `yaml:&quot;read_timeout&quot;`
+ 	ReadHeaderTimeout     time.Duration `yaml:&quot;read_header_timeout&quot;`
+ 	WriteTimeout          time.Duration `yaml:&quot;write_timeout&quot;`
+<a href="#h2-1" id="h2-1" class="h">@@ -155,11 +154,12 @@ type TLSCertificate struct {
+</a> 
+ // TLSContext describes server and client TLS configuration.
+ type TLSContext struct {
+<a href="#h2-1-3" id="h2-1-3" class="d">-	Certificates    []*TLSCertificate `yaml:&quot;certificates&quot;`
+</a><a href="#h2-1-4" id="h2-1-4" class="d">-	VerifyMode      string            `yaml:&quot;verify_mode&quot;`
+</a><a href="#h2-1-5" id="h2-1-5" class="d">-	VerifyPeer      *Regex            `yaml:&quot;verify_peer&quot;`
+</a><a href="#h2-1-6" id="h2-1-6" class="d">-	ReloadInterval  time.Duration     `yaml:&quot;reload_interval&quot;`
+</a><a href="#h2-1-7" id="h2-1-7" class="d">-	ProtocolVersion string            `yaml:&quot;protocol_version&quot;`
+</a><a href="#h2-1-8" id="h2-1-8" class="i">+	Certificates     []*TLSCertificate `yaml:&quot;certificates&quot;`
+</a><a href="#h2-1-9" id="h2-1-9" class="i">+	VerifyMode       string            `yaml:&quot;verify_mode&quot;`
+</a><a href="#h2-1-10" id="h2-1-10" class="i">+	VerifyPeer       *Regex            `yaml:&quot;verify_peer&quot;`
+</a><a href="#h2-1-11" id="h2-1-11" class="i">+	HandshakeTimeout time.Duration     `yaml:&quot;handshake_timeout&quot;`
+</a><a href="#h2-1-12" id="h2-1-12" class="i">+	ReloadInterval   time.Duration     `yaml:&quot;reload_interval&quot;`
+</a><a href="#h2-1-13" id="h2-1-13" class="i">+	ProtocolVersion  string            `yaml:&quot;protocol_version&quot;`
+</a> }
+ 
+ // Listener describes a single bound listener for the server.
+</pre>
+</div>
+</body>
+</html>

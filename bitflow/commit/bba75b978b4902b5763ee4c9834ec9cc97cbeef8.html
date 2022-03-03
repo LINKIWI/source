@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/config: Client TLS origination capability in config - bitflow - Layer 4 TCP proxy for secure interconnection of isolated networks</title>
+<meta name="description" content="Layer 4 TCP proxy for secure interconnection of isolated networks" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="bitflow Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="bitflow Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>bitflow</h1><span class="desc">Layer 4 TCP proxy for secure interconnection of isolated networks</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/bitflow.git">https://source.static.kevinlin.info/bitflow.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/bba75b978b4902b5763ee4c9834ec9cc97cbeef8">bba75b978b4902b5763ee4c9834ec9cc97cbeef8</a>
+<b>parent</b> <a href="../commit/a1fb6265b2a3c572c5c9280e67772ce2d30a58c9">a1fb6265b2a3c572c5c9280e67772ce2d30a58c9</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Thu 23 Dec 2021 17:17:09 -0800
+
+internal/config: Client TLS origination capability in config
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">README.md</a></td><td> | </td><td class="num">5</td><td><span class="i">+++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">internal/config/config.go</a></td><td> | </td><td class="num">58</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">internal/config/types.go</a></td><td> | </td><td class="num">1</td><td><span class="i">+</span><span class="d"></span></td></tr>
+</table></pre><pre>3 files changed, 63 insertions(+), 1 deletion(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/README.md">README.md</a> b/<a href="../file/README.md">README.md</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -56,6 +56,11 @@ The following configuration directives are recognized:
+</a> |`server.proxies[].targets[].write_timeout`|No|Target socket write timeout|
+ |`server.proxies[].targets[].read_timeout`|No|Target socket read timeout|
+ |`server.proxies[].targets[].keepalive_interval`|No|TCP keepalive interval; 0 to use default, -1 to disable, any positive value as a custom interval|
+<a href="#h0-0-3" id="h0-0-3" class="i">+|`server.proxies[].targets[].tls_context.verify_mode`|No|Mutual TLS authentication mode for server handshakes; choose from `[none relaxed strict]`|
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+|`server.proxies[].targets[].tls_context.certificates[].key`|No|Path to a PEM-format TLS client private key|
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+|`server.proxies[].targets[].tls_context.certificates[].certificate`|No|Path to a PEM-format TLS client certificate|
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+|`server.proxies[].targets[].tls_context.certificates[].authority`|No|Path to a PEM-format TLS CA certificate for server certificate validation|
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+|`server.proxies[].targets[].tls_context.application_protocols[]`|No|List of client-supported application protocols to negotiate for ALPN at handshake time|
+</a> |`server.proxies[].options.connection_limit`|No|Maximum allowed active open connections; accepted connections above this limit are rejected|
+ |`server.proxies[].options.connection_lifetime`|No|Maximum allowed duration of a client connection|
+ |`server.proxies[].options.connection_log`|No|Optional path to a log file on disk for JSON-formatted connection access logs|
+<b>diff --git a/<a id="h1" href="../file/internal/config/config.go">internal/config/config.go</a> b/<a href="../file/internal/config/config.go">internal/config/config.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -76,7 +76,7 @@ func (c *Config) Validate() error {
+</a> 				)
+ 			} else if len(proxy.Listener.TLSContext.Certificates) == 0 {
+ 				return fmt.Errorf(
+<a href="#h1-0-3" id="h1-0-3" class="d">-					&quot;config: TLS context specified without any certificates: proxy=%s&quot;,
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+					&quot;config: TLS context specified without any server certificates: proxy=%s&quot;,
+</a> 					proxy.Name,
+ 				)
+ 			}
+<a href="#h1-1" id="h1-1" class="h">@@ -109,12 +109,68 @@ func (c *Config) Validate() error {
+</a> 					target.Name,
+ 				)
+ 			}
+<a href="#h1-1-3" id="h1-1-3" class="i">+
+</a><a href="#h1-1-4" id="h1-1-4" class="i">+			if target.TLSContext != nil {
+</a><a href="#h1-1-5" id="h1-1-5" class="i">+				if _, ok := tlsVerifyModes[target.TLSContext.VerifyMode]; !ok {
+</a><a href="#h1-1-6" id="h1-1-6" class="i">+					return fmt.Errorf(
+</a><a href="#h1-1-7" id="h1-1-7" class="i">+						&quot;config: unknown TLS server verification mode: &quot;+
+</a><a href="#h1-1-8" id="h1-1-8" class="i">+							&quot;proxy=%s target=%s mode=%s candidates=%v&quot;,
+</a><a href="#h1-1-9" id="h1-1-9" class="i">+						proxy.Name,
+</a><a href="#h1-1-10" id="h1-1-10" class="i">+						target.Name,
+</a><a href="#h1-1-11" id="h1-1-11" class="i">+						target.TLSContext.VerifyMode,
+</a><a href="#h1-1-12" id="h1-1-12" class="i">+						tlsVerifyModes,
+</a><a href="#h1-1-13" id="h1-1-13" class="i">+					)
+</a><a href="#h1-1-14" id="h1-1-14" class="i">+				}
+</a><a href="#h1-1-15" id="h1-1-15" class="i">+			}
+</a> 		}
+ 	}
+ 
+ 	return nil
+ }
+ 
+<a href="#h1-1-22" id="h1-1-22" class="i">+// ClientConfig derives a *tls.Config from the declared client TLS origination configuration.
+</a><a href="#h1-1-23" id="h1-1-23" class="i">+func (t *TLSContext) ClientConfig() (*tls.Config, error) {
+</a><a href="#h1-1-24" id="h1-1-24" class="i">+	var certificates []tls.Certificate
+</a><a href="#h1-1-25" id="h1-1-25" class="i">+
+</a><a href="#h1-1-26" id="h1-1-26" class="i">+	caPool, err := x509.SystemCertPool()
+</a><a href="#h1-1-27" id="h1-1-27" class="i">+	if err != nil {
+</a><a href="#h1-1-28" id="h1-1-28" class="i">+		return nil, fmt.Errorf(
+</a><a href="#h1-1-29" id="h1-1-29" class="i">+			&quot;config: error retrieving system default CA certificate store: err=%v&quot;,
+</a><a href="#h1-1-30" id="h1-1-30" class="i">+			err,
+</a><a href="#h1-1-31" id="h1-1-31" class="i">+		)
+</a><a href="#h1-1-32" id="h1-1-32" class="i">+	}
+</a><a href="#h1-1-33" id="h1-1-33" class="i">+
+</a><a href="#h1-1-34" id="h1-1-34" class="i">+	for _, cert := range t.Certificates {
+</a><a href="#h1-1-35" id="h1-1-35" class="i">+		keypair, err := tls.LoadX509KeyPair(cert.Certificate, cert.Key)
+</a><a href="#h1-1-36" id="h1-1-36" class="i">+		if err != nil {
+</a><a href="#h1-1-37" id="h1-1-37" class="i">+			return nil, fmt.Errorf(&quot;config: error loading X.509 keypair: err=%v&quot;, err)
+</a><a href="#h1-1-38" id="h1-1-38" class="i">+		}
+</a><a href="#h1-1-39" id="h1-1-39" class="i">+
+</a><a href="#h1-1-40" id="h1-1-40" class="i">+		certificates = append(certificates, keypair)
+</a><a href="#h1-1-41" id="h1-1-41" class="i">+
+</a><a href="#h1-1-42" id="h1-1-42" class="i">+		if cert.Authority != &quot;&quot; {
+</a><a href="#h1-1-43" id="h1-1-43" class="i">+			ca, err := os.ReadFile(cert.Authority)
+</a><a href="#h1-1-44" id="h1-1-44" class="i">+			if err != nil {
+</a><a href="#h1-1-45" id="h1-1-45" class="i">+				return nil, fmt.Errorf(
+</a><a href="#h1-1-46" id="h1-1-46" class="i">+					&quot;config: error reading certificate authority file: err=%v&quot;,
+</a><a href="#h1-1-47" id="h1-1-47" class="i">+					err,
+</a><a href="#h1-1-48" id="h1-1-48" class="i">+				)
+</a><a href="#h1-1-49" id="h1-1-49" class="i">+			}
+</a><a href="#h1-1-50" id="h1-1-50" class="i">+
+</a><a href="#h1-1-51" id="h1-1-51" class="i">+			caPool.AppendCertsFromPEM(ca)
+</a><a href="#h1-1-52" id="h1-1-52" class="i">+		}
+</a><a href="#h1-1-53" id="h1-1-53" class="i">+	}
+</a><a href="#h1-1-54" id="h1-1-54" class="i">+
+</a><a href="#h1-1-55" id="h1-1-55" class="i">+	return &amp;tls.Config{
+</a><a href="#h1-1-56" id="h1-1-56" class="i">+		Certificates:       certificates,
+</a><a href="#h1-1-57" id="h1-1-57" class="i">+		RootCAs:            caPool,
+</a><a href="#h1-1-58" id="h1-1-58" class="i">+		MinVersion:         tls.VersionTLS13,
+</a><a href="#h1-1-59" id="h1-1-59" class="i">+		NextProtos:         t.ApplicationProtocols,
+</a><a href="#h1-1-60" id="h1-1-60" class="i">+		InsecureSkipVerify: t.VerifyMode == &quot;none&quot;,
+</a><a href="#h1-1-61" id="h1-1-61" class="i">+		ClientSessionCache: tls.NewLRUClientSessionCache(128),
+</a><a href="#h1-1-62" id="h1-1-62" class="i">+	}, nil
+</a><a href="#h1-1-63" id="h1-1-63" class="i">+}
+</a><a href="#h1-1-64" id="h1-1-64" class="i">+
+</a> // ServerConfig derives a *tls.Config from the declared server TLS termination configuration.
+ func (t *TLSContext) ServerConfig() (*tls.Config, error) {
+ 	var certificates []tls.Certificate
+<b>diff --git a/<a id="h2" href="../file/internal/config/types.go">internal/config/types.go</a> b/<a href="../file/internal/config/types.go">internal/config/types.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -32,6 +32,7 @@ type Target struct {
+</a> 	ReadTimeout       time.Duration `yaml:&quot;read_timeout&quot;`
+ 	WriteTimeout      time.Duration `yaml:&quot;write_timeout&quot;`
+ 	KeepaliveInterval time.Duration `yaml:&quot;keepalive_interval&quot;`
+<a href="#h2-0-3" id="h2-0-3" class="i">+	TLSContext        *TLSContext   `yaml:&quot;tls_context&quot;`
+</a> }
+ 
+ // TLSCertificate describes a TLS keypair with an optional certificate authority, all in PEM format.
+</pre>
+</div>
+</body>
+</html>

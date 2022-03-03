@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/middleware/filters: Update all filters to only consider DNS names from client leaf certificate - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/e901b24493d14d56c9ed536c8509b8238355642a">e901b24493d14d56c9ed536c8509b8238355642a</a>
+<b>parent</b> <a href="../commit/4e3e672152e428076be09399465765a9bf217999">4e3e672152e428076be09399465765a9bf217999</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sat 24 Apr 2021 17:37:17 -0700
+
+internal/middleware/filters: Update all filters to only consider DNS names from client leaf certificate
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/middleware/filters/identity.go</a></td><td> | </td><td class="num">8</td><td><span class="i">+++</span><span class="d">-----</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">internal/middleware/filters/metadata.go</a></td><td> | </td><td class="num">8</td><td><span class="i">+++</span><span class="d">-----</span></td></tr>
+</table></pre><pre>2 files changed, 6 insertions(+), 10 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/middleware/filters/identity.go">internal/middleware/filters/identity.go</a> b/<a href="../file/internal/middleware/filters/identity.go">internal/middleware/filters/identity.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -90,7 +90,7 @@ type identityAuthorizer struct {
+</a> func (i *identityAuthorizer) RequestAuthorized(request *http.Request) authorizationAction {
+ 	var identities []string
+ 
+<a href="#h0-0-3" id="h0-0-3" class="d">-	if request.TLS == nil {
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+	if request.TLS == nil || len(request.TLS.PeerCertificates) == 0 {
+</a> 		zap.L().Debug(
+ 			&quot;identity authorization enabled but no client certificates are available&quot;,
+ 			zap.Any(&quot;action&quot;, i.defaultAction),
+<a href="#h0-1" id="h0-1" class="h">@@ -99,10 +99,8 @@ func (i *identityAuthorizer) RequestAuthorized(request *http.Request) authorizat
+</a> 		return i.defaultAction
+ 	}
+ 
+<a href="#h0-1-3" id="h0-1-3" class="d">-	for _, peerCert := range request.TLS.PeerCertificates {
+</a><a href="#h0-1-4" id="h0-1-4" class="d">-		for _, name := range peerCert.DNSNames {
+</a><a href="#h0-1-5" id="h0-1-5" class="d">-			identities = append(identities, name)
+</a><a href="#h0-1-6" id="h0-1-6" class="d">-		}
+</a><a href="#h0-1-7" id="h0-1-7" class="i">+	for _, name := range request.TLS.PeerCertificates[0].DNSNames {
+</a><a href="#h0-1-8" id="h0-1-8" class="i">+		identities = append(identities, name)
+</a> 	}
+ 
+ 	for _, rule := range i.rules {
+<b>diff --git a/<a id="h1" href="../file/internal/middleware/filters/metadata.go">internal/middleware/filters/metadata.go</a> b/<a href="../file/internal/middleware/filters/metadata.go">internal/middleware/filters/metadata.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -94,11 +94,9 @@ func (m *metadata) ProcessRequest(clientReq *http.Request) (*http.Request, *http
+</a> 		clientReq.Header.Set(headerClientIP, clientIP)
+ 	}
+ 
+<a href="#h1-0-3" id="h1-0-3" class="d">-	if clientReq.TLS != nil {
+</a><a href="#h1-0-4" id="h1-0-4" class="d">-		for _, peerCert := range clientReq.TLS.PeerCertificates {
+</a><a href="#h1-0-5" id="h1-0-5" class="d">-			for _, name := range peerCert.DNSNames {
+</a><a href="#h1-0-6" id="h1-0-6" class="d">-				clientReq.Header.Add(headerClientIdentity, name)
+</a><a href="#h1-0-7" id="h1-0-7" class="d">-			}
+</a><a href="#h1-0-8" id="h1-0-8" class="i">+	if clientReq.TLS != nil &amp;&amp; len(clientReq.TLS.PeerCertificates) &gt; 0 {
+</a><a href="#h1-0-9" id="h1-0-9" class="i">+		for _, name := range clientReq.TLS.PeerCertificates[0].DNSNames {
+</a><a href="#h1-0-10" id="h1-0-10" class="i">+			clientReq.Header.Add(headerClientIdentity, name)
+</a> 		}
+ 	}
+ 
+</pre>
+</div>
+</body>
+</html>

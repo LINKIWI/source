@@ -1,0 +1,119 @@
+application:
+  instance: courier
+  sentry_dsn: https://key@sentry.example.com/1
+  log:
+    level: info
+    outputs:
+      - stderr
+      - file:///var/log/courier/courier.log
+  metrics:
+    address: udp://localhost:8125
+    prefix: courier
+
+server:
+  listeners:
+    - name: courier
+      address: 127.0.0.1:8200
+      connection:
+        read_timeout: 2s
+        read_header_timeout: 2s
+        write_timeout: 5s
+        idle_timeout: 5m
+        active_limit: 1024
+      tls_context:
+        verify_mode: strict
+        reload_interval: 12h
+        certificates:
+          - key: /etc/ssl/service/key.pem
+            certificate: /etc/ssl/service/cert.pem
+            authority: /etc/ssl/service/ca.pem
+  proxy:
+    enable_error_propagation: true
+  virtual_hosts:
+    - name: foo
+      host: foo.example.com
+      upstreams:
+        - name: foo
+          address: unix:/var/run/http/http.sock
+          connection:
+            connect_timeout: 4s
+            read_timeout: 10s
+            write_timeout: 10s
+          health_check:
+            interval: 10s
+            jitter: 3s
+            path: /status
+            enable_circuit_break: true
+            status:
+              lower: 200
+              upper: 300
+      routes:
+        - upstream: foo
+      filters:
+        - name: metadata
+          type: metadata
+        - name: access-log
+          type: log
+          params:
+            path: /var/log/courier/foo.log
+    - name: bar
+      host: bar.example.com
+      upstreams:
+        - name: bar
+          address: 10.1.0.1:8200
+          connection:
+            connect_timeout: 1s
+          tls_context:
+            verify_mode: strict
+            verify_peer: bar.local
+            handshake_timeout: 1s
+            reload_interval: 12h
+            certificates:
+              - key: /etc/ssl/service/key.pem
+                certificate: /etc/ssl/service/cert.pem
+                authority: /etc/ssl/service/ca.pem
+        - name: baz
+          address: 10.1.0.2:8200
+      routes:
+        - upstream: bar
+          match:
+            path: /^\/bar/
+        - upstream: baz
+          match:
+            path: /^\/baz/
+      filters:
+        - name: localhost-filter
+          type: ip
+          params:
+            default: deny
+            rules:
+              - cidr: 127.0.0.1/32
+                action: allow
+              - cidr: 10.0.0.0/8
+                action: allow
+        - name: host-override
+          type: rewrite
+          params:
+            host:
+              - find: '/(.*)/'
+                replace: bar.upstream.example.com
+        - name: header
+          type: header
+          params:
+            request:
+              - action: set
+                key: X-Request-Header
+                value: foo
+            response:
+              - action: append
+                key: X-Response-Header
+                value: bar
+    - name: grpc
+      host: baz.example.com
+      upstreams:
+        - name: grpc
+          address: localhost:9090
+          proxy: socks5://localhost:3125
+          transport: http2
+      routes:
+        - upstream: grpc

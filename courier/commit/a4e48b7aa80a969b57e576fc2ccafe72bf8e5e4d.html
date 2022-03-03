@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/middleware/filters: Move request context keys enum to shared types - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/a4e48b7aa80a969b57e576fc2ccafe72bf8e5e4d">a4e48b7aa80a969b57e576fc2ccafe72bf8e5e4d</a>
+<b>parent</b> <a href="../commit/775f8f5607a75b08f8a8dde79499979b2d6aad86">775f8f5607a75b08f8a8dde79499979b2d6aad86</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Wed  3 Feb 2021 20:25:08 -0800
+
+internal/middleware/filters: Move request context keys enum to shared types
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/middleware/filters/log.go</a></td><td> | </td><td class="num">18</td><td><span class="i">++++++</span><span class="d">------------</span></td></tr>
+<tr><td class="A">A</td><td><a href="#h1">internal/middleware/filters/types.go</a></td><td> | </td><td class="num">13</td><td><span class="i">+++++++++++++</span><span class="d"></span></td></tr>
+</table></pre><pre>2 files changed, 19 insertions(+), 12 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/middleware/filters/log.go">internal/middleware/filters/log.go</a> b/<a href="../file/internal/middleware/filters/log.go">internal/middleware/filters/log.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -26,12 +26,6 @@ const (
+</a> 	logSerializerLine = &quot;line&quot;
+ )
+ 
+<a href="#h0-0-3" id="h0-0-3" class="d">-const (
+</a><a href="#h0-0-4" id="h0-0-4" class="d">-	ctxRequestID middleware.RequestContextKey = iota
+</a><a href="#h0-0-5" id="h0-0-5" class="d">-	ctxStopwatch
+</a><a href="#h0-0-6" id="h0-0-6" class="d">-	ctxOriginalURL
+</a><a href="#h0-0-7" id="h0-0-7" class="d">-)
+</a><a href="#h0-0-8" id="h0-0-8" class="d">-
+</a> // jsonLogEntry is an alias type for a log entry that can be serialized as JSON.
+ type jsonLogEntry logEntry
+ 
+<a href="#h0-1" id="h0-1" class="h">@@ -126,9 +120,9 @@ func NewLog(cfg *config.Filter) (middleware.Filter, error) {
+</a> 
+ // ProcessRequest assigns the request a unique ID and starts a latency stopwatch.
+ func (l *log) ProcessRequest(clientReq *http.Request) (*http.Request, *http.Response, error) {
+<a href="#h0-1-3" id="h0-1-3" class="d">-	ctx := context.WithValue(clientReq.Context(), ctxRequestID, uuid.New())
+</a><a href="#h0-1-4" id="h0-1-4" class="d">-	ctx = context.WithValue(ctx, ctxStopwatch, lib.NewStopwatch())
+</a><a href="#h0-1-5" id="h0-1-5" class="d">-	ctx = context.WithValue(ctx, ctxOriginalURL, clientReq.URL)
+</a><a href="#h0-1-6" id="h0-1-6" class="i">+	ctx := context.WithValue(clientReq.Context(), ctxLogRequestID, uuid.New())
+</a><a href="#h0-1-7" id="h0-1-7" class="i">+	ctx = context.WithValue(ctx, ctxLogStopwatch, lib.NewStopwatch())
+</a><a href="#h0-1-8" id="h0-1-8" class="i">+	ctx = context.WithValue(ctx, ctxLogOriginalURL, clientReq.URL)
+</a> 
+ 	return clientReq.WithContext(ctx), nil, nil
+ }
+<a href="#h0-2" id="h0-2" class="h">@@ -138,9 +132,9 @@ func (l *log) ProcessResponse(proxyResp *http.Response) (*http.Response, error) 
+</a> 	var serialized []byte
+ 
+ 	tags := make(map[string]string)
+<a href="#h0-2-3" id="h0-2-3" class="d">-	requestID := proxyResp.Request.Context().Value(ctxRequestID).(uuid.UUID)
+</a><a href="#h0-2-4" id="h0-2-4" class="d">-	stopwatch := proxyResp.Request.Context().Value(ctxStopwatch).(*lib.Stopwatch)
+</a><a href="#h0-2-5" id="h0-2-5" class="d">-	originalURL := proxyResp.Request.Context().Value(ctxOriginalURL).(*url.URL)
+</a><a href="#h0-2-6" id="h0-2-6" class="i">+	requestID := proxyResp.Request.Context().Value(ctxLogRequestID).(uuid.UUID)
+</a><a href="#h0-2-7" id="h0-2-7" class="i">+	stopwatch := proxyResp.Request.Context().Value(ctxLogStopwatch).(*lib.Stopwatch)
+</a><a href="#h0-2-8" id="h0-2-8" class="i">+	originalURL := proxyResp.Request.Context().Value(ctxLogOriginalURL).(*url.URL)
+</a> 
+ 	clientIP, _, err := net.SplitHostPort(proxyResp.Request.RemoteAddr)
+ 	if err != nil {
+<b>diff --git a/<a id="h1" href="../file/internal/middleware/filters/types.go">internal/middleware/filters/types.go</a> b/<a href="../file/internal/middleware/filters/types.go">internal/middleware/filters/types.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -0,0 +1,13 @@
+</a><a href="#h1-0-0" id="h1-0-0" class="i">+package filters
+</a><a href="#h1-0-1" id="h1-0-1" class="i">+
+</a><a href="#h1-0-2" id="h1-0-2" class="i">+import (
+</a><a href="#h1-0-3" id="h1-0-3" class="i">+	&quot;courier/internal/middleware&quot;
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+)
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+
+</a><a href="#h1-0-6" id="h1-0-6" class="i">+// Request context keys used by filters. Centralized here as an enum to maintain isolation of
+</a><a href="#h1-0-7" id="h1-0-7" class="i">+// context values across multiple filters.
+</a><a href="#h1-0-8" id="h1-0-8" class="i">+const (
+</a><a href="#h1-0-9" id="h1-0-9" class="i">+	ctxLogRequestID middleware.RequestContextKey = iota
+</a><a href="#h1-0-10" id="h1-0-10" class="i">+	ctxLogStopwatch
+</a><a href="#h1-0-11" id="h1-0-11" class="i">+	ctxLogOriginalURL
+</a><a href="#h1-0-12" id="h1-0-12" class="i">+)
+</a></pre>
+</div>
+</body>
+</html>

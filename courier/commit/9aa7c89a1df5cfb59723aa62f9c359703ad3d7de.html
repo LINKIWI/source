@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/middleware: Separate request context key types between meta filters and contrib filters - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/9aa7c89a1df5cfb59723aa62f9c359703ad3d7de">9aa7c89a1df5cfb59723aa62f9c359703ad3d7de</a>
+<b>parent</b> <a href="../commit/8259ba1b538d219637673c07700c9bd8c8af722e">8259ba1b538d219637673c07700c9bd8c8af722e</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Tue 16 Feb 2021 21:58:34 -0800
+
+internal/middleware: Separate request context key types between meta filters and contrib filters
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/middleware/filters/types.go</a></td><td> | </td><td class="num">12</td><td><span class="i">++++++</span><span class="d">------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">internal/middleware/types.go</a></td><td> | </td><td class="num">4</td><td><span class="i">++</span><span class="d">--</span></td></tr>
+</table></pre><pre>2 files changed, 8 insertions(+), 8 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/middleware/filters/types.go">internal/middleware/filters/types.go</a> b/<a href="../file/internal/middleware/filters/types.go">internal/middleware/filters/types.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -1,13 +1,13 @@
+</a> package filters
+ 
+<a href="#h0-0-2" id="h0-0-2" class="d">-import (
+</a><a href="#h0-0-3" id="h0-0-3" class="d">-	&quot;courier/internal/middleware&quot;
+</a><a href="#h0-0-4" id="h0-0-4" class="d">-)
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+// requestContextKey is used for arbitrary state attached to a request retained throughout its
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+// entire lifecycle, for use by both request and response processing.
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+type requestContextKey int
+</a> 
+<a href="#h0-0-9" id="h0-0-9" class="d">-// Request context keys used by filters. Centralized here as an enum to maintain isolation of
+</a><a href="#h0-0-10" id="h0-0-10" class="d">-// context values across multiple filters.
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+// Request context keys used by filters, centralized in the filters package as an enum to maintain
+</a><a href="#h0-0-12" id="h0-0-12" class="i">+// isolation of context values across multiple filters.
+</a> const (
+<a href="#h0-0-14" id="h0-0-14" class="d">-	ctxInstrumentationStopwatch middleware.RequestContextKey = iota
+</a><a href="#h0-0-15" id="h0-0-15" class="i">+	ctxInstrumentationStopwatch requestContextKey = iota
+</a> 	ctxInstrumentationRequestBody
+ 
+ 	ctxMetadataStopwatch
+<b>diff --git a/<a id="h1" href="../file/internal/middleware/types.go">internal/middleware/types.go</a> b/<a href="../file/internal/middleware/types.go">internal/middleware/types.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -6,9 +6,9 @@ import (
+</a> 	&quot;courier/internal/config&quot;
+ )
+ 
+<a href="#h1-0-3" id="h1-0-3" class="d">-// RequestContextKey is used for arbitrary state attached to a request retained throughout its
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+// requestContextKey is used for arbitrary state attached to a request retained throughout its
+</a> // entire lifecycle, for use by both request and response processing.
+<a href="#h1-0-6" id="h1-0-6" class="d">-type RequestContextKey int
+</a><a href="#h1-0-7" id="h1-0-7" class="i">+type requestContextKey int
+</a> 
+ // FilterFactory creates a filter from a config.Filter node.
+ type FilterFactory func(cfg *config.Filter) (Filter, error)
+</pre>
+</div>
+</body>
+</html>

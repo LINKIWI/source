@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/server: Initialize health checks in proxy and optionally fail-fast on HC failures - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/c45a99cfc0aaf374247bc99c85d1892fe0901aac">c45a99cfc0aaf374247bc99c85d1892fe0901aac</a>
+<b>parent</b> <a href="../commit/ed3cdac4a23001214ecfaac63e6404436b327790">ed3cdac4a23001214ecfaac63e6404436b327790</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Tue  9 Feb 2021 22:43:46 -0800
+
+internal/server: Initialize health checks in proxy and optionally fail-fast on HC failures
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/server/proxy.go</a></td><td> | </td><td class="num">45</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+</table></pre><pre>1 file changed, 45 insertions(+), 0 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/server/proxy.go">internal/server/proxy.go</a> b/<a href="../file/internal/server/proxy.go">internal/server/proxy.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -44,6 +44,12 @@ var (
+</a> 		statusCode: http.StatusInternalServerError,
+ 		message:    &quot;failed in filter chain processing&quot;,
+ 	}
+<a href="#h0-0-3" id="h0-0-3" class="i">+	// errUpstreamUnhealthy is returned when the upstream health check is in a failing state, as
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+	// a fail-fast behavior when health check-based circuit breaking is enabled.
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+	errUpstreamUnhealthy = &amp;response{
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+		statusCode: http.StatusBadGateway,
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+		message:    &quot;upstream is marked unhealthy&quot;,
+</a><a href="#h0-0-8" id="h0-0-8" class="i">+	}
+</a> 	// errProxyInternal is returned when the HTTP proxy itself raises an error.
+ 	errProxyInternal = &amp;response{
+ 		statusCode: http.StatusServiceUnavailable,
+<a href="#h0-1" id="h0-1" class="h">@@ -57,6 +63,7 @@ type reverseProxy struct {
+</a> 	opts   config.Proxy
+ 
+ 	filterChains map[string]middleware.Filter
+<a href="#h0-1-3" id="h0-1-3" class="i">+	healthProbes map[string]*healthProbe
+</a> 	transports   *util.ConcurrentMap
+ 	sequenceID   *int64
+ }
+<a href="#h0-2" id="h0-2" class="h">@@ -64,6 +71,7 @@ type reverseProxy struct {
+</a> // newReverseProxy creates a new reverseProxy from a list of virtual host configurations.
+ func newReverseProxy(vhosts []*config.VirtualHost, opts config.Proxy) (http.Handler, error) {
+ 	filterChains := make(map[string]middleware.Filter)
+<a href="#h0-2-3" id="h0-2-3" class="i">+	healthProbes := make(map[string]*healthProbe)
+</a> 
+ 	// Set up the filter chains for each virtual host up front, so that they can be trivially
+ 	// accessed in hot request paths.
+<a href="#h0-3" id="h0-3" class="h">@@ -90,6 +98,7 @@ func newReverseProxy(vhosts []*config.VirtualHost, opts config.Proxy) (http.Hand
+</a> 					Namespace: &quot;server&quot;,
+ 					Message:   &quot;unknown filter type&quot;,
+ 					Tags: map[string]interface{}{
+<a href="#h0-3-3" id="h0-3-3" class="i">+						&quot;vhost&quot;:  vhost.Name,
+</a> 						&quot;name&quot;:   cfgFilter.Name,
+ 						&quot;type&quot;:   cfgFilter.Type,
+ 						&quot;params&quot;: cfgFilter.Params.Value,
+<a href="#h0-4" id="h0-4" class="h">@@ -103,6 +112,7 @@ func newReverseProxy(vhosts []*config.VirtualHost, opts config.Proxy) (http.Hand
+</a> 					Namespace: &quot;server&quot;,
+ 					Message:   &quot;error creating filter&quot;,
+ 					Tags: map[string]interface{}{
+<a href="#h0-4-3" id="h0-4-3" class="i">+						&quot;vhost&quot;:  vhost.Name,
+</a> 						&quot;name&quot;:   cfgFilter.Name,
+ 						&quot;params&quot;: cfgFilter.Params.Value,
+ 					},
+<a href="#h0-5" id="h0-5" class="h">@@ -114,10 +124,37 @@ func newReverseProxy(vhosts []*config.VirtualHost, opts config.Proxy) (http.Hand
+</a> 		}
+ 
+ 		filterChains[vhost.Name] = middleware.NewComposedFilter(vhostFilters...)
+<a href="#h0-5-3" id="h0-5-3" class="i">+
+</a><a href="#h0-5-4" id="h0-5-4" class="i">+		if vhost.Upstream.HealthCheck != nil {
+</a><a href="#h0-5-5" id="h0-5-5" class="i">+			zap.L().Debug(
+</a><a href="#h0-5-6" id="h0-5-6" class="i">+				&quot;creating health check for virtual host upstream&quot;,
+</a><a href="#h0-5-7" id="h0-5-7" class="i">+				zap.String(&quot;vhost&quot;, vhost.Name),
+</a><a href="#h0-5-8" id="h0-5-8" class="i">+				zap.String(&quot;address&quot;, vhost.Upstream.Address.String()),
+</a><a href="#h0-5-9" id="h0-5-9" class="i">+				zap.String(&quot;host&quot;, vhost.Upstream.Host),
+</a><a href="#h0-5-10" id="h0-5-10" class="i">+				zap.String(&quot;path&quot;, vhost.Upstream.HealthCheck.Path),
+</a><a href="#h0-5-11" id="h0-5-11" class="i">+				zap.Duration(&quot;interval&quot;, vhost.Upstream.HealthCheck.Interval),
+</a><a href="#h0-5-12" id="h0-5-12" class="i">+				zap.Duration(&quot;jitter&quot;, vhost.Upstream.HealthCheck.Jitter),
+</a><a href="#h0-5-13" id="h0-5-13" class="i">+				zap.Bool(&quot;circuit_break&quot;, vhost.Upstream.HealthCheck.EnableCircuitBreak),
+</a><a href="#h0-5-14" id="h0-5-14" class="i">+			)
+</a><a href="#h0-5-15" id="h0-5-15" class="i">+
+</a><a href="#h0-5-16" id="h0-5-16" class="i">+			hp, err := newHealthProbe(vhost.Upstream)
+</a><a href="#h0-5-17" id="h0-5-17" class="i">+			if err != nil {
+</a><a href="#h0-5-18" id="h0-5-18" class="i">+				return nil, &amp;util.Error{
+</a><a href="#h0-5-19" id="h0-5-19" class="i">+					Namespace: &quot;server&quot;,
+</a><a href="#h0-5-20" id="h0-5-20" class="i">+					Message:   &quot;error creating health check probe&quot;,
+</a><a href="#h0-5-21" id="h0-5-21" class="i">+					Tags: map[string]interface{}{
+</a><a href="#h0-5-22" id="h0-5-22" class="i">+						&quot;vhost&quot;: vhost.Name,
+</a><a href="#h0-5-23" id="h0-5-23" class="i">+					},
+</a><a href="#h0-5-24" id="h0-5-24" class="i">+				}
+</a><a href="#h0-5-25" id="h0-5-25" class="i">+			}
+</a><a href="#h0-5-26" id="h0-5-26" class="i">+
+</a><a href="#h0-5-27" id="h0-5-27" class="i">+			healthProbes[vhost.Name] = hp
+</a><a href="#h0-5-28" id="h0-5-28" class="i">+		}
+</a> 	}
+ 
+ 	return &amp;reverseProxy{
+ 		vhosts:       vhosts,
+<a href="#h0-5-33" id="h0-5-33" class="i">+		healthProbes: healthProbes,
+</a> 		opts:         opts,
+ 		filterChains: filterChains,
+ 		transports:   util.NewConcurrentMap(),
+<a href="#h0-6" id="h0-6" class="h">@@ -200,6 +237,14 @@ func (rp *reverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+</a> 		return
+ 	}
+ 
+<a href="#h0-6-3" id="h0-6-3" class="i">+	// Conditionally fail-fast on upstream health check failures
+</a><a href="#h0-6-4" id="h0-6-4" class="i">+	if hp, ok := rp.healthProbes[vhost.Name]; ok {
+</a><a href="#h0-6-5" id="h0-6-5" class="i">+		if err := hp.error(); err != nil &amp;&amp; vhost.Upstream.HealthCheck.EnableCircuitBreak {
+</a><a href="#h0-6-6" id="h0-6-6" class="i">+			rpErrorHandler(errUpstreamUnhealthy)(rw, proxyReq, err)
+</a><a href="#h0-6-7" id="h0-6-7" class="i">+			return
+</a><a href="#h0-6-8" id="h0-6-8" class="i">+		}
+</a><a href="#h0-6-9" id="h0-6-9" class="i">+	}
+</a><a href="#h0-6-10" id="h0-6-10" class="i">+
+</a> 	// Prepare proxy request
+ 	proxyReq.URL.Scheme = &quot;http&quot;
+ 	proxyReq.URL.Host = proxyReq.Host
+</pre>
+</div>
+</body>
+</html>

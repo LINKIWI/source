@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/middleware: Execute response filters only up to successfully completed request filters - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/cf7824e79213ded969378ffecf1360280a415043">cf7824e79213ded969378ffecf1360280a415043</a>
+<b>parent</b> <a href="../commit/9aa7c89a1df5cfb59723aa62f9c359703ad3d7de">9aa7c89a1df5cfb59723aa62f9c359703ad3d7de</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Tue 16 Feb 2021 22:17:58 -0800
+
+internal/middleware: Execute response filters only up to successfully completed request filters
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/middleware/filter.go</a></td><td> | </td><td class="num">37</td><td><span class="i">+++++++++++++++++++++++++++++++++++</span><span class="d">--</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">internal/middleware/types.go</a></td><td> | </td><td class="num">10</td><td><span class="i">+++++++</span><span class="d">---</span></td></tr>
+</table></pre><pre>2 files changed, 42 insertions(+), 5 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/middleware/filter.go">internal/middleware/filter.go</a> b/<a href="../file/internal/middleware/filter.go">internal/middleware/filter.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -1,6 +1,7 @@
+</a> package middleware
+ 
+ import (
+<a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;context&quot;
+</a> 	&quot;net/http&quot;
+ 
+ 	&quot;lib.kevinlin.info/aperture/lib&quot;
+<a href="#h0-1" id="h0-1" class="h">@@ -52,6 +53,7 @@ func NewInstrumentedFilter(name string, filter Filter) Filter {
+</a> 
+ // ProcessRequest chains the request through each filter sequentially.
+ func (c *composedFilter) ProcessRequest(clientReq *http.Request) (*http.Request, *http.Response, error) {
+<a href="#h0-1-3" id="h0-1-3" class="i">+	var processed []Filter
+</a> 	var resp *http.Response
+ 	var err error
+ 
+<a href="#h0-2" id="h0-2" class="h">@@ -61,6 +63,36 @@ func (c *composedFilter) ProcessRequest(clientReq *http.Request) (*http.Request,
+</a> 	// them errors or requests a response be sent back to the client immediately.
+ 	for _, filter := range c.filters {
+ 		proxyReq, resp, err = filter.ProcessRequest(proxyReq)
+<a href="#h0-2-3" id="h0-2-3" class="i">+
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+		if err == nil {
+</a><a href="#h0-2-5" id="h0-2-5" class="i">+			// As long as the request processing didn&#39;t error (i.e. the request was
+</a><a href="#h0-2-6" id="h0-2-6" class="i">+			// either passed along or terminated early with a static response), it
+</a><a href="#h0-2-7" id="h0-2-7" class="i">+			// should be queued for future response processing.
+</a><a href="#h0-2-8" id="h0-2-8" class="i">+			// Prepend the successfully processed filter so that response processing can
+</a><a href="#h0-2-9" id="h0-2-9" class="i">+			// occur in reverse stack order after the reverse proxy completes.
+</a><a href="#h0-2-10" id="h0-2-10" class="i">+			processed = append([]Filter{filter}, processed...)
+</a><a href="#h0-2-11" id="h0-2-11" class="i">+		}
+</a><a href="#h0-2-12" id="h0-2-12" class="i">+
+</a><a href="#h0-2-13" id="h0-2-13" class="i">+		if proxyReq != nil {
+</a><a href="#h0-2-14" id="h0-2-14" class="i">+			proxyReq = proxyReq.WithContext(
+</a><a href="#h0-2-15" id="h0-2-15" class="i">+				context.WithValue(
+</a><a href="#h0-2-16" id="h0-2-16" class="i">+					proxyReq.Context(),
+</a><a href="#h0-2-17" id="h0-2-17" class="i">+					ctxComposedProcessedFilters,
+</a><a href="#h0-2-18" id="h0-2-18" class="i">+					processed,
+</a><a href="#h0-2-19" id="h0-2-19" class="i">+				),
+</a><a href="#h0-2-20" id="h0-2-20" class="i">+			)
+</a><a href="#h0-2-21" id="h0-2-21" class="i">+		}
+</a><a href="#h0-2-22" id="h0-2-22" class="i">+
+</a><a href="#h0-2-23" id="h0-2-23" class="i">+		if resp != nil &amp;&amp; resp.Request != nil {
+</a><a href="#h0-2-24" id="h0-2-24" class="i">+			resp.Request = resp.Request.WithContext(
+</a><a href="#h0-2-25" id="h0-2-25" class="i">+				context.WithValue(
+</a><a href="#h0-2-26" id="h0-2-26" class="i">+					resp.Request.Context(),
+</a><a href="#h0-2-27" id="h0-2-27" class="i">+					ctxComposedProcessedFilters,
+</a><a href="#h0-2-28" id="h0-2-28" class="i">+					processed,
+</a><a href="#h0-2-29" id="h0-2-29" class="i">+				),
+</a><a href="#h0-2-30" id="h0-2-30" class="i">+			)
+</a><a href="#h0-2-31" id="h0-2-31" class="i">+		}
+</a><a href="#h0-2-32" id="h0-2-32" class="i">+
+</a> 		if err != nil || resp != nil {
+ 			return proxyReq, resp, err
+ 		}
+<a href="#h0-3" id="h0-3" class="h">@@ -73,10 +105,11 @@ func (c *composedFilter) ProcessRequest(clientReq *http.Request) (*http.Request,
+</a> func (c *composedFilter) ProcessResponse(proxyResp *http.Response) (*http.Response, error) {
+ 	var err error
+ 
+<a href="#h0-3-3" id="h0-3-3" class="i">+	processed := proxyResp.Request.Context().Value(ctxComposedProcessedFilters).([]Filter)
+</a> 	clientResp := proxyResp
+ 
+<a href="#h0-3-6" id="h0-3-6" class="d">-	for i := range c.filters {
+</a><a href="#h0-3-7" id="h0-3-7" class="d">-		clientResp, err = c.filters[len(c.filters)-i-1].ProcessResponse(clientResp)
+</a><a href="#h0-3-8" id="h0-3-8" class="i">+	for _, filter := range processed {
+</a><a href="#h0-3-9" id="h0-3-9" class="i">+		clientResp, err = filter.ProcessResponse(clientResp)
+</a> 		if err != nil {
+ 			return clientResp, err
+ 		}
+<b>diff --git a/<a id="h1" href="../file/internal/middleware/types.go">internal/middleware/types.go</a> b/<a href="../file/internal/middleware/types.go">internal/middleware/types.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -6,9 +6,9 @@ import (
+</a> 	&quot;courier/internal/config&quot;
+ )
+ 
+<a href="#h1-0-3" id="h1-0-3" class="d">-// requestContextKey is used for arbitrary state attached to a request retained throughout its
+</a><a href="#h1-0-4" id="h1-0-4" class="d">-// entire lifecycle, for use by both request and response processing.
+</a><a href="#h1-0-5" id="h1-0-5" class="d">-type requestContextKey int
+</a><a href="#h1-0-6" id="h1-0-6" class="i">+// metaFilterContextKey is used for arbitrary state attached to a request, intended for use by meta
+</a><a href="#h1-0-7" id="h1-0-7" class="i">+// filters.
+</a><a href="#h1-0-8" id="h1-0-8" class="i">+type metaFilterContextKey int
+</a> 
+ // FilterFactory creates a filter from a config.Filter node.
+ type FilterFactory func(cfg *config.Filter) (Filter, error)
+<a href="#h1-1" id="h1-1" class="h">@@ -23,3 +23,7 @@ type Filter interface {
+</a> 	// back to the client. It may modify the response before it is sent.
+ 	ProcessResponse(proxyResp *http.Response) (*http.Response, error)
+ }
+<a href="#h1-1-3" id="h1-1-3" class="i">+
+</a><a href="#h1-1-4" id="h1-1-4" class="i">+const (
+</a><a href="#h1-1-5" id="h1-1-5" class="i">+	ctxComposedProcessedFilters metaFilterContextKey = iota
+</a><a href="#h1-1-6" id="h1-1-6" class="i">+)
+</a></pre>
+</div>
+</body>
+</html>

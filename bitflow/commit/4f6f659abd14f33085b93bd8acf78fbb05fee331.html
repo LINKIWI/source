@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/config: Support file descriptor listener spec - bitflow - Layer 4 TCP proxy for secure interconnection of isolated networks</title>
+<meta name="description" content="Layer 4 TCP proxy for secure interconnection of isolated networks" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="bitflow Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="bitflow Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>bitflow</h1><span class="desc">Layer 4 TCP proxy for secure interconnection of isolated networks</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/bitflow.git">https://source.static.kevinlin.info/bitflow.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/4f6f659abd14f33085b93bd8acf78fbb05fee331">4f6f659abd14f33085b93bd8acf78fbb05fee331</a>
+<b>parent</b> <a href="../commit/7e9ec9452e8d97957c3aa510b7587e08c492f7ab">7e9ec9452e8d97957c3aa510b7587e08c492f7ab</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sun 30 May 2021 21:00:29 -0700
+
+internal/config: Support file descriptor listener spec
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">go.mod</a></td><td> | </td><td class="num">6</td><td><span class="i">+++</span><span class="d">---</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">internal/config/data.go</a></td><td> | </td><td class="num">44</td><td><span class="i">++++++++++++++++++++++++++++++++++</span><span class="d">----------</span></td></tr>
+</table></pre><pre>2 files changed, 37 insertions(+), 13 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/go.mod">go.mod</a> b/<a href="../file/go.mod">go.mod</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -3,10 +3,10 @@ module bitflow
+</a> go 1.16
+ 
+ require (
+<a href="#h0-0-3" id="h0-0-3" class="d">-	github.com/getsentry/sentry-go v0.10.0
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+	github.com/getsentry/sentry-go v0.11.0
+</a> 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616
+<a href="#h0-0-6" id="h0-0-6" class="d">-	golang.org/x/net v0.0.0-20210510120150-4163338589ed
+</a><a href="#h0-0-7" id="h0-0-7" class="d">-	golang.org/x/tools v0.1.1
+</a><a href="#h0-0-8" id="h0-0-8" class="i">+	golang.org/x/net v0.0.0-20210525063256-abc453219eb5
+</a><a href="#h0-0-9" id="h0-0-9" class="i">+	golang.org/x/tools v0.1.2
+</a> 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
+ 	lib.kevinlin.info/aperture v0.0.0-20210508182034-84a61db2c3ec
+ )
+<b>diff --git a/<a id="h1" href="../file/internal/config/data.go">internal/config/data.go</a> b/<a href="../file/internal/config/data.go">internal/config/data.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -4,6 +4,7 @@ import (
+</a> 	&quot;context&quot;
+ 	&quot;fmt&quot;
+ 	&quot;net&quot;
+<a href="#h1-0-3" id="h1-0-3" class="i">+	&quot;os&quot;
+</a> 	&quot;strconv&quot;
+ 	&quot;strings&quot;
+ 
+<a href="#h1-1" id="h1-1" class="h">@@ -16,6 +17,7 @@ type Address struct {
+</a> 	Host   string
+ 	Port   int
+ 	Socket string
+<a href="#h1-1-3" id="h1-1-3" class="i">+	FD     int
+</a> }
+ 
+ // UnmarshalYAML attempts to parse the node&#39;s string contents as a host and port combination.
+<a href="#h1-2" id="h1-2" class="h">@@ -23,6 +25,9 @@ func (a *Address) UnmarshalYAML(node *yaml.Node) error {
+</a> 	var address string
+ 
+ 	switch {
+<a href="#h1-2-3" id="h1-2-3" class="i">+	case strings.HasPrefix(node.Value, &quot;fd:&quot;):
+</a><a href="#h1-2-4" id="h1-2-4" class="i">+		a.Net = &quot;fd&quot;
+</a><a href="#h1-2-5" id="h1-2-5" class="i">+		address = node.Value[3:]
+</a> 	case strings.HasPrefix(node.Value, &quot;unix:&quot;):
+ 		a.Net = &quot;unix&quot;
+ 		address = node.Value[5:]
+<a href="#h1-3" id="h1-3" class="h">@@ -40,6 +45,16 @@ func (a *Address) UnmarshalYAML(node *yaml.Node) error {
+</a> 		address = node.Value
+ 	}
+ 
+<a href="#h1-3-3" id="h1-3-3" class="i">+	if a.Net == &quot;fd&quot; {
+</a><a href="#h1-3-4" id="h1-3-4" class="i">+		fd, err := strconv.Atoi(address)
+</a><a href="#h1-3-5" id="h1-3-5" class="i">+		if err != nil {
+</a><a href="#h1-3-6" id="h1-3-6" class="i">+			return fmt.Errorf(&quot;config: failed to parse file descriptor: err=%v&quot;, err)
+</a><a href="#h1-3-7" id="h1-3-7" class="i">+		}
+</a><a href="#h1-3-8" id="h1-3-8" class="i">+
+</a><a href="#h1-3-9" id="h1-3-9" class="i">+		a.FD = fd
+</a><a href="#h1-3-10" id="h1-3-10" class="i">+		return nil
+</a><a href="#h1-3-11" id="h1-3-11" class="i">+	}
+</a><a href="#h1-3-12" id="h1-3-12" class="i">+
+</a> 	if a.Net == &quot;unix&quot; {
+ 		a.Socket = address
+ 		return nil
+<a href="#h1-4" id="h1-4" class="h">@@ -58,12 +73,27 @@ func (a *Address) UnmarshalYAML(node *yaml.Node) error {
+</a> 
+ // Listen creates a net.Listener for the address on the requested network.
+ func (a *Address) Listen() (net.Listener, error) {
+<a href="#h1-4-3" id="h1-4-3" class="d">-	return net.Listen(a.Net, a.String())
+</a><a href="#h1-4-4" id="h1-4-4" class="i">+	switch a.Net {
+</a><a href="#h1-4-5" id="h1-4-5" class="i">+	case &quot;fd&quot;:
+</a><a href="#h1-4-6" id="h1-4-6" class="i">+		return net.FileListener(os.NewFile(uintptr(a.FD), a.String()))
+</a><a href="#h1-4-7" id="h1-4-7" class="i">+	default:
+</a><a href="#h1-4-8" id="h1-4-8" class="i">+		network, addr := a.Address()
+</a><a href="#h1-4-9" id="h1-4-9" class="i">+		return net.Listen(network, addr)
+</a><a href="#h1-4-10" id="h1-4-10" class="i">+	}
+</a> }
+ 
+ // Address returns a dial target as a (network, address) pair.
+ func (a *Address) Address() (string, string) {
+<a href="#h1-4-15" id="h1-4-15" class="d">-	return a.Net, a.String()
+</a><a href="#h1-4-16" id="h1-4-16" class="i">+	switch a.Net {
+</a><a href="#h1-4-17" id="h1-4-17" class="i">+	case &quot;tcp&quot;, &quot;tcp4&quot;, &quot;tcp6&quot;:
+</a><a href="#h1-4-18" id="h1-4-18" class="i">+		return a.Net, net.JoinHostPort(a.Host, strconv.Itoa(a.Port))
+</a><a href="#h1-4-19" id="h1-4-19" class="i">+	case &quot;unix&quot;:
+</a><a href="#h1-4-20" id="h1-4-20" class="i">+		return a.Net, a.Socket
+</a><a href="#h1-4-21" id="h1-4-21" class="i">+	case &quot;fd&quot;:
+</a><a href="#h1-4-22" id="h1-4-22" class="i">+		return a.Net, strconv.Itoa(a.FD)
+</a><a href="#h1-4-23" id="h1-4-23" class="i">+	default:
+</a><a href="#h1-4-24" id="h1-4-24" class="i">+		return &quot;&quot;, &quot;&quot;
+</a><a href="#h1-4-25" id="h1-4-25" class="i">+	}
+</a> }
+ 
+ // Resolve resolves the address as an explicit IPv4 or IPv6 address, as specified by the IP network.
+<a href="#h1-5" id="h1-5" class="h">@@ -106,14 +136,8 @@ func (a *Address) Resolve(ctx context.Context, ipNet string) (*Address, error) {
+</a> 
+ // String returns the address in standard form.
+ func (a *Address) String() string {
+<a href="#h1-5-3" id="h1-5-3" class="d">-	switch a.Net {
+</a><a href="#h1-5-4" id="h1-5-4" class="d">-	case &quot;tcp&quot;, &quot;tcp4&quot;, &quot;tcp6&quot;:
+</a><a href="#h1-5-5" id="h1-5-5" class="d">-		return net.JoinHostPort(a.Host, strconv.Itoa(a.Port))
+</a><a href="#h1-5-6" id="h1-5-6" class="d">-	case &quot;unix&quot;:
+</a><a href="#h1-5-7" id="h1-5-7" class="d">-		return a.Socket
+</a><a href="#h1-5-8" id="h1-5-8" class="d">-	default:
+</a><a href="#h1-5-9" id="h1-5-9" class="d">-		return &quot;&lt;nil&gt;&quot;
+</a><a href="#h1-5-10" id="h1-5-10" class="d">-	}
+</a><a href="#h1-5-11" id="h1-5-11" class="i">+	network, addr := a.Address()
+</a><a href="#h1-5-12" id="h1-5-12" class="i">+	return fmt.Sprintf(&quot;%s:%s&quot;, network, addr)
+</a> }
+ 
+ // CIDR is a YAML node representing an IP and subnet mask in CIDR notation.
+</pre>
+</div>
+</body>
+</html>

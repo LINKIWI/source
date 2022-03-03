@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/config, internal/server: Move dual stack resolution to Address method - bitflow - Layer 4 TCP proxy for secure interconnection of isolated networks</title>
+<meta name="description" content="Layer 4 TCP proxy for secure interconnection of isolated networks" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="bitflow Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="bitflow Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>bitflow</h1><span class="desc">Layer 4 TCP proxy for secure interconnection of isolated networks</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/bitflow.git">https://source.static.kevinlin.info/bitflow.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/2583f66eaba25af2a623f1aa0f8603849e7a3244">2583f66eaba25af2a623f1aa0f8603849e7a3244</a>
+<b>parent</b> <a href="../commit/a66c57302ef2c8f2e08f983d584f2a65c354a8b1">a66c57302ef2c8f2e08f983d584f2a65c354a8b1</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Mon 10 May 2021 23:02:14 -0700
+
+internal/config, internal/server: Move dual stack resolution to Address method
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">README.md</a></td><td> | </td><td class="num">1</td><td><span class="i">+</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">internal/config/data.go</a></td><td> | </td><td class="num">39</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">internal/server/server.go</a></td><td> | </td><td class="num">20</td><td><span class="i">+++</span><span class="d">-----------------</span></td></tr>
+</table></pre><pre>3 files changed, 43 insertions(+), 17 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/README.md">README.md</a> b/<a href="../file/README.md">README.md</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -7,6 +7,7 @@
+</a> * Detailed observability into connection behavior
+ * Highly configurable connection circuit breaking and timeouts
+ * Optional use of the HAProxy PROXY protocol header
+<a href="#h0-0-3" id="h0-0-3" class="i">+* IPv6 support and seamless in-proxy IPv4/IPv6 translation
+</a> 
+ ## Building
+ 
+<b>diff --git a/<a id="h1" href="../file/internal/config/data.go">internal/config/data.go</a> b/<a href="../file/internal/config/data.go">internal/config/data.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -1,6 +1,7 @@
+</a> package config
+ 
+ import (
+<a href="#h1-0-3" id="h1-0-3" class="i">+	&quot;context&quot;
+</a> 	&quot;fmt&quot;
+ 	&quot;net&quot;
+ 	&quot;strconv&quot;
+<a href="#h1-1" id="h1-1" class="h">@@ -65,6 +66,44 @@ func (a *Address) Address() (string, string) {
+</a> 	return a.Net, a.String()
+ }
+ 
+<a href="#h1-1-3" id="h1-1-3" class="i">+// Resolve resolves the address as an explicit IPv4 or IPv6 address, as specified by the IP network.
+</a><a href="#h1-1-4" id="h1-1-4" class="i">+func (a *Address) Resolve(ctx context.Context, ipNet string) (*Address, error) {
+</a><a href="#h1-1-5" id="h1-1-5" class="i">+	var resolvedNet string
+</a><a href="#h1-1-6" id="h1-1-6" class="i">+
+</a><a href="#h1-1-7" id="h1-1-7" class="i">+	switch a.Net {
+</a><a href="#h1-1-8" id="h1-1-8" class="i">+	case &quot;tcp&quot;:
+</a><a href="#h1-1-9" id="h1-1-9" class="i">+	case &quot;tcp4&quot;, &quot;tcp6&quot;:
+</a><a href="#h1-1-10" id="h1-1-10" class="i">+		return nil, fmt.Errorf(&quot;config: address is already resolved as explicit IPv4/IPv6&quot;)
+</a><a href="#h1-1-11" id="h1-1-11" class="i">+	default:
+</a><a href="#h1-1-12" id="h1-1-12" class="i">+		return nil, fmt.Errorf(&quot;config: network is not supported for IPv4/IPv6 resolution&quot;)
+</a><a href="#h1-1-13" id="h1-1-13" class="i">+	}
+</a><a href="#h1-1-14" id="h1-1-14" class="i">+
+</a><a href="#h1-1-15" id="h1-1-15" class="i">+	ips, err := net.DefaultResolver.LookupIP(ctx, ipNet, a.Host)
+</a><a href="#h1-1-16" id="h1-1-16" class="i">+	if err != nil {
+</a><a href="#h1-1-17" id="h1-1-17" class="i">+		return nil, fmt.Errorf(
+</a><a href="#h1-1-18" id="h1-1-18" class="i">+			&quot;config: error in IP resolution: network=%s host=%s err=%v&quot;,
+</a><a href="#h1-1-19" id="h1-1-19" class="i">+			ipNet,
+</a><a href="#h1-1-20" id="h1-1-20" class="i">+			a.Host,
+</a><a href="#h1-1-21" id="h1-1-21" class="i">+			err,
+</a><a href="#h1-1-22" id="h1-1-22" class="i">+		)
+</a><a href="#h1-1-23" id="h1-1-23" class="i">+	}
+</a><a href="#h1-1-24" id="h1-1-24" class="i">+
+</a><a href="#h1-1-25" id="h1-1-25" class="i">+	switch ipNet {
+</a><a href="#h1-1-26" id="h1-1-26" class="i">+	case &quot;ip4&quot;:
+</a><a href="#h1-1-27" id="h1-1-27" class="i">+		resolvedNet = &quot;tcp4&quot;
+</a><a href="#h1-1-28" id="h1-1-28" class="i">+	case &quot;ip6&quot;:
+</a><a href="#h1-1-29" id="h1-1-29" class="i">+		resolvedNet = &quot;tcp6&quot;
+</a><a href="#h1-1-30" id="h1-1-30" class="i">+	default:
+</a><a href="#h1-1-31" id="h1-1-31" class="i">+		resolvedNet = &quot;tcp&quot;
+</a><a href="#h1-1-32" id="h1-1-32" class="i">+	}
+</a><a href="#h1-1-33" id="h1-1-33" class="i">+
+</a><a href="#h1-1-34" id="h1-1-34" class="i">+	return &amp;Address{
+</a><a href="#h1-1-35" id="h1-1-35" class="i">+		Net:  resolvedNet,
+</a><a href="#h1-1-36" id="h1-1-36" class="i">+		Host: ips[0].String(),
+</a><a href="#h1-1-37" id="h1-1-37" class="i">+		Port: a.Port,
+</a><a href="#h1-1-38" id="h1-1-38" class="i">+	}, nil
+</a><a href="#h1-1-39" id="h1-1-39" class="i">+}
+</a><a href="#h1-1-40" id="h1-1-40" class="i">+
+</a> // String returns the address in standard form.
+ func (a *Address) String() string {
+ 	switch a.Net {
+<b>diff --git a/<a id="h2" href="../file/internal/server/server.go">internal/server/server.go</a> b/<a href="../file/internal/server/server.go">internal/server/server.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -7,7 +7,6 @@ import (
+</a> 	&quot;log&quot;
+ 	&quot;net&quot;
+ 	&quot;os&quot;
+<a href="#h2-0-3" id="h2-0-3" class="d">-	&quot;strconv&quot;
+</a> 	&quot;syscall&quot;
+ 
+ 	stdproxy &quot;golang.org/x/net/proxy&quot;
+<a href="#h2-1" id="h2-1" class="h">@@ -103,14 +102,6 @@ func (s *Server) proxy(cfg config.Proxy) error {
+</a> 		if cfg.Options.EnableDualStack {
+ 			var ipNet string
+ 
+<a href="#h2-1-3" id="h2-1-3" class="d">-			switch network {
+</a><a href="#h2-1-4" id="h2-1-4" class="d">-			case &quot;tcp&quot;:
+</a><a href="#h2-1-5" id="h2-1-5" class="d">-			case &quot;tcp4&quot;, &quot;tcp6&quot;:
+</a><a href="#h2-1-6" id="h2-1-6" class="d">-				return nil, fmt.Errorf(&quot;server: IPv4/IPv6 target specification is not compatible with dual stack selection&quot;)
+</a><a href="#h2-1-7" id="h2-1-7" class="d">-			default:
+</a><a href="#h2-1-8" id="h2-1-8" class="d">-				return nil, fmt.Errorf(&quot;server: network is not supported for dual stack selection&quot;)
+</a><a href="#h2-1-9" id="h2-1-9" class="d">-			}
+</a><a href="#h2-1-10" id="h2-1-10" class="d">-
+</a> 			if tcpAddr, ok := src.RemoteAddr().(*net.TCPAddr); ok {
+ 				switch {
+ 				case tcpAddr.IP.To4() != nil:
+<a href="#h2-2" id="h2-2" class="h">@@ -131,20 +122,15 @@ func (s *Server) proxy(cfg config.Proxy) error {
+</a> 				defer cancel()
+ 			}
+ 
+<a href="#h2-2-3" id="h2-2-3" class="d">-			ips, err := net.DefaultResolver.LookupIP(ctx, ipNet, cfg.Target.Address.Host)
+</a><a href="#h2-2-4" id="h2-2-4" class="i">+			resolved, err := cfg.Target.Address.Resolve(ctx, ipNet)
+</a> 			if err != nil {
+ 				return nil, fmt.Errorf(
+<a href="#h2-2-7" id="h2-2-7" class="d">-					&quot;server: error in IP resolution: network=%s host=%s err=%v&quot;,
+</a><a href="#h2-2-8" id="h2-2-8" class="d">-					ipNet,
+</a><a href="#h2-2-9" id="h2-2-9" class="d">-					cfg.Target.Address.Host,
+</a><a href="#h2-2-10" id="h2-2-10" class="i">+					&quot;server: error resolving address for dual stack selection: err=%v&quot;,
+</a> 					err,
+ 				)
+ 			}
+ 
+<a href="#h2-2-15" id="h2-2-15" class="d">-			addr = net.JoinHostPort(
+</a><a href="#h2-2-16" id="h2-2-16" class="d">-				ips[0].String(),
+</a><a href="#h2-2-17" id="h2-2-17" class="d">-				strconv.Itoa(cfg.Target.Address.Port),
+</a><a href="#h2-2-18" id="h2-2-18" class="d">-			)
+</a><a href="#h2-2-19" id="h2-2-19" class="i">+			network, addr = resolved.Address()
+</a> 		}
+ 
+ 		if cfg.Target.ConnectAttempts == 0 {
+</pre>
+</div>
+</body>
+</html>

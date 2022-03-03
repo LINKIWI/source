@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/server: Separate abstraction for individual proxy instance - bitflow - Layer 4 TCP proxy for secure interconnection of isolated networks</title>
+<meta name="description" content="Layer 4 TCP proxy for secure interconnection of isolated networks" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="bitflow Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="bitflow Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>bitflow</h1><span class="desc">Layer 4 TCP proxy for secure interconnection of isolated networks</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/bitflow.git">https://source.static.kevinlin.info/bitflow.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/b7eaae3126bda0a3010a69ed73d12d2a89f36813">b7eaae3126bda0a3010a69ed73d12d2a89f36813</a>
+<b>parent</b> <a href="../commit/afa8f97825f944da6ab414732f7905d2829d0902">afa8f97825f944da6ab414732f7905d2829d0902</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Fri 14 May 2021 20:32:16 -0700
+
+internal/server: Separate abstraction for individual proxy instance
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/server/server.go</a></td><td> | </td><td class="num">189</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++</span><span class="d">------------------------------------</span></td></tr>
+</table></pre><pre>1 file changed, 104 insertions(+), 85 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/server/server.go">internal/server/server.go</a> b/<a href="../file/internal/server/server.go">internal/server/server.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -39,39 +39,56 @@ func (s *Server) Serve() error {
+</a> 		)
+ 
+ 		go func(p config.Proxy) {
+<a href="#h0-0-3" id="h0-0-3" class="d">-			errs &lt;- s.proxy(p)
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+			errs &lt;- (&amp;instance{
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+				cfg:      p,
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+				metrics:  s.Metrics,
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+				debugLog: s.DebugLog,
+</a><a href="#h0-0-8" id="h0-0-8" class="i">+				infoLog:  s.InfoLog,
+</a><a href="#h0-0-9" id="h0-0-9" class="i">+				warnLog:  s.WarnLog,
+</a><a href="#h0-0-10" id="h0-0-10" class="i">+				errorLog: s.ErrorLog,
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+			}).serve()
+</a> 		}(p)
+ 	}
+ 
+ 	return &lt;-errs
+ }
+ 
+<a href="#h0-0-18" id="h0-0-18" class="d">-// proxy starts a proxy server for an individual listener and target.
+</a><a href="#h0-0-19" id="h0-0-19" class="d">-func (s *Server) proxy(cfg config.Proxy) error {
+</a><a href="#h0-0-20" id="h0-0-20" class="i">+// instance describes a single proxy instance for an individual listener and target.
+</a><a href="#h0-0-21" id="h0-0-21" class="i">+type instance struct {
+</a><a href="#h0-0-22" id="h0-0-22" class="i">+	cfg      config.Proxy
+</a><a href="#h0-0-23" id="h0-0-23" class="i">+	metrics  aperture.Statsd
+</a><a href="#h0-0-24" id="h0-0-24" class="i">+	debugLog *log.Logger
+</a><a href="#h0-0-25" id="h0-0-25" class="i">+	infoLog  *log.Logger
+</a><a href="#h0-0-26" id="h0-0-26" class="i">+	warnLog  *log.Logger
+</a><a href="#h0-0-27" id="h0-0-27" class="i">+	errorLog *log.Logger
+</a><a href="#h0-0-28" id="h0-0-28" class="i">+}
+</a><a href="#h0-0-29" id="h0-0-29" class="i">+
+</a><a href="#h0-0-30" id="h0-0-30" class="i">+// serve starts serving the proxy server.
+</a><a href="#h0-0-31" id="h0-0-31" class="i">+func (i *instance) serve() error {
+</a> 	var connectionLog io.WriteCloser
+ 
+<a href="#h0-0-34" id="h0-0-34" class="d">-	s.InfoLog.Printf(
+</a><a href="#h0-0-35" id="h0-0-35" class="i">+	i.infoLog.Printf(
+</a> 		&quot;server: starting proxy server: name=%s listener=%v target=%v&quot;,
+<a href="#h0-0-37" id="h0-0-37" class="d">-		cfg.Name,
+</a><a href="#h0-0-38" id="h0-0-38" class="d">-		cfg.Listener.Address.String(),
+</a><a href="#h0-0-39" id="h0-0-39" class="d">-		cfg.Target.Address.String(),
+</a><a href="#h0-0-40" id="h0-0-40" class="i">+		i.cfg.Name,
+</a><a href="#h0-0-41" id="h0-0-41" class="i">+		i.cfg.Listener.Address.String(),
+</a><a href="#h0-0-42" id="h0-0-42" class="i">+		i.cfg.Target.Address.String(),
+</a> 	)
+ 
+<a href="#h0-0-45" id="h0-0-45" class="d">-	ln, err := cfg.Listener.Address.Listen()
+</a><a href="#h0-0-46" id="h0-0-46" class="i">+	ln, err := i.cfg.Listener.Address.Listen()
+</a> 	if err != nil {
+ 		return fmt.Errorf(&quot;server: error listening on socket: err=%v&quot;, err)
+ 	}
+ 
+<a href="#h0-0-51" id="h0-0-51" class="d">-	if len(cfg.Listener.AuthorizedSources) &gt; 0 {
+</a><a href="#h0-0-52" id="h0-0-52" class="i">+	if len(i.cfg.Listener.AuthorizedSources) &gt; 0 {
+</a> 		ln = &amp;restrictedListener{
+<a href="#h0-0-54" id="h0-0-54" class="d">-			sources:  cfg.Listener.AuthorizedSources,
+</a><a href="#h0-0-55" id="h0-0-55" class="i">+			sources:  i.cfg.Listener.AuthorizedSources,
+</a> 			Listener: ln,
+ 		}
+ 	}
+ 
+<a href="#h0-0-60" id="h0-0-60" class="d">-	if cfg.Options.ConnectionLog != &quot;&quot; {
+</a><a href="#h0-0-61" id="h0-0-61" class="i">+	if i.cfg.Options.ConnectionLog != &quot;&quot; {
+</a> 		connectionLog, err = os.OpenFile(
+<a href="#h0-0-63" id="h0-0-63" class="d">-			cfg.Options.ConnectionLog,
+</a><a href="#h0-0-64" id="h0-0-64" class="i">+			i.cfg.Options.ConnectionLog,
+</a> 			syscall.O_WRONLY|syscall.O_APPEND|syscall.O_CREAT,
+ 			0644,
+ 		)
+<a href="#h0-1" id="h0-1" class="h">@@ -82,99 +99,101 @@ func (s *Server) proxy(cfg config.Proxy) error {
+</a> 		defer connectionLog.Close()
+ 	}
+ 
+<a href="#h0-1-3" id="h0-1-3" class="d">-	dialTarget := func(src net.Conn) (net.Conn, error) {
+</a><a href="#h0-1-4" id="h0-1-4" class="d">-		var dialer stdproxy.Dialer
+</a><a href="#h0-1-5" id="h0-1-5" class="d">-		var srcIPNet string
+</a><a href="#h0-1-6" id="h0-1-6" class="i">+	p := &amp;proxy.Proxy{
+</a><a href="#h0-1-7" id="h0-1-7" class="i">+		Name: i.cfg.Name,
+</a><a href="#h0-1-8" id="h0-1-8" class="i">+		Pipe: &amp;proxy.DirectPipe{
+</a><a href="#h0-1-9" id="h0-1-9" class="i">+			ConnectionLifetime:      i.cfg.Options.ConnectionLifetime,
+</a><a href="#h0-1-10" id="h0-1-10" class="i">+			SourceReadTimeout:       i.cfg.Listener.ReadTimeout,
+</a><a href="#h0-1-11" id="h0-1-11" class="i">+			SourceWriteTimeout:      i.cfg.Listener.WriteTimeout,
+</a><a href="#h0-1-12" id="h0-1-12" class="i">+			DestinationReadTimeout:  i.cfg.Target.ReadTimeout,
+</a><a href="#h0-1-13" id="h0-1-13" class="i">+			DestinationWriteTimeout: i.cfg.Target.WriteTimeout,
+</a><a href="#h0-1-14" id="h0-1-14" class="i">+			DebugLog:                i.debugLog,
+</a><a href="#h0-1-15" id="h0-1-15" class="i">+			ErrorLog:                i.errorLog,
+</a><a href="#h0-1-16" id="h0-1-16" class="i">+		},
+</a><a href="#h0-1-17" id="h0-1-17" class="i">+		MaxActiveConnections: i.cfg.Options.ConnectionLimit,
+</a><a href="#h0-1-18" id="h0-1-18" class="i">+		EnableProxyHeader:    i.cfg.Options.EnableProxyHeader,
+</a><a href="#h0-1-19" id="h0-1-19" class="i">+		DialTarget:           i.directDialTarget,
+</a><a href="#h0-1-20" id="h0-1-20" class="i">+		Metrics:              i.metrics,
+</a><a href="#h0-1-21" id="h0-1-21" class="i">+		DebugLog:             i.debugLog,
+</a><a href="#h0-1-22" id="h0-1-22" class="i">+		ErrorLog:             i.errorLog,
+</a><a href="#h0-1-23" id="h0-1-23" class="i">+		ConnectionLog:        connectionLog,
+</a><a href="#h0-1-24" id="h0-1-24" class="i">+	}
+</a> 
+<a href="#h0-1-26" id="h0-1-26" class="d">-		ctx := context.Background()
+</a><a href="#h0-1-27" id="h0-1-27" class="i">+	return p.Serve(ln)
+</a><a href="#h0-1-28" id="h0-1-28" class="i">+}
+</a> 
+<a href="#h0-1-30" id="h0-1-30" class="d">-		network, addr := cfg.Target.Address.Address()
+</a><a href="#h0-1-31" id="h0-1-31" class="d">-		dialer = &amp;net.Dialer{
+</a><a href="#h0-1-32" id="h0-1-32" class="d">-			Timeout:   cfg.Target.ConnectTimeout,
+</a><a href="#h0-1-33" id="h0-1-33" class="d">-			KeepAlive: cfg.Target.KeepaliveInterval,
+</a><a href="#h0-1-34" id="h0-1-34" class="d">-		}
+</a><a href="#h0-1-35" id="h0-1-35" class="i">+// directDialTarget is a target dialer callback that directly dials the configured target on-demand.
+</a><a href="#h0-1-36" id="h0-1-36" class="i">+func (i *instance) directDialTarget(src net.Conn) (net.Conn, error) {
+</a><a href="#h0-1-37" id="h0-1-37" class="i">+	var err error
+</a><a href="#h0-1-38" id="h0-1-38" class="i">+	var dialer stdproxy.Dialer
+</a><a href="#h0-1-39" id="h0-1-39" class="i">+	var srcIPNet string
+</a> 
+<a href="#h0-1-41" id="h0-1-41" class="d">-		if cfg.Options.EnableDualStack {
+</a><a href="#h0-1-42" id="h0-1-42" class="d">-			if srcTCPAddr, ok := src.RemoteAddr().(*net.TCPAddr); ok {
+</a><a href="#h0-1-43" id="h0-1-43" class="d">-				switch {
+</a><a href="#h0-1-44" id="h0-1-44" class="d">-				case srcTCPAddr.IP.To4() != nil:
+</a><a href="#h0-1-45" id="h0-1-45" class="d">-					srcIPNet = &quot;ip4&quot;
+</a><a href="#h0-1-46" id="h0-1-46" class="d">-				case srcTCPAddr.IP.To16() != nil:
+</a><a href="#h0-1-47" id="h0-1-47" class="d">-					srcIPNet = &quot;ip6&quot;
+</a><a href="#h0-1-48" id="h0-1-48" class="d">-				default:
+</a><a href="#h0-1-49" id="h0-1-49" class="d">-					srcIPNet = &quot;ip&quot;
+</a><a href="#h0-1-50" id="h0-1-50" class="d">-				}
+</a><a href="#h0-1-51" id="h0-1-51" class="d">-			}
+</a><a href="#h0-1-52" id="h0-1-52" class="i">+	ctx := context.Background()
+</a> 
+<a href="#h0-1-54" id="h0-1-54" class="d">-			if cfg.Target.ResolveTimeout &gt; 0 {
+</a><a href="#h0-1-55" id="h0-1-55" class="d">-				var cancel context.CancelFunc
+</a><a href="#h0-1-56" id="h0-1-56" class="i">+	network, addr := i.cfg.Target.Address.Address()
+</a><a href="#h0-1-57" id="h0-1-57" class="i">+	dialer = &amp;net.Dialer{
+</a><a href="#h0-1-58" id="h0-1-58" class="i">+		Timeout:   i.cfg.Target.ConnectTimeout,
+</a><a href="#h0-1-59" id="h0-1-59" class="i">+		KeepAlive: i.cfg.Target.KeepaliveInterval,
+</a><a href="#h0-1-60" id="h0-1-60" class="i">+	}
+</a> 
+<a href="#h0-1-62" id="h0-1-62" class="d">-				ctx, cancel = context.WithTimeout(ctx, cfg.Target.ResolveTimeout)
+</a><a href="#h0-1-63" id="h0-1-63" class="d">-				defer cancel()
+</a><a href="#h0-1-64" id="h0-1-64" class="i">+	if i.cfg.Options.EnableDualStack {
+</a><a href="#h0-1-65" id="h0-1-65" class="i">+		if srcTCPAddr, ok := src.RemoteAddr().(*net.TCPAddr); ok {
+</a><a href="#h0-1-66" id="h0-1-66" class="i">+			switch {
+</a><a href="#h0-1-67" id="h0-1-67" class="i">+			case srcTCPAddr.IP.To4() != nil:
+</a><a href="#h0-1-68" id="h0-1-68" class="i">+				srcIPNet = &quot;ip4&quot;
+</a><a href="#h0-1-69" id="h0-1-69" class="i">+			case srcTCPAddr.IP.To16() != nil:
+</a><a href="#h0-1-70" id="h0-1-70" class="i">+				srcIPNet = &quot;ip6&quot;
+</a><a href="#h0-1-71" id="h0-1-71" class="i">+			default:
+</a><a href="#h0-1-72" id="h0-1-72" class="i">+				srcIPNet = &quot;ip&quot;
+</a> 			}
+<a href="#h0-1-74" id="h0-1-74" class="i">+		}
+</a> 
+<a href="#h0-1-76" id="h0-1-76" class="d">-			resolved, err := cfg.Target.Address.Resolve(ctx, srcIPNet)
+</a><a href="#h0-1-77" id="h0-1-77" class="d">-			if err != nil {
+</a><a href="#h0-1-78" id="h0-1-78" class="d">-				return nil, fmt.Errorf(
+</a><a href="#h0-1-79" id="h0-1-79" class="d">-					&quot;server: error resolving target address for dual stack selection: err=%v&quot;,
+</a><a href="#h0-1-80" id="h0-1-80" class="d">-					err,
+</a><a href="#h0-1-81" id="h0-1-81" class="d">-				)
+</a><a href="#h0-1-82" id="h0-1-82" class="d">-			}
+</a><a href="#h0-1-83" id="h0-1-83" class="i">+		if i.cfg.Target.ResolveTimeout &gt; 0 {
+</a><a href="#h0-1-84" id="h0-1-84" class="i">+			var cancel context.CancelFunc
+</a> 
+<a href="#h0-1-86" id="h0-1-86" class="d">-			network, addr = resolved.Address()
+</a><a href="#h0-1-87" id="h0-1-87" class="i">+			ctx, cancel = context.WithTimeout(ctx, i.cfg.Target.ResolveTimeout)
+</a><a href="#h0-1-88" id="h0-1-88" class="i">+			defer cancel()
+</a> 		}
+ 
+<a href="#h0-1-91" id="h0-1-91" class="d">-		if cfg.Target.Proxy != nil {
+</a><a href="#h0-1-92" id="h0-1-92" class="d">-			proxyNet, proxyAddr := cfg.Target.Proxy.Address()
+</a><a href="#h0-1-93" id="h0-1-93" class="i">+		resolved, err := i.cfg.Target.Address.Resolve(ctx, srcIPNet)
+</a><a href="#h0-1-94" id="h0-1-94" class="i">+		if err != nil {
+</a><a href="#h0-1-95" id="h0-1-95" class="i">+			return nil, fmt.Errorf(
+</a><a href="#h0-1-96" id="h0-1-96" class="i">+				&quot;server: error resolving target address for dual stack selection: err=%v&quot;,
+</a><a href="#h0-1-97" id="h0-1-97" class="i">+				err,
+</a><a href="#h0-1-98" id="h0-1-98" class="i">+			)
+</a><a href="#h0-1-99" id="h0-1-99" class="i">+		}
+</a> 
+<a href="#h0-1-101" id="h0-1-101" class="d">-			if cfg.Options.EnableDualStack {
+</a><a href="#h0-1-102" id="h0-1-102" class="d">-				proxyResolved, err := cfg.Target.Proxy.Resolve(ctx, srcIPNet)
+</a><a href="#h0-1-103" id="h0-1-103" class="d">-				if err != nil {
+</a><a href="#h0-1-104" id="h0-1-104" class="d">-					return nil, fmt.Errorf(
+</a><a href="#h0-1-105" id="h0-1-105" class="d">-						&quot;server: error resolving proxy address for dual stack selection: err=%v&quot;,
+</a><a href="#h0-1-106" id="h0-1-106" class="d">-						err,
+</a><a href="#h0-1-107" id="h0-1-107" class="d">-					)
+</a><a href="#h0-1-108" id="h0-1-108" class="d">-				}
+</a><a href="#h0-1-109" id="h0-1-109" class="i">+		network, addr = resolved.Address()
+</a><a href="#h0-1-110" id="h0-1-110" class="i">+	}
+</a> 
+<a href="#h0-1-112" id="h0-1-112" class="d">-				proxyNet, proxyAddr = proxyResolved.Address()
+</a><a href="#h0-1-113" id="h0-1-113" class="d">-			}
+</a><a href="#h0-1-114" id="h0-1-114" class="i">+	if i.cfg.Target.Proxy != nil {
+</a><a href="#h0-1-115" id="h0-1-115" class="i">+		proxyNet, proxyAddr := i.cfg.Target.Proxy.Address()
+</a> 
+<a href="#h0-1-117" id="h0-1-117" class="d">-			dialer, err = stdproxy.SOCKS5(proxyNet, proxyAddr, nil, dialer)
+</a><a href="#h0-1-118" id="h0-1-118" class="i">+		if i.cfg.Options.EnableDualStack {
+</a><a href="#h0-1-119" id="h0-1-119" class="i">+			proxyResolved, err := i.cfg.Target.Proxy.Resolve(ctx, srcIPNet)
+</a> 			if err != nil {
+<a href="#h0-1-121" id="h0-1-121" class="d">-				return nil, fmt.Errorf(&quot;server: error dialing proxy: err=%v&quot;, err)
+</a><a href="#h0-1-122" id="h0-1-122" class="i">+				return nil, fmt.Errorf(
+</a><a href="#h0-1-123" id="h0-1-123" class="i">+					&quot;server: error resolving proxy address for dual stack selection: err=%v&quot;,
+</a><a href="#h0-1-124" id="h0-1-124" class="i">+					err,
+</a><a href="#h0-1-125" id="h0-1-125" class="i">+				)
+</a> 			}
+<a href="#h0-1-127" id="h0-1-127" class="d">-		}
+</a> 
+<a href="#h0-1-129" id="h0-1-129" class="d">-		if cfg.Target.ConnectAttempts &gt; 1 {
+</a><a href="#h0-1-130" id="h0-1-130" class="d">-			dialer = &amp;retryDialer{
+</a><a href="#h0-1-131" id="h0-1-131" class="d">-				attempts: cfg.Target.ConnectAttempts,
+</a><a href="#h0-1-132" id="h0-1-132" class="d">-				backoff:  cfg.Target.ConnectBackoff,
+</a><a href="#h0-1-133" id="h0-1-133" class="d">-				Dialer:   dialer,
+</a><a href="#h0-1-134" id="h0-1-134" class="d">-			}
+</a><a href="#h0-1-135" id="h0-1-135" class="i">+			proxyNet, proxyAddr = proxyResolved.Address()
+</a> 		}
+ 
+<a href="#h0-1-138" id="h0-1-138" class="d">-		return dialer.Dial(network, addr)
+</a><a href="#h0-1-139" id="h0-1-139" class="i">+		dialer, err = stdproxy.SOCKS5(proxyNet, proxyAddr, nil, dialer)
+</a><a href="#h0-1-140" id="h0-1-140" class="i">+		if err != nil {
+</a><a href="#h0-1-141" id="h0-1-141" class="i">+			return nil, fmt.Errorf(&quot;server: error dialing proxy: err=%v&quot;, err)
+</a><a href="#h0-1-142" id="h0-1-142" class="i">+		}
+</a> 	}
+ 
+<a href="#h0-1-145" id="h0-1-145" class="d">-	p := &amp;proxy.Proxy{
+</a><a href="#h0-1-146" id="h0-1-146" class="d">-		Name: cfg.Name,
+</a><a href="#h0-1-147" id="h0-1-147" class="d">-		Pipe: &amp;proxy.DirectPipe{
+</a><a href="#h0-1-148" id="h0-1-148" class="d">-			ConnectionLifetime:      cfg.Options.ConnectionLifetime,
+</a><a href="#h0-1-149" id="h0-1-149" class="d">-			SourceReadTimeout:       cfg.Listener.ReadTimeout,
+</a><a href="#h0-1-150" id="h0-1-150" class="d">-			SourceWriteTimeout:      cfg.Listener.WriteTimeout,
+</a><a href="#h0-1-151" id="h0-1-151" class="d">-			DestinationReadTimeout:  cfg.Target.ReadTimeout,
+</a><a href="#h0-1-152" id="h0-1-152" class="d">-			DestinationWriteTimeout: cfg.Target.WriteTimeout,
+</a><a href="#h0-1-153" id="h0-1-153" class="d">-			DebugLog:                s.DebugLog,
+</a><a href="#h0-1-154" id="h0-1-154" class="d">-			ErrorLog:                s.ErrorLog,
+</a><a href="#h0-1-155" id="h0-1-155" class="d">-		},
+</a><a href="#h0-1-156" id="h0-1-156" class="d">-		MaxActiveConnections: cfg.Options.ConnectionLimit,
+</a><a href="#h0-1-157" id="h0-1-157" class="d">-		EnableProxyHeader:    cfg.Options.EnableProxyHeader,
+</a><a href="#h0-1-158" id="h0-1-158" class="d">-		DialTarget:           dialTarget,
+</a><a href="#h0-1-159" id="h0-1-159" class="d">-		Metrics:              s.Metrics,
+</a><a href="#h0-1-160" id="h0-1-160" class="d">-		DebugLog:             s.DebugLog,
+</a><a href="#h0-1-161" id="h0-1-161" class="d">-		ErrorLog:             s.ErrorLog,
+</a><a href="#h0-1-162" id="h0-1-162" class="d">-		ConnectionLog:        connectionLog,
+</a><a href="#h0-1-163" id="h0-1-163" class="i">+	if i.cfg.Target.ConnectAttempts &gt; 0 {
+</a><a href="#h0-1-164" id="h0-1-164" class="i">+		dialer = &amp;retryDialer{
+</a><a href="#h0-1-165" id="h0-1-165" class="i">+			attempts: i.cfg.Target.ConnectAttempts,
+</a><a href="#h0-1-166" id="h0-1-166" class="i">+			backoff:  i.cfg.Target.ConnectBackoff,
+</a><a href="#h0-1-167" id="h0-1-167" class="i">+			Dialer:   dialer,
+</a><a href="#h0-1-168" id="h0-1-168" class="i">+		}
+</a> 	}
+ 
+<a href="#h0-1-171" id="h0-1-171" class="d">-	return p.Serve(ln)
+</a><a href="#h0-1-172" id="h0-1-172" class="i">+	return dialer.Dial(network, addr)
+</a> }
+</pre>
+</div>
+</body>
+</html>

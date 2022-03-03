@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/server: Cache client TLS configuration per-host on reverse proxy initialization - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/5a66f0a9afe19ee75ebeac44ac94a25aae9a54b6">5a66f0a9afe19ee75ebeac44ac94a25aae9a54b6</a>
+<b>parent</b> <a href="../commit/157cb716efb9e9f396f5d7df266d6cb067c7032f">157cb716efb9e9f396f5d7df266d6cb067c7032f</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Fri  5 Feb 2021 22:39:22 -0800
+
+internal/server: Cache client TLS configuration per-host on reverse proxy initialization
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/server/proxy.go</a></td><td> | </td><td class="num">37</td><td><span class="i">++++++++++++++++++++++++</span><span class="d">-------------</span></td></tr>
+</table></pre><pre>1 file changed, 24 insertions(+), 13 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/server/proxy.go">internal/server/proxy.go</a> b/<a href="../file/internal/server/proxy.go">internal/server/proxy.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -29,12 +29,6 @@ var (
+</a> 		statusCode: http.StatusInternalServerError,
+ 		message:    &quot;failed in filter chain processing&quot;,
+ 	}
+<a href="#h0-0-3" id="h0-0-3" class="d">-	// errBadTLSConfig is returned when there is an error creating the client TLS configuration
+</a><a href="#h0-0-4" id="h0-0-4" class="d">-	// for TLS origination to an upstream.
+</a><a href="#h0-0-5" id="h0-0-5" class="d">-	errBadTLSConfig = &amp;response{
+</a><a href="#h0-0-6" id="h0-0-6" class="d">-		statusCode: http.StatusInternalServerError,
+</a><a href="#h0-0-7" id="h0-0-7" class="d">-		message:    &quot;failed to configure certificates for TLS origination&quot;,
+</a><a href="#h0-0-8" id="h0-0-8" class="d">-	}
+</a> 	// errProxyInternal is returned when the HTTP proxy itself raises an error.
+ 	errProxyInternal = &amp;response{
+ 		statusCode: http.StatusServiceUnavailable,
+<a href="#h0-1" id="h0-1" class="h">@@ -44,13 +38,16 @@ var (
+</a> 
+ // reverseProxy is an http.Handler that abstracts an httputil.ReverseProxy.
+ type reverseProxy struct {
+<a href="#h0-1-3" id="h0-1-3" class="d">-	vhosts       []*config.VirtualHost
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+	vhosts []*config.VirtualHost
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+
+</a> 	filterChains map[string]middleware.Filter
+<a href="#h0-1-7" id="h0-1-7" class="i">+	tlsCfgs      map[string]*tls.Config
+</a> }
+ 
+ // newReverseProxy creates a new reverseProxy from a list of virtual host configurations.
+ func newReverseProxy(vhosts []*config.VirtualHost) (http.Handler, error) {
+ 	filterChains := make(map[string]middleware.Filter)
+<a href="#h0-1-13" id="h0-1-13" class="i">+	tlsCfgs := make(map[string]*tls.Config)
+</a> 
+ 	// Set up the filter chains for each virtual host up front, so that they can be trivially
+ 	// accessed in hot request paths.
+<a href="#h0-2" id="h0-2" class="h">@@ -101,11 +98,30 @@ func newReverseProxy(vhosts []*config.VirtualHost) (http.Handler, error) {
+</a> 		}
+ 
+ 		filterChains[vhost.Name] = middleware.NewComposedFilter(vhostFilters...)
+<a href="#h0-2-3" id="h0-2-3" class="i">+
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+		if vhost.Upstream.TLSContext != nil {
+</a><a href="#h0-2-5" id="h0-2-5" class="i">+			zap.L().Debug(&quot;creating client TLS context&quot;)
+</a><a href="#h0-2-6" id="h0-2-6" class="i">+
+</a><a href="#h0-2-7" id="h0-2-7" class="i">+			tlsCfg, err := vhost.Upstream.TLSContext.ClientConfig()
+</a><a href="#h0-2-8" id="h0-2-8" class="i">+			if err != nil {
+</a><a href="#h0-2-9" id="h0-2-9" class="i">+				return nil, &amp;util.Error{
+</a><a href="#h0-2-10" id="h0-2-10" class="i">+					Namespace: &quot;server&quot;,
+</a><a href="#h0-2-11" id="h0-2-11" class="i">+					Message:   &quot;error creating client TLS config&quot;,
+</a><a href="#h0-2-12" id="h0-2-12" class="i">+					Tags: map[string]interface{}{
+</a><a href="#h0-2-13" id="h0-2-13" class="i">+						&quot;virtual_host&quot;: vhost.Name,
+</a><a href="#h0-2-14" id="h0-2-14" class="i">+					},
+</a><a href="#h0-2-15" id="h0-2-15" class="i">+					StackedError: err,
+</a><a href="#h0-2-16" id="h0-2-16" class="i">+				}
+</a><a href="#h0-2-17" id="h0-2-17" class="i">+			}
+</a><a href="#h0-2-18" id="h0-2-18" class="i">+
+</a><a href="#h0-2-19" id="h0-2-19" class="i">+			tlsCfgs[vhost.Name] = tlsCfg
+</a><a href="#h0-2-20" id="h0-2-20" class="i">+		}
+</a> 	}
+ 
+ 	return &amp;reverseProxy{
+ 		vhosts:       vhosts,
+ 		filterChains: filterChains,
+<a href="#h0-2-26" id="h0-2-26" class="i">+		tlsCfgs:      tlsCfgs,
+</a> 	}, nil
+ }
+ 
+<a href="#h0-3" id="h0-3" class="h">@@ -170,14 +186,9 @@ func (rp *reverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+</a> 	if vhost.Upstream.Host != &quot;&quot; {
+ 		proxyReq.URL.Host = vhost.Upstream.Host
+ 	}
+<a href="#h0-3-3" id="h0-3-3" class="d">-
+</a><a href="#h0-3-4" id="h0-3-4" class="d">-	// Optional TLS origination configuration
+</a> 	if vhost.Upstream.TLSContext != nil {
+ 		proxyReq.URL.Scheme = &quot;https&quot;
+<a href="#h0-3-7" id="h0-3-7" class="d">-		if tlsCfg, err = vhost.Upstream.TLSContext.ClientConfig(); err != nil {
+</a><a href="#h0-3-8" id="h0-3-8" class="d">-			rpErrorHandler(errBadTLSConfig)(rw, proxyReq, err)
+</a><a href="#h0-3-9" id="h0-3-9" class="d">-			return
+</a><a href="#h0-3-10" id="h0-3-10" class="d">-		}
+</a><a href="#h0-3-11" id="h0-3-11" class="i">+		tlsCfg = rp.tlsCfgs[vhost.Name]
+</a> 	}
+ 
+ 	// Transport and dialer selection
+</pre>
+</div>
+</body>
+</html>

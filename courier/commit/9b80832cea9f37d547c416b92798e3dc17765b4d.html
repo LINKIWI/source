@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/config: Support negated regular expresions with backslash syntax - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/9b80832cea9f37d547c416b92798e3dc17765b4d">9b80832cea9f37d547c416b92798e3dc17765b4d</a>
+<b>parent</b> <a href="../commit/f7fce6b49d8a3f08dc520ed9c9a4cf707b8c61ae">f7fce6b49d8a3f08dc520ed9c9a4cf707b8c61ae</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Mon  1 Mar 2021 23:17:21 -0800
+
+internal/config: Support negated regular expresions with backslash syntax
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/config/data.go</a></td><td> | </td><td class="num">35</td><td><span class="i">+++++++++++++++++++++++++++++++</span><span class="d">----</span></td></tr>
+</table></pre><pre>1 file changed, 31 insertions(+), 4 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/config/data.go">internal/config/data.go</a> b/<a href="../file/internal/config/data.go">internal/config/data.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -15,6 +15,7 @@ import (
+</a> 
+ // Regex is YAML node with a regular expression.
+ type Regex struct {
+<a href="#h0-0-3" id="h0-0-3" class="i">+	negated bool
+</a> 	*regexp.Regexp
+ }
+ 
+<a href="#h0-1" id="h0-1" class="h">@@ -39,12 +40,18 @@ type CIDR struct {
+</a> // string literal.
+ func (r *Regex) UnmarshalYAML(node *yaml.Node) error {
+ 	var value string
+<a href="#h0-1-3" id="h0-1-3" class="i">+	var negated bool
+</a> 
+<a href="#h0-1-5" id="h0-1-5" class="d">-	// By convention, regex-interpreted hostnames in config are surrounded with forward slashes.
+</a><a href="#h0-1-6" id="h0-1-6" class="d">-	// Hostnames that lack this structure should be treated as literals for exact matching.
+</a><a href="#h0-1-7" id="h0-1-7" class="d">-	if len(node.Value) &gt; 2 &amp;&amp; strings.HasPrefix(node.Value, &quot;/&quot;) &amp;&amp; strings.HasSuffix(node.Value, &quot;/&quot;) {
+</a><a href="#h0-1-8" id="h0-1-8" class="i">+	switch {
+</a><a href="#h0-1-9" id="h0-1-9" class="i">+	// Strings wrapped with forward slashes are interpreted as standard regular expressions.
+</a><a href="#h0-1-10" id="h0-1-10" class="i">+	case len(node.Value) &gt; 2 &amp;&amp; strings.HasPrefix(node.Value, &quot;/&quot;) &amp;&amp; strings.HasSuffix(node.Value, &quot;/&quot;):
+</a> 		value = node.Value[1 : len(node.Value)-1]
+<a href="#h0-1-12" id="h0-1-12" class="d">-	} else {
+</a><a href="#h0-1-13" id="h0-1-13" class="i">+	// Strings wrapped with backwards slashes are interpreted as negated regular expressions.
+</a><a href="#h0-1-14" id="h0-1-14" class="i">+	case len(node.Value) &gt; 2 &amp;&amp; strings.HasPrefix(node.Value, &quot;\\&quot;) &amp;&amp; strings.HasSuffix(node.Value, &quot;\\&quot;):
+</a><a href="#h0-1-15" id="h0-1-15" class="i">+		value = node.Value[1 : len(node.Value)-1]
+</a><a href="#h0-1-16" id="h0-1-16" class="i">+		negated = true
+</a><a href="#h0-1-17" id="h0-1-17" class="i">+	// All other strings are interpreted as a string literal compatible only with exact matches.
+</a><a href="#h0-1-18" id="h0-1-18" class="i">+	default:
+</a> 		value = fmt.Sprintf(&quot;^%s$&quot;, regexp.QuoteMeta(node.Value))
+ 	}
+ 
+<a href="#h0-2" id="h0-2" class="h">@@ -58,11 +65,31 @@ func (r *Regex) UnmarshalYAML(node *yaml.Node) error {
+</a> 		}
+ 	}
+ 
+<a href="#h0-2-3" id="h0-2-3" class="i">+	r.negated = negated
+</a> 	r.Regexp = re
+ 
+ 	return nil
+ }
+ 
+<a href="#h0-2-9" id="h0-2-9" class="i">+// Match matches the input byte array against the regular expression, respecting negation as needed.
+</a><a href="#h0-2-10" id="h0-2-10" class="i">+func (r *Regex) Match(b []byte) bool {
+</a><a href="#h0-2-11" id="h0-2-11" class="i">+	if r.negated {
+</a><a href="#h0-2-12" id="h0-2-12" class="i">+		return !r.Regexp.Match(b)
+</a><a href="#h0-2-13" id="h0-2-13" class="i">+	}
+</a><a href="#h0-2-14" id="h0-2-14" class="i">+
+</a><a href="#h0-2-15" id="h0-2-15" class="i">+	return r.Regexp.Match(b)
+</a><a href="#h0-2-16" id="h0-2-16" class="i">+}
+</a><a href="#h0-2-17" id="h0-2-17" class="i">+
+</a><a href="#h0-2-18" id="h0-2-18" class="i">+// MatchString matches the input string against the regular expression, respecting negation as
+</a><a href="#h0-2-19" id="h0-2-19" class="i">+// needed.
+</a><a href="#h0-2-20" id="h0-2-20" class="i">+func (r *Regex) MatchString(s string) bool {
+</a><a href="#h0-2-21" id="h0-2-21" class="i">+	if r.negated {
+</a><a href="#h0-2-22" id="h0-2-22" class="i">+		return !r.Regexp.MatchString(s)
+</a><a href="#h0-2-23" id="h0-2-23" class="i">+	}
+</a><a href="#h0-2-24" id="h0-2-24" class="i">+
+</a><a href="#h0-2-25" id="h0-2-25" class="i">+	return r.Regexp.MatchString(s)
+</a><a href="#h0-2-26" id="h0-2-26" class="i">+}
+</a><a href="#h0-2-27" id="h0-2-27" class="i">+
+</a> // UnmarshalYAML attempts to parse the node&#39;s string contents as a URL.
+ func (u *URL) UnmarshalYAML(node *yaml.Node) error {
+ 	parsed, err := url.Parse(node.Value)
+</pre>
+</div>
+</body>
+</html>

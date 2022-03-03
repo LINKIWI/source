@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>cmd/courier, internal/config, internal/server: Deprecate upstream host parameter - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/d0e0d5c1cf9c133560047043c370ef5a2a7602a2">d0e0d5c1cf9c133560047043c370ef5a2a7602a2</a>
+<b>parent</b> <a href="../commit/0f62b7f215b08badd27f14665835170042fbdf48">0f62b7f215b08badd27f14665835170042fbdf48</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sun  2 May 2021 12:51:53 -0700
+
+cmd/courier, internal/config, internal/server: Deprecate upstream host parameter
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">cmd/courier/main.go</a></td><td> | </td><td class="num">1</td><td><span class="i"></span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">internal/config/config.go</a></td><td> | </td><td class="num">14</td><td><span class="i"></span><span class="d">--------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">internal/config/types.go</a></td><td> | </td><td class="num">1</td><td><span class="i"></span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">internal/server/health.go</a></td><td> | </td><td class="num">2</td><td><span class="i">+</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h4">internal/server/proxy.go</a></td><td> | </td><td class="num">4</td><td><span class="i"></span><span class="d">----</span></td></tr>
+</table></pre><pre>5 files changed, 1 insertion(+), 21 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/cmd/courier/main.go">cmd/courier/main.go</a> b/<a href="../file/cmd/courier/main.go">cmd/courier/main.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -72,7 +72,6 @@ func main() {
+</a> 				zap.String(&quot;vhost&quot;, vhost.Name),
+ 				zap.String(&quot;name&quot;, upstream.Name),
+ 				zap.Stringer(&quot;address&quot;, upstream.Address),
+<a href="#h0-0-3" id="h0-0-3" class="d">-				zap.String(&quot;host&quot;, upstream.Host),
+</a> 				zap.Stringer(&quot;proxy&quot;, upstream.Proxy),
+ 				zap.String(&quot;transport&quot;, upstream.Transport),
+ 				zap.Any(&quot;connection&quot;, upstream.Connection),
+<b>diff --git a/<a id="h1" href="../file/internal/config/config.go">internal/config/config.go</a> b/<a href="../file/internal/config/config.go">internal/config/config.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -264,15 +264,6 @@ func (c *Config) Validate() error {
+</a> 							&quot;method&quot;:   upstream.HealthCheck.Method,
+ 						},
+ 					}
+<a href="#h1-0-3" id="h1-0-3" class="d">-				} else if upstream.Host == &quot;&quot; &amp;&amp; upstream.HealthCheck.Host == &quot;&quot; {
+</a><a href="#h1-0-4" id="h1-0-4" class="d">-					return &amp;util.Error{
+</a><a href="#h1-0-5" id="h1-0-5" class="d">-						Namespace: &quot;config&quot;,
+</a><a href="#h1-0-6" id="h1-0-6" class="d">-						Message:   &quot;health check host is missing&quot;,
+</a><a href="#h1-0-7" id="h1-0-7" class="d">-						Tags: map[string]interface{}{
+</a><a href="#h1-0-8" id="h1-0-8" class="d">-							&quot;vhost&quot;:    vhost.Name,
+</a><a href="#h1-0-9" id="h1-0-9" class="d">-							&quot;upstream&quot;: upstream.Name,
+</a><a href="#h1-0-10" id="h1-0-10" class="d">-						},
+</a><a href="#h1-0-11" id="h1-0-11" class="d">-					}
+</a> 				} else if upstream.HealthCheck.Interval &lt;= 0 {
+ 					return &amp;util.Error{
+ 						Namespace: &quot;config&quot;,
+<a href="#h1-1" id="h1-1" class="h">@@ -373,7 +364,6 @@ func (u *Upstream) ClientTransport() (http.RoundTripper, error) {
+</a> 		zap.L().Debug(
+ 			&quot;creating client TLS origination context&quot;,
+ 			zap.String(&quot;upstream&quot;, u.Address.String()),
+<a href="#h1-1-3" id="h1-1-3" class="d">-			zap.String(&quot;host&quot;, u.Host),
+</a> 		)
+ 
+ 		tlsCfg, err = u.TLSContext.ClientConfig()
+<a href="#h1-2" id="h1-2" class="h">@@ -384,10 +374,6 @@ func (u *Upstream) ClientTransport() (http.RoundTripper, error) {
+</a> 				StackedError: err,
+ 			}
+ 		}
+<a href="#h1-2-3" id="h1-2-3" class="d">-
+</a><a href="#h1-2-4" id="h1-2-4" class="d">-		if u.Host != &quot;&quot; {
+</a><a href="#h1-2-5" id="h1-2-5" class="d">-			tlsCfg.ServerName = u.Host
+</a><a href="#h1-2-6" id="h1-2-6" class="d">-		}
+</a> 	}
+ 
+ 	switch u.Transport {
+<b>diff --git a/<a id="h2" href="../file/internal/config/types.go">internal/config/types.go</a> b/<a href="../file/internal/config/types.go">internal/config/types.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -105,7 +105,6 @@ type HealthCheck struct {
+</a> type Upstream struct {
+ 	Name        string             `yaml:&quot;name&quot;`
+ 	Address     *Address           `yaml:&quot;address&quot;`
+<a href="#h2-0-3" id="h2-0-3" class="d">-	Host        string             `yaml:&quot;host&quot;`
+</a> 	Proxy       *URL               `yaml:&quot;proxy&quot;`
+ 	Transport   string             `yaml:&quot;transport&quot;`
+ 	Connection  UpstreamConnection `yaml:&quot;connection&quot;`
+<b>diff --git a/<a id="h3" href="../file/internal/server/health.go">internal/server/health.go</a> b/<a href="../file/internal/server/health.go">internal/server/health.go</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -133,7 +133,7 @@ func (hp *healthProbe) start() {
+</a> // probe sends a single HTTP request to the upstream to check its health.
+ func (hp *healthProbe) probe() error {
+ 	scheme := &quot;http&quot;
+<a href="#h3-0-3" id="h3-0-3" class="d">-	host := hp.upstream.Host
+</a><a href="#h3-0-4" id="h3-0-4" class="i">+	host := &quot;localhost&quot;
+</a> 	path := &quot;/&quot;
+ 	if hp.upstream.TLSContext != nil {
+ 		scheme = &quot;https&quot;
+<b>diff --git a/<a id="h4" href="../file/internal/server/proxy.go">internal/server/proxy.go</a> b/<a href="../file/internal/server/proxy.go">internal/server/proxy.go</a></b>
+<a href="#h4-0" id="h4-0" class="h">@@ -345,10 +345,6 @@ func (rp *reverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+</a> 
+ 	// Prepare proxy request to upstream
+ 	proxyReq.URL.Scheme = &quot;http&quot;
+<a href="#h4-0-3" id="h4-0-3" class="d">-	proxyReq.URL.Host = proxyReq.Host
+</a><a href="#h4-0-4" id="h4-0-4" class="d">-	if upstream.Host != &quot;&quot; {
+</a><a href="#h4-0-5" id="h4-0-5" class="d">-		proxyReq.URL.Host = upstream.Host
+</a><a href="#h4-0-6" id="h4-0-6" class="d">-	}
+</a> 	if upstream.TLSContext != nil {
+ 		proxyReq.URL.Scheme = &quot;https&quot;
+ 	}
+</pre>
+</div>
+</body>
+</html>
