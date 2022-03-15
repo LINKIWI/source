@@ -136,7 +136,7 @@ var (
 	}
 	listBucketsCmd = &cobra.Command{
 		Use:     "list-buckets",
-		Aliases: []string{"listb", "lb"},
+		Aliases: []string{"listb", "lb", "ls-buckets"},
 		Short:   "List all buckets",
 		Long:    "List all buckets. Structured data is printed to standard output.",
 		Example: strings.Join([]string{
@@ -149,7 +149,7 @@ var (
 	}
 	listObjectsCmd = &cobra.Command{
 		Use:     "list-objects <prefix>",
-		Aliases: []string{"list", "lo", "ls"},
+		Aliases: []string{"list", "lo", "ls", "ls-objects"},
 		Short:   "List objects by prefix",
 		Long: "List objects by prefix, recursively through any hierarchical delimiters (e.g. directories).\n" +
 			"Structured data is printed to standard output.",

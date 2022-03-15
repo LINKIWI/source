@@ -170,31 +170,36 @@ func (h *humanRenderer) protoInfoResponse(response *service.InfoResponse) error 
 	renderNode = func(node *common.Node) []string {
 		var out []string
 
-		childrenConstants := make(map[string]string)
-		childrenNodes := make(map[string]*common.Node)
+		childrenConstants := make(map[string]string, len(node.Children))
+		childrenNodes := make([]string, 0, len(node.Children))
 
 		for param, value := range node.Children {
 			switch c := value.Child.(type) {
 			case *common.Node_Value_Value:
 				childrenConstants[param] = c.Value
 			case *common.Node_Value_Node:
-				childrenNodes[param] = c.Node
+				childrenNodes = append(childrenNodes, param)
 			}
 		}
 
+		sort.Strings(childrenNodes)
+
+		// Render the node name, along with any constant parameters.
 		if len(childrenConstants) > 0 {
 			var params []string
 			for param, value := range childrenConstants {
 				params = append(params, fmt.Sprintf("%s: %s", param, value))
 			}
+			sort.Strings(params)
 
 			out = append(out, fmt.Sprintf("%s [%s]", node.Name, strings.Join(params, ", ")))
 		} else {
 			out = append(out, node.Name)
 		}
 
-		for _, n := range childrenNodes {
-			for _, line := range renderNode(n) {
+		// Recursively render all children nodes, sorted by name.
+		for _, name := range childrenNodes {
+			for _, line := range renderNode(node.Children[name].GetNode()) {
 				out = append(out, fmt.Sprintf("%s%s", defaultIndent, line))
 			}
 		}

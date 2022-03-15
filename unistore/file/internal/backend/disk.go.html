@@ -18,7 +18,7 @@ body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{fo
 <a href="../../../log">Log</a> | <a href="../../../files">Files</a> | <a href="../../../refs">Refs</a> | <a href="../../../file/README.md">README</a></td></tr></table>
 <hr/>
 <div id="content">
-<p>internal/backend/<strong>disk.go</strong> (18658B) (<a href="../../../raw/internal/backend/disk.go">raw</a>) (<a href="../../../blame/internal/backend/disk.go">blame</a>)</p><hr/>
+<p>internal/backend/<strong>disk.go</strong> (18724B) (<a href="../../../raw/internal/backend/disk.go">raw</a>) (<a href="../../../blame/internal/backend/disk.go">blame</a>)</p><hr/>
 <pre id="blob">
 <a href="#l1" class="line" id="l1">      1</a> package backend
 <a href="#l2" class="line" id="l2">      2</a> 
@@ -621,88 +621,93 @@ body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{fo
 <a href="#l599" class="line" id="l599">    599</a> 	}
 <a href="#l600" class="line" id="l600">    600</a> }
 <a href="#l601" class="line" id="l601">    601</a> 
-<a href="#l602" class="line" id="l602">    602</a> // String returns a human-consumable representation of this backend.
-<a href="#l603" class="line" id="l603">    603</a> func (d *Disk) String() string {
-<a href="#l604" class="line" id="l604">    604</a> 	return schemas.MarshalDescriptor(d.Descriptor())
+<a href="#l602" class="line" id="l602">    602</a> // Close is a noop.
+<a href="#l603" class="line" id="l603">    603</a> func (d *Disk) Close() error {
+<a href="#l604" class="line" id="l604">    604</a> 	return nil
 <a href="#l605" class="line" id="l605">    605</a> }
 <a href="#l606" class="line" id="l606">    606</a> 
-<a href="#l607" class="line" id="l607">    607</a> // createError creates a semantically accurate gRPC status for errored filesystem operations.
-<a href="#l608" class="line" id="l608">    608</a> func (d *Disk) createError(err error) error {
-<a href="#l609" class="line" id="l609">    609</a> 	switch {
-<a href="#l610" class="line" id="l610">    610</a> 	case os.IsNotExist(err):
-<a href="#l611" class="line" id="l611">    611</a> 		return status.Error(codes.NotFound, err.Error())
-<a href="#l612" class="line" id="l612">    612</a> 	case os.IsPermission(err):
-<a href="#l613" class="line" id="l613">    613</a> 		return status.Error(codes.PermissionDenied, err.Error())
-<a href="#l614" class="line" id="l614">    614</a> 	case os.IsTimeout(err):
-<a href="#l615" class="line" id="l615">    615</a> 		return status.Error(codes.DeadlineExceeded, err.Error())
-<a href="#l616" class="line" id="l616">    616</a> 	case errors.Is(err, os.ErrInvalid):
-<a href="#l617" class="line" id="l617">    617</a> 		return status.Error(codes.InvalidArgument, err.Error())
-<a href="#l618" class="line" id="l618">    618</a> 	case errors.Is(err, syscall.ENOTEMPTY):
-<a href="#l619" class="line" id="l619">    619</a> 		return status.Error(codes.FailedPrecondition, err.Error())
-<a href="#l620" class="line" id="l620">    620</a> 	default:
-<a href="#l621" class="line" id="l621">    621</a> 		return status.Error(codes.Unknown, err.Error())
-<a href="#l622" class="line" id="l622">    622</a> 	}
-<a href="#l623" class="line" id="l623">    623</a> }
-<a href="#l624" class="line" id="l624">    624</a> 
-<a href="#l625" class="line" id="l625">    625</a> // fileTarget is an abstraction over a file target on disk, as constructed from a bucket name and
-<a href="#l626" class="line" id="l626">    626</a> // file key.
-<a href="#l627" class="line" id="l627">    627</a> type fileTarget struct {
-<a href="#l628" class="line" id="l628">    628</a> 	client *disk.Client
-<a href="#l629" class="line" id="l629">    629</a> 	bucket string
-<a href="#l630" class="line" id="l630">    630</a> 	key    string
-<a href="#l631" class="line" id="l631">    631</a> }
-<a href="#l632" class="line" id="l632">    632</a> 
-<a href="#l633" class="line" id="l633">    633</a> // newFileTarget creates a new file target while validating the desired path.
-<a href="#l634" class="line" id="l634">    634</a> func newFileTarget(client *disk.Client, bucket string, key string) (*fileTarget, error) {
-<a href="#l635" class="line" id="l635">    635</a> 	zap.L().Debug(
-<a href="#l636" class="line" id="l636">    636</a> 		&quot;creating disk file target&quot;,
-<a href="#l637" class="line" id="l637">    637</a> 		zap.String(&quot;bucket&quot;, bucket),
-<a href="#l638" class="line" id="l638">    638</a> 		zap.String(&quot;key&quot;, key),
-<a href="#l639" class="line" id="l639">    639</a> 	)
-<a href="#l640" class="line" id="l640">    640</a> 
-<a href="#l641" class="line" id="l641">    641</a> 	if strings.Contains(bucket, string(os.PathSeparator)) {
-<a href="#l642" class="line" id="l642">    642</a> 		return nil, fmt.Errorf(&quot;bucket name contains illegal characters: bucket=%s&quot;, bucket)
-<a href="#l643" class="line" id="l643">    643</a> 	}
-<a href="#l644" class="line" id="l644">    644</a> 
-<a href="#l645" class="line" id="l645">    645</a> 	canonicalKey := filepath.Clean(key)
-<a href="#l646" class="line" id="l646">    646</a> 	resolved := filepath.Join(bucket, canonicalKey)
-<a href="#l647" class="line" id="l647">    647</a> 
-<a href="#l648" class="line" id="l648">    648</a> 	// Require the resolved path to start with the bucket after a pass through filepath.Clean.
-<a href="#l649" class="line" id="l649">    649</a> 	// Since at this point it is known that the bucket does not contain nested directories, this
-<a href="#l650" class="line" id="l650">    650</a> 	// thwarts potential directory traversal attacks by enforcing that the requested key does
-<a href="#l651" class="line" id="l651">    651</a> 	// not resolve to be outside the allowed file tree.
-<a href="#l652" class="line" id="l652">    652</a> 	if canonicalKey != &quot;.&quot; &amp;&amp; !strings.HasPrefix(resolved, fmt.Sprintf(&quot;%s%c&quot;, bucket, os.PathSeparator)) {
-<a href="#l653" class="line" id="l653">    653</a> 		return nil, fmt.Errorf(&quot;resolved file path is invalid: key=%s&quot;, key)
-<a href="#l654" class="line" id="l654">    654</a> 	}
-<a href="#l655" class="line" id="l655">    655</a> 
-<a href="#l656" class="line" id="l656">    656</a> 	return &amp;fileTarget{
-<a href="#l657" class="line" id="l657">    657</a> 		client: client,
-<a href="#l658" class="line" id="l658">    658</a> 		bucket: bucket,
-<a href="#l659" class="line" id="l659">    659</a> 		key:    canonicalKey,
-<a href="#l660" class="line" id="l660">    660</a> 	}, nil
-<a href="#l661" class="line" id="l661">    661</a> }
-<a href="#l662" class="line" id="l662">    662</a> 
-<a href="#l663" class="line" id="l663">    663</a> // resolve resolves the file path targeted by the supplied bucket and key.
-<a href="#l664" class="line" id="l664">    664</a> func (f *fileTarget) resolve() string {
-<a href="#l665" class="line" id="l665">    665</a> 	return filepath.Join(f.bucket, f.key)
+<a href="#l607" class="line" id="l607">    607</a> // String returns a human-consumable representation of this backend.
+<a href="#l608" class="line" id="l608">    608</a> func (d *Disk) String() string {
+<a href="#l609" class="line" id="l609">    609</a> 	return schemas.MarshalDescriptor(d.Descriptor())
+<a href="#l610" class="line" id="l610">    610</a> }
+<a href="#l611" class="line" id="l611">    611</a> 
+<a href="#l612" class="line" id="l612">    612</a> // createError creates a semantically accurate gRPC status for errored filesystem operations.
+<a href="#l613" class="line" id="l613">    613</a> func (d *Disk) createError(err error) error {
+<a href="#l614" class="line" id="l614">    614</a> 	switch {
+<a href="#l615" class="line" id="l615">    615</a> 	case os.IsNotExist(err):
+<a href="#l616" class="line" id="l616">    616</a> 		return status.Error(codes.NotFound, err.Error())
+<a href="#l617" class="line" id="l617">    617</a> 	case os.IsPermission(err):
+<a href="#l618" class="line" id="l618">    618</a> 		return status.Error(codes.PermissionDenied, err.Error())
+<a href="#l619" class="line" id="l619">    619</a> 	case os.IsTimeout(err):
+<a href="#l620" class="line" id="l620">    620</a> 		return status.Error(codes.DeadlineExceeded, err.Error())
+<a href="#l621" class="line" id="l621">    621</a> 	case errors.Is(err, os.ErrInvalid):
+<a href="#l622" class="line" id="l622">    622</a> 		return status.Error(codes.InvalidArgument, err.Error())
+<a href="#l623" class="line" id="l623">    623</a> 	case errors.Is(err, syscall.ENOTEMPTY):
+<a href="#l624" class="line" id="l624">    624</a> 		return status.Error(codes.FailedPrecondition, err.Error())
+<a href="#l625" class="line" id="l625">    625</a> 	default:
+<a href="#l626" class="line" id="l626">    626</a> 		return status.Error(codes.Unknown, err.Error())
+<a href="#l627" class="line" id="l627">    627</a> 	}
+<a href="#l628" class="line" id="l628">    628</a> }
+<a href="#l629" class="line" id="l629">    629</a> 
+<a href="#l630" class="line" id="l630">    630</a> // fileTarget is an abstraction over a file target on disk, as constructed from a bucket name and
+<a href="#l631" class="line" id="l631">    631</a> // file key.
+<a href="#l632" class="line" id="l632">    632</a> type fileTarget struct {
+<a href="#l633" class="line" id="l633">    633</a> 	client *disk.Client
+<a href="#l634" class="line" id="l634">    634</a> 	bucket string
+<a href="#l635" class="line" id="l635">    635</a> 	key    string
+<a href="#l636" class="line" id="l636">    636</a> }
+<a href="#l637" class="line" id="l637">    637</a> 
+<a href="#l638" class="line" id="l638">    638</a> // newFileTarget creates a new file target while validating the desired path.
+<a href="#l639" class="line" id="l639">    639</a> func newFileTarget(client *disk.Client, bucket string, key string) (*fileTarget, error) {
+<a href="#l640" class="line" id="l640">    640</a> 	zap.L().Debug(
+<a href="#l641" class="line" id="l641">    641</a> 		&quot;creating disk file target&quot;,
+<a href="#l642" class="line" id="l642">    642</a> 		zap.String(&quot;bucket&quot;, bucket),
+<a href="#l643" class="line" id="l643">    643</a> 		zap.String(&quot;key&quot;, key),
+<a href="#l644" class="line" id="l644">    644</a> 	)
+<a href="#l645" class="line" id="l645">    645</a> 
+<a href="#l646" class="line" id="l646">    646</a> 	if strings.Contains(bucket, string(os.PathSeparator)) {
+<a href="#l647" class="line" id="l647">    647</a> 		return nil, fmt.Errorf(&quot;bucket name contains illegal characters: bucket=%s&quot;, bucket)
+<a href="#l648" class="line" id="l648">    648</a> 	}
+<a href="#l649" class="line" id="l649">    649</a> 
+<a href="#l650" class="line" id="l650">    650</a> 	canonicalKey := filepath.Clean(key)
+<a href="#l651" class="line" id="l651">    651</a> 	resolved := filepath.Join(bucket, canonicalKey)
+<a href="#l652" class="line" id="l652">    652</a> 
+<a href="#l653" class="line" id="l653">    653</a> 	// Require the resolved path to start with the bucket after a pass through filepath.Clean.
+<a href="#l654" class="line" id="l654">    654</a> 	// Since at this point it is known that the bucket does not contain nested directories, this
+<a href="#l655" class="line" id="l655">    655</a> 	// thwarts potential directory traversal attacks by enforcing that the requested key does
+<a href="#l656" class="line" id="l656">    656</a> 	// not resolve to be outside the allowed file tree.
+<a href="#l657" class="line" id="l657">    657</a> 	if canonicalKey != &quot;.&quot; &amp;&amp; !strings.HasPrefix(resolved, fmt.Sprintf(&quot;%s%c&quot;, bucket, os.PathSeparator)) {
+<a href="#l658" class="line" id="l658">    658</a> 		return nil, fmt.Errorf(&quot;resolved file path is invalid: key=%s&quot;, key)
+<a href="#l659" class="line" id="l659">    659</a> 	}
+<a href="#l660" class="line" id="l660">    660</a> 
+<a href="#l661" class="line" id="l661">    661</a> 	return &amp;fileTarget{
+<a href="#l662" class="line" id="l662">    662</a> 		client: client,
+<a href="#l663" class="line" id="l663">    663</a> 		bucket: bucket,
+<a href="#l664" class="line" id="l664">    664</a> 		key:    canonicalKey,
+<a href="#l665" class="line" id="l665">    665</a> 	}, nil
 <a href="#l666" class="line" id="l666">    666</a> }
 <a href="#l667" class="line" id="l667">    667</a> 
-<a href="#l668" class="line" id="l668">    668</a> // parent returns the parent directory of the target. If the target is itself a directory, the
-<a href="#l669" class="line" id="l669">    669</a> // return value is the same as that of resolve. If the target is a file or file prefix, the nearest
-<a href="#l670" class="line" id="l670">    670</a> // path ancestor is returned.
-<a href="#l671" class="line" id="l671">    671</a> func (f *fileTarget) parent() string {
-<a href="#l672" class="line" id="l672">    672</a> 	resolved := f.resolve()
-<a href="#l673" class="line" id="l673">    673</a> 
-<a href="#l674" class="line" id="l674">    674</a> 	// The requested path may itself already be a directory, in which case the parsed dirname
-<a href="#l675" class="line" id="l675">    675</a> 	// should be discarded.
-<a href="#l676" class="line" id="l676">    676</a> 	p := filepath.Dir(resolved)
-<a href="#l677" class="line" id="l677">    677</a> 	stat, err := f.client.StatFile(resolved)
-<a href="#l678" class="line" id="l678">    678</a> 	if p == &quot;.&quot; || (err == nil &amp;&amp; stat.Mode.IsDir()) {
-<a href="#l679" class="line" id="l679">    679</a> 		p = resolved
-<a href="#l680" class="line" id="l680">    680</a> 	}
-<a href="#l681" class="line" id="l681">    681</a> 
-<a href="#l682" class="line" id="l682">    682</a> 	return p
-<a href="#l683" class="line" id="l683">    683</a> }
+<a href="#l668" class="line" id="l668">    668</a> // resolve resolves the file path targeted by the supplied bucket and key.
+<a href="#l669" class="line" id="l669">    669</a> func (f *fileTarget) resolve() string {
+<a href="#l670" class="line" id="l670">    670</a> 	return filepath.Join(f.bucket, f.key)
+<a href="#l671" class="line" id="l671">    671</a> }
+<a href="#l672" class="line" id="l672">    672</a> 
+<a href="#l673" class="line" id="l673">    673</a> // parent returns the parent directory of the target. If the target is itself a directory, the
+<a href="#l674" class="line" id="l674">    674</a> // return value is the same as that of resolve. If the target is a file or file prefix, the nearest
+<a href="#l675" class="line" id="l675">    675</a> // path ancestor is returned.
+<a href="#l676" class="line" id="l676">    676</a> func (f *fileTarget) parent() string {
+<a href="#l677" class="line" id="l677">    677</a> 	resolved := f.resolve()
+<a href="#l678" class="line" id="l678">    678</a> 
+<a href="#l679" class="line" id="l679">    679</a> 	// The requested path may itself already be a directory, in which case the parsed dirname
+<a href="#l680" class="line" id="l680">    680</a> 	// should be discarded.
+<a href="#l681" class="line" id="l681">    681</a> 	p := filepath.Dir(resolved)
+<a href="#l682" class="line" id="l682">    682</a> 	stat, err := f.client.StatFile(resolved)
+<a href="#l683" class="line" id="l683">    683</a> 	if p == &quot;.&quot; || (err == nil &amp;&amp; stat.Mode.IsDir()) {
+<a href="#l684" class="line" id="l684">    684</a> 		p = resolved
+<a href="#l685" class="line" id="l685">    685</a> 	}
+<a href="#l686" class="line" id="l686">    686</a> 
+<a href="#l687" class="line" id="l687">    687</a> 	return p
+<a href="#l688" class="line" id="l688">    688</a> }
 </pre>
 </div>
 </body>

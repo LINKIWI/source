@@ -41,4 +41,7 @@ type Backend interface {
 
 	// Descriptor provides a structured descriptor of the backend's internal composition tree.
 	Descriptor() *common.Node
+
+	// Close releases resources associated with this backend and gracefully shuts down.
+	Close() error
 }

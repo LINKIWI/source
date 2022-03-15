@@ -49,6 +49,9 @@ The following documents each field and its expected value:
 |`client.site.banner.description`|No|Header informational banner text description|
 |`client.site.banner.link`|No|Header informational banner external link title|
 |`client.site.banner.href`|No|Header informational banner external link target URL|
+|`client.search.name`|No|Search engine plugin name|
+|`client.search.description`|No|Search engine plugin description|
+|`client.search.base_url`|No|Instance base URL used by the search engine plugin for search executions|
 |`client.options.metadata_poll_interval`|No|Poll interval for new server metadata in milliseconds|
 |`client.resources[].title`|No|Title for an arbitrary external link shown in the Admin section|
 |`client.resources[].href`|No|URL for an associated external link shown in the Admin section|

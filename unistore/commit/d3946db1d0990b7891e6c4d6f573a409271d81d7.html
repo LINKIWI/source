@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/backend: Add Close interface method to Backend and implement for all storage layers - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/d3946db1d0990b7891e6c4d6f573a409271d81d7">d3946db1d0990b7891e6c4d6f573a409271d81d7</a>
+<b>parent</b> <a href="../commit/4c5ac80b8885c1d9411c5f76179ac8bb23bb9603">4c5ac80b8885c1d9411c5f76179ac8bb23bb9603</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sat 12 Mar 2022 20:07:07 -0800
+
+internal/backend: Add Close interface method to Backend and implement for all storage layers
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">internal/backend/b2.go</a></td><td> | </td><td class="num">5</td><td><span class="i">+++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">internal/backend/composite.go</a></td><td> | </td><td class="num">20</td><td><span class="i">++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">internal/backend/disk.go</a></td><td> | </td><td class="num">5</td><td><span class="i">+++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">internal/backend/mux.go</a></td><td> | </td><td class="num">20</td><td><span class="i">++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h4">internal/backend/types.go</a></td><td> | </td><td class="num">3</td><td><span class="i">+++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h5">internal/backend/unistore.go</a></td><td> | </td><td class="num">5</td><td><span class="i">+++++</span><span class="d"></span></td></tr>
+</table></pre><pre>6 files changed, 58 insertions(+), 0 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/backend/b2.go">internal/backend/b2.go</a> b/<a href="../file/internal/backend/b2.go">internal/backend/b2.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -925,6 +925,11 @@ func (b *B2) Descriptor() *common.Node {
+</a> 	}
+ }
+ 
+<a href="#h0-0-3" id="h0-0-3" class="i">+// Close is a noop.
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+func (b *B2) Close() error {
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+	return nil
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+}
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+
+</a> // String returns a human-consumable representation of this backend.
+ func (b *B2) String() string {
+ 	return schemas.MarshalDescriptor(b.Descriptor())
+<b>diff --git a/<a id="h1" href="../file/internal/backend/composite.go">internal/backend/composite.go</a> b/<a href="../file/internal/backend/composite.go">internal/backend/composite.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -273,6 +273,26 @@ func (c *Composite) Descriptor() *common.Node {
+</a> 	}
+ }
+ 
+<a href="#h1-0-3" id="h1-0-3" class="i">+// Close closes all backends asynchronously, waits for all closes to complete, and returns the first
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+// error if available, or nil if there are no errors.
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+func (c *Composite) Close() error {
+</a><a href="#h1-0-6" id="h1-0-6" class="i">+	errs := make(chan error, len(c.backends))
+</a><a href="#h1-0-7" id="h1-0-7" class="i">+
+</a><a href="#h1-0-8" id="h1-0-8" class="i">+	for _, backend := range c.backends {
+</a><a href="#h1-0-9" id="h1-0-9" class="i">+		go func(backend Backend) {
+</a><a href="#h1-0-10" id="h1-0-10" class="i">+			errs &lt;- backend.Close()
+</a><a href="#h1-0-11" id="h1-0-11" class="i">+		}(backend)
+</a><a href="#h1-0-12" id="h1-0-12" class="i">+	}
+</a><a href="#h1-0-13" id="h1-0-13" class="i">+
+</a><a href="#h1-0-14" id="h1-0-14" class="i">+	for i := 0; i &lt; len(c.backends); i++ {
+</a><a href="#h1-0-15" id="h1-0-15" class="i">+		if err := &lt;-errs; err != nil {
+</a><a href="#h1-0-16" id="h1-0-16" class="i">+			return err
+</a><a href="#h1-0-17" id="h1-0-17" class="i">+		}
+</a><a href="#h1-0-18" id="h1-0-18" class="i">+	}
+</a><a href="#h1-0-19" id="h1-0-19" class="i">+
+</a><a href="#h1-0-20" id="h1-0-20" class="i">+	return nil
+</a><a href="#h1-0-21" id="h1-0-21" class="i">+}
+</a><a href="#h1-0-22" id="h1-0-22" class="i">+
+</a> // String returns a human-consumable representation of this backend.
+ func (c *Composite) String() string {
+ 	return schemas.MarshalDescriptor(c.Descriptor())
+<b>diff --git a/<a id="h2" href="../file/internal/backend/disk.go">internal/backend/disk.go</a> b/<a href="../file/internal/backend/disk.go">internal/backend/disk.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -599,6 +599,11 @@ func (d *Disk) Descriptor() *common.Node {
+</a> 	}
+ }
+ 
+<a href="#h2-0-3" id="h2-0-3" class="i">+// Close is a noop.
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+func (d *Disk) Close() error {
+</a><a href="#h2-0-5" id="h2-0-5" class="i">+	return nil
+</a><a href="#h2-0-6" id="h2-0-6" class="i">+}
+</a><a href="#h2-0-7" id="h2-0-7" class="i">+
+</a> // String returns a human-consumable representation of this backend.
+ func (d *Disk) String() string {
+ 	return schemas.MarshalDescriptor(d.Descriptor())
+<b>diff --git a/<a id="h3" href="../file/internal/backend/mux.go">internal/backend/mux.go</a> b/<a href="../file/internal/backend/mux.go">internal/backend/mux.go</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -190,6 +190,26 @@ func (m *Mux) Descriptor() *common.Node {
+</a> 	}
+ }
+ 
+<a href="#h3-0-3" id="h3-0-3" class="i">+// Close closes all backends asynchronously, waits for all closes to complete, and returns the first
+</a><a href="#h3-0-4" id="h3-0-4" class="i">+// error if available, or nil if there are no errors.
+</a><a href="#h3-0-5" id="h3-0-5" class="i">+func (m *Mux) Close() error {
+</a><a href="#h3-0-6" id="h3-0-6" class="i">+	errs := make(chan error, len(m.backends))
+</a><a href="#h3-0-7" id="h3-0-7" class="i">+
+</a><a href="#h3-0-8" id="h3-0-8" class="i">+	for _, backend := range m.backends {
+</a><a href="#h3-0-9" id="h3-0-9" class="i">+		go func(backend Backend) {
+</a><a href="#h3-0-10" id="h3-0-10" class="i">+			errs &lt;- backend.Close()
+</a><a href="#h3-0-11" id="h3-0-11" class="i">+		}(backend)
+</a><a href="#h3-0-12" id="h3-0-12" class="i">+	}
+</a><a href="#h3-0-13" id="h3-0-13" class="i">+
+</a><a href="#h3-0-14" id="h3-0-14" class="i">+	for i := 0; i &lt; len(m.backends); i++ {
+</a><a href="#h3-0-15" id="h3-0-15" class="i">+		if err := &lt;-errs; err != nil {
+</a><a href="#h3-0-16" id="h3-0-16" class="i">+			return err
+</a><a href="#h3-0-17" id="h3-0-17" class="i">+		}
+</a><a href="#h3-0-18" id="h3-0-18" class="i">+	}
+</a><a href="#h3-0-19" id="h3-0-19" class="i">+
+</a><a href="#h3-0-20" id="h3-0-20" class="i">+	return nil
+</a><a href="#h3-0-21" id="h3-0-21" class="i">+}
+</a><a href="#h3-0-22" id="h3-0-22" class="i">+
+</a> // String returns a human-consumable representation of this backend.
+ func (m *Mux) String() string {
+ 	return schemas.MarshalDescriptor(m.Descriptor())
+<b>diff --git a/<a id="h4" href="../file/internal/backend/types.go">internal/backend/types.go</a> b/<a href="../file/internal/backend/types.go">internal/backend/types.go</a></b>
+<a href="#h4-0" id="h4-0" class="h">@@ -41,4 +41,7 @@ type Backend interface {
+</a> 
+ 	// Descriptor provides a structured descriptor of the backend&#39;s internal composition tree.
+ 	Descriptor() *common.Node
+<a href="#h4-0-3" id="h4-0-3" class="i">+
+</a><a href="#h4-0-4" id="h4-0-4" class="i">+	// Close releases resources associated with this backend and gracefully shuts down.
+</a><a href="#h4-0-5" id="h4-0-5" class="i">+	Close() error
+</a> }
+<b>diff --git a/<a id="h5" href="../file/internal/backend/unistore.go">internal/backend/unistore.go</a> b/<a href="../file/internal/backend/unistore.go">internal/backend/unistore.go</a></b>
+<a href="#h5-0" id="h5-0" class="h">@@ -245,6 +245,11 @@ func (u *Unistore) Descriptor() *common.Node {
+</a> 	}
+ }
+ 
+<a href="#h5-0-3" id="h5-0-3" class="i">+// Close closes the underlying Unistore gRPC client.
+</a><a href="#h5-0-4" id="h5-0-4" class="i">+func (u *Unistore) Close() error {
+</a><a href="#h5-0-5" id="h5-0-5" class="i">+	return u.client.Close()
+</a><a href="#h5-0-6" id="h5-0-6" class="i">+}
+</a><a href="#h5-0-7" id="h5-0-7" class="i">+
+</a> // String returns a human-consumable representation of this backend.
+ func (u *Unistore) String() string {
+ 	return schemas.MarshalDescriptor(u.Descriptor())
+</pre>
+</div>
+</body>
+</html>

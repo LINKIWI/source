@@ -7,6 +7,7 @@ import SourceHandler from 'server/handlers/api/source';
 import HealthHandler from 'server/handlers/meta/health';
 import FallbackHandler from 'server/handlers/view/fallback';
 import FrontendHandler from 'server/handlers/view/frontend';
+import ResourceHandler from 'server/handlers/view/resource';
 
 export default [
   AdminConfigHandler,
@@ -19,5 +20,6 @@ export default [
   SourceHandler,
   HealthHandler,
   FrontendHandler,
+  ResourceHandler,
   FallbackHandler,
 ];

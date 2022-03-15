@@ -2,6 +2,8 @@ package backend
 
 import (
 	"context"
+	"sort"
+	"strings"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -174,7 +176,13 @@ func (m *Mux) ListObjects(ctx context.Context, request *service.ListObjectsReque
 
 // Descriptor returns a structured Protobuf-defined descriptor of this backend.
 func (m *Mux) Descriptor() *common.Node {
-	children := make(map[string]*common.Node_Value)
+	ids := make([]string, 0, len(m.backends))
+	children := make(map[string]*common.Node_Value, len(m.backends))
+
+	for id := range m.backends {
+		ids = append(ids, id.String())
+	}
+	sort.Strings(ids)
 
 	for id, backend := range m.backends {
 		children[id.String()] = &common.Node_Value{
@@ -184,10 +192,36 @@ func (m *Mux) Descriptor() *common.Node {
 		}
 	}
 
+	children["backends"] = &common.Node_Value{
+		Child: &common.Node_Value_Value{
+			Value: strings.Join(ids, ", "),
+		},
+	}
+
 	return &common.Node{
 		Name:     "mux",
 		Children: children,
 	}
+}
+
+// Close closes all backends asynchronously, waits for all closes to complete, and returns the first
+// error if available, or nil if there are no errors.
+func (m *Mux) Close() error {
+	errs := make(chan error, len(m.backends))
+
+	for _, backend := range m.backends {
+		go func(backend Backend) {
+			errs <- backend.Close()
+		}(backend)
+	}
+
+	for i := 0; i < len(m.backends); i++ {
+		if err := <-errs; err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // String returns a human-consumable representation of this backend.

@@ -599,6 +599,11 @@ func (d *Disk) Descriptor() *common.Node {
 	}
 }
 
+// Close is a noop.
+func (d *Disk) Close() error {
+	return nil
+}
+
 // String returns a human-consumable representation of this backend.
 func (d *Disk) String() string {
 	return schemas.MarshalDescriptor(d.Descriptor())

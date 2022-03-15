@@ -35,6 +35,8 @@ func New(path string) (*Config, error) {
 		}
 	}
 
+	defer file.Close()
+
 	decoder := yaml.NewDecoder(file)
 	decoder.KnownFields(true)
 

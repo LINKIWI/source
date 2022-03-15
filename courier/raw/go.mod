@@ -9,7 +9,7 @@ require (
 	go.uber.org/zap v1.21.0
 	golang.org/x/crypto v0.0.0-20220214200702-86341886e292
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616
-	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd
+	golang.org/x/net v0.0.0-20220225172249-27dd8689420f
 	golang.org/x/tools v0.1.9
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 	lib.kevinlin.info/aperture v0.0.0-20220213151549-9558cca0726f

@@ -5,16 +5,16 @@ go 1.17
 require (
 	filippo.io/age v1.0.0
 	github.com/dustin/go-humanize v1.0.0
-	github.com/getsentry/sentry-go v0.12.0
-	github.com/klauspost/compress v1.14.3
-	github.com/pkg/xattr v0.4.5
-	github.com/spf13/cobra v1.3.0
+	github.com/getsentry/sentry-go v0.13.0
+	github.com/klauspost/compress v1.15.1
+	github.com/pkg/xattr v0.4.6
+	github.com/spf13/cobra v1.4.0
 	github.com/uber/prototool v1.10.0
 	go.uber.org/zap v1.21.0
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616
-	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd
+	golang.org/x/net v0.0.0-20220225172249-27dd8689420f
 	golang.org/x/tools v0.1.9
-	google.golang.org/grpc v1.44.0
+	google.golang.org/grpc v1.45.0
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.2.0
 	google.golang.org/protobuf v1.27.1
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b

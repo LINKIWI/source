@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"net"
 	"net/http"
+	"sync"
 	"sync/atomic"
 
 	"go.uber.org/zap"
@@ -96,12 +97,13 @@ type instance struct {
 
 // newInstance creates an instance wrapping a single http.Server for one listener specification.
 func newInstance(cfg *config.Listener, handler http.Handler) *instance {
-	connStats := util.NewConcurrentMap()
-	connStats.Set(http.StateNew, new(int64))
-	connStats.Set(http.StateActive, new(int64))
-	connStats.Set(http.StateIdle, new(int64))
-	connStats.Set(http.StateHijacked, new(int64))
-	connStats.Set(http.StateClosed, new(int64))
+	var connStats sync.Map
+
+	connStats.Store(http.StateNew, new(int64))
+	connStats.Store(http.StateActive, new(int64))
+	connStats.Store(http.StateIdle, new(int64))
+	connStats.Store(http.StateHijacked, new(int64))
+	connStats.Store(http.StateClosed, new(int64))
 
 	handler = h2c.NewHandler(handler, &http2.Server{})
 	handler = log.NewRequestLogHandler(cfg.Name, handler)
@@ -119,7 +121,7 @@ func newInstance(cfg *config.Listener, handler http.Handler) *instance {
 				"state":    state.String(),
 			}
 
-			stateTotal, _ := connStats.Get(state)
+			stateTotal, _ := connStats.Load(state)
 			atomic.AddInt64(stateTotal.(*int64), 1)
 
 			metrics.Client.Incr(metricConnectionStateTransition, tags)

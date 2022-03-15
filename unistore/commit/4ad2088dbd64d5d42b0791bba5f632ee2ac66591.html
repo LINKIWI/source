@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>pkg/client/unistore: Ensure client connection close routine is idempotent and synchronized - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/4ad2088dbd64d5d42b0791bba5f632ee2ac66591">4ad2088dbd64d5d42b0791bba5f632ee2ac66591</a>
+<b>parent</b> <a href="../commit/580e6b3e4be6c9e296be412370a91b8787f0100f">580e6b3e4be6c9e296be412370a91b8787f0100f</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sat 12 Mar 2022 20:51:22 -0800
+
+pkg/client/unistore: Ensure client connection close routine is idempotent and synchronized
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">pkg/client/unistore/client.go</a></td><td> | </td><td class="num">18</td><td><span class="i">+++++++++++++++</span><span class="d">---</span></td></tr>
+</table></pre><pre>1 file changed, 15 insertions(+), 3 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/pkg/client/unistore/client.go">pkg/client/unistore/client.go</a> b/<a href="../file/pkg/client/unistore/client.go">pkg/client/unistore/client.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -2,16 +2,19 @@ package unistore
+</a> 
+ import (
+ 	&quot;context&quot;
+<a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;sync&quot;
+</a> 
+ 	&quot;google.golang.org/grpc&quot;
+<a href="#h0-0-6" id="h0-0-6" class="i">+	&quot;google.golang.org/grpc/connectivity&quot;
+</a> 
+ 	&quot;unistore/schemas/service&quot;
+ )
+ 
+ // Client is a Unistore gRPC client wrapper.
+ type Client struct {
+<a href="#h0-0-13" id="h0-0-13" class="d">-	conn *grpc.ClientConn
+</a><a href="#h0-0-14" id="h0-0-14" class="d">-	meta service.MetaClient
+</a><a href="#h0-0-15" id="h0-0-15" class="i">+	conn  *grpc.ClientConn
+</a><a href="#h0-0-16" id="h0-0-16" class="i">+	meta  service.MetaClient
+</a><a href="#h0-0-17" id="h0-0-17" class="i">+	mutex sync.Mutex
+</a> 	service.UnistoreClient
+ }
+ 
+<a href="#h0-1" id="h0-1" class="h">@@ -34,7 +37,16 @@ func (c *Client) Meta() service.MetaClient {
+</a> 	return c.meta
+ }
+ 
+<a href="#h0-1-3" id="h0-1-3" class="d">-// Close closes the underlying client connection.
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+// Close idempotently closes the underlying client connection.
+</a> func (c *Client) Close() error {
+<a href="#h0-1-6" id="h0-1-6" class="i">+	c.mutex.Lock()
+</a><a href="#h0-1-7" id="h0-1-7" class="i">+	defer c.mutex.Unlock()
+</a><a href="#h0-1-8" id="h0-1-8" class="i">+
+</a><a href="#h0-1-9" id="h0-1-9" class="i">+	if c.conn.GetState() == connectivity.Shutdown {
+</a><a href="#h0-1-10" id="h0-1-10" class="i">+		// The connection has already been closed, or is in the process of being closed;
+</a><a href="#h0-1-11" id="h0-1-11" class="i">+		// this is a noop condition.
+</a><a href="#h0-1-12" id="h0-1-12" class="i">+		return nil
+</a><a href="#h0-1-13" id="h0-1-13" class="i">+	}
+</a><a href="#h0-1-14" id="h0-1-14" class="i">+
+</a> 	return c.conn.Close()
+ }
+</pre>
+</div>
+</body>
+</html>

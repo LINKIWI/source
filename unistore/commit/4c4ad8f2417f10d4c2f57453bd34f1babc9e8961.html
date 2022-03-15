@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/backend, internal/server: Structured request logging middleware - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/4c4ad8f2417f10d4c2f57453bd34f1babc9e8961">4c4ad8f2417f10d4c2f57453bd34f1babc9e8961</a>
+<b>parent</b> <a href="../commit/68242d09ff53c33fae6b9302c24859c52df344dc">68242d09ff53c33fae6b9302c24859c52df344dc</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sun 13 Mar 2022 18:32:00 -0700
+
+internal/backend, internal/server: Structured request logging middleware
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">README.md</a></td><td> | </td><td class="num">1</td><td><span class="i">+</span><span class="d"></span></td></tr>
+<tr><td class="A">A</td><td><a href="#h1">internal/backend/log.go</a></td><td> | </td><td class="num">406</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">internal/server/unistore.go</a></td><td> | </td><td class="num">90</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">--------</span></td></tr>
+</table></pre><pre>3 files changed, 488 insertions(+), 9 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/README.md">README.md</a> b/<a href="../file/README.md">README.md</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -20,6 +20,7 @@ Configurable middleware layers include:
+</a> * In-flight compression with configurable compression algorithms and levels
+ * In-flight encryption with configurable encryption mechanisms
+ * In-flight stream chunk reshaping for optimal performance
+<a href="#h0-0-3" id="h0-0-3" class="i">+* Structured request and response logging
+</a> 
+ ## Building
+ 
+<b>diff --git a/<a id="h1" href="../file/internal/backend/log.go">internal/backend/log.go</a> b/<a href="../file/internal/backend/log.go">internal/backend/log.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -0,0 +1,406 @@
+</a><a href="#h1-0-0" id="h1-0-0" class="i">+package backend
+</a><a href="#h1-0-1" id="h1-0-1" class="i">+
+</a><a href="#h1-0-2" id="h1-0-2" class="i">+import (
+</a><a href="#h1-0-3" id="h1-0-3" class="i">+	&quot;context&quot;
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+	&quot;encoding/json&quot;
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+	&quot;fmt&quot;
+</a><a href="#h1-0-6" id="h1-0-6" class="i">+	&quot;io&quot;
+</a><a href="#h1-0-7" id="h1-0-7" class="i">+	&quot;os&quot;
+</a><a href="#h1-0-8" id="h1-0-8" class="i">+	&quot;strings&quot;
+</a><a href="#h1-0-9" id="h1-0-9" class="i">+	&quot;syscall&quot;
+</a><a href="#h1-0-10" id="h1-0-10" class="i">+	&quot;time&quot;
+</a><a href="#h1-0-11" id="h1-0-11" class="i">+
+</a><a href="#h1-0-12" id="h1-0-12" class="i">+	&quot;go.uber.org/zap/zapcore&quot;
+</a><a href="#h1-0-13" id="h1-0-13" class="i">+	&quot;google.golang.org/grpc/codes&quot;
+</a><a href="#h1-0-14" id="h1-0-14" class="i">+	&quot;google.golang.org/grpc/metadata&quot;
+</a><a href="#h1-0-15" id="h1-0-15" class="i">+	&quot;google.golang.org/grpc/peer&quot;
+</a><a href="#h1-0-16" id="h1-0-16" class="i">+	&quot;google.golang.org/grpc/status&quot;
+</a><a href="#h1-0-17" id="h1-0-17" class="i">+	&quot;lib.kevinlin.info/aperture/lib&quot;
+</a><a href="#h1-0-18" id="h1-0-18" class="i">+
+</a><a href="#h1-0-19" id="h1-0-19" class="i">+	&quot;unistore/internal/schemas&quot;
+</a><a href="#h1-0-20" id="h1-0-20" class="i">+	&quot;unistore/internal/util&quot;
+</a><a href="#h1-0-21" id="h1-0-21" class="i">+	&quot;unistore/schemas/common&quot;
+</a><a href="#h1-0-22" id="h1-0-22" class="i">+	&quot;unistore/schemas/service&quot;
+</a><a href="#h1-0-23" id="h1-0-23" class="i">+)
+</a><a href="#h1-0-24" id="h1-0-24" class="i">+
+</a><a href="#h1-0-25" id="h1-0-25" class="i">+// Log is a Backend that logs all requests with request and response parameters.
+</a><a href="#h1-0-26" id="h1-0-26" class="i">+type Log struct {
+</a><a href="#h1-0-27" id="h1-0-27" class="i">+	level  zapcore.Level
+</a><a href="#h1-0-28" id="h1-0-28" class="i">+	output io.WriteCloser
+</a><a href="#h1-0-29" id="h1-0-29" class="i">+	tags   map[string]string
+</a><a href="#h1-0-30" id="h1-0-30" class="i">+	Backend
+</a><a href="#h1-0-31" id="h1-0-31" class="i">+}
+</a><a href="#h1-0-32" id="h1-0-32" class="i">+
+</a><a href="#h1-0-33" id="h1-0-33" class="i">+// NewLog creates a new Log with the specified log level, outputs, and extra static tags.
+</a><a href="#h1-0-34" id="h1-0-34" class="i">+func NewLog(level string, outputs []string, tags map[string]string, backend Backend) (Backend, error) {
+</a><a href="#h1-0-35" id="h1-0-35" class="i">+	wc := make([]io.WriteCloser, len(outputs))
+</a><a href="#h1-0-36" id="h1-0-36" class="i">+
+</a><a href="#h1-0-37" id="h1-0-37" class="i">+	// Use the convenience methods from Zap for log eligibility based on level.
+</a><a href="#h1-0-38" id="h1-0-38" class="i">+	zapLevel, err := zapcore.ParseLevel(level)
+</a><a href="#h1-0-39" id="h1-0-39" class="i">+	if err != nil {
+</a><a href="#h1-0-40" id="h1-0-40" class="i">+		return nil, err
+</a><a href="#h1-0-41" id="h1-0-41" class="i">+	}
+</a><a href="#h1-0-42" id="h1-0-42" class="i">+
+</a><a href="#h1-0-43" id="h1-0-43" class="i">+	for i, output := range outputs {
+</a><a href="#h1-0-44" id="h1-0-44" class="i">+		switch output {
+</a><a href="#h1-0-45" id="h1-0-45" class="i">+		case &quot;stdout&quot;:
+</a><a href="#h1-0-46" id="h1-0-46" class="i">+			wc[i] = os.Stdout
+</a><a href="#h1-0-47" id="h1-0-47" class="i">+		case &quot;stderr&quot;:
+</a><a href="#h1-0-48" id="h1-0-48" class="i">+			wc[i] = os.Stderr
+</a><a href="#h1-0-49" id="h1-0-49" class="i">+		default:
+</a><a href="#h1-0-50" id="h1-0-50" class="i">+			wc[i], err = os.OpenFile(
+</a><a href="#h1-0-51" id="h1-0-51" class="i">+				output,
+</a><a href="#h1-0-52" id="h1-0-52" class="i">+				syscall.O_WRONLY|syscall.O_APPEND|syscall.O_CREAT,
+</a><a href="#h1-0-53" id="h1-0-53" class="i">+				0644,
+</a><a href="#h1-0-54" id="h1-0-54" class="i">+			)
+</a><a href="#h1-0-55" id="h1-0-55" class="i">+			if err != nil {
+</a><a href="#h1-0-56" id="h1-0-56" class="i">+				return nil, err
+</a><a href="#h1-0-57" id="h1-0-57" class="i">+			}
+</a><a href="#h1-0-58" id="h1-0-58" class="i">+		}
+</a><a href="#h1-0-59" id="h1-0-59" class="i">+	}
+</a><a href="#h1-0-60" id="h1-0-60" class="i">+
+</a><a href="#h1-0-61" id="h1-0-61" class="i">+	l := &amp;Log{
+</a><a href="#h1-0-62" id="h1-0-62" class="i">+		level:   zapLevel,
+</a><a href="#h1-0-63" id="h1-0-63" class="i">+		output:  util.NewMultiWriteCloser(wc...),
+</a><a href="#h1-0-64" id="h1-0-64" class="i">+		tags:    tags,
+</a><a href="#h1-0-65" id="h1-0-65" class="i">+		Backend: backend,
+</a><a href="#h1-0-66" id="h1-0-66" class="i">+	}
+</a><a href="#h1-0-67" id="h1-0-67" class="i">+
+</a><a href="#h1-0-68" id="h1-0-68" class="i">+	return newInstrumentation(&quot;log&quot;, l), nil
+</a><a href="#h1-0-69" id="h1-0-69" class="i">+}
+</a><a href="#h1-0-70" id="h1-0-70" class="i">+
+</a><a href="#h1-0-71" id="h1-0-71" class="i">+// HeadBucket invokes the underlying backend and logs the request on completion.
+</a><a href="#h1-0-72" id="h1-0-72" class="i">+func (l *Log) HeadBucket(ctx context.Context, request *service.HeadBucketRequest) (*service.HeadBucketResponse, error) {
+</a><a href="#h1-0-73" id="h1-0-73" class="i">+	stopwatch := lib.NewStopwatch()
+</a><a href="#h1-0-74" id="h1-0-74" class="i">+	response, err := l.Backend.HeadBucket(ctx, request)
+</a><a href="#h1-0-75" id="h1-0-75" class="i">+
+</a><a href="#h1-0-76" id="h1-0-76" class="i">+	e := entry{
+</a><a href="#h1-0-77" id="h1-0-77" class="i">+		Code:     status.Convert(err).Code().String(),
+</a><a href="#h1-0-78" id="h1-0-78" class="i">+		Error:    status.Convert(err).Message(),
+</a><a href="#h1-0-79" id="h1-0-79" class="i">+		Duration: stopwatch.Elapsed().Milliseconds(),
+</a><a href="#h1-0-80" id="h1-0-80" class="i">+		Method:   &quot;HeadBucket&quot;,
+</a><a href="#h1-0-81" id="h1-0-81" class="i">+		Backend:  request.Resource.Backend.String(),
+</a><a href="#h1-0-82" id="h1-0-82" class="i">+		Bucket:   request.Resource.Bucket,
+</a><a href="#h1-0-83" id="h1-0-83" class="i">+	}
+</a><a href="#h1-0-84" id="h1-0-84" class="i">+
+</a><a href="#h1-0-85" id="h1-0-85" class="i">+	go l.log(ctx, e)
+</a><a href="#h1-0-86" id="h1-0-86" class="i">+
+</a><a href="#h1-0-87" id="h1-0-87" class="i">+	return response, err
+</a><a href="#h1-0-88" id="h1-0-88" class="i">+}
+</a><a href="#h1-0-89" id="h1-0-89" class="i">+
+</a><a href="#h1-0-90" id="h1-0-90" class="i">+// HeadObject invokes the underlying backend and logs the request on completion.
+</a><a href="#h1-0-91" id="h1-0-91" class="i">+func (l *Log) HeadObject(ctx context.Context, request *service.HeadObjectRequest) (*service.HeadObjectResponse, error) {
+</a><a href="#h1-0-92" id="h1-0-92" class="i">+	stopwatch := lib.NewStopwatch()
+</a><a href="#h1-0-93" id="h1-0-93" class="i">+	response, err := l.Backend.HeadObject(ctx, request)
+</a><a href="#h1-0-94" id="h1-0-94" class="i">+
+</a><a href="#h1-0-95" id="h1-0-95" class="i">+	e := entry{
+</a><a href="#h1-0-96" id="h1-0-96" class="i">+		Code:     status.Convert(err).Code().String(),
+</a><a href="#h1-0-97" id="h1-0-97" class="i">+		Error:    status.Convert(err).Message(),
+</a><a href="#h1-0-98" id="h1-0-98" class="i">+		Duration: stopwatch.Elapsed().Milliseconds(),
+</a><a href="#h1-0-99" id="h1-0-99" class="i">+		Method:   &quot;HeadObject&quot;,
+</a><a href="#h1-0-100" id="h1-0-100" class="i">+		Backend:  request.Resource.Backend.String(),
+</a><a href="#h1-0-101" id="h1-0-101" class="i">+		Bucket:   request.Resource.Bucket,
+</a><a href="#h1-0-102" id="h1-0-102" class="i">+		Key:      request.Key,
+</a><a href="#h1-0-103" id="h1-0-103" class="i">+	}
+</a><a href="#h1-0-104" id="h1-0-104" class="i">+	if response != nil &amp;&amp; response.Metadata != nil {
+</a><a href="#h1-0-105" id="h1-0-105" class="i">+		e.Size = response.Metadata.Size
+</a><a href="#h1-0-106" id="h1-0-106" class="i">+	}
+</a><a href="#h1-0-107" id="h1-0-107" class="i">+
+</a><a href="#h1-0-108" id="h1-0-108" class="i">+	go l.log(ctx, e)
+</a><a href="#h1-0-109" id="h1-0-109" class="i">+
+</a><a href="#h1-0-110" id="h1-0-110" class="i">+	return response, err
+</a><a href="#h1-0-111" id="h1-0-111" class="i">+}
+</a><a href="#h1-0-112" id="h1-0-112" class="i">+
+</a><a href="#h1-0-113" id="h1-0-113" class="i">+// GetObject invokes the underlying backend and logs the request on completion.
+</a><a href="#h1-0-114" id="h1-0-114" class="i">+func (l *Log) GetObject(ctx context.Context, request *service.GetObjectRequest) (*service.GetObjectResponse, error) {
+</a><a href="#h1-0-115" id="h1-0-115" class="i">+	stopwatch := lib.NewStopwatch()
+</a><a href="#h1-0-116" id="h1-0-116" class="i">+	response, err := l.Backend.GetObject(ctx, request)
+</a><a href="#h1-0-117" id="h1-0-117" class="i">+
+</a><a href="#h1-0-118" id="h1-0-118" class="i">+	e := entry{
+</a><a href="#h1-0-119" id="h1-0-119" class="i">+		Code:     status.Convert(err).Code().String(),
+</a><a href="#h1-0-120" id="h1-0-120" class="i">+		Error:    status.Convert(err).Message(),
+</a><a href="#h1-0-121" id="h1-0-121" class="i">+		Duration: stopwatch.Elapsed().Milliseconds(),
+</a><a href="#h1-0-122" id="h1-0-122" class="i">+		Method:   &quot;GetObject&quot;,
+</a><a href="#h1-0-123" id="h1-0-123" class="i">+		Backend:  request.Resource.Backend.String(),
+</a><a href="#h1-0-124" id="h1-0-124" class="i">+		Bucket:   request.Resource.Bucket,
+</a><a href="#h1-0-125" id="h1-0-125" class="i">+		Key:      request.Key,
+</a><a href="#h1-0-126" id="h1-0-126" class="i">+	}
+</a><a href="#h1-0-127" id="h1-0-127" class="i">+	if response != nil &amp;&amp; response.Metadata != nil {
+</a><a href="#h1-0-128" id="h1-0-128" class="i">+		e.Size = response.Metadata.Size
+</a><a href="#h1-0-129" id="h1-0-129" class="i">+	}
+</a><a href="#h1-0-130" id="h1-0-130" class="i">+
+</a><a href="#h1-0-131" id="h1-0-131" class="i">+	go l.log(ctx, e)
+</a><a href="#h1-0-132" id="h1-0-132" class="i">+
+</a><a href="#h1-0-133" id="h1-0-133" class="i">+	return response, err
+</a><a href="#h1-0-134" id="h1-0-134" class="i">+}
+</a><a href="#h1-0-135" id="h1-0-135" class="i">+
+</a><a href="#h1-0-136" id="h1-0-136" class="i">+// StreamGetObject invokes the underlying backend and logs the request on completion.
+</a><a href="#h1-0-137" id="h1-0-137" class="i">+func (l *Log) StreamGetObject(ctx context.Context, request *service.GetObjectStreamRequest) (&lt;-chan *service.GetObjectStreamResponse, chan error) {
+</a><a href="#h1-0-138" id="h1-0-138" class="i">+	responseProxy := make(chan *service.GetObjectStreamResponse)
+</a><a href="#h1-0-139" id="h1-0-139" class="i">+	errsProxy := make(chan error, 1)
+</a><a href="#h1-0-140" id="h1-0-140" class="i">+	stopwatch := lib.NewStopwatch()
+</a><a href="#h1-0-141" id="h1-0-141" class="i">+
+</a><a href="#h1-0-142" id="h1-0-142" class="i">+	e := entry{
+</a><a href="#h1-0-143" id="h1-0-143" class="i">+		Method:  &quot;StreamGetObject&quot;,
+</a><a href="#h1-0-144" id="h1-0-144" class="i">+		Backend: request.Request.Resource.Backend.String(),
+</a><a href="#h1-0-145" id="h1-0-145" class="i">+		Bucket:  request.Request.Resource.Bucket,
+</a><a href="#h1-0-146" id="h1-0-146" class="i">+		Key:     request.Request.Key,
+</a><a href="#h1-0-147" id="h1-0-147" class="i">+	}
+</a><a href="#h1-0-148" id="h1-0-148" class="i">+
+</a><a href="#h1-0-149" id="h1-0-149" class="i">+	stream, errs := l.Backend.StreamGetObject(ctx, request)
+</a><a href="#h1-0-150" id="h1-0-150" class="i">+	if stream == nil {
+</a><a href="#h1-0-151" id="h1-0-151" class="i">+		err := &lt;-errs
+</a><a href="#h1-0-152" id="h1-0-152" class="i">+		st := status.Convert(err)
+</a><a href="#h1-0-153" id="h1-0-153" class="i">+
+</a><a href="#h1-0-154" id="h1-0-154" class="i">+		e.Code = st.Code().String()
+</a><a href="#h1-0-155" id="h1-0-155" class="i">+		e.Error = st.Message()
+</a><a href="#h1-0-156" id="h1-0-156" class="i">+		e.Duration = stopwatch.Elapsed().Milliseconds()
+</a><a href="#h1-0-157" id="h1-0-157" class="i">+		go l.log(ctx, e)
+</a><a href="#h1-0-158" id="h1-0-158" class="i">+
+</a><a href="#h1-0-159" id="h1-0-159" class="i">+		errsProxy &lt;- err
+</a><a href="#h1-0-160" id="h1-0-160" class="i">+		return nil, errsProxy
+</a><a href="#h1-0-161" id="h1-0-161" class="i">+	}
+</a><a href="#h1-0-162" id="h1-0-162" class="i">+
+</a><a href="#h1-0-163" id="h1-0-163" class="i">+	go func() {
+</a><a href="#h1-0-164" id="h1-0-164" class="i">+		var size uint64
+</a><a href="#h1-0-165" id="h1-0-165" class="i">+
+</a><a href="#h1-0-166" id="h1-0-166" class="i">+		for {
+</a><a href="#h1-0-167" id="h1-0-167" class="i">+			select {
+</a><a href="#h1-0-168" id="h1-0-168" class="i">+			case err := &lt;-errs:
+</a><a href="#h1-0-169" id="h1-0-169" class="i">+				st := status.Convert(err)
+</a><a href="#h1-0-170" id="h1-0-170" class="i">+
+</a><a href="#h1-0-171" id="h1-0-171" class="i">+				e.Code = st.Code().String()
+</a><a href="#h1-0-172" id="h1-0-172" class="i">+				e.Error = st.Message()
+</a><a href="#h1-0-173" id="h1-0-173" class="i">+				e.Duration = stopwatch.Elapsed().Milliseconds()
+</a><a href="#h1-0-174" id="h1-0-174" class="i">+				e.Size = size
+</a><a href="#h1-0-175" id="h1-0-175" class="i">+				go l.log(ctx, e)
+</a><a href="#h1-0-176" id="h1-0-176" class="i">+
+</a><a href="#h1-0-177" id="h1-0-177" class="i">+				errsProxy &lt;- err
+</a><a href="#h1-0-178" id="h1-0-178" class="i">+				return
+</a><a href="#h1-0-179" id="h1-0-179" class="i">+			case response, ok := &lt;-stream:
+</a><a href="#h1-0-180" id="h1-0-180" class="i">+				if !ok {
+</a><a href="#h1-0-181" id="h1-0-181" class="i">+					e.Code = codes.OK.String()
+</a><a href="#h1-0-182" id="h1-0-182" class="i">+					e.Duration = stopwatch.Elapsed().Milliseconds()
+</a><a href="#h1-0-183" id="h1-0-183" class="i">+					e.Size = size
+</a><a href="#h1-0-184" id="h1-0-184" class="i">+					go l.log(ctx, e)
+</a><a href="#h1-0-185" id="h1-0-185" class="i">+
+</a><a href="#h1-0-186" id="h1-0-186" class="i">+					close(responseProxy)
+</a><a href="#h1-0-187" id="h1-0-187" class="i">+					return
+</a><a href="#h1-0-188" id="h1-0-188" class="i">+				}
+</a><a href="#h1-0-189" id="h1-0-189" class="i">+
+</a><a href="#h1-0-190" id="h1-0-190" class="i">+				size = response.Response.Metadata.Size
+</a><a href="#h1-0-191" id="h1-0-191" class="i">+
+</a><a href="#h1-0-192" id="h1-0-192" class="i">+				responseProxy &lt;- response
+</a><a href="#h1-0-193" id="h1-0-193" class="i">+			}
+</a><a href="#h1-0-194" id="h1-0-194" class="i">+		}
+</a><a href="#h1-0-195" id="h1-0-195" class="i">+	}()
+</a><a href="#h1-0-196" id="h1-0-196" class="i">+
+</a><a href="#h1-0-197" id="h1-0-197" class="i">+	return responseProxy, errsProxy
+</a><a href="#h1-0-198" id="h1-0-198" class="i">+}
+</a><a href="#h1-0-199" id="h1-0-199" class="i">+
+</a><a href="#h1-0-200" id="h1-0-200" class="i">+// PutObject invokes the underlying backend and logs the request on completion.
+</a><a href="#h1-0-201" id="h1-0-201" class="i">+func (l *Log) PutObject(ctx context.Context, request *service.PutObjectRequest) (*service.PutObjectResponse, error) {
+</a><a href="#h1-0-202" id="h1-0-202" class="i">+	stopwatch := lib.NewStopwatch()
+</a><a href="#h1-0-203" id="h1-0-203" class="i">+	response, err := l.Backend.PutObject(ctx, request)
+</a><a href="#h1-0-204" id="h1-0-204" class="i">+
+</a><a href="#h1-0-205" id="h1-0-205" class="i">+	e := entry{
+</a><a href="#h1-0-206" id="h1-0-206" class="i">+		Code:     status.Convert(err).Code().String(),
+</a><a href="#h1-0-207" id="h1-0-207" class="i">+		Error:    status.Convert(err).Message(),
+</a><a href="#h1-0-208" id="h1-0-208" class="i">+		Duration: stopwatch.Elapsed().Milliseconds(),
+</a><a href="#h1-0-209" id="h1-0-209" class="i">+		Method:   &quot;PutObject&quot;,
+</a><a href="#h1-0-210" id="h1-0-210" class="i">+		Backend:  request.Resource.Backend.String(),
+</a><a href="#h1-0-211" id="h1-0-211" class="i">+		Bucket:   request.Resource.Bucket,
+</a><a href="#h1-0-212" id="h1-0-212" class="i">+		Key:      request.Key,
+</a><a href="#h1-0-213" id="h1-0-213" class="i">+		Size:     uint64(len(request.Data)),
+</a><a href="#h1-0-214" id="h1-0-214" class="i">+	}
+</a><a href="#h1-0-215" id="h1-0-215" class="i">+
+</a><a href="#h1-0-216" id="h1-0-216" class="i">+	go l.log(ctx, e)
+</a><a href="#h1-0-217" id="h1-0-217" class="i">+
+</a><a href="#h1-0-218" id="h1-0-218" class="i">+	return response, err
+</a><a href="#h1-0-219" id="h1-0-219" class="i">+}
+</a><a href="#h1-0-220" id="h1-0-220" class="i">+
+</a><a href="#h1-0-221" id="h1-0-221" class="i">+// StreamPutObject invokes the underlying backend and logs the request on completion.
+</a><a href="#h1-0-222" id="h1-0-222" class="i">+func (l *Log) StreamPutObject(ctx context.Context, stream chan *service.PutObjectStreamRequest) (*service.PutObjectStreamResponse, error) {
+</a><a href="#h1-0-223" id="h1-0-223" class="i">+	var request *service.PutObjectStreamRequest
+</a><a href="#h1-0-224" id="h1-0-224" class="i">+	var size uint64
+</a><a href="#h1-0-225" id="h1-0-225" class="i">+
+</a><a href="#h1-0-226" id="h1-0-226" class="i">+	proxy := make(chan *service.PutObjectStreamRequest)
+</a><a href="#h1-0-227" id="h1-0-227" class="i">+	stopwatch := lib.NewStopwatch()
+</a><a href="#h1-0-228" id="h1-0-228" class="i">+
+</a><a href="#h1-0-229" id="h1-0-229" class="i">+	e := entry{
+</a><a href="#h1-0-230" id="h1-0-230" class="i">+		Method:  &quot;StreamPutObject&quot;,
+</a><a href="#h1-0-231" id="h1-0-231" class="i">+		Backend: common.Backend_EMPTY.String(),
+</a><a href="#h1-0-232" id="h1-0-232" class="i">+		Bucket:  &quot;unknown&quot;,
+</a><a href="#h1-0-233" id="h1-0-233" class="i">+	}
+</a><a href="#h1-0-234" id="h1-0-234" class="i">+
+</a><a href="#h1-0-235" id="h1-0-235" class="i">+	go func() {
+</a><a href="#h1-0-236" id="h1-0-236" class="i">+		for request = range stream {
+</a><a href="#h1-0-237" id="h1-0-237" class="i">+			size += uint64(len(request.Request.Data))
+</a><a href="#h1-0-238" id="h1-0-238" class="i">+
+</a><a href="#h1-0-239" id="h1-0-239" class="i">+			proxy &lt;- request
+</a><a href="#h1-0-240" id="h1-0-240" class="i">+		}
+</a><a href="#h1-0-241" id="h1-0-241" class="i">+
+</a><a href="#h1-0-242" id="h1-0-242" class="i">+		close(proxy)
+</a><a href="#h1-0-243" id="h1-0-243" class="i">+	}()
+</a><a href="#h1-0-244" id="h1-0-244" class="i">+
+</a><a href="#h1-0-245" id="h1-0-245" class="i">+	response, err := l.Backend.StreamPutObject(ctx, proxy)
+</a><a href="#h1-0-246" id="h1-0-246" class="i">+	if err != nil {
+</a><a href="#h1-0-247" id="h1-0-247" class="i">+		st := status.Convert(err)
+</a><a href="#h1-0-248" id="h1-0-248" class="i">+
+</a><a href="#h1-0-249" id="h1-0-249" class="i">+		e.Code = st.Code().String()
+</a><a href="#h1-0-250" id="h1-0-250" class="i">+		e.Error = st.Message()
+</a><a href="#h1-0-251" id="h1-0-251" class="i">+		e.Duration = stopwatch.Elapsed().Milliseconds()
+</a><a href="#h1-0-252" id="h1-0-252" class="i">+		e.Size = size
+</a><a href="#h1-0-253" id="h1-0-253" class="i">+		if request != nil {
+</a><a href="#h1-0-254" id="h1-0-254" class="i">+			e.Backend = request.Request.Resource.Backend.String()
+</a><a href="#h1-0-255" id="h1-0-255" class="i">+			e.Bucket = request.Request.Resource.Bucket
+</a><a href="#h1-0-256" id="h1-0-256" class="i">+			e.Key = request.Request.Key
+</a><a href="#h1-0-257" id="h1-0-257" class="i">+		}
+</a><a href="#h1-0-258" id="h1-0-258" class="i">+		go l.log(ctx, e)
+</a><a href="#h1-0-259" id="h1-0-259" class="i">+
+</a><a href="#h1-0-260" id="h1-0-260" class="i">+		return nil, err
+</a><a href="#h1-0-261" id="h1-0-261" class="i">+	}
+</a><a href="#h1-0-262" id="h1-0-262" class="i">+
+</a><a href="#h1-0-263" id="h1-0-263" class="i">+	e.Code = codes.OK.String()
+</a><a href="#h1-0-264" id="h1-0-264" class="i">+	e.Duration = stopwatch.Elapsed().Milliseconds()
+</a><a href="#h1-0-265" id="h1-0-265" class="i">+	e.Backend = request.Request.Resource.Backend.String()
+</a><a href="#h1-0-266" id="h1-0-266" class="i">+	e.Bucket = request.Request.Resource.Bucket
+</a><a href="#h1-0-267" id="h1-0-267" class="i">+	e.Key = request.Request.Key
+</a><a href="#h1-0-268" id="h1-0-268" class="i">+	e.Size = size
+</a><a href="#h1-0-269" id="h1-0-269" class="i">+	go l.log(ctx, e)
+</a><a href="#h1-0-270" id="h1-0-270" class="i">+
+</a><a href="#h1-0-271" id="h1-0-271" class="i">+	return response, err
+</a><a href="#h1-0-272" id="h1-0-272" class="i">+}
+</a><a href="#h1-0-273" id="h1-0-273" class="i">+
+</a><a href="#h1-0-274" id="h1-0-274" class="i">+// DeleteObject invokes the underlying backend and logs the request on completion.
+</a><a href="#h1-0-275" id="h1-0-275" class="i">+func (l *Log) DeleteObject(ctx context.Context, request *service.DeleteObjectRequest) (*service.DeleteObjectResponse, error) {
+</a><a href="#h1-0-276" id="h1-0-276" class="i">+	stopwatch := lib.NewStopwatch()
+</a><a href="#h1-0-277" id="h1-0-277" class="i">+	response, err := l.Backend.DeleteObject(ctx, request)
+</a><a href="#h1-0-278" id="h1-0-278" class="i">+
+</a><a href="#h1-0-279" id="h1-0-279" class="i">+	e := entry{
+</a><a href="#h1-0-280" id="h1-0-280" class="i">+		Code:     status.Convert(err).Code().String(),
+</a><a href="#h1-0-281" id="h1-0-281" class="i">+		Error:    status.Convert(err).Message(),
+</a><a href="#h1-0-282" id="h1-0-282" class="i">+		Duration: stopwatch.Elapsed().Milliseconds(),
+</a><a href="#h1-0-283" id="h1-0-283" class="i">+		Method:   &quot;DeleteObject&quot;,
+</a><a href="#h1-0-284" id="h1-0-284" class="i">+		Backend:  request.Resource.Backend.String(),
+</a><a href="#h1-0-285" id="h1-0-285" class="i">+		Bucket:   request.Resource.Bucket,
+</a><a href="#h1-0-286" id="h1-0-286" class="i">+		Key:      request.Key,
+</a><a href="#h1-0-287" id="h1-0-287" class="i">+	}
+</a><a href="#h1-0-288" id="h1-0-288" class="i">+
+</a><a href="#h1-0-289" id="h1-0-289" class="i">+	go l.log(ctx, e)
+</a><a href="#h1-0-290" id="h1-0-290" class="i">+
+</a><a href="#h1-0-291" id="h1-0-291" class="i">+	return response, err
+</a><a href="#h1-0-292" id="h1-0-292" class="i">+}
+</a><a href="#h1-0-293" id="h1-0-293" class="i">+
+</a><a href="#h1-0-294" id="h1-0-294" class="i">+// ListBuckets invokes the underlying backend and logs the request on completion.
+</a><a href="#h1-0-295" id="h1-0-295" class="i">+func (l *Log) ListBuckets(ctx context.Context, request *service.ListBucketsRequest) (*service.ListBucketsResponse, error) {
+</a><a href="#h1-0-296" id="h1-0-296" class="i">+	stopwatch := lib.NewStopwatch()
+</a><a href="#h1-0-297" id="h1-0-297" class="i">+	response, err := l.Backend.ListBuckets(ctx, request)
+</a><a href="#h1-0-298" id="h1-0-298" class="i">+
+</a><a href="#h1-0-299" id="h1-0-299" class="i">+	e := entry{
+</a><a href="#h1-0-300" id="h1-0-300" class="i">+		Code:     status.Convert(err).Code().String(),
+</a><a href="#h1-0-301" id="h1-0-301" class="i">+		Error:    status.Convert(err).Message(),
+</a><a href="#h1-0-302" id="h1-0-302" class="i">+		Duration: stopwatch.Elapsed().Milliseconds(),
+</a><a href="#h1-0-303" id="h1-0-303" class="i">+		Method:   &quot;ListBuckets&quot;,
+</a><a href="#h1-0-304" id="h1-0-304" class="i">+		Backend:  request.Resource.Backend.String(),
+</a><a href="#h1-0-305" id="h1-0-305" class="i">+		Bucket:   request.Resource.Bucket,
+</a><a href="#h1-0-306" id="h1-0-306" class="i">+	}
+</a><a href="#h1-0-307" id="h1-0-307" class="i">+
+</a><a href="#h1-0-308" id="h1-0-308" class="i">+	go l.log(ctx, e)
+</a><a href="#h1-0-309" id="h1-0-309" class="i">+
+</a><a href="#h1-0-310" id="h1-0-310" class="i">+	return response, err
+</a><a href="#h1-0-311" id="h1-0-311" class="i">+}
+</a><a href="#h1-0-312" id="h1-0-312" class="i">+
+</a><a href="#h1-0-313" id="h1-0-313" class="i">+// ListObjects invokes the underlying backend and logs the request on completion.
+</a><a href="#h1-0-314" id="h1-0-314" class="i">+func (l *Log) ListObjects(ctx context.Context, request *service.ListObjectsRequest) (*service.ListObjectsResponse, error) {
+</a><a href="#h1-0-315" id="h1-0-315" class="i">+	stopwatch := lib.NewStopwatch()
+</a><a href="#h1-0-316" id="h1-0-316" class="i">+	response, err := l.Backend.ListObjects(ctx, request)
+</a><a href="#h1-0-317" id="h1-0-317" class="i">+
+</a><a href="#h1-0-318" id="h1-0-318" class="i">+	e := entry{
+</a><a href="#h1-0-319" id="h1-0-319" class="i">+		Code:     status.Convert(err).Code().String(),
+</a><a href="#h1-0-320" id="h1-0-320" class="i">+		Error:    status.Convert(err).Message(),
+</a><a href="#h1-0-321" id="h1-0-321" class="i">+		Duration: stopwatch.Elapsed().Milliseconds(),
+</a><a href="#h1-0-322" id="h1-0-322" class="i">+		Method:   &quot;ListObjects&quot;,
+</a><a href="#h1-0-323" id="h1-0-323" class="i">+		Backend:  request.Resource.Backend.String(),
+</a><a href="#h1-0-324" id="h1-0-324" class="i">+		Bucket:   request.Resource.Bucket,
+</a><a href="#h1-0-325" id="h1-0-325" class="i">+		Key:      request.Prefix,
+</a><a href="#h1-0-326" id="h1-0-326" class="i">+	}
+</a><a href="#h1-0-327" id="h1-0-327" class="i">+
+</a><a href="#h1-0-328" id="h1-0-328" class="i">+	go l.log(ctx, e)
+</a><a href="#h1-0-329" id="h1-0-329" class="i">+
+</a><a href="#h1-0-330" id="h1-0-330" class="i">+	return response, err
+</a><a href="#h1-0-331" id="h1-0-331" class="i">+}
+</a><a href="#h1-0-332" id="h1-0-332" class="i">+
+</a><a href="#h1-0-333" id="h1-0-333" class="i">+// Descriptor returns a structured Protobuf-defined descriptor of this backend.
+</a><a href="#h1-0-334" id="h1-0-334" class="i">+func (l *Log) Descriptor() *common.Node {
+</a><a href="#h1-0-335" id="h1-0-335" class="i">+	return &amp;common.Node{
+</a><a href="#h1-0-336" id="h1-0-336" class="i">+		Name: &quot;log&quot;,
+</a><a href="#h1-0-337" id="h1-0-337" class="i">+		Children: map[string]*common.Node_Value{
+</a><a href="#h1-0-338" id="h1-0-338" class="i">+			&quot;level&quot;:   {Child: &amp;common.Node_Value_Value{Value: l.level.String()}},
+</a><a href="#h1-0-339" id="h1-0-339" class="i">+			&quot;backend&quot;: {Child: &amp;common.Node_Value_Node{Node: l.Backend.Descriptor()}},
+</a><a href="#h1-0-340" id="h1-0-340" class="i">+		},
+</a><a href="#h1-0-341" id="h1-0-341" class="i">+	}
+</a><a href="#h1-0-342" id="h1-0-342" class="i">+}
+</a><a href="#h1-0-343" id="h1-0-343" class="i">+
+</a><a href="#h1-0-344" id="h1-0-344" class="i">+// Close closes the io.WriteClosers used for logging outputs.
+</a><a href="#h1-0-345" id="h1-0-345" class="i">+func (l *Log) Close() error {
+</a><a href="#h1-0-346" id="h1-0-346" class="i">+	return l.output.Close()
+</a><a href="#h1-0-347" id="h1-0-347" class="i">+}
+</a><a href="#h1-0-348" id="h1-0-348" class="i">+
+</a><a href="#h1-0-349" id="h1-0-349" class="i">+// String returns a human-consumable representation of this backend.
+</a><a href="#h1-0-350" id="h1-0-350" class="i">+func (l *Log) String() string {
+</a><a href="#h1-0-351" id="h1-0-351" class="i">+	return schemas.MarshalDescriptor(l.Descriptor())
+</a><a href="#h1-0-352" id="h1-0-352" class="i">+}
+</a><a href="#h1-0-353" id="h1-0-353" class="i">+
+</a><a href="#h1-0-354" id="h1-0-354" class="i">+// log populates derived fields in the log entry, serializes the entry, and writes it to the
+</a><a href="#h1-0-355" id="h1-0-355" class="i">+// the declared output targets when eligible per the configured log level.
+</a><a href="#h1-0-356" id="h1-0-356" class="i">+func (l *Log) log(ctx context.Context, e entry) {
+</a><a href="#h1-0-357" id="h1-0-357" class="i">+	if e.Error != &quot;&quot; &amp;&amp; !l.level.Enabled(zapcore.ErrorLevel) {
+</a><a href="#h1-0-358" id="h1-0-358" class="i">+		return
+</a><a href="#h1-0-359" id="h1-0-359" class="i">+	} else if e.Error == &quot;&quot; &amp;&amp; !l.level.Enabled(zapcore.InfoLevel) {
+</a><a href="#h1-0-360" id="h1-0-360" class="i">+		return
+</a><a href="#h1-0-361" id="h1-0-361" class="i">+	}
+</a><a href="#h1-0-362" id="h1-0-362" class="i">+
+</a><a href="#h1-0-363" id="h1-0-363" class="i">+	// Populate some fields automatically
+</a><a href="#h1-0-364" id="h1-0-364" class="i">+
+</a><a href="#h1-0-365" id="h1-0-365" class="i">+	e.Timestamp = time.Now()
+</a><a href="#h1-0-366" id="h1-0-366" class="i">+	e.Tags = l.tags
+</a><a href="#h1-0-367" id="h1-0-367" class="i">+	e.ClientID = &quot;unknown&quot;
+</a><a href="#h1-0-368" id="h1-0-368" class="i">+	if p, ok := peer.FromContext(ctx); ok {
+</a><a href="#h1-0-369" id="h1-0-369" class="i">+		e.Peer = fmt.Sprintf(&quot;%s:%s&quot;, p.Addr.Network(), p.Addr.String())
+</a><a href="#h1-0-370" id="h1-0-370" class="i">+	}
+</a><a href="#h1-0-371" id="h1-0-371" class="i">+	if md, ok := metadata.FromIncomingContext(ctx); ok {
+</a><a href="#h1-0-372" id="h1-0-372" class="i">+		if ua := md.Get(&quot;User-Agent&quot;); len(ua) &gt; 0 {
+</a><a href="#h1-0-373" id="h1-0-373" class="i">+			e.ClientID = strings.Join(ua, &quot;, &quot;)
+</a><a href="#h1-0-374" id="h1-0-374" class="i">+		}
+</a><a href="#h1-0-375" id="h1-0-375" class="i">+	}
+</a><a href="#h1-0-376" id="h1-0-376" class="i">+
+</a><a href="#h1-0-377" id="h1-0-377" class="i">+	serialized, err := e.MarshalBinary()
+</a><a href="#h1-0-378" id="h1-0-378" class="i">+	if err != nil {
+</a><a href="#h1-0-379" id="h1-0-379" class="i">+		return
+</a><a href="#h1-0-380" id="h1-0-380" class="i">+	}
+</a><a href="#h1-0-381" id="h1-0-381" class="i">+
+</a><a href="#h1-0-382" id="h1-0-382" class="i">+	l.output.Write(append(serialized, []byte(&quot;\n&quot;)...))
+</a><a href="#h1-0-383" id="h1-0-383" class="i">+}
+</a><a href="#h1-0-384" id="h1-0-384" class="i">+
+</a><a href="#h1-0-385" id="h1-0-385" class="i">+// entry represents a single structured log entry for a request.
+</a><a href="#h1-0-386" id="h1-0-386" class="i">+type entry struct {
+</a><a href="#h1-0-387" id="h1-0-387" class="i">+	Timestamp time.Time         `json:&quot;timestamp&quot;`
+</a><a href="#h1-0-388" id="h1-0-388" class="i">+	Code      string            `json:&quot;code&quot;`
+</a><a href="#h1-0-389" id="h1-0-389" class="i">+	Error     string            `json:&quot;error&quot;`
+</a><a href="#h1-0-390" id="h1-0-390" class="i">+	Duration  int64             `json:&quot;duration&quot;`
+</a><a href="#h1-0-391" id="h1-0-391" class="i">+	Method    string            `json:&quot;method&quot;`
+</a><a href="#h1-0-392" id="h1-0-392" class="i">+	Backend   string            `json:&quot;backend&quot;`
+</a><a href="#h1-0-393" id="h1-0-393" class="i">+	Bucket    string            `json:&quot;bucket&quot;`
+</a><a href="#h1-0-394" id="h1-0-394" class="i">+	Key       string            `json:&quot;key&quot;`
+</a><a href="#h1-0-395" id="h1-0-395" class="i">+	Size      uint64            `json:&quot;size&quot;`
+</a><a href="#h1-0-396" id="h1-0-396" class="i">+	Peer      string            `json:&quot;peer&quot;`
+</a><a href="#h1-0-397" id="h1-0-397" class="i">+	ClientID  string            `json:&quot;client_id&quot;`
+</a><a href="#h1-0-398" id="h1-0-398" class="i">+	Tags      map[string]string `json:&quot;tags&quot;`
+</a><a href="#h1-0-399" id="h1-0-399" class="i">+}
+</a><a href="#h1-0-400" id="h1-0-400" class="i">+
+</a><a href="#h1-0-401" id="h1-0-401" class="i">+// MarshalBinary implements the encoding.BinaryMarshaler interface. It serializes the log entry as
+</a><a href="#h1-0-402" id="h1-0-402" class="i">+// a JSON string using json.Marshal.
+</a><a href="#h1-0-403" id="h1-0-403" class="i">+func (e *entry) MarshalBinary() ([]byte, error) {
+</a><a href="#h1-0-404" id="h1-0-404" class="i">+	return json.Marshal(e)
+</a><a href="#h1-0-405" id="h1-0-405" class="i">+}
+</a><b>diff --git a/<a id="h2" href="../file/internal/server/unistore.go">internal/server/unistore.go</a> b/<a href="../file/internal/server/unistore.go">internal/server/unistore.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -20,7 +20,10 @@ type unistoreService struct {
+</a> 
+ // newUnistoreService creates a new Unistore gRPC service from storage configuration.
+ func newUnistoreService(cfg *config.Server) (*unistoreService, error) {
+<a href="#h2-0-3" id="h2-0-3" class="d">-	backends := make(map[common.Backend]backend.Backend)
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+	var err error
+</a><a href="#h2-0-5" id="h2-0-5" class="i">+	var tree backend.Backend
+</a><a href="#h2-0-6" id="h2-0-6" class="i">+
+</a><a href="#h2-0-7" id="h2-0-7" class="i">+	mux := make(map[common.Backend]backend.Backend)
+</a> 
+ 	if cfg.Storage.Disk != nil {
+ 		disk, err := backend.NewDisk(cfg.Storage.Disk)
+<a href="#h2-1" id="h2-1" class="h">@@ -77,13 +80,30 @@ func newUnistoreService(cfg *config.Server) (*unistoreService, error) {
+</a> 			return nil, err
+ 		}
+ 
+<a href="#h2-1-3" id="h2-1-3" class="i">+		if cfg.Storage.Disk.Log != nil {
+</a><a href="#h2-1-4" id="h2-1-4" class="i">+			tags := make(map[string]string)
+</a><a href="#h2-1-5" id="h2-1-5" class="i">+			for _, tag := range cfg.Storage.Disk.Log.Tags {
+</a><a href="#h2-1-6" id="h2-1-6" class="i">+				tags[tag.Key] = tag.Value
+</a><a href="#h2-1-7" id="h2-1-7" class="i">+			}
+</a><a href="#h2-1-8" id="h2-1-8" class="i">+
+</a><a href="#h2-1-9" id="h2-1-9" class="i">+			disk, err = backend.NewLog(
+</a><a href="#h2-1-10" id="h2-1-10" class="i">+				cfg.Storage.Disk.Log.Level,
+</a><a href="#h2-1-11" id="h2-1-11" class="i">+				cfg.Storage.Disk.Log.Outputs,
+</a><a href="#h2-1-12" id="h2-1-12" class="i">+				tags,
+</a><a href="#h2-1-13" id="h2-1-13" class="i">+				disk,
+</a><a href="#h2-1-14" id="h2-1-14" class="i">+			)
+</a><a href="#h2-1-15" id="h2-1-15" class="i">+			if err != nil {
+</a><a href="#h2-1-16" id="h2-1-16" class="i">+				return nil, err
+</a><a href="#h2-1-17" id="h2-1-17" class="i">+			}
+</a><a href="#h2-1-18" id="h2-1-18" class="i">+		}
+</a><a href="#h2-1-19" id="h2-1-19" class="i">+
+</a> 		zap.L().Info(
+ 			&quot;configured storage backend&quot;,
+ 			zap.Stringer(&quot;type&quot;, common.Backend_DISK),
+ 			zap.Stringer(&quot;backend&quot;, disk),
+ 		)
+ 
+<a href="#h2-1-26" id="h2-1-26" class="d">-		backends[common.Backend_DISK] = disk
+</a><a href="#h2-1-27" id="h2-1-27" class="i">+		mux[common.Backend_DISK] = disk
+</a> 	}
+ 
+ 	if cfg.Storage.Unistore != nil {
+<a href="#h2-2" id="h2-2" class="h">@@ -152,13 +172,30 @@ func newUnistoreService(cfg *config.Server) (*unistoreService, error) {
+</a> 			return nil, err
+ 		}
+ 
+<a href="#h2-2-3" id="h2-2-3" class="i">+		if cfg.Storage.Unistore.Log != nil {
+</a><a href="#h2-2-4" id="h2-2-4" class="i">+			tags := make(map[string]string)
+</a><a href="#h2-2-5" id="h2-2-5" class="i">+			for _, tag := range cfg.Storage.Unistore.Log.Tags {
+</a><a href="#h2-2-6" id="h2-2-6" class="i">+				tags[tag.Key] = tag.Value
+</a><a href="#h2-2-7" id="h2-2-7" class="i">+			}
+</a><a href="#h2-2-8" id="h2-2-8" class="i">+
+</a><a href="#h2-2-9" id="h2-2-9" class="i">+			unistore, err = backend.NewLog(
+</a><a href="#h2-2-10" id="h2-2-10" class="i">+				cfg.Storage.Unistore.Log.Level,
+</a><a href="#h2-2-11" id="h2-2-11" class="i">+				cfg.Storage.Unistore.Log.Outputs,
+</a><a href="#h2-2-12" id="h2-2-12" class="i">+				tags,
+</a><a href="#h2-2-13" id="h2-2-13" class="i">+				unistore,
+</a><a href="#h2-2-14" id="h2-2-14" class="i">+			)
+</a><a href="#h2-2-15" id="h2-2-15" class="i">+			if err != nil {
+</a><a href="#h2-2-16" id="h2-2-16" class="i">+				return nil, err
+</a><a href="#h2-2-17" id="h2-2-17" class="i">+			}
+</a><a href="#h2-2-18" id="h2-2-18" class="i">+		}
+</a><a href="#h2-2-19" id="h2-2-19" class="i">+
+</a> 		zap.L().Info(
+ 			&quot;configured storage backend&quot;,
+ 			zap.Stringer(&quot;type&quot;, common.Backend_UNISTORE),
+ 			zap.Stringer(&quot;backend&quot;, unistore),
+ 		)
+ 
+<a href="#h2-2-26" id="h2-2-26" class="d">-		backends[common.Backend_UNISTORE] = unistore
+</a><a href="#h2-2-27" id="h2-2-27" class="i">+		mux[common.Backend_UNISTORE] = unistore
+</a> 	}
+ 
+ 	if cfg.Storage.B2 != nil {
+<a href="#h2-3" id="h2-3" class="h">@@ -221,13 +258,30 @@ func newUnistoreService(cfg *config.Server) (*unistoreService, error) {
+</a> 			return nil, err
+ 		}
+ 
+<a href="#h2-3-3" id="h2-3-3" class="i">+		if cfg.Storage.B2.Log != nil {
+</a><a href="#h2-3-4" id="h2-3-4" class="i">+			tags := make(map[string]string)
+</a><a href="#h2-3-5" id="h2-3-5" class="i">+			for _, tag := range cfg.Storage.B2.Log.Tags {
+</a><a href="#h2-3-6" id="h2-3-6" class="i">+				tags[tag.Key] = tag.Value
+</a><a href="#h2-3-7" id="h2-3-7" class="i">+			}
+</a><a href="#h2-3-8" id="h2-3-8" class="i">+
+</a><a href="#h2-3-9" id="h2-3-9" class="i">+			b2, err = backend.NewLog(
+</a><a href="#h2-3-10" id="h2-3-10" class="i">+				cfg.Storage.B2.Log.Level,
+</a><a href="#h2-3-11" id="h2-3-11" class="i">+				cfg.Storage.B2.Log.Outputs,
+</a><a href="#h2-3-12" id="h2-3-12" class="i">+				tags,
+</a><a href="#h2-3-13" id="h2-3-13" class="i">+				b2,
+</a><a href="#h2-3-14" id="h2-3-14" class="i">+			)
+</a><a href="#h2-3-15" id="h2-3-15" class="i">+			if err != nil {
+</a><a href="#h2-3-16" id="h2-3-16" class="i">+				return nil, err
+</a><a href="#h2-3-17" id="h2-3-17" class="i">+			}
+</a><a href="#h2-3-18" id="h2-3-18" class="i">+		}
+</a><a href="#h2-3-19" id="h2-3-19" class="i">+
+</a> 		zap.L().Info(
+ 			&quot;configured storage backend&quot;,
+ 			zap.Stringer(&quot;type&quot;, common.Backend_B2),
+ 			zap.Stringer(&quot;backend&quot;, b2),
+ 		)
+ 
+<a href="#h2-3-26" id="h2-3-26" class="d">-		backends[common.Backend_B2] = b2
+</a><a href="#h2-3-27" id="h2-3-27" class="i">+		mux[common.Backend_B2] = b2
+</a> 	}
+ 
+ 	if cfg.Storage.Composite != nil {
+<a href="#h2-4" id="h2-4" class="h">@@ -235,7 +289,7 @@ func newUnistoreService(cfg *config.Server) (*unistoreService, error) {
+</a> 
+ 		for _, name := range cfg.Storage.Composite.Backends {
+ 			bid := common.Backend(common.Backend_value[strings.ToUpper(name)])
+<a href="#h2-4-3" id="h2-4-3" class="d">-			children = append(children, backends[bid])
+</a><a href="#h2-4-4" id="h2-4-4" class="i">+			children = append(children, mux[bid])
+</a> 		}
+ 
+ 		composite := backend.NewComposite(
+<a href="#h2-5" id="h2-5" class="h">@@ -244,18 +298,36 @@ func newUnistoreService(cfg *config.Server) (*unistoreService, error) {
+</a> 			children,
+ 		)
+ 
+<a href="#h2-5-3" id="h2-5-3" class="i">+		if cfg.Storage.Composite.Log != nil {
+</a><a href="#h2-5-4" id="h2-5-4" class="i">+			tags := make(map[string]string)
+</a><a href="#h2-5-5" id="h2-5-5" class="i">+			for _, tag := range cfg.Storage.Composite.Log.Tags {
+</a><a href="#h2-5-6" id="h2-5-6" class="i">+				tags[tag.Key] = tag.Value
+</a><a href="#h2-5-7" id="h2-5-7" class="i">+			}
+</a><a href="#h2-5-8" id="h2-5-8" class="i">+
+</a><a href="#h2-5-9" id="h2-5-9" class="i">+			composite, err = backend.NewLog(
+</a><a href="#h2-5-10" id="h2-5-10" class="i">+				cfg.Storage.Composite.Log.Level,
+</a><a href="#h2-5-11" id="h2-5-11" class="i">+				cfg.Storage.Composite.Log.Outputs,
+</a><a href="#h2-5-12" id="h2-5-12" class="i">+				tags,
+</a><a href="#h2-5-13" id="h2-5-13" class="i">+				composite,
+</a><a href="#h2-5-14" id="h2-5-14" class="i">+			)
+</a><a href="#h2-5-15" id="h2-5-15" class="i">+			if err != nil {
+</a><a href="#h2-5-16" id="h2-5-16" class="i">+				return nil, err
+</a><a href="#h2-5-17" id="h2-5-17" class="i">+			}
+</a><a href="#h2-5-18" id="h2-5-18" class="i">+		}
+</a><a href="#h2-5-19" id="h2-5-19" class="i">+
+</a> 		zap.L().Info(
+ 			&quot;configured storage backend&quot;,
+ 			zap.Stringer(&quot;type&quot;, common.Backend_COMPOSITE),
+ 			zap.Stringer(&quot;backend&quot;, composite),
+ 		)
+ 
+<a href="#h2-5-26" id="h2-5-26" class="d">-		backends[common.Backend_COMPOSITE] = composite
+</a><a href="#h2-5-27" id="h2-5-27" class="i">+		mux[common.Backend_COMPOSITE] = composite
+</a> 	}
+ 
+<a href="#h2-5-30" id="h2-5-30" class="d">-	return &amp;unistoreService{
+</a><a href="#h2-5-31" id="h2-5-31" class="d">-		backend: backend.NewValidation(backend.NewMux(backends)),
+</a><a href="#h2-5-32" id="h2-5-32" class="d">-	}, nil
+</a><a href="#h2-5-33" id="h2-5-33" class="i">+	tree = backend.NewMux(mux)
+</a><a href="#h2-5-34" id="h2-5-34" class="i">+	tree = backend.NewValidation(tree)
+</a><a href="#h2-5-35" id="h2-5-35" class="i">+
+</a><a href="#h2-5-36" id="h2-5-36" class="i">+	return &amp;unistoreService{backend: tree}, nil
+</a> }
+ 
+ // HeadBucket calls into the backend&#39;s HeadBucket.
+</pre>
+</div>
+</body>
+</html>

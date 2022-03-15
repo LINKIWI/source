@@ -93,7 +93,7 @@ func runServer(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	closed := make(chan bool)
 
 	go func() {
 		shutdown := make(chan os.Signal, 1)
@@ -101,7 +101,11 @@ func runServer(cmd *cobra.Command, args []string) error {
 
 		sig := <-shutdown
 		zap.L().Info("initiating graceful server shutdown", zap.Stringer("signal", sig))
-		cancel()
+		if err := srv.Close(); err != nil {
+			zap.L().Error("error during server close", zap.Error(err))
+		}
+
+		closed <- true
 
 		sig = <-shutdown
 		zap.L().Warn(
@@ -112,10 +116,14 @@ func runServer(cmd *cobra.Command, args []string) error {
 		os.Exit(1)
 	}()
 
-	if err := srv.Serve(ctx); err != nil {
+	if err := srv.Serve(context.Background()); err != nil {
 		zap.L().Error("error during serve", zap.Error(err))
 		return err
 	}
+
+	// Additionally wait for the server to complete (or at least attempt) its full close
+	// routine, even if the server's serving path has already exited.
+	<-closed
 
 	zap.L().Info("completed graceful shutdown")
 

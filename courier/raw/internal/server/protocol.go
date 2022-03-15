@@ -85,7 +85,7 @@ func (l *proxyListener) Accept() (net.Conn, error) {
 
 // Read attempts to read the PROXY protocol header if it hasn't already been read, followed by
 // deferring to the underlying connection for the requested read.
-func (c *proxyConn) Read(b []byte) (n int, err error) {
+func (c *proxyConn) Read(b []byte) (int, error) {
 	c.headerParser.Do(c.initProxyMetadata)
 
 	return c.bufferedConn.Read(b)

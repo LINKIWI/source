@@ -925,6 +925,11 @@ func (b *B2) Descriptor() *common.Node {
 	}
 }
 
+// Close is a noop.
+func (b *B2) Close() error {
+	return nil
+}
+
 // String returns a human-consumable representation of this backend.
 func (b *B2) String() string {
 	return schemas.MarshalDescriptor(b.Descriptor())

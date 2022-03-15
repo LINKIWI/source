@@ -1,29 +1,7 @@
-import fs from 'fs';
-import path from 'path';
+import { CODE_NOT_FOUND, CODE_SERVER_UNDEFINED } from 'supercharged/shared/constants/error';
 import BaseLogic from 'server/logic/base';
-
-const CLIENT_BUNDLE_PATH = path.join(__dirname, '../../../dist/client/js/main.js');
-
-const clientTemplate = (injectedGlobals, bundle) => `
-  <!DOCTYPE html>
-  <html lang="en">
-    <head>
-      <meta charset="UTF-8" />
-      <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0"
-      />
-    </head>
-    <body>
-      <div id="app"></div>
-      <script>window.__SSR_INJECTED_GLOBALS__ = ${JSON.stringify(injectedGlobals)}</script>
-      <script>${bundle}</script>
-    </body>
-  </html>
-`;
-
-const renderTemplate = (injectedGlobals, cb) => fs.readFile(CLIENT_BUNDLE_PATH, (err, bundle) =>
-  (err ? cb(err) : cb(null, clientTemplate(injectedGlobals, bundle.toString()))));
+import { clientResource, serverResource } from 'server/util/resource';
+import { render } from 'server/util/template';
 
 /**
  * Logic related to rendering client templates.
@@ -61,7 +39,78 @@ export default class ViewLogic extends BaseLogic {
         meta,
       };
 
-      return renderTemplate({ store: hydratedStore }, cb);
+      return serverResource('resources/template/frontend.html', (frontendTemplateErr, index) => {
+        if (frontendTemplateErr) {
+          return cb(frontendTemplateErr);
+        }
+
+        return clientResource('js/main.js', (clientBundleErr, bundle) => {
+          if (clientBundleErr) {
+            return cb(clientBundleErr);
+          }
+
+          const variables = {
+            SEARCH_ENGINE_NAME: this.ctx.config.get('client.search.name') || 'webgrep',
+            CLIENT_BUNDLE: bundle.toString(),
+            SSR_INJECTED_GLOBALS: JSON.stringify({ store: hydratedStore }),
+          };
+
+          return cb(null, render(index.toString(), variables));
+        });
+      });
     });
+  }
+
+  /**
+   * Render a resource.
+   *
+   * @param {String} path Original request path.
+   * @param {Function} cb Function invoked with (err, resp) on completion. The response is an object
+   *                      with keys `header` and `body` describing HTTP response parameters.
+   */
+  renderResource(path, cb) {
+    switch (path) {
+      case '/resource/opensearch.xml':
+        return serverResource('resources/template/opensearch.xml', (specErr, spec) => {
+          if (specErr) {
+            return cb({
+              status: 500,
+              code: CODE_SERVER_UNDEFINED,
+              message: specErr.toString(),
+            });
+          }
+
+          return clientResource('img/logo.png.base64', (logoErr, logo) => {
+            if (logoErr) {
+              return cb({
+                status: 500,
+                code: CODE_SERVER_UNDEFINED,
+                message: logoErr.toString(),
+              });
+            }
+
+            const variables = {
+              NAME: this.ctx.config.get('client.search.name') || 'webgrep',
+              DESCRIPTION: this.ctx.config.get('client.search.description') ||
+                'webgrep code search',
+              LOGO: logo.toString(),
+              BASE_URL: this.ctx.config.get('client.search.base_url') || '',
+            };
+
+            return cb(null, {
+              headers: { 'Content-Type': 'application/opensearchdescription+xml' },
+              body: render(spec.toString(), variables),
+            });
+          });
+        });
+
+      default:
+        return cb({
+          status: 404,
+          code: CODE_NOT_FOUND,
+          message: 'no such resource',
+          data: { path },
+        });
+    }
   }
 }

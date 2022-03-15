@@ -19,8 +19,11 @@ type unistoreService struct {
 }
 
 // newUnistoreService creates a new Unistore gRPC service from storage configuration.
-func newUnistoreService(cfg *config.Server) (service.UnistoreServer, error) {
-	backends := make(map[common.Backend]backend.Backend)
+func newUnistoreService(cfg *config.Server) (*unistoreService, error) {
+	var err error
+	var tree backend.Backend
+
+	mux := make(map[common.Backend]backend.Backend)
 
 	if cfg.Storage.Disk != nil {
 		disk, err := backend.NewDisk(cfg.Storage.Disk)
@@ -77,13 +80,30 @@ func newUnistoreService(cfg *config.Server) (service.UnistoreServer, error) {
 			return nil, err
 		}
 
+		if cfg.Storage.Disk.Log != nil {
+			tags := make(map[string]string)
+			for _, tag := range cfg.Storage.Disk.Log.Tags {
+				tags[tag.Key] = tag.Value
+			}
+
+			disk, err = backend.NewLog(
+				cfg.Storage.Disk.Log.Level,
+				cfg.Storage.Disk.Log.Outputs,
+				tags,
+				disk,
+			)
+			if err != nil {
+				return nil, err
+			}
+		}
+
 		zap.L().Info(
 			"configured storage backend",
 			zap.Stringer("type", common.Backend_DISK),
 			zap.Stringer("backend", disk),
 		)
 
-		backends[common.Backend_DISK] = disk
+		mux[common.Backend_DISK] = disk
 	}
 
 	if cfg.Storage.Unistore != nil {
@@ -152,13 +172,30 @@ func newUnistoreService(cfg *config.Server) (service.UnistoreServer, error) {
 			return nil, err
 		}
 
+		if cfg.Storage.Unistore.Log != nil {
+			tags := make(map[string]string)
+			for _, tag := range cfg.Storage.Unistore.Log.Tags {
+				tags[tag.Key] = tag.Value
+			}
+
+			unistore, err = backend.NewLog(
+				cfg.Storage.Unistore.Log.Level,
+				cfg.Storage.Unistore.Log.Outputs,
+				tags,
+				unistore,
+			)
+			if err != nil {
+				return nil, err
+			}
+		}
+
 		zap.L().Info(
 			"configured storage backend",
 			zap.Stringer("type", common.Backend_UNISTORE),
 			zap.Stringer("backend", unistore),
 		)
 
-		backends[common.Backend_UNISTORE] = unistore
+		mux[common.Backend_UNISTORE] = unistore
 	}
 
 	if cfg.Storage.B2 != nil {
@@ -221,13 +258,30 @@ func newUnistoreService(cfg *config.Server) (service.UnistoreServer, error) {
 			return nil, err
 		}
 
+		if cfg.Storage.B2.Log != nil {
+			tags := make(map[string]string)
+			for _, tag := range cfg.Storage.B2.Log.Tags {
+				tags[tag.Key] = tag.Value
+			}
+
+			b2, err = backend.NewLog(
+				cfg.Storage.B2.Log.Level,
+				cfg.Storage.B2.Log.Outputs,
+				tags,
+				b2,
+			)
+			if err != nil {
+				return nil, err
+			}
+		}
+
 		zap.L().Info(
 			"configured storage backend",
 			zap.Stringer("type", common.Backend_B2),
 			zap.Stringer("backend", b2),
 		)
 
-		backends[common.Backend_B2] = b2
+		mux[common.Backend_B2] = b2
 	}
 
 	if cfg.Storage.Composite != nil {
@@ -235,7 +289,7 @@ func newUnistoreService(cfg *config.Server) (service.UnistoreServer, error) {
 
 		for _, name := range cfg.Storage.Composite.Backends {
 			bid := common.Backend(common.Backend_value[strings.ToUpper(name)])
-			children = append(children, backends[bid])
+			children = append(children, mux[bid])
 		}
 
 		composite := backend.NewComposite(
@@ -244,18 +298,36 @@ func newUnistoreService(cfg *config.Server) (service.UnistoreServer, error) {
 			children,
 		)
 
+		if cfg.Storage.Composite.Log != nil {
+			tags := make(map[string]string)
+			for _, tag := range cfg.Storage.Composite.Log.Tags {
+				tags[tag.Key] = tag.Value
+			}
+
+			composite, err = backend.NewLog(
+				cfg.Storage.Composite.Log.Level,
+				cfg.Storage.Composite.Log.Outputs,
+				tags,
+				composite,
+			)
+			if err != nil {
+				return nil, err
+			}
+		}
+
 		zap.L().Info(
 			"configured storage backend",
 			zap.Stringer("type", common.Backend_COMPOSITE),
 			zap.Stringer("backend", composite),
 		)
 
-		backends[common.Backend_COMPOSITE] = composite
+		mux[common.Backend_COMPOSITE] = composite
 	}
 
-	return &unistoreService{
-		backend: backend.NewValidation(backend.NewMux(backends)),
-	}, nil
+	tree = backend.NewMux(mux)
+	tree = backend.NewValidation(tree)
+
+	return &unistoreService{backend: tree}, nil
 }
 
 // HeadBucket calls into the backend's HeadBucket.
@@ -342,4 +414,15 @@ func (u *unistoreService) ListBuckets(ctx context.Context, request *service.List
 // ListObjects calls into the backend's ListObjects.
 func (u *unistoreService) ListObjects(ctx context.Context, request *service.ListObjectsRequest) (*service.ListObjectsResponse, error) {
 	return u.backend.ListObjects(ctx, request)
+}
+
+// Close closes the entire backend tree.
+func (u *unistoreService) Close() error {
+	return u.backend.Close()
+}
+
+// String provides a human-readable representation of the service by borrowing the string
+// representation of the associated backend tree.
+func (u *unistoreService) String() string {
+	return u.backend.String()
 }

@@ -8,6 +8,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/protobuf/proto"
 
 	"unistore/internal/config"
 	"unistore/internal/meta"
@@ -94,9 +95,10 @@ func (u *Unistore) HeadBucket(ctx context.Context, request *service.HeadBucketRe
 		defer cancel()
 	}
 
-	request.Resource.Backend = u.backend
+	proxyRequest := proto.Clone(request).(*service.HeadBucketRequest)
+	proxyRequest.Resource.Backend = u.backend
 
-	return u.client.HeadBucket(ctx, request)
+	return u.client.HeadBucket(ctx, proxyRequest)
 }
 
 // HeadObject invokes the gRPC HeadObject RPC.
@@ -108,9 +110,10 @@ func (u *Unistore) HeadObject(ctx context.Context, request *service.HeadObjectRe
 		defer cancel()
 	}
 
-	request.Resource.Backend = u.backend
+	proxyRequest := proto.Clone(request).(*service.HeadObjectRequest)
+	proxyRequest.Resource.Backend = u.backend
 
-	return u.client.HeadObject(ctx, request)
+	return u.client.HeadObject(ctx, proxyRequest)
 }
 
 // GetObject invokes the gRPC GetObject RPC.
@@ -122,9 +125,10 @@ func (u *Unistore) GetObject(ctx context.Context, request *service.GetObjectRequ
 		defer cancel()
 	}
 
-	request.Resource.Backend = u.backend
+	proxyRequest := proto.Clone(request).(*service.GetObjectRequest)
+	proxyRequest.Resource.Backend = u.backend
 
-	return u.client.GetObject(ctx, request)
+	return u.client.GetObject(ctx, proxyRequest)
 }
 
 // StreamGetObject invokes the gRPC StreamGetObject RPC and adapts the response stream to a channel.
@@ -132,9 +136,10 @@ func (u *Unistore) StreamGetObject(ctx context.Context, request *service.GetObje
 	responses := make(chan *service.GetObjectStreamResponse)
 	errs := make(chan error, 1)
 
-	request.Request.Resource.Backend = u.backend
+	proxyRequest := proto.Clone(request).(*service.GetObjectStreamRequest)
+	proxyRequest.Request.Resource.Backend = u.backend
 
-	stream, err := u.client.StreamGetObject(ctx, request)
+	stream, err := u.client.StreamGetObject(ctx, proxyRequest)
 	if stream == nil {
 		errs <- err
 		return nil, errs
@@ -168,9 +173,10 @@ func (u *Unistore) PutObject(ctx context.Context, request *service.PutObjectRequ
 		defer cancel()
 	}
 
-	request.Resource.Backend = u.backend
+	proxyRequest := proto.Clone(request).(*service.PutObjectRequest)
+	proxyRequest.Resource.Backend = u.backend
 
-	return u.client.PutObject(ctx, request)
+	return u.client.PutObject(ctx, proxyRequest)
 }
 
 // StreamPutObject invokes the gRPC StreamPutObject RPC and adapts the request stream to a channel.
@@ -181,10 +187,11 @@ func (u *Unistore) StreamPutObject(ctx context.Context, stream chan *service.Put
 	}
 
 	for request := range stream {
-		request.Request.Resource.Backend = u.backend
+		proxyRequest := proto.Clone(request).(*service.PutObjectStreamRequest)
+		proxyRequest.Request.Resource.Backend = u.backend
 
-		if err := c.Send(request); err != nil {
-			return nil, err
+		if err := c.Send(proxyRequest); err != nil {
+			break
 		}
 	}
 
@@ -200,9 +207,10 @@ func (u *Unistore) DeleteObject(ctx context.Context, request *service.DeleteObje
 		defer cancel()
 	}
 
-	request.Resource.Backend = u.backend
+	proxyRequest := proto.Clone(request).(*service.DeleteObjectRequest)
+	proxyRequest.Resource.Backend = u.backend
 
-	return u.client.DeleteObject(ctx, request)
+	return u.client.DeleteObject(ctx, proxyRequest)
 }
 
 // ListBuckets invokes the gRPC ListBuckets RPC.
@@ -214,9 +222,10 @@ func (u *Unistore) ListBuckets(ctx context.Context, request *service.ListBuckets
 		defer cancel()
 	}
 
-	request.Resource.Backend = u.backend
+	proxyRequest := proto.Clone(request).(*service.ListBucketsRequest)
+	proxyRequest.Resource.Backend = u.backend
 
-	return u.client.ListBuckets(ctx, request)
+	return u.client.ListBuckets(ctx, proxyRequest)
 }
 
 // ListObjects invokes the gRPC ListObjects RPC.
@@ -228,9 +237,10 @@ func (u *Unistore) ListObjects(ctx context.Context, request *service.ListObjects
 		defer cancel()
 	}
 
-	request.Resource.Backend = u.backend
+	proxyRequest := proto.Clone(request).(*service.ListObjectsRequest)
+	proxyRequest.Resource.Backend = u.backend
 
-	return u.client.ListObjects(ctx, request)
+	return u.client.ListObjects(ctx, proxyRequest)
 }
 
 // Descriptor returns a structured Protobuf-defined descriptor of this backend.
@@ -243,6 +253,11 @@ func (u *Unistore) Descriptor() *common.Node {
 			"backend":   {Child: &common.Node_Value_Value{Value: u.backend.String()}},
 		},
 	}
+}
+
+// Close closes the underlying Unistore gRPC client.
+func (u *Unistore) Close() error {
+	return u.client.Close()
 }
 
 // String returns a human-consumable representation of this backend.

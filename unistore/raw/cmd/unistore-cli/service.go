@@ -356,7 +356,7 @@ func runUpload(cmd *cobra.Command, args []string) error {
 		}
 
 		if err := request.Send(message); err != nil {
-			return err
+			break
 		}
 	}
 

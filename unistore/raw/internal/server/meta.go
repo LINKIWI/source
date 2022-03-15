@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 
-	"unistore/internal/backend"
 	"unistore/internal/config"
 	"unistore/internal/meta"
 	"unistore/schemas/service"
@@ -11,16 +10,16 @@ import (
 
 // metaService is an implementation of the service.MetaServer gRPC service.
 type metaService struct {
-	cfg     *config.Server
-	backend backend.Backend
+	cfg      *config.Server
+	unistore *unistoreService
 	service.UnimplementedMetaServer
 }
 
 // newMetaService creates a new meta gRPC service.
-func newMetaService(cfg *config.Server, backend backend.Backend) (service.MetaServer, error) {
+func newMetaService(cfg *config.Server, unistore *unistoreService) (*metaService, error) {
 	return &metaService{
-		cfg:     cfg,
-		backend: backend,
+		cfg:      cfg,
+		unistore: unistore,
 	}, nil
 }
 
@@ -34,6 +33,6 @@ func (m *metaService) Info(ctx context.Context, request *service.InfoRequest) (*
 	return &service.InfoResponse{
 		Version: meta.Version,
 		Address: m.cfg.Listener.Address.Spec(),
-		Backend: m.backend.Descriptor(),
+		Backend: m.unistore.backend.Descriptor(),
 	}, nil
 }

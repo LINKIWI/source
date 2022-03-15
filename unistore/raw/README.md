@@ -20,6 +20,7 @@ Configurable middleware layers include:
 * In-flight compression with configurable compression algorithms and levels
 * In-flight encryption with configurable encryption mechanisms
 * In-flight stream chunk reshaping for optimal performance
+* Structured request and response logging
 
 ## Building
 

@@ -18,7 +18,7 @@ body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{fo
 <a href="../../../log">Log</a> | <a href="../../../files">Files</a> | <a href="../../../refs">Refs</a> | <a href="../../../file/README.md">README</a></td></tr></table>
 <hr/>
 <div id="content">
-<p>internal/backend/<strong>composite.go</strong> (12451B) (<a href="../../../raw/internal/backend/composite.go">raw</a>) (<a href="../../../blame/internal/backend/composite.go">blame</a>)</p><hr/>
+<p>internal/backend/<strong>composite.go</strong> (12907B) (<a href="../../../raw/internal/backend/composite.go">raw</a>) (<a href="../../../blame/internal/backend/composite.go">blame</a>)</p><hr/>
 <pre id="blob">
 <a href="#l1" class="line" id="l1">      1</a> package backend
 <a href="#l2" class="line" id="l2">      2</a> 
@@ -295,109 +295,129 @@ body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{fo
 <a href="#l273" class="line" id="l273">    273</a> 	}
 <a href="#l274" class="line" id="l274">    274</a> }
 <a href="#l275" class="line" id="l275">    275</a> 
-<a href="#l276" class="line" id="l276">    276</a> // String returns a human-consumable representation of this backend.
-<a href="#l277" class="line" id="l277">    277</a> func (c *Composite) String() string {
-<a href="#l278" class="line" id="l278">    278</a> 	return schemas.MarshalDescriptor(c.Descriptor())
-<a href="#l279" class="line" id="l279">    279</a> }
+<a href="#l276" class="line" id="l276">    276</a> // Close closes all backends asynchronously, waits for all closes to complete, and returns the first
+<a href="#l277" class="line" id="l277">    277</a> // error if available, or nil if there are no errors.
+<a href="#l278" class="line" id="l278">    278</a> func (c *Composite) Close() error {
+<a href="#l279" class="line" id="l279">    279</a> 	errs := make(chan error, len(c.backends))
 <a href="#l280" class="line" id="l280">    280</a> 
-<a href="#l281" class="line" id="l281">    281</a> // dispatch is a convenience method to dispatch a request based on the selected dispatch policy.
-<a href="#l282" class="line" id="l282">    282</a> func (c *Composite) dispatch(policy common.Dispatch, rpc func(backend Backend) (proto.Message, error)) (proto.Message, error) {
-<a href="#l283" class="line" id="l283">    283</a> 	switch policy {
-<a href="#l284" class="line" id="l284">    284</a> 	case common.Dispatch_RANDOM:
-<a href="#l285" class="line" id="l285">    285</a> 		return c.dispatchRandom(rpc)
-<a href="#l286" class="line" id="l286">    286</a> 	case common.Dispatch_INITIAL:
-<a href="#l287" class="line" id="l287">    287</a> 		return c.dispatchInitial(rpc)
-<a href="#l288" class="line" id="l288">    288</a> 	case common.Dispatch_FAILOVER:
-<a href="#l289" class="line" id="l289">    289</a> 		return c.dispatchFailover(rpc)
-<a href="#l290" class="line" id="l290">    290</a> 	case common.Dispatch_ALL_SYNC:
-<a href="#l291" class="line" id="l291">    291</a> 		return c.dispatchAllSync(rpc)
-<a href="#l292" class="line" id="l292">    292</a> 	case common.Dispatch_ALL_ASYNC:
-<a href="#l293" class="line" id="l293">    293</a> 		return c.dispatchAllAsync(rpc)
-<a href="#l294" class="line" id="l294">    294</a> 	default:
-<a href="#l295" class="line" id="l295">    295</a> 		return nil, status.Errorf(
-<a href="#l296" class="line" id="l296">    296</a> 			codes.Unimplemented,
-<a href="#l297" class="line" id="l297">    297</a> 			&quot;backend: unsupported dispatch policy for method: policy=%v&quot;,
-<a href="#l298" class="line" id="l298">    298</a> 			policy,
-<a href="#l299" class="line" id="l299">    299</a> 		)
-<a href="#l300" class="line" id="l300">    300</a> 	}
-<a href="#l301" class="line" id="l301">    301</a> }
-<a href="#l302" class="line" id="l302">    302</a> 
-<a href="#l303" class="line" id="l303">    303</a> // dispatchRandom is a dispatcher implementation that dispatches the request to a randomly selected
-<a href="#l304" class="line" id="l304">    304</a> // backend.
-<a href="#l305" class="line" id="l305">    305</a> func (c *Composite) dispatchRandom(rpc func(backend Backend) (proto.Message, error)) (proto.Message, error) {
-<a href="#l306" class="line" id="l306">    306</a> 	return rpc(c.backends[rand.Intn(len(c.backends))])
-<a href="#l307" class="line" id="l307">    307</a> }
-<a href="#l308" class="line" id="l308">    308</a> 
-<a href="#l309" class="line" id="l309">    309</a> // dispatchInitial is a dispatcher implementation that dispatches the request to the first backend.
-<a href="#l310" class="line" id="l310">    310</a> func (c *Composite) dispatchInitial(rpc func(backend Backend) (proto.Message, error)) (proto.Message, error) {
-<a href="#l311" class="line" id="l311">    311</a> 	return rpc(c.backends[0])
-<a href="#l312" class="line" id="l312">    312</a> }
-<a href="#l313" class="line" id="l313">    313</a> 
-<a href="#l314" class="line" id="l314">    314</a> // dispatchFailover is a dispatcher implementation that attempts the request against backends
-<a href="#l315" class="line" id="l315">    315</a> // sequentially until one provides a non-error result.
-<a href="#l316" class="line" id="l316">    316</a> func (c *Composite) dispatchFailover(rpc func(backend Backend) (proto.Message, error)) (proto.Message, error) {
-<a href="#l317" class="line" id="l317">    317</a> 	var errs []error
-<a href="#l318" class="line" id="l318">    318</a> 
-<a href="#l319" class="line" id="l319">    319</a> 	for _, backend := range c.backends {
-<a href="#l320" class="line" id="l320">    320</a> 		response, err := rpc(backend)
-<a href="#l321" class="line" id="l321">    321</a> 		if err == nil {
-<a href="#l322" class="line" id="l322">    322</a> 			return response, nil
-<a href="#l323" class="line" id="l323">    323</a> 		}
-<a href="#l324" class="line" id="l324">    324</a> 
-<a href="#l325" class="line" id="l325">    325</a> 		zap.L().Warn(
-<a href="#l326" class="line" id="l326">    326</a> 			&quot;error during invocation; advancing to next backend by failover policy&quot;,
-<a href="#l327" class="line" id="l327">    327</a> 			zap.Error(err),
-<a href="#l328" class="line" id="l328">    328</a> 		)
-<a href="#l329" class="line" id="l329">    329</a> 
-<a href="#l330" class="line" id="l330">    330</a> 		errs = append(errs, err)
-<a href="#l331" class="line" id="l331">    331</a> 	}
-<a href="#l332" class="line" id="l332">    332</a> 
-<a href="#l333" class="line" id="l333">    333</a> 	return nil, fmt.Errorf(&quot;backend: all backends errored in failover policy: errs=%v&quot;, errs)
-<a href="#l334" class="line" id="l334">    334</a> }
-<a href="#l335" class="line" id="l335">    335</a> 
-<a href="#l336" class="line" id="l336">    336</a> // dispatchAllSync is a dispatcher implementation that synchronously dispatches the request to all
-<a href="#l337" class="line" id="l337">    337</a> // backends, one after the other in sequential order.
-<a href="#l338" class="line" id="l338">    338</a> func (c *Composite) dispatchAllSync(rpc func(backend Backend) (proto.Message, error)) (proto.Message, error) {
-<a href="#l339" class="line" id="l339">    339</a> 	var response proto.Message
-<a href="#l340" class="line" id="l340">    340</a> 	var err error
-<a href="#l341" class="line" id="l341">    341</a> 
-<a href="#l342" class="line" id="l342">    342</a> 	for _, backend := range c.backends {
-<a href="#l343" class="line" id="l343">    343</a> 		response, err = rpc(backend)
-<a href="#l344" class="line" id="l344">    344</a> 		if err != nil {
-<a href="#l345" class="line" id="l345">    345</a> 			return nil, err
-<a href="#l346" class="line" id="l346">    346</a> 		}
-<a href="#l347" class="line" id="l347">    347</a> 	}
-<a href="#l348" class="line" id="l348">    348</a> 
-<a href="#l349" class="line" id="l349">    349</a> 	return response, nil
-<a href="#l350" class="line" id="l350">    350</a> }
-<a href="#l351" class="line" id="l351">    351</a> 
-<a href="#l352" class="line" id="l352">    352</a> // dispatchAllAsync is a dispatcher implementation that asynchronously dispatches the request to all
-<a href="#l353" class="line" id="l353">    353</a> // backends and waits for all requests to complete. If any request errors, that error is propagated
-<a href="#l354" class="line" id="l354">    354</a> // to the client. Otherwise, the first successful response is returned.
-<a href="#l355" class="line" id="l355">    355</a> func (c *Composite) dispatchAllAsync(rpc func(backend Backend) (proto.Message, error)) (proto.Message, error) {
-<a href="#l356" class="line" id="l356">    356</a> 	responses := make(chan proto.Message, len(c.backends))
-<a href="#l357" class="line" id="l357">    357</a> 	errs := make(chan error, len(c.backends))
-<a href="#l358" class="line" id="l358">    358</a> 
-<a href="#l359" class="line" id="l359">    359</a> 	for _, backend := range c.backends {
-<a href="#l360" class="line" id="l360">    360</a> 		go func(backend Backend) {
-<a href="#l361" class="line" id="l361">    361</a> 			response, err := rpc(backend)
-<a href="#l362" class="line" id="l362">    362</a> 			errs &lt;- err
-<a href="#l363" class="line" id="l363">    363</a> 
-<a href="#l364" class="line" id="l364">    364</a> 			if response != nil {
-<a href="#l365" class="line" id="l365">    365</a> 				responses &lt;- response
-<a href="#l366" class="line" id="l366">    366</a> 			}
-<a href="#l367" class="line" id="l367">    367</a> 		}(backend)
-<a href="#l368" class="line" id="l368">    368</a> 	}
-<a href="#l369" class="line" id="l369">    369</a> 
-<a href="#l370" class="line" id="l370">    370</a> 	// Block until all requests have been completed.
-<a href="#l371" class="line" id="l371">    371</a> 	for i := 0; i &lt; len(c.backends); i++ {
-<a href="#l372" class="line" id="l372">    372</a> 		if err := &lt;-errs; err != nil {
-<a href="#l373" class="line" id="l373">    373</a> 			return nil, err
-<a href="#l374" class="line" id="l374">    374</a> 		}
-<a href="#l375" class="line" id="l375">    375</a> 	}
-<a href="#l376" class="line" id="l376">    376</a> 
-<a href="#l377" class="line" id="l377">    377</a> 	return &lt;-responses, nil
-<a href="#l378" class="line" id="l378">    378</a> }
+<a href="#l281" class="line" id="l281">    281</a> 	for _, backend := range c.backends {
+<a href="#l282" class="line" id="l282">    282</a> 		go func(backend Backend) {
+<a href="#l283" class="line" id="l283">    283</a> 			errs &lt;- backend.Close()
+<a href="#l284" class="line" id="l284">    284</a> 		}(backend)
+<a href="#l285" class="line" id="l285">    285</a> 	}
+<a href="#l286" class="line" id="l286">    286</a> 
+<a href="#l287" class="line" id="l287">    287</a> 	for i := 0; i &lt; len(c.backends); i++ {
+<a href="#l288" class="line" id="l288">    288</a> 		if err := &lt;-errs; err != nil {
+<a href="#l289" class="line" id="l289">    289</a> 			return err
+<a href="#l290" class="line" id="l290">    290</a> 		}
+<a href="#l291" class="line" id="l291">    291</a> 	}
+<a href="#l292" class="line" id="l292">    292</a> 
+<a href="#l293" class="line" id="l293">    293</a> 	return nil
+<a href="#l294" class="line" id="l294">    294</a> }
+<a href="#l295" class="line" id="l295">    295</a> 
+<a href="#l296" class="line" id="l296">    296</a> // String returns a human-consumable representation of this backend.
+<a href="#l297" class="line" id="l297">    297</a> func (c *Composite) String() string {
+<a href="#l298" class="line" id="l298">    298</a> 	return schemas.MarshalDescriptor(c.Descriptor())
+<a href="#l299" class="line" id="l299">    299</a> }
+<a href="#l300" class="line" id="l300">    300</a> 
+<a href="#l301" class="line" id="l301">    301</a> // dispatch is a convenience method to dispatch a request based on the selected dispatch policy.
+<a href="#l302" class="line" id="l302">    302</a> func (c *Composite) dispatch(policy common.Dispatch, rpc func(backend Backend) (proto.Message, error)) (proto.Message, error) {
+<a href="#l303" class="line" id="l303">    303</a> 	switch policy {
+<a href="#l304" class="line" id="l304">    304</a> 	case common.Dispatch_RANDOM:
+<a href="#l305" class="line" id="l305">    305</a> 		return c.dispatchRandom(rpc)
+<a href="#l306" class="line" id="l306">    306</a> 	case common.Dispatch_INITIAL:
+<a href="#l307" class="line" id="l307">    307</a> 		return c.dispatchInitial(rpc)
+<a href="#l308" class="line" id="l308">    308</a> 	case common.Dispatch_FAILOVER:
+<a href="#l309" class="line" id="l309">    309</a> 		return c.dispatchFailover(rpc)
+<a href="#l310" class="line" id="l310">    310</a> 	case common.Dispatch_ALL_SYNC:
+<a href="#l311" class="line" id="l311">    311</a> 		return c.dispatchAllSync(rpc)
+<a href="#l312" class="line" id="l312">    312</a> 	case common.Dispatch_ALL_ASYNC:
+<a href="#l313" class="line" id="l313">    313</a> 		return c.dispatchAllAsync(rpc)
+<a href="#l314" class="line" id="l314">    314</a> 	default:
+<a href="#l315" class="line" id="l315">    315</a> 		return nil, status.Errorf(
+<a href="#l316" class="line" id="l316">    316</a> 			codes.Unimplemented,
+<a href="#l317" class="line" id="l317">    317</a> 			&quot;backend: unsupported dispatch policy for method: policy=%v&quot;,
+<a href="#l318" class="line" id="l318">    318</a> 			policy,
+<a href="#l319" class="line" id="l319">    319</a> 		)
+<a href="#l320" class="line" id="l320">    320</a> 	}
+<a href="#l321" class="line" id="l321">    321</a> }
+<a href="#l322" class="line" id="l322">    322</a> 
+<a href="#l323" class="line" id="l323">    323</a> // dispatchRandom is a dispatcher implementation that dispatches the request to a randomly selected
+<a href="#l324" class="line" id="l324">    324</a> // backend.
+<a href="#l325" class="line" id="l325">    325</a> func (c *Composite) dispatchRandom(rpc func(backend Backend) (proto.Message, error)) (proto.Message, error) {
+<a href="#l326" class="line" id="l326">    326</a> 	return rpc(c.backends[rand.Intn(len(c.backends))])
+<a href="#l327" class="line" id="l327">    327</a> }
+<a href="#l328" class="line" id="l328">    328</a> 
+<a href="#l329" class="line" id="l329">    329</a> // dispatchInitial is a dispatcher implementation that dispatches the request to the first backend.
+<a href="#l330" class="line" id="l330">    330</a> func (c *Composite) dispatchInitial(rpc func(backend Backend) (proto.Message, error)) (proto.Message, error) {
+<a href="#l331" class="line" id="l331">    331</a> 	return rpc(c.backends[0])
+<a href="#l332" class="line" id="l332">    332</a> }
+<a href="#l333" class="line" id="l333">    333</a> 
+<a href="#l334" class="line" id="l334">    334</a> // dispatchFailover is a dispatcher implementation that attempts the request against backends
+<a href="#l335" class="line" id="l335">    335</a> // sequentially until one provides a non-error result.
+<a href="#l336" class="line" id="l336">    336</a> func (c *Composite) dispatchFailover(rpc func(backend Backend) (proto.Message, error)) (proto.Message, error) {
+<a href="#l337" class="line" id="l337">    337</a> 	var errs []error
+<a href="#l338" class="line" id="l338">    338</a> 
+<a href="#l339" class="line" id="l339">    339</a> 	for _, backend := range c.backends {
+<a href="#l340" class="line" id="l340">    340</a> 		response, err := rpc(backend)
+<a href="#l341" class="line" id="l341">    341</a> 		if err == nil {
+<a href="#l342" class="line" id="l342">    342</a> 			return response, nil
+<a href="#l343" class="line" id="l343">    343</a> 		}
+<a href="#l344" class="line" id="l344">    344</a> 
+<a href="#l345" class="line" id="l345">    345</a> 		zap.L().Warn(
+<a href="#l346" class="line" id="l346">    346</a> 			&quot;error during invocation; advancing to next backend by failover policy&quot;,
+<a href="#l347" class="line" id="l347">    347</a> 			zap.Error(err),
+<a href="#l348" class="line" id="l348">    348</a> 		)
+<a href="#l349" class="line" id="l349">    349</a> 
+<a href="#l350" class="line" id="l350">    350</a> 		errs = append(errs, err)
+<a href="#l351" class="line" id="l351">    351</a> 	}
+<a href="#l352" class="line" id="l352">    352</a> 
+<a href="#l353" class="line" id="l353">    353</a> 	return nil, fmt.Errorf(&quot;backend: all backends errored in failover policy: errs=%v&quot;, errs)
+<a href="#l354" class="line" id="l354">    354</a> }
+<a href="#l355" class="line" id="l355">    355</a> 
+<a href="#l356" class="line" id="l356">    356</a> // dispatchAllSync is a dispatcher implementation that synchronously dispatches the request to all
+<a href="#l357" class="line" id="l357">    357</a> // backends, one after the other in sequential order.
+<a href="#l358" class="line" id="l358">    358</a> func (c *Composite) dispatchAllSync(rpc func(backend Backend) (proto.Message, error)) (proto.Message, error) {
+<a href="#l359" class="line" id="l359">    359</a> 	var response proto.Message
+<a href="#l360" class="line" id="l360">    360</a> 	var err error
+<a href="#l361" class="line" id="l361">    361</a> 
+<a href="#l362" class="line" id="l362">    362</a> 	for _, backend := range c.backends {
+<a href="#l363" class="line" id="l363">    363</a> 		response, err = rpc(backend)
+<a href="#l364" class="line" id="l364">    364</a> 		if err != nil {
+<a href="#l365" class="line" id="l365">    365</a> 			return nil, err
+<a href="#l366" class="line" id="l366">    366</a> 		}
+<a href="#l367" class="line" id="l367">    367</a> 	}
+<a href="#l368" class="line" id="l368">    368</a> 
+<a href="#l369" class="line" id="l369">    369</a> 	return response, nil
+<a href="#l370" class="line" id="l370">    370</a> }
+<a href="#l371" class="line" id="l371">    371</a> 
+<a href="#l372" class="line" id="l372">    372</a> // dispatchAllAsync is a dispatcher implementation that asynchronously dispatches the request to all
+<a href="#l373" class="line" id="l373">    373</a> // backends and waits for all requests to complete. If any request errors, that error is propagated
+<a href="#l374" class="line" id="l374">    374</a> // to the client. Otherwise, the first successful response is returned.
+<a href="#l375" class="line" id="l375">    375</a> func (c *Composite) dispatchAllAsync(rpc func(backend Backend) (proto.Message, error)) (proto.Message, error) {
+<a href="#l376" class="line" id="l376">    376</a> 	responses := make(chan proto.Message, len(c.backends))
+<a href="#l377" class="line" id="l377">    377</a> 	errs := make(chan error, len(c.backends))
+<a href="#l378" class="line" id="l378">    378</a> 
+<a href="#l379" class="line" id="l379">    379</a> 	for _, backend := range c.backends {
+<a href="#l380" class="line" id="l380">    380</a> 		go func(backend Backend) {
+<a href="#l381" class="line" id="l381">    381</a> 			response, err := rpc(backend)
+<a href="#l382" class="line" id="l382">    382</a> 			errs &lt;- err
+<a href="#l383" class="line" id="l383">    383</a> 
+<a href="#l384" class="line" id="l384">    384</a> 			if response != nil {
+<a href="#l385" class="line" id="l385">    385</a> 				responses &lt;- response
+<a href="#l386" class="line" id="l386">    386</a> 			}
+<a href="#l387" class="line" id="l387">    387</a> 		}(backend)
+<a href="#l388" class="line" id="l388">    388</a> 	}
+<a href="#l389" class="line" id="l389">    389</a> 
+<a href="#l390" class="line" id="l390">    390</a> 	// Block until all requests have been completed.
+<a href="#l391" class="line" id="l391">    391</a> 	for i := 0; i &lt; len(c.backends); i++ {
+<a href="#l392" class="line" id="l392">    392</a> 		if err := &lt;-errs; err != nil {
+<a href="#l393" class="line" id="l393">    393</a> 			return nil, err
+<a href="#l394" class="line" id="l394">    394</a> 		}
+<a href="#l395" class="line" id="l395">    395</a> 	}
+<a href="#l396" class="line" id="l396">    396</a> 
+<a href="#l397" class="line" id="l397">    397</a> 	return &lt;-responses, nil
+<a href="#l398" class="line" id="l398">    398</a> }
 </pre>
 </div>
 </body>

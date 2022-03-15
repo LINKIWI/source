@@ -22,34 +22,9 @@ type composedFilter struct {
 	filters []Filter
 }
 
-// asyncFilter wraps a Filter to execute processing asynchronously. It is useful for logic that
-// does not modify the underlying request and response and should be executed off the critical path.
-type asyncFilter struct {
-	Filter
-}
-
-// instrumentedFilter wraps a Filter with transparent instrumentation.
-type instrumentedFilter struct {
-	name string
-	Filter
-}
-
 // NewComposedFilter creates a Filter that composes zero or more underlying filters.
 func NewComposedFilter(filters ...Filter) Filter {
 	return NewInstrumentedFilter("composed", &composedFilter{filters})
-}
-
-// NewAsyncFilter creates a Filter that runs response processing asynchronously.
-func NewAsyncFilter(filter Filter) Filter {
-	return &asyncFilter{filter}
-}
-
-// NewInstrumentedFilter creates a Filter that emits metrics on the underlying filter's processing.
-func NewInstrumentedFilter(name string, filter Filter) Filter {
-	return &instrumentedFilter{
-		name:   name,
-		Filter: filter,
-	}
 }
 
 // ProcessRequest chains the request through each filter sequentially.
@@ -133,12 +108,37 @@ func (c *composedFilter) ProcessResponse(proxyResp *http.Response) (*http.Respon
 	return clientResp, err
 }
 
+// asyncFilter wraps a Filter to execute processing asynchronously. It is useful for logic that
+// does not modify the underlying request and response and should be executed off the critical path.
+type asyncFilter struct {
+	Filter
+}
+
+// NewAsyncFilter creates a Filter that runs response processing asynchronously.
+func NewAsyncFilter(filter Filter) Filter {
+	return &asyncFilter{filter}
+}
+
 // ProcessResponse runs the underlying filter's ProcessResponse asynchronously and immediately
 // returns the proxy response as-is. Note that the underlying filter must not modify the response.
 func (a *asyncFilter) ProcessResponse(proxyResp *http.Response) (*http.Response, error) {
 	go a.Filter.ProcessResponse(proxyResp)
 
 	return proxyResp, nil
+}
+
+// instrumentedFilter wraps a Filter with transparent instrumentation.
+type instrumentedFilter struct {
+	name string
+	Filter
+}
+
+// NewInstrumentedFilter creates a Filter that emits metrics on the underlying filter's processing.
+func NewInstrumentedFilter(name string, filter Filter) Filter {
+	return &instrumentedFilter{
+		name:   name,
+		Filter: filter,
+	}
 }
 
 // ProcessRequest runs the underlying filter's ProcessRequest and emits a counter and timer.

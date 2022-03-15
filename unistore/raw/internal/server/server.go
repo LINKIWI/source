@@ -17,7 +17,9 @@ import (
 
 // Unistore wraps a grpc.Server to provide the core Unistore gRPC services.
 type Unistore struct {
-	cfg *config.Server
+	cfg      *config.Server
+	unistore *unistoreService
+	meta     *metaService
 	*grpc.Server
 }
 
@@ -54,7 +56,7 @@ func New(cfg *config.Server) (*Unistore, error) {
 		return nil, fmt.Errorf("server: error initializing Unistore service: err=%v", err)
 	}
 
-	metaSrv, err := newMetaService(cfg, unistoreSrv.(*unistoreService).backend)
+	metaSrv, err := newMetaService(cfg, unistoreSrv)
 	if err != nil {
 		return nil, fmt.Errorf("server: error initializing meta service: err=%v", err)
 	}
@@ -72,8 +74,10 @@ func New(cfg *config.Server) (*Unistore, error) {
 	}
 
 	return &Unistore{
-		cfg:    cfg,
-		Server: srv,
+		cfg:      cfg,
+		unistore: unistoreSrv,
+		meta:     metaSrv,
+		Server:   srv,
 	}, nil
 }
 
@@ -108,7 +112,16 @@ func (u *Unistore) Serve(ctx context.Context) error {
 
 // Close closes the server by stopping the backing gRPC server gracefully.
 func (u *Unistore) Close() error {
+	zap.L().Debug(
+		"initiating gRPC server graceful shutdown",
+		zap.String("network", u.cfg.Listener.Address.Network()),
+		zap.Stringer("address", u.cfg.Listener.Address),
+	)
 	u.Server.GracefulStop()
 
-	return nil
+	zap.L().Debug(
+		"initiating Unistore service backend graceful shutdown",
+		zap.Stringer("backend", u.unistore.backend),
+	)
+	return u.unistore.Close()
 }

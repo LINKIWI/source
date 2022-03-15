@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httputil"
+	"sync"
 	"sync/atomic"
 
 	"github.com/getsentry/sentry-go"
@@ -104,7 +105,7 @@ type reverseProxy struct {
 
 	filterChains map[string]middleware.Filter
 	healthProbes map[*config.Upstream]*healthProbe
-	transports   *util.ConcurrentMap
+	transports   sync.Map
 	sequenceID   *int64
 }
 
@@ -213,7 +214,6 @@ func newReverseProxy(vhosts []*config.VirtualHost, opts config.Proxy) (http.Hand
 		opts:         opts,
 		healthProbes: healthProbes,
 		filterChains: filterChains,
-		transports:   util.NewConcurrentMap(),
 		sequenceID:   new(int64),
 	}, nil
 }
@@ -349,7 +349,7 @@ func (rp *reverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	// Transport initialization
-	tr, ok := rp.transports.Get(upstream)
+	tr, ok := rp.transports.Load(upstream)
 	if ok {
 		transport = tr.(http.RoundTripper)
 		metrics.Client.Incr(metricProxyTransportRecycle, tags)
@@ -360,7 +360,7 @@ func (rp *reverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		rp.transports.Set(upstream, transport)
+		rp.transports.Store(upstream, transport)
 		metrics.Client.Incr(metricProxyTransportInitialize, tags)
 	}
 

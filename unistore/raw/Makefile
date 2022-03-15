@@ -6,6 +6,7 @@ BIN_DIR = bin
 TOOLS_DIR = .tools
 SCHEMAS_DIR = schemas
 
+VERSION ?= dev
 GOOS ?= $(shell go env GOOS)
 GOARCH ?= $(shell go env GOARCH)
 

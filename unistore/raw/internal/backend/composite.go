@@ -273,6 +273,26 @@ func (c *Composite) Descriptor() *common.Node {
 	}
 }
 
+// Close closes all backends asynchronously, waits for all closes to complete, and returns the first
+// error if available, or nil if there are no errors.
+func (c *Composite) Close() error {
+	errs := make(chan error, len(c.backends))
+
+	for _, backend := range c.backends {
+		go func(backend Backend) {
+			errs <- backend.Close()
+		}(backend)
+	}
+
+	for i := 0; i < len(c.backends); i++ {
+		if err := <-errs; err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // String returns a human-consumable representation of this backend.
 func (c *Composite) String() string {
 	return schemas.MarshalDescriptor(c.Descriptor())

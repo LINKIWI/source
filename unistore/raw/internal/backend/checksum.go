@@ -41,14 +41,14 @@ func NewChecksum(algorithm string, backend Backend) Backend {
 // GetObject defers to the underlying Backend and transparently injects a checksum in the response
 // metadata.
 func (c *Checksum) GetObject(ctx context.Context, request *service.GetObjectRequest) (*service.GetObjectResponse, error) {
-	resp, err := c.Backend.GetObject(ctx, request)
+	response, err := c.Backend.GetObject(ctx, request)
 	if err != nil {
 		return nil, err
 	}
 
-	resp.Metadata.Checksum = c.checksum(resp.Data)
+	response.Metadata.Checksum = c.checksum(response.Data)
 
-	return resp, nil
+	return response, nil
 }
 
 // StreamGetObject defers to the underlying Backend and transparently injects a checksum for each

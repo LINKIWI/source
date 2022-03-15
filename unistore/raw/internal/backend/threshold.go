@@ -116,12 +116,12 @@ func (t *Threshold) StreamPutObject(ctx context.Context, stream chan *service.Pu
 		unary := proto.Clone(request.Request).(*service.PutObjectRequest)
 		unary.Data = combined
 
-		resp, err := t.Backend.PutObject(ctx, unary)
+		response, err := t.Backend.PutObject(ctx, unary)
 		if err != nil {
 			return nil, err
 		}
 
-		return &service.PutObjectStreamResponse{Response: resp}, nil
+		return &service.PutObjectStreamResponse{Response: response}, nil
 	}
 
 	// The desired streaming size threshold has been reached; drain the queue of

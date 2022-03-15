@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Migrate frontend view to use resource with dynamic templating - webgrep - Web client for livegrep</title>
+<meta name="description" content="Web client for livegrep" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="webgrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="webgrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>webgrep</h1><span class="desc">Web client for livegrep</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/webgrep.git">https://source.static.kevinlin.info/webgrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/LICENSE">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/9eaf7ee73670385881d517541a30419dae525939">9eaf7ee73670385881d517541a30419dae525939</a>
+<b>parent</b> <a href="../commit/bbd4d62db4434941ce2b40428e1b86f18da918ea">bbd4d62db4434941ce2b40428e1b86f18da918ea</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sat 12 Mar 2022 11:42:39 -0800
+
+Migrate frontend view to use resource with dynamic templating
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">src/server/logic/view.js</a></td><td> | </td><td class="num">43</td><td><span class="i">++++++++++++++++++++</span><span class="d">-----------------------</span></td></tr>
+<tr><td class="A">A</td><td><a href="#h1">src/server/resources/template/frontend.html</a></td><td> | </td><td class="num">15</td><td><span class="i">+++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="A">A</td><td><a href="#h2">src/server/util/template.js</a></td><td> | </td><td class="num">18</td><td><span class="i">++++++++++++++++++</span><span class="d"></span></td></tr>
+</table></pre><pre>3 files changed, 53 insertions(+), 23 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/src/server/logic/view.js">src/server/logic/view.js</a> b/<a href="../file/src/server/logic/view.js">src/server/logic/view.js</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -1,26 +1,6 @@
+</a> import BaseLogic from &#39;server/logic/base&#39;;
+<a href="#h0-0-1" id="h0-0-1" class="d">-import { clientResource } from &#39;server/util/resource&#39;;
+</a><a href="#h0-0-2" id="h0-0-2" class="d">-
+</a><a href="#h0-0-3" id="h0-0-3" class="d">-const clientTemplate = (injectedGlobals, bundle) =&gt; `
+</a><a href="#h0-0-4" id="h0-0-4" class="d">-  &lt;!DOCTYPE html&gt;
+</a><a href="#h0-0-5" id="h0-0-5" class="d">-  &lt;html lang=&quot;en&quot;&gt;
+</a><a href="#h0-0-6" id="h0-0-6" class="d">-    &lt;head&gt;
+</a><a href="#h0-0-7" id="h0-0-7" class="d">-      &lt;meta charset=&quot;UTF-8&quot; /&gt;
+</a><a href="#h0-0-8" id="h0-0-8" class="d">-      &lt;meta
+</a><a href="#h0-0-9" id="h0-0-9" class="d">-        name=&quot;viewport&quot;
+</a><a href="#h0-0-10" id="h0-0-10" class="d">-        content=&quot;width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0&quot;
+</a><a href="#h0-0-11" id="h0-0-11" class="d">-      /&gt;
+</a><a href="#h0-0-12" id="h0-0-12" class="d">-    &lt;/head&gt;
+</a><a href="#h0-0-13" id="h0-0-13" class="d">-    &lt;body&gt;
+</a><a href="#h0-0-14" id="h0-0-14" class="d">-      &lt;div id=&quot;app&quot;&gt;&lt;/div&gt;
+</a><a href="#h0-0-15" id="h0-0-15" class="d">-      &lt;script&gt;window.__SSR_INJECTED_GLOBALS__ = ${JSON.stringify(injectedGlobals)}&lt;/script&gt;
+</a><a href="#h0-0-16" id="h0-0-16" class="d">-      &lt;script&gt;${bundle}&lt;/script&gt;
+</a><a href="#h0-0-17" id="h0-0-17" class="d">-    &lt;/body&gt;
+</a><a href="#h0-0-18" id="h0-0-18" class="d">-  &lt;/html&gt;
+</a><a href="#h0-0-19" id="h0-0-19" class="d">-`;
+</a><a href="#h0-0-20" id="h0-0-20" class="d">-
+</a><a href="#h0-0-21" id="h0-0-21" class="d">-const renderTemplate = (injectedGlobals, cb) =&gt; clientResource(&#39;js/main.js&#39;, (err, bundle) =&gt;
+</a><a href="#h0-0-22" id="h0-0-22" class="d">-  (err ? cb(err) : cb(null, clientTemplate(injectedGlobals, bundle.toString()))));
+</a><a href="#h0-0-23" id="h0-0-23" class="i">+import { clientResource, serverResource } from &#39;server/util/resource&#39;;
+</a><a href="#h0-0-24" id="h0-0-24" class="i">+import { render } from &#39;server/util/template&#39;;
+</a> 
+ /**
+  * Logic related to rendering client templates.
+<a href="#h0-1" id="h0-1" class="h">@@ -58,7 +38,24 @@ export default class ViewLogic extends BaseLogic {
+</a>         meta,
+       };
+ 
+<a href="#h0-1-3" id="h0-1-3" class="d">-      return renderTemplate({ store: hydratedStore }, cb);
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+      return serverResource(&#39;resources/template/frontend.html&#39;, (frontendTemplateErr, index) =&gt; {
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+        if (frontendTemplateErr) {
+</a><a href="#h0-1-6" id="h0-1-6" class="i">+          return cb(frontendTemplateErr);
+</a><a href="#h0-1-7" id="h0-1-7" class="i">+        }
+</a><a href="#h0-1-8" id="h0-1-8" class="i">+
+</a><a href="#h0-1-9" id="h0-1-9" class="i">+        return clientResource(&#39;js/main.js&#39;, (clientBundleErr, bundle) =&gt; {
+</a><a href="#h0-1-10" id="h0-1-10" class="i">+          if (clientBundleErr) {
+</a><a href="#h0-1-11" id="h0-1-11" class="i">+            return cb(clientBundleErr);
+</a><a href="#h0-1-12" id="h0-1-12" class="i">+          }
+</a><a href="#h0-1-13" id="h0-1-13" class="i">+
+</a><a href="#h0-1-14" id="h0-1-14" class="i">+          const variables = {
+</a><a href="#h0-1-15" id="h0-1-15" class="i">+            CLIENT_BUNDLE: bundle.toString(),
+</a><a href="#h0-1-16" id="h0-1-16" class="i">+            SSR_INJECTED_GLOBALS: JSON.stringify({ store: hydratedStore }),
+</a><a href="#h0-1-17" id="h0-1-17" class="i">+          };
+</a><a href="#h0-1-18" id="h0-1-18" class="i">+
+</a><a href="#h0-1-19" id="h0-1-19" class="i">+          return cb(null, render(index.toString(), variables));
+</a><a href="#h0-1-20" id="h0-1-20" class="i">+        });
+</a><a href="#h0-1-21" id="h0-1-21" class="i">+      });
+</a>     });
+   }
+ }
+<b>diff --git a/<a id="h1" href="../file/src/server/resources/template/frontend.html">src/server/resources/template/frontend.html</a> b/<a href="../file/src/server/resources/template/frontend.html">src/server/resources/template/frontend.html</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -0,0 +1,15 @@
+</a><a href="#h1-0-0" id="h1-0-0" class="i">+&lt;!DOCTYPE html&gt;
+</a><a href="#h1-0-1" id="h1-0-1" class="i">+&lt;html lang=&quot;en&quot;&gt;
+</a><a href="#h1-0-2" id="h1-0-2" class="i">+  &lt;head&gt;
+</a><a href="#h1-0-3" id="h1-0-3" class="i">+    &lt;meta charset=&quot;UTF-8&quot; /&gt;
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+    &lt;meta
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+      name=&quot;viewport&quot;
+</a><a href="#h1-0-6" id="h1-0-6" class="i">+      content=&quot;width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0&quot;
+</a><a href="#h1-0-7" id="h1-0-7" class="i">+    /&gt;
+</a><a href="#h1-0-8" id="h1-0-8" class="i">+  &lt;/head&gt;
+</a><a href="#h1-0-9" id="h1-0-9" class="i">+  &lt;body&gt;
+</a><a href="#h1-0-10" id="h1-0-10" class="i">+    &lt;div id=&quot;app&quot;&gt;&lt;/div&gt;
+</a><a href="#h1-0-11" id="h1-0-11" class="i">+    &lt;script&gt;window.__SSR_INJECTED_GLOBALS__ = {SSR_INJECTED_GLOBALS}&lt;/script&gt;
+</a><a href="#h1-0-12" id="h1-0-12" class="i">+    &lt;script&gt;{CLIENT_BUNDLE}&lt;/script&gt;
+</a><a href="#h1-0-13" id="h1-0-13" class="i">+  &lt;/body&gt;
+</a><a href="#h1-0-14" id="h1-0-14" class="i">+&lt;/html&gt;
+</a><b>diff --git a/<a id="h2" href="../file/src/server/util/template.js">src/server/util/template.js</a> b/<a href="../file/src/server/util/template.js">src/server/util/template.js</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -0,0 +1,18 @@
+</a><a href="#h2-0-0" id="h2-0-0" class="i">+/**
+</a><a href="#h2-0-1" id="h2-0-1" class="i">+ * Do a one-shot render against a fully materialized blob of text.
+</a><a href="#h2-0-2" id="h2-0-2" class="i">+ *
+</a><a href="#h2-0-3" id="h2-0-3" class="i">+ * Template variables in the source blob are expected to be of the form {NAME}, i.e. surrounded by
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+ * curly braces. All such instances are replaced with the value associated with the NAME key in the
+</a><a href="#h2-0-5" id="h2-0-5" class="i">+ * template variables.
+</a><a href="#h2-0-6" id="h2-0-6" class="i">+ *
+</a><a href="#h2-0-7" id="h2-0-7" class="i">+ * @param {String} source Original template text from which output should be rendered.
+</a><a href="#h2-0-8" id="h2-0-8" class="i">+ * @param {Object} variables Mapping of template variable names to values to render.
+</a><a href="#h2-0-9" id="h2-0-9" class="i">+ * @returns {String} Rendered output.
+</a><a href="#h2-0-10" id="h2-0-10" class="i">+ */
+</a><a href="#h2-0-11" id="h2-0-11" class="i">+export const render = (source, variables) =&gt; Object.entries(variables)
+</a><a href="#h2-0-12" id="h2-0-12" class="i">+  // The String.prototype.replaceAll function recognizes special symbols in the replacement value
+</a><a href="#h2-0-13" id="h2-0-13" class="i">+  // to change the replacement behavior. To force replacement of the string literal, use the
+</a><a href="#h2-0-14" id="h2-0-14" class="i">+  // alternate API which invokes a callback function to supply the literal replacement value.
+</a><a href="#h2-0-15" id="h2-0-15" class="i">+  .reduce((rendered, [key, value]) =&gt; rendered.replaceAll(`{${key}}`, () =&gt; value), source);
+</a><a href="#h2-0-16" id="h2-0-16" class="i">+
+</a><a href="#h2-0-17" id="h2-0-17" class="i">+export default undefined;
+</a></pre>
+</div>
+</body>
+</html>

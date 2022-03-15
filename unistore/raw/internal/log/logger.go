@@ -29,13 +29,18 @@ func Init(cfg *config.Log) error {
 	encoder.EncodeDuration = zapcore.StringDurationEncoder
 	encoder.FunctionKey = "func"
 
+	fields := map[string]interface{}{"version": meta.Version}
+	for _, tag := range cfg.Tags {
+		fields[tag.Key] = tag.Value
+	}
+
 	logCfg := zap.Config{
 		Level:            level,
 		Encoding:         "json",
 		EncoderConfig:    encoder,
 		OutputPaths:      cfg.Outputs,
 		ErrorOutputPaths: cfg.Outputs,
-		InitialFields:    map[string]interface{}{"version": meta.Version},
+		InitialFields:    fields,
 	}
 
 	logger, err := logCfg.Build()

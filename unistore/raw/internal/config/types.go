@@ -81,6 +81,7 @@ type Composite struct {
 	ReadDispatch  string   `yaml:"read_dispatch"`
 	WriteDispatch string   `yaml:"write_dispatch"`
 	Backends      []string `yaml:"backends"`
+	Log           *Log     `yaml:"log"`
 }
 
 // Disk describes options for the disk object storage backend.
@@ -92,6 +93,7 @@ type Disk struct {
 	Checksum          *Checksum     `yaml:"checksum"`
 	Compression       *Compression  `yaml:"compression"`
 	Encryption        *Encryption   `yaml:"encryption"`
+	Log               *Log          `yaml:"log"`
 }
 
 // B2 describes options for the Backblaze B2 object storage backend.
@@ -106,6 +108,7 @@ type B2 struct {
 	Checksum          *Checksum     `yaml:"checksum"`
 	Compression       *Compression  `yaml:"compression"`
 	Encryption        *Encryption   `yaml:"encryption"`
+	Log               *Log          `yaml:"log"`
 }
 
 // Unistore describes options for the Unistore object storage backend.
@@ -121,6 +124,7 @@ type Unistore struct {
 	Checksum          *Checksum     `yaml:"checksum"`
 	Compression       *Compression  `yaml:"compression"`
 	Encryption        *Encryption   `yaml:"encryption"`
+	Log               *Log          `yaml:"log"`
 }
 
 // Storage defines available object storage backends.
@@ -178,6 +182,10 @@ type Metrics struct {
 type Log struct {
 	Level   string   `yaml:"level"`
 	Outputs []string `yaml:"outputs"`
+	Tags    []struct {
+		Key   string `yaml:"key"`
+		Value string `yaml:"value"`
+	} `yaml:"tags"`
 }
 
 // Errors describes application error tracking and capture configuration.

@@ -87,24 +87,24 @@ func newIOProcessor(
 // GetObject defers to the underlying backend followed by performing transparent transformation of
 // the full payload.
 func (p *ioProcessor) GetObject(ctx context.Context, request *service.GetObjectRequest) (*service.GetObjectResponse, error) {
-	resp, err := p.Backend.GetObject(ctx, request)
+	response, err := p.Backend.GetObject(ctx, request)
 	if err != nil {
 		return nil, err
 	}
 
-	proxyReader, err := p.reader(bytes.NewReader(resp.Data))
+	proxyReader, err := p.reader(bytes.NewReader(response.Data))
 	if err != nil {
 		return nil, status.Error(codes.Unknown, err.Error())
 	}
 
 	defer proxyReader.Close()
 
-	resp.Data, err = io.ReadAll(proxyReader)
+	response.Data, err = io.ReadAll(proxyReader)
 	if err != nil {
 		return nil, status.Error(codes.Unknown, err.Error())
 	}
 
-	return resp, nil
+	return response, nil
 }
 
 // StreamGetObject is a streaming implementation of GetObject that transforms data chunk-by-chunk.
