@@ -18,6 +18,7 @@ class AdminPreferencesInterfaceContainer extends Component {
     // HOC props
     preferences: PropTypes.shape({
       [PREFERENCE_KEYS.CODE_SEARCH_RESULT_NAVIGATION]: PropTypes.string.isRequired,
+      [PREFERENCE_KEYS.CODE_SEARCH_TRANSPORT_PROTOCOL]: PropTypes.string.isRequired,
       [PREFERENCE_KEYS.SYNTAX_HIGHLIGHT_THEME]: PropTypes.string.isRequired,
     }).isRequired,
     sourcePreviewOpts: PropTypes.object,
@@ -70,6 +71,35 @@ class AdminPreferencesInterfaceContainer extends Component {
                 label: 'Open interactive source preview',
               },
             ].filter(Boolean)}
+          />
+        </AdminControl>
+
+        <Spacing top bottom>
+          <Separator />
+        </Spacing>
+
+        <AdminControl
+          title="Code search query transport protocol"
+          description="Preferred protocol for code search query executions"
+          isCompact={isCompact}
+        >
+          <SelectList
+            value={preferences[PREFERENCE_KEYS.CODE_SEARCH_TRANSPORT_PROTOCOL]}
+            onChange={this.handleChoiceChange(PREFERENCE_KEYS.CODE_SEARCH_TRANSPORT_PROTOCOL)}
+            options={[
+              {
+                value: PREFERENCE_VALUES[PREFERENCE_KEYS.CODE_SEARCH_TRANSPORT_PROTOCOL].AUTO,
+                label: 'Automatic',
+              },
+              {
+                value: PREFERENCE_VALUES[PREFERENCE_KEYS.CODE_SEARCH_TRANSPORT_PROTOCOL].WEBSOCKET,
+                label: 'Websocket only',
+              },
+              {
+                value: PREFERENCE_VALUES[PREFERENCE_KEYS.CODE_SEARCH_TRANSPORT_PROTOCOL].HTTP,
+                label: 'HTTP only',
+              },
+            ]}
           />
         </AdminControl>
 

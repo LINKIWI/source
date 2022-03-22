@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/config, internal/server: Support custom Unix socket listener file mode - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/c5ff85c206abda21665c895c7fade01d1d541063">c5ff85c206abda21665c895c7fade01d1d541063</a>
+<b>parent</b> <a href="../commit/d206a3efeadd556a0553e10ebb9f1d1bb9f95b0a">d206a3efeadd556a0553e10ebb9f1d1bb9f95b0a</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sun 20 Mar 2022 11:49:38 -0700
+
+internal/config, internal/server: Support custom Unix socket listener file mode
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">config.example.yaml</a></td><td> | </td><td class="num">10</td><td><span class="i">+++++++++</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">internal/config/types.go</a></td><td> | </td><td class="num">19</td><td><span class="i">+++++++++++++</span><span class="d">------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">internal/server/server.go</a></td><td> | </td><td class="num">23</td><td><span class="i">+++++++++++++++++++</span><span class="d">----</span></td></tr>
+</table></pre><pre>3 files changed, 41 insertions(+), 11 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/config.example.yaml">config.example.yaml</a> b/<a href="../file/config.example.yaml">config.example.yaml</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -12,7 +12,7 @@ application:
+</a> 
+ server:
+   listeners:
+<a href="#h0-0-3" id="h0-0-3" class="d">-    - name: courier
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+    - name: courier-tcp
+</a>       address: 127.0.0.1:8200
+       connection:
+         read_timeout: 2s
+<a href="#h0-1" id="h0-1" class="h">@@ -27,6 +27,14 @@ server:
+</a>           - key: /etc/ssl/service/key.pem
+             certificate: /etc/ssl/service/cert.pem
+             authority: /etc/ssl/service/ca.pem
+<a href="#h0-1-3" id="h0-1-3" class="i">+      authorization:
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+        sources:
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+          - 127.0.0.1/32
+</a><a href="#h0-1-6" id="h0-1-6" class="i">+          - 10.0.0.0/8
+</a><a href="#h0-1-7" id="h0-1-7" class="i">+    - name: courier-socket
+</a><a href="#h0-1-8" id="h0-1-8" class="i">+      address: unix:/var/run/courier/courier.sock
+</a><a href="#h0-1-9" id="h0-1-9" class="i">+      authorization:
+</a><a href="#h0-1-10" id="h0-1-10" class="i">+        socket_file_mode: 0600
+</a>   proxy:
+     enable_error_propagation: true
+   virtual_hosts:
+<b>diff --git a/<a id="h1" href="../file/internal/config/types.go">internal/config/types.go</a> b/<a href="../file/internal/config/types.go">internal/config/types.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -1,6 +1,7 @@
+</a> package config
+ 
+ import (
+<a href="#h1-0-3" id="h1-0-3" class="i">+	&quot;io/fs&quot;
+</a> 	&quot;net/http&quot;
+ 	&quot;time&quot;
+ 
+<a href="#h1-1" id="h1-1" class="h">@@ -163,14 +164,20 @@ type TLSContext struct {
+</a> 	ProtocolVersion  string            `yaml:&quot;protocol_version&quot;`
+ }
+ 
+<a href="#h1-1-3" id="h1-1-3" class="i">+// Authorization describes listener connection authorization of clients.
+</a><a href="#h1-1-4" id="h1-1-4" class="i">+type Authorization struct {
+</a><a href="#h1-1-5" id="h1-1-5" class="i">+	Sources        []CIDR      `yaml:&quot;sources&quot;`
+</a><a href="#h1-1-6" id="h1-1-6" class="i">+	SocketFileMode fs.FileMode `yaml:&quot;socket_file_mode&quot;`
+</a><a href="#h1-1-7" id="h1-1-7" class="i">+}
+</a><a href="#h1-1-8" id="h1-1-8" class="i">+
+</a> // Listener describes a single bound listener for the server.
+ type Listener struct {
+<a href="#h1-1-11" id="h1-1-11" class="d">-	Name              string           `yaml:&quot;name&quot;`
+</a><a href="#h1-1-12" id="h1-1-12" class="d">-	Address           *Address         `yaml:&quot;address&quot;`
+</a><a href="#h1-1-13" id="h1-1-13" class="d">-	Protocol          string           `yaml:&quot;protocol&quot;`
+</a><a href="#h1-1-14" id="h1-1-14" class="d">-	Connection        ServerConnection `yaml:&quot;connection&quot;`
+</a><a href="#h1-1-15" id="h1-1-15" class="d">-	TLSContext        *TLSContext      `yaml:&quot;tls_context&quot;`
+</a><a href="#h1-1-16" id="h1-1-16" class="d">-	AuthorizedSources []CIDR           `yaml:&quot;authorized_sources&quot;`
+</a><a href="#h1-1-17" id="h1-1-17" class="i">+	Name          string           `yaml:&quot;name&quot;`
+</a><a href="#h1-1-18" id="h1-1-18" class="i">+	Address       *Address         `yaml:&quot;address&quot;`
+</a><a href="#h1-1-19" id="h1-1-19" class="i">+	Protocol      string           `yaml:&quot;protocol&quot;`
+</a><a href="#h1-1-20" id="h1-1-20" class="i">+	Connection    ServerConnection `yaml:&quot;connection&quot;`
+</a><a href="#h1-1-21" id="h1-1-21" class="i">+	TLSContext    *TLSContext      `yaml:&quot;tls_context&quot;`
+</a><a href="#h1-1-22" id="h1-1-22" class="i">+	Authorization Authorization    `yaml:&quot;authorization&quot;`
+</a> }
+ 
+ // Proxy describes proxy behavior options.
+<b>diff --git a/<a id="h2" href="../file/internal/server/server.go">internal/server/server.go</a> b/<a href="../file/internal/server/server.go">internal/server/server.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -181,10 +181,10 @@ func (i *instance) serve() error {
+</a> 		ln = netutil.LimitListener(ln, i.cfg.Connection.ActiveLimit)
+ 	}
+ 
+<a href="#h2-0-3" id="h2-0-3" class="d">-	if len(i.cfg.AuthorizedSources) &gt; 0 {
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+	if len(i.cfg.Authorization.Sources) &gt; 0 {
+</a> 		switch listenNet {
+ 		case &quot;tcp&quot;, &quot;tcp4&quot;, &quot;tcp6&quot;:
+<a href="#h2-0-7" id="h2-0-7" class="d">-			for _, source := range i.cfg.AuthorizedSources {
+</a><a href="#h2-0-8" id="h2-0-8" class="i">+			for _, source := range i.cfg.Authorization.Sources {
+</a> 				zap.L().Debug(
+ 					&quot;enabling restricted IP source for listener&quot;,
+ 					zap.String(&quot;name&quot;, i.cfg.Name),
+<a href="#h2-1" id="h2-1" class="h">@@ -192,7 +192,7 @@ func (i *instance) serve() error {
+</a> 				)
+ 			}
+ 
+<a href="#h2-1-3" id="h2-1-3" class="d">-			ln = newRestrictedListener(i.cfg.Name, i.cfg.AuthorizedSources, ln)
+</a><a href="#h2-1-4" id="h2-1-4" class="i">+			ln = newRestrictedListener(i.cfg.Name, i.cfg.Authorization.Sources, ln)
+</a> 		default:
+ 			return &amp;util.Error{
+ 				Namespace: &quot;server&quot;,
+<a href="#h2-2" id="h2-2" class="h">@@ -208,18 +208,33 @@ func (i *instance) serve() error {
+</a> 
+ 	switch listenNet {
+ 	case &quot;unix&quot;:
+<a href="#h2-2-3" id="h2-2-3" class="d">-		if err := os.Chmod(listenAddr, 0600); err != nil {
+</a><a href="#h2-2-4" id="h2-2-4" class="i">+		socketFileMode := i.cfg.Authorization.SocketFileMode
+</a><a href="#h2-2-5" id="h2-2-5" class="i">+		if socketFileMode == 0 {
+</a><a href="#h2-2-6" id="h2-2-6" class="i">+			socketFileMode = 0600 // User R/W only
+</a><a href="#h2-2-7" id="h2-2-7" class="i">+		}
+</a><a href="#h2-2-8" id="h2-2-8" class="i">+
+</a><a href="#h2-2-9" id="h2-2-9" class="i">+		if err := os.Chmod(listenAddr, socketFileMode); err != nil {
+</a> 			return &amp;util.Error{
+ 				Namespace: &quot;server&quot;,
+ 				Message:   &quot;error setting file ownership on Unix socket&quot;,
+ 				Tags: map[string]interface{}{
+ 					&quot;name&quot;:    i.cfg.Name,
+ 					&quot;address&quot;: i.cfg.Address.String(),
+<a href="#h2-2-16" id="h2-2-16" class="i">+					&quot;mode&quot;:    socketFileMode,
+</a> 				},
+ 				StackedError: err,
+ 			}
+ 		}
+ 	default:
+<a href="#h2-2-22" id="h2-2-22" class="i">+		return &amp;util.Error{
+</a><a href="#h2-2-23" id="h2-2-23" class="i">+			Namespace: &quot;server&quot;,
+</a><a href="#h2-2-24" id="h2-2-24" class="i">+			Message:   &quot;socket file mode is only supported for Unix domain socket transports&quot;,
+</a><a href="#h2-2-25" id="h2-2-25" class="i">+			Tags: map[string]interface{}{
+</a><a href="#h2-2-26" id="h2-2-26" class="i">+				&quot;name&quot;:    i.cfg.Name,
+</a><a href="#h2-2-27" id="h2-2-27" class="i">+				&quot;network&quot;: listenNet,
+</a><a href="#h2-2-28" id="h2-2-28" class="i">+				&quot;address&quot;: listenAddr,
+</a><a href="#h2-2-29" id="h2-2-29" class="i">+			},
+</a><a href="#h2-2-30" id="h2-2-30" class="i">+		}
+</a> 	}
+ 
+ 	switch i.cfg.Protocol {
+</pre>
+</div>
+</body>
+</html>

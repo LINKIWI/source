@@ -4,6 +4,7 @@ import { Spacing } from 'react-elemental';
 import { Helmet } from 'react-helmet';
 import { connect } from 'react-redux';
 import { bindActionCreators } from 'redux';
+import { withResource } from 'supercharged/client';
 import { compose, withForm } from '@linkiwi/hoc';
 import withTelemetry from 'client/app/react/containers/hoc/with-telemetry';
 import withTransactionalTunnel from 'client/app/react/containers/hoc/with-transactional-tunnel';
@@ -12,7 +13,7 @@ import SearchQueryContainer from 'client/app/react/containers/search/query';
 import Layout from 'client/app/react/components/common/layout';
 import { CONNECTIVITY_STATE } from 'client/app/react/components/search/meta/connection-status';
 import { recordSearchHistoryItem } from 'client/app/redux/actions/search';
-import { PREFERENCE_KEYS } from 'client/app/util/constants/preferences';
+import { PREFERENCE_KEYS, PREFERENCE_VALUES } from 'client/app/util/constants/preferences';
 import { MAX_MATCHES } from 'client/app/util/constants/search';
 import { string } from 'client/app/util/format';
 import { URLStateSerializer, URLStateDeserializer } from 'client/app/util/data';
@@ -35,6 +36,7 @@ class SearchContainer extends Component {
     width: PropTypes.number,
     contextLines: PropTypes.number.isRequired,
     initialMatchLimit: PropTypes.number.isRequired,
+    transportProtocol: PropTypes.string.isRequired,
     indexIdentity: PropTypes.shape({
       name: PropTypes.string.isRequired,
       timestamp: PropTypes.number.isRequired,
@@ -42,11 +44,17 @@ class SearchContainer extends Component {
     actions: PropTypes.shape({
       recordSearchHistoryItem: PropTypes.func.isRequired,
     }).isRequired,
-    results: PropTypes.shape({
+    primary: PropTypes.shape({
       err: PropTypes.object,
       message: PropTypes.object,
       isConnected: PropTypes.bool.isRequired,
       sendMessage: PropTypes.func.isRequired,
+    }).isRequired,
+    fallback: PropTypes.shape({
+      err: PropTypes.object,
+      data: PropTypes.object,
+      isLoaded: PropTypes.bool.isRequired,
+      invoke: PropTypes.func.isRequired,
     }).isRequired,
     form: PropTypes.shape({
       query: PropTypes.string.isRequired,
@@ -64,11 +72,27 @@ class SearchContainer extends Component {
     width: null,
   };
 
+  componentDidMount() {
+    // Eagerly invoke the search endpoint on component mount with pre-populated search parameters
+    // (e.g. from URL state). In most cases, this allows for faster display of search results (from
+    // a "cold start") via fallback data before the live endpoint connects.
+    if (this.props.form.query) {
+      this.invoke();
+    }
+  }
+
+  shouldComponentUpdate(nextProps) {
+    // Skip render updates when loading a new fallback response for visual consistency with the
+    // non-fallback path. This prevents a flash of empty results when a new fallback request is
+    // dispatched.
+    return !(this.props.fallback.isLoaded && !nextProps.fallback.isLoaded);
+  }
+
   componentDidUpdate(prevProps) {
-    const { results, recordTelemetryEvent } = this.props;
+    const { primary, recordTelemetryEvent } = this.props;
 
     // Trigger another search request if the connection state changed from disconnected to connected
-    if (results.isConnected && !prevProps.results.isConnected) {
+    if (primary.isConnected && !prevProps.primary.isConnected) {
       this.invoke();
       recordTelemetryEvent(TELEMETRY_ACTIONS.SEARCH_CONNECT);
     }
@@ -141,7 +165,16 @@ class SearchContainer extends Component {
   }
 
   _invoke(overrides = {}, cb) {
-    const { results, form, indexIdentity, contextLines, initialMatchLimit } = this.props;
+    const {
+      primary,
+      fallback,
+      form,
+      indexIdentity,
+      contextLines,
+      initialMatchLimit,
+      transportProtocol,
+    } = this.props;
+
     const searchParams = { ...form, ...overrides };
 
     // Only re-encode URL state when a form parameter changes
@@ -176,7 +209,23 @@ class SearchContainer extends Component {
       context: contextLines,
     };
 
-    results.sendMessage(request);
+    switch (transportProtocol) {
+      case PREFERENCE_VALUES[PREFERENCE_KEYS.CODE_SEARCH_TRANSPORT_PROTOCOL].WEBSOCKET:
+        primary.sendMessage(request);
+        break;
+
+      case PREFERENCE_VALUES[PREFERENCE_KEYS.CODE_SEARCH_TRANSPORT_PROTOCOL].HTTP:
+        fallback.invoke(request);
+        break;
+
+      default:
+        primary.sendMessage(request);
+        // Dispatch a fallback request only if the live endpoint is not connected.
+        if (!primary.err && !primary.isConnected) {
+          fallback.invoke(request);
+        }
+        break;
+    }
 
     if (cb) {
       this.forceUpdate(cb);
@@ -184,20 +233,39 @@ class SearchContainer extends Component {
   }
 
   render() {
-    const { results, form, title, width, actions } = this.props;
+    const {
+      primary,
+      fallback,
+      form,
+      title,
+      width,
+      actions,
+    } = this.props;
+
     const searchTitle = form.query ? `${form.query} - ${title}` : title;
     const isCompact = breakpoints.reduce((acc, breakpoint) =>
       (width < breakpoint.threshold ? breakpoint.compact : acc), false);
     const connectivity = (() => {
-      if (results.err) {
+      if (primary.err) {
         return CONNECTIVITY_STATE.DISCONNECTED;
       }
 
-      if (results.isConnected) {
+      if (primary.isConnected) {
         return CONNECTIVITY_STATE.CONNECTED;
       }
 
       return CONNECTIVITY_STATE.CONNECTING;
+    })();
+    const results = (() => {
+      if (primary.message) {
+        return primary.message;
+      }
+
+      if (!fallback.err && fallback.isLoaded && fallback.data) {
+        return fallback;
+      }
+
+      return null;
     })();
 
     return (
@@ -218,7 +286,7 @@ class SearchContainer extends Component {
                 maxMatches={form.maxMatches}
                 filePath={form.file}
                 filteredRepos={form.repos}
-                results={results.message}
+                results={results}
                 onQueryChange={this.handleQueryChange}
                 onRegexChange={this.handleRegexChange}
                 onCaseSensitivityChange={this.handleCaseSensitivityChange}
@@ -235,7 +303,7 @@ class SearchContainer extends Component {
           <Spacing size="huge" bottom>
             <SearchResultsContainer
               maxMatches={form.maxMatches}
-              results={results.message}
+              results={results}
               onQueryChange={this.handleQueryChange}
               onQueryRecord={actions.recordSearchHistoryItem}
               onMaxMatchesChange={this.handleMaxMatchesChange}
@@ -258,6 +326,7 @@ const mapStateToProps = ({ config, context, meta, preferences }) => ({
   indexIdentity: { name: meta.name, timestamp: meta.timestamp },
   contextLines: preferences[PREFERENCE_KEYS.CODE_SEARCH_CONTEXT_LINES],
   initialMatchLimit: preferences[PREFERENCE_KEYS.CODE_SEARCH_INITIAL_MATCH_LIMIT],
+  transportProtocol: preferences[PREFERENCE_KEYS.CODE_SEARCH_TRANSPORT_PROTOCOL],
 });
 
 const mapDispatchToProps = (dispatch) => ({
@@ -284,8 +353,13 @@ export default compose(
     }),
   }),
   withTelemetry,
+  withResource({
+    key: 'fallback',
+    endpoint: '/api/search',
+    invokeOnMount: false,
+  }),
   withTransactionalTunnel({
-    key: 'results',
+    key: 'primary',
     endpoint: '/api/search',
     messageBufferSize: 1,
   }),

@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/middleware/filters: Request and response body size limit filter - courier - HTTP service proxy</title>
+<meta name="description" content="HTTP service proxy" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="courier Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>courier</h1><span class="desc">HTTP service proxy</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/courier.git">https://source.static.kevinlin.info/courier.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/7c41a32f2e9e16afddc0e26bf75df25a7e703191">7c41a32f2e9e16afddc0e26bf75df25a7e703191</a>
+<b>parent</b> <a href="../commit/ff1fc6b132be0ba11149fb1e50a493826d538037">ff1fc6b132be0ba11149fb1e50a493826d538037</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sun 20 Mar 2022 12:53:24 -0700
+
+internal/middleware/filters: Request and response body size limit filter
+
+<b>Diffstat:</b>
+<table><tr><td class="A">A</td><td><a href="#h0">internal/middleware/filters/size.go</a></td><td> | </td><td class="num">173</td><td><span class="i">+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+</table></pre><pre>1 file changed, 173 insertions(+), 0 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/internal/middleware/filters/size.go">internal/middleware/filters/size.go</a> b/<a href="../file/internal/middleware/filters/size.go">internal/middleware/filters/size.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -0,0 +1,173 @@
+</a><a href="#h0-0-0" id="h0-0-0" class="i">+package filters
+</a><a href="#h0-0-1" id="h0-0-1" class="i">+
+</a><a href="#h0-0-2" id="h0-0-2" class="i">+import (
+</a><a href="#h0-0-3" id="h0-0-3" class="i">+	&quot;bytes&quot;
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+	&quot;errors&quot;
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+	&quot;io&quot;
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+	&quot;net/http&quot;
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+	&quot;strconv&quot;
+</a><a href="#h0-0-8" id="h0-0-8" class="i">+	&quot;strings&quot;
+</a><a href="#h0-0-9" id="h0-0-9" class="i">+
+</a><a href="#h0-0-10" id="h0-0-10" class="i">+	&quot;go.uber.org/zap&quot;
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+
+</a><a href="#h0-0-12" id="h0-0-12" class="i">+	&quot;courier/internal/config&quot;
+</a><a href="#h0-0-13" id="h0-0-13" class="i">+	&quot;courier/internal/middleware&quot;
+</a><a href="#h0-0-14" id="h0-0-14" class="i">+	&quot;courier/internal/util&quot;
+</a><a href="#h0-0-15" id="h0-0-15" class="i">+)
+</a><a href="#h0-0-16" id="h0-0-16" class="i">+
+</a><a href="#h0-0-17" id="h0-0-17" class="i">+var (
+</a><a href="#h0-0-18" id="h0-0-18" class="i">+	errRequestSizeLimitExceeded  = errors.New(&quot;request body size limit exceeded&quot;)
+</a><a href="#h0-0-19" id="h0-0-19" class="i">+	errResponseSizeLimitExceeded = errors.New(&quot;response body size limit exceeded&quot;)
+</a><a href="#h0-0-20" id="h0-0-20" class="i">+)
+</a><a href="#h0-0-21" id="h0-0-21" class="i">+
+</a><a href="#h0-0-22" id="h0-0-22" class="i">+// sizeLimitParams is the configuration descriptor for the sizeLimit filter.
+</a><a href="#h0-0-23" id="h0-0-23" class="i">+type sizeLimitParams struct {
+</a><a href="#h0-0-24" id="h0-0-24" class="i">+	Request struct {
+</a><a href="#h0-0-25" id="h0-0-25" class="i">+		MaxBodySize int `yaml:&quot;max_body_size&quot;`
+</a><a href="#h0-0-26" id="h0-0-26" class="i">+	} `yaml:&quot;request&quot;`
+</a><a href="#h0-0-27" id="h0-0-27" class="i">+	Response struct {
+</a><a href="#h0-0-28" id="h0-0-28" class="i">+		MaxBodySize int `yaml:&quot;max_body_size&quot;`
+</a><a href="#h0-0-29" id="h0-0-29" class="i">+	} `yaml:&quot;response&quot;`
+</a><a href="#h0-0-30" id="h0-0-30" class="i">+}
+</a><a href="#h0-0-31" id="h0-0-31" class="i">+
+</a><a href="#h0-0-32" id="h0-0-32" class="i">+// sizeLimit is a filter that disallows inbound requests or outbound responses beyond a configured
+</a><a href="#h0-0-33" id="h0-0-33" class="i">+// maximum size threshold.
+</a><a href="#h0-0-34" id="h0-0-34" class="i">+type sizeLimit struct {
+</a><a href="#h0-0-35" id="h0-0-35" class="i">+	params *sizeLimitParams
+</a><a href="#h0-0-36" id="h0-0-36" class="i">+}
+</a><a href="#h0-0-37" id="h0-0-37" class="i">+
+</a><a href="#h0-0-38" id="h0-0-38" class="i">+// NewSizeLimit creates a new size limit filter.
+</a><a href="#h0-0-39" id="h0-0-39" class="i">+func NewSizeLimit(cfg *config.Filter) (middleware.Filter, error) {
+</a><a href="#h0-0-40" id="h0-0-40" class="i">+	var params sizeLimitParams
+</a><a href="#h0-0-41" id="h0-0-41" class="i">+
+</a><a href="#h0-0-42" id="h0-0-42" class="i">+	if err := cfg.Params.Decode(&amp;params); err != nil {
+</a><a href="#h0-0-43" id="h0-0-43" class="i">+		return nil, &amp;util.Error{
+</a><a href="#h0-0-44" id="h0-0-44" class="i">+			Namespace:    &quot;filters&quot;,
+</a><a href="#h0-0-45" id="h0-0-45" class="i">+			Message:      &quot;failed to parse request size filter params&quot;,
+</a><a href="#h0-0-46" id="h0-0-46" class="i">+			StackedError: err,
+</a><a href="#h0-0-47" id="h0-0-47" class="i">+		}
+</a><a href="#h0-0-48" id="h0-0-48" class="i">+	}
+</a><a href="#h0-0-49" id="h0-0-49" class="i">+
+</a><a href="#h0-0-50" id="h0-0-50" class="i">+	if params.Request.MaxBodySize &lt;= 0 {
+</a><a href="#h0-0-51" id="h0-0-51" class="i">+		return nil, &amp;util.Error{
+</a><a href="#h0-0-52" id="h0-0-52" class="i">+			Namespace: &quot;filters&quot;,
+</a><a href="#h0-0-53" id="h0-0-53" class="i">+			Message:   &quot;max request body size must be more than 0 bytes&quot;,
+</a><a href="#h0-0-54" id="h0-0-54" class="i">+			Tags: map[string]interface{}{
+</a><a href="#h0-0-55" id="h0-0-55" class="i">+				&quot;size&quot;: params.Request.MaxBodySize,
+</a><a href="#h0-0-56" id="h0-0-56" class="i">+			},
+</a><a href="#h0-0-57" id="h0-0-57" class="i">+		}
+</a><a href="#h0-0-58" id="h0-0-58" class="i">+	} else if params.Response.MaxBodySize &lt;= 0 {
+</a><a href="#h0-0-59" id="h0-0-59" class="i">+		return nil, &amp;util.Error{
+</a><a href="#h0-0-60" id="h0-0-60" class="i">+			Namespace: &quot;filters&quot;,
+</a><a href="#h0-0-61" id="h0-0-61" class="i">+			Message:   &quot;max response body size must be more than 0 bytes&quot;,
+</a><a href="#h0-0-62" id="h0-0-62" class="i">+			Tags: map[string]interface{}{
+</a><a href="#h0-0-63" id="h0-0-63" class="i">+				&quot;size&quot;: params.Response.MaxBodySize,
+</a><a href="#h0-0-64" id="h0-0-64" class="i">+			},
+</a><a href="#h0-0-65" id="h0-0-65" class="i">+		}
+</a><a href="#h0-0-66" id="h0-0-66" class="i">+	}
+</a><a href="#h0-0-67" id="h0-0-67" class="i">+
+</a><a href="#h0-0-68" id="h0-0-68" class="i">+	filter := &amp;sizeLimit{params: &amp;params}
+</a><a href="#h0-0-69" id="h0-0-69" class="i">+
+</a><a href="#h0-0-70" id="h0-0-70" class="i">+	return middleware.NewInstrumentedFilter(&quot;size&quot;, filter), nil
+</a><a href="#h0-0-71" id="h0-0-71" class="i">+}
+</a><a href="#h0-0-72" id="h0-0-72" class="i">+
+</a><a href="#h0-0-73" id="h0-0-73" class="i">+// ProcessRequest rejects the inbound request if its body size exceeds the maximum allowed request
+</a><a href="#h0-0-74" id="h0-0-74" class="i">+// body size. Note that the implementation buffers up to the maximum request size in-memory before
+</a><a href="#h0-0-75" id="h0-0-75" class="i">+// dispatching the request to the next layer in the chain.
+</a><a href="#h0-0-76" id="h0-0-76" class="i">+func (s *sizeLimit) ProcessRequest(clientReq *http.Request) (*http.Request, *http.Response, error) {
+</a><a href="#h0-0-77" id="h0-0-77" class="i">+	// Body size limit evaluation is not supported for bidirectional streams.
+</a><a href="#h0-0-78" id="h0-0-78" class="i">+	if _, ok := clientReq.Body.(io.Writer); ok {
+</a><a href="#h0-0-79" id="h0-0-79" class="i">+		return clientReq, nil, nil
+</a><a href="#h0-0-80" id="h0-0-80" class="i">+	}
+</a><a href="#h0-0-81" id="h0-0-81" class="i">+
+</a><a href="#h0-0-82" id="h0-0-82" class="i">+	chunk := make([]byte, 1024)
+</a><a href="#h0-0-83" id="h0-0-83" class="i">+	buf := make([]byte, 0, s.params.Request.MaxBodySize)
+</a><a href="#h0-0-84" id="h0-0-84" class="i">+
+</a><a href="#h0-0-85" id="h0-0-85" class="i">+	for len(buf) &lt; s.params.Request.MaxBodySize+1 {
+</a><a href="#h0-0-86" id="h0-0-86" class="i">+		n, err := clientReq.Body.Read(chunk)
+</a><a href="#h0-0-87" id="h0-0-87" class="i">+		if n &gt; 0 {
+</a><a href="#h0-0-88" id="h0-0-88" class="i">+			buf = append(buf, chunk[:n]...)
+</a><a href="#h0-0-89" id="h0-0-89" class="i">+		}
+</a><a href="#h0-0-90" id="h0-0-90" class="i">+
+</a><a href="#h0-0-91" id="h0-0-91" class="i">+		if err == io.EOF {
+</a><a href="#h0-0-92" id="h0-0-92" class="i">+			break
+</a><a href="#h0-0-93" id="h0-0-93" class="i">+		} else if err != nil {
+</a><a href="#h0-0-94" id="h0-0-94" class="i">+			return nil, nil, err
+</a><a href="#h0-0-95" id="h0-0-95" class="i">+		}
+</a><a href="#h0-0-96" id="h0-0-96" class="i">+	}
+</a><a href="#h0-0-97" id="h0-0-97" class="i">+
+</a><a href="#h0-0-98" id="h0-0-98" class="i">+	if len(buf) &gt; s.params.Request.MaxBodySize {
+</a><a href="#h0-0-99" id="h0-0-99" class="i">+		zap.L().Warn(
+</a><a href="#h0-0-100" id="h0-0-100" class="i">+			&quot;size limit filter rejecting request due to size limit violation&quot;,
+</a><a href="#h0-0-101" id="h0-0-101" class="i">+			zap.Int(&quot;max_request_size&quot;, s.params.Request.MaxBodySize),
+</a><a href="#h0-0-102" id="h0-0-102" class="i">+		)
+</a><a href="#h0-0-103" id="h0-0-103" class="i">+
+</a><a href="#h0-0-104" id="h0-0-104" class="i">+		headers := make(http.Header)
+</a><a href="#h0-0-105" id="h0-0-105" class="i">+		headers.Set(&quot;X-Courier-Request-Size-Limit&quot;, strconv.Itoa(s.params.Request.MaxBodySize))
+</a><a href="#h0-0-106" id="h0-0-106" class="i">+
+</a><a href="#h0-0-107" id="h0-0-107" class="i">+		resp := &amp;http.Response{
+</a><a href="#h0-0-108" id="h0-0-108" class="i">+			StatusCode: http.StatusBadRequest,
+</a><a href="#h0-0-109" id="h0-0-109" class="i">+			Body:       io.NopCloser(strings.NewReader(errRequestSizeLimitExceeded.Error())),
+</a><a href="#h0-0-110" id="h0-0-110" class="i">+			Request:    clientReq,
+</a><a href="#h0-0-111" id="h0-0-111" class="i">+			Header:     headers,
+</a><a href="#h0-0-112" id="h0-0-112" class="i">+		}
+</a><a href="#h0-0-113" id="h0-0-113" class="i">+
+</a><a href="#h0-0-114" id="h0-0-114" class="i">+		return nil, resp, nil
+</a><a href="#h0-0-115" id="h0-0-115" class="i">+	}
+</a><a href="#h0-0-116" id="h0-0-116" class="i">+
+</a><a href="#h0-0-117" id="h0-0-117" class="i">+	// Pass along the buffered request body contents along with the remaining unread body.
+</a><a href="#h0-0-118" id="h0-0-118" class="i">+	clientReq.Body = util.NewMultiReadCloser(io.NopCloser(bytes.NewReader(buf)), clientReq.Body)
+</a><a href="#h0-0-119" id="h0-0-119" class="i">+
+</a><a href="#h0-0-120" id="h0-0-120" class="i">+	return clientReq, nil, nil
+</a><a href="#h0-0-121" id="h0-0-121" class="i">+}
+</a><a href="#h0-0-122" id="h0-0-122" class="i">+
+</a><a href="#h0-0-123" id="h0-0-123" class="i">+// ProcessResponse rejects the response if its body size exceeds the maximum allowed response body
+</a><a href="#h0-0-124" id="h0-0-124" class="i">+// size. In the event that the response is rejected, its body its closed immediately and the
+</a><a href="#h0-0-125" id="h0-0-125" class="i">+// client response is replaced with a static error message. Note that the implementation buffers up
+</a><a href="#h0-0-126" id="h0-0-126" class="i">+// to the maximum response size in-memory before returning to the client.
+</a><a href="#h0-0-127" id="h0-0-127" class="i">+func (s *sizeLimit) ProcessResponse(proxyResp *http.Response) (*http.Response, error) {
+</a><a href="#h0-0-128" id="h0-0-128" class="i">+	// Body size limit evaluation is not supported for bidirectional streams.
+</a><a href="#h0-0-129" id="h0-0-129" class="i">+	if _, ok := proxyResp.Body.(io.Writer); ok {
+</a><a href="#h0-0-130" id="h0-0-130" class="i">+		return proxyResp, nil
+</a><a href="#h0-0-131" id="h0-0-131" class="i">+	}
+</a><a href="#h0-0-132" id="h0-0-132" class="i">+
+</a><a href="#h0-0-133" id="h0-0-133" class="i">+	chunk := make([]byte, 1024)
+</a><a href="#h0-0-134" id="h0-0-134" class="i">+	buf := make([]byte, 0, s.params.Response.MaxBodySize)
+</a><a href="#h0-0-135" id="h0-0-135" class="i">+
+</a><a href="#h0-0-136" id="h0-0-136" class="i">+	for len(buf) &lt; s.params.Response.MaxBodySize+1 {
+</a><a href="#h0-0-137" id="h0-0-137" class="i">+		n, err := proxyResp.Body.Read(chunk)
+</a><a href="#h0-0-138" id="h0-0-138" class="i">+		if n &gt; 0 {
+</a><a href="#h0-0-139" id="h0-0-139" class="i">+			buf = append(buf, chunk[:n]...)
+</a><a href="#h0-0-140" id="h0-0-140" class="i">+		}
+</a><a href="#h0-0-141" id="h0-0-141" class="i">+
+</a><a href="#h0-0-142" id="h0-0-142" class="i">+		if err == io.EOF {
+</a><a href="#h0-0-143" id="h0-0-143" class="i">+			break
+</a><a href="#h0-0-144" id="h0-0-144" class="i">+		} else if err != nil {
+</a><a href="#h0-0-145" id="h0-0-145" class="i">+			return nil, err
+</a><a href="#h0-0-146" id="h0-0-146" class="i">+		}
+</a><a href="#h0-0-147" id="h0-0-147" class="i">+	}
+</a><a href="#h0-0-148" id="h0-0-148" class="i">+
+</a><a href="#h0-0-149" id="h0-0-149" class="i">+	if len(buf) &gt; s.params.Response.MaxBodySize {
+</a><a href="#h0-0-150" id="h0-0-150" class="i">+		zap.L().Warn(
+</a><a href="#h0-0-151" id="h0-0-151" class="i">+			&quot;size limit filter rejecting response due to size limit violation&quot;,
+</a><a href="#h0-0-152" id="h0-0-152" class="i">+			zap.Int(&quot;max_response_size&quot;, s.params.Response.MaxBodySize),
+</a><a href="#h0-0-153" id="h0-0-153" class="i">+		)
+</a><a href="#h0-0-154" id="h0-0-154" class="i">+
+</a><a href="#h0-0-155" id="h0-0-155" class="i">+		// Invalidate the original response body
+</a><a href="#h0-0-156" id="h0-0-156" class="i">+		proxyResp.Header.Del(&quot;Content-Length&quot;)
+</a><a href="#h0-0-157" id="h0-0-157" class="i">+		proxyResp.Body.Close()
+</a><a href="#h0-0-158" id="h0-0-158" class="i">+
+</a><a href="#h0-0-159" id="h0-0-159" class="i">+		// Replace the response with an error
+</a><a href="#h0-0-160" id="h0-0-160" class="i">+		proxyResp.StatusCode = http.StatusBadRequest
+</a><a href="#h0-0-161" id="h0-0-161" class="i">+		proxyResp.Header = make(http.Header)
+</a><a href="#h0-0-162" id="h0-0-162" class="i">+		proxyResp.Header.Set(&quot;X-Courier-Response-Size-Limit&quot;, strconv.Itoa(s.params.Response.MaxBodySize))
+</a><a href="#h0-0-163" id="h0-0-163" class="i">+		proxyResp.Body = io.NopCloser(strings.NewReader(errResponseSizeLimitExceeded.Error()))
+</a><a href="#h0-0-164" id="h0-0-164" class="i">+
+</a><a href="#h0-0-165" id="h0-0-165" class="i">+		return proxyResp, nil
+</a><a href="#h0-0-166" id="h0-0-166" class="i">+	}
+</a><a href="#h0-0-167" id="h0-0-167" class="i">+
+</a><a href="#h0-0-168" id="h0-0-168" class="i">+	// Pass along the buffered response body contents along with the remaining unread body.
+</a><a href="#h0-0-169" id="h0-0-169" class="i">+	proxyResp.Body = util.NewMultiReadCloser(io.NopCloser(bytes.NewReader(buf)), proxyResp.Body)
+</a><a href="#h0-0-170" id="h0-0-170" class="i">+
+</a><a href="#h0-0-171" id="h0-0-171" class="i">+	return proxyResp, nil
+</a><a href="#h0-0-172" id="h0-0-172" class="i">+}
+</a></pre>
+</div>
+</body>
+</html>

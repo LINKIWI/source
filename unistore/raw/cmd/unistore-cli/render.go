@@ -154,6 +154,10 @@ func (h *humanRenderer) proto(message proto.Message) error {
 	switch m := message.(type) {
 	case *service.InfoResponse:
 		return h.protoInfoResponse(m)
+	case *service.HeadBucketResponse:
+		return h.protoHeadBucketResponse(m)
+	case *service.HeadObjectResponse:
+		return h.protoHeadObjectResponse(m)
 	case *service.ListBucketsResponse:
 		return h.protoListBucketsResponse(m)
 	case *service.ListObjectsResponse:
@@ -219,26 +223,72 @@ func (h *humanRenderer) protoInfoResponse(response *service.InfoResponse) error 
 	return nil
 }
 
-// protoListBucketsResponse renders a service.ListBucketsResponse.
-func (h *humanRenderer) protoListBucketsResponse(response *service.ListBucketsResponse) error {
-	var objects service.ListObjectsResponse
+// protoHeadBucketResponse renders a service.HeadBucketResponse.
+func (h *humanRenderer) protoHeadBucketResponse(response *service.HeadBucketResponse) error {
+	// Reuse the existing renderer for HeadObject by reshaping the HeadBucket response to
+	// object metadata with Object.DIRECTORY type.
 
-	// Reuse the existing renderer for ListObjects by reshaping the ListBuckets response to
-	// a list of objects with Object.DIRECTORY type.
-
-	for _, bucket := range response.Buckets {
-		head := &service.HeadObjectResponse{
-			Metadata: &common.Metadata{
-				Key:          bucket.Bucket.Name,
-				ModifiedTime: bucket.Bucket.Timestamp,
-				ObjectType:   common.Object_DIRECTORY,
-			},
-		}
-
-		objects.Objects = append(objects.Objects, head)
+	head := &service.HeadObjectResponse{
+		Metadata: &common.Metadata{
+			Key:          response.Bucket.Name,
+			ModifiedTime: response.Bucket.Timestamp,
+			ObjectType:   common.Object_DIRECTORY,
+		},
 	}
 
-	return h.protoListObjectsResponse(&objects)
+	return h.protoHeadObjectResponse(head)
+}
+
+// protoHeadObjectResponse renders a service.HeadObjectResponse.
+func (h *humanRenderer) protoHeadObjectResponse(response *service.HeadObjectResponse) error {
+	switch response.Metadata.ObjectType {
+	case common.Object_DIRECTORY:
+		if !strings.HasSuffix(response.Metadata.Key, "/") {
+			response.Metadata.Key = fmt.Sprintf("%s/", response.Metadata.Key)
+		}
+
+		_, err := fmt.Fprintf(
+			h.output,
+			"%v\t%s\t%s\t%s\n",
+			response.Metadata.ModifiedTime.AsTime().Format(time.RFC3339),
+			"-", // Physical size
+			"-", // Real size
+			response.Metadata.Key,
+		)
+		if err != nil {
+			return err
+		}
+
+	case common.Object_REGULAR:
+		_, err := fmt.Fprintf(
+			h.output,
+			"%v\t%s\t%s\t%s\n",
+			response.Metadata.ModifiedTime.AsTime().Format(time.RFC3339),
+			humanize.Bytes(response.Metadata.Size),
+			humanize.Bytes(response.Metadata.Attributes.Size),
+			response.Metadata.Key,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// protoListBucketsResponse renders a service.ListBucketsResponse.
+func (h *humanRenderer) protoListBucketsResponse(response *service.ListBucketsResponse) error {
+	sort.Slice(response.Buckets, func(i int, j int) bool {
+		return response.Buckets[i].Bucket.Name < response.Buckets[j].Bucket.Name
+	})
+
+	for _, bucket := range response.Buckets {
+		if err := h.protoHeadBucketResponse(bucket); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // protoListObjectsResponse renders a service.ListObjectsResponse.
@@ -266,34 +316,8 @@ func (h *humanRenderer) protoListObjectsResponse(response *service.ListObjectsRe
 	})
 
 	for _, object := range response.Objects {
-		switch object.Metadata.ObjectType {
-		case common.Object_DIRECTORY:
-			if !strings.HasSuffix(object.Metadata.Key, "/") {
-				object.Metadata.Key = fmt.Sprintf("%s/", object.Metadata.Key)
-			}
-
-			_, err := fmt.Fprintf(
-				h.output,
-				"%v\t%s\t%s\n",
-				object.Metadata.ModifiedTime.AsTime().Format(time.RFC3339),
-				"-",
-				object.Metadata.Key,
-			)
-			if err != nil {
-				return err
-			}
-
-		case common.Object_REGULAR:
-			_, err := fmt.Fprintf(
-				h.output,
-				"%v\t%s\t%s\n",
-				object.Metadata.ModifiedTime.AsTime().Format(time.RFC3339),
-				humanize.Bytes(object.Metadata.Size),
-				object.Metadata.Key,
-			)
-			if err != nil {
-				return err
-			}
+		if err := h.protoHeadObjectResponse(object); err != nil {
+			return err
 		}
 	}
 

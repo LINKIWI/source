@@ -110,6 +110,8 @@ func (c *Config) Validate() error {
 	}
 
 	for _, listener := range c.Server.Listeners {
+		listenNet, listenAddr := listener.Address.Address()
+
 		if listener.Name == "" {
 			return &util.Error{
 				Namespace: "config",
@@ -192,6 +194,40 @@ func (c *Config) Validate() error {
 							"name": listener.Name,
 						},
 					}
+				}
+			}
+		}
+
+		if len(listener.Authorization.Sources) > 0 {
+			switch listenNet {
+			case "tcp", "tcp4", "tcp6":
+			default:
+				return &util.Error{
+					Namespace: "config",
+					Message:   "restricted IP sources are only supported for TCP transports",
+					Tags: map[string]interface{}{
+						"name":    listener.Name,
+						"network": listenNet,
+						"address": listenAddr,
+						"sources": listener.Authorization.Sources,
+					},
+				}
+			}
+		}
+
+		if listener.Authorization.SocketFileMode > 0 {
+			switch listenNet {
+			case "unix":
+			default:
+				return &util.Error{
+					Namespace: "config",
+					Message:   "socket file mode is only supported for Unix domain socket transports",
+					Tags: map[string]interface{}{
+						"name":    listener.Name,
+						"network": listenNet,
+						"address": listenAddr,
+						"mode":    listener.Authorization.SocketFileMode,
+					},
 				}
 			}
 		}

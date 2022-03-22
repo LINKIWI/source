@@ -27,7 +27,7 @@ const withTransactionalTunnel = (opts) => (WrappedComponent) => {
     }
 
     _sendMessage(message) {
-      if (this.socket.readyState !== WebSocket.OPEN) {
+      if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
         return;
       }
 

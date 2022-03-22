@@ -29,6 +29,7 @@ var (
 		"metadata":        filters.NewMetadata,
 		"redirect":        filters.NewRedirect,
 		"rewrite":         filters.NewRewrite,
+		"size":            filters.NewSizeLimit,
 		"static":          filters.NewStatic,
 	}
 )

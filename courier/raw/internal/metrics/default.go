@@ -124,19 +124,21 @@ func newResourceUsageHeartbeat() Heartbeat {
 
 // Run emits gauges describing current process resource usage.
 func (r *resourceUsageHeartbeat) Run(client aperture.Statsd) error {
+	tags := map[string]interface{}{"go_version": runtime.Version()}
+
 	if err := syscall.Getrusage(syscall.RUSAGE_SELF, r.usage); err != nil {
 		return err
 	}
 
-	client.Gauge("resource.usage.cpu.user", float64(r.usage.Utime.Nano()), nil)
-	client.Gauge("resource.usage.cpu.system", float64(r.usage.Stime.Nano()), nil)
-	client.Gauge("resource.usage.memory.max_rss", float64(1024*r.usage.Maxrss), nil)
-	client.Gauge("resource.usage.memory.page_faults.minor", float64(r.usage.Minflt), nil)
-	client.Gauge("resource.usage.memory.page_faults.major", float64(r.usage.Majflt), nil)
-	client.Gauge("resource.usage.io.reads", float64(r.usage.Inblock), nil)
-	client.Gauge("resource.usage.io.writes", float64(r.usage.Oublock), nil)
-	client.Gauge("resource.usage.load.context_switch.voluntary", float64(r.usage.Nvcsw), nil)
-	client.Gauge("resource.usage.load.context_switch.involuntary", float64(r.usage.Nivcsw), nil)
+	client.Gauge("resource.usage.cpu.user", float64(r.usage.Utime.Nano()), tags)
+	client.Gauge("resource.usage.cpu.system", float64(r.usage.Stime.Nano()), tags)
+	client.Gauge("resource.usage.memory.max_rss", float64(1024*r.usage.Maxrss), tags)
+	client.Gauge("resource.usage.memory.page_faults.minor", float64(r.usage.Minflt), tags)
+	client.Gauge("resource.usage.memory.page_faults.major", float64(r.usage.Majflt), tags)
+	client.Gauge("resource.usage.io.reads", float64(r.usage.Inblock), tags)
+	client.Gauge("resource.usage.io.writes", float64(r.usage.Oublock), tags)
+	client.Gauge("resource.usage.load.context_switch.voluntary", float64(r.usage.Nvcsw), tags)
+	client.Gauge("resource.usage.load.context_switch.involuntary", float64(r.usage.Nivcsw), tags)
 
 	return nil
 }

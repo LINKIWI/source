@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Enable fallback search API request when live endpoint is not connected - webgrep - Web client for livegrep</title>
+<meta name="description" content="Web client for livegrep" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="webgrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="webgrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>webgrep</h1><span class="desc">Web client for livegrep</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/webgrep.git">https://source.static.kevinlin.info/webgrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/LICENSE">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/2e1879ded0faec2df80ce61d13d457f7cbe59d6a">2e1879ded0faec2df80ce61d13d457f7cbe59d6a</a>
+<b>parent</b> <a href="../commit/43f778560f2d94842dd52a96344b74ab7884053b">43f778560f2d94842dd52a96344b74ab7884053b</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sun 20 Mar 2022 16:40:50 -0700
+
+Enable fallback search API request when live endpoint is not connected
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">src/client/app/react/containers/search/index.js</a></td><td> | </td><td class="num">77</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">-----------</span></td></tr>
+</table></pre><pre>1 file changed, 66 insertions(+), 11 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/src/client/app/react/containers/search/index.js">src/client/app/react/containers/search/index.js</a> b/<a href="../file/src/client/app/react/containers/search/index.js">src/client/app/react/containers/search/index.js</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -4,6 +4,7 @@ import { Spacing } from &#39;react-elemental&#39;;
+</a> import { Helmet } from &#39;react-helmet&#39;;
+ import { connect } from &#39;react-redux&#39;;
+ import { bindActionCreators } from &#39;redux&#39;;
+<a href="#h0-0-3" id="h0-0-3" class="i">+import { withResource } from &#39;supercharged/client&#39;;
+</a> import { compose, withForm } from &#39;@linkiwi/hoc&#39;;
+ import withTelemetry from &#39;client/app/react/containers/hoc/with-telemetry&#39;;
+ import withTransactionalTunnel from &#39;client/app/react/containers/hoc/with-transactional-tunnel&#39;;
+<a href="#h0-1" id="h0-1" class="h">@@ -42,12 +43,18 @@ class SearchContainer extends Component {
+</a>     actions: PropTypes.shape({
+       recordSearchHistoryItem: PropTypes.func.isRequired,
+     }).isRequired,
+<a href="#h0-1-3" id="h0-1-3" class="d">-    results: PropTypes.shape({
+</a><a href="#h0-1-4" id="h0-1-4" class="i">+    primary: PropTypes.shape({
+</a>       err: PropTypes.object,
+       message: PropTypes.object,
+       isConnected: PropTypes.bool.isRequired,
+       sendMessage: PropTypes.func.isRequired,
+     }).isRequired,
+<a href="#h0-1-10" id="h0-1-10" class="i">+    fallback: PropTypes.shape({
+</a><a href="#h0-1-11" id="h0-1-11" class="i">+      err: PropTypes.object,
+</a><a href="#h0-1-12" id="h0-1-12" class="i">+      data: PropTypes.object,
+</a><a href="#h0-1-13" id="h0-1-13" class="i">+      isLoaded: PropTypes.bool.isRequired,
+</a><a href="#h0-1-14" id="h0-1-14" class="i">+      invoke: PropTypes.func.isRequired,
+</a><a href="#h0-1-15" id="h0-1-15" class="i">+    }).isRequired,
+</a>     form: PropTypes.shape({
+       query: PropTypes.string.isRequired,
+       regex: PropTypes.bool.isRequired,
+<a href="#h0-2" id="h0-2" class="h">@@ -64,11 +71,22 @@ class SearchContainer extends Component {
+</a>     width: null,
+   };
+ 
+<a href="#h0-2-3" id="h0-2-3" class="i">+  componentDidMount() {
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+    this.invoke();
+</a><a href="#h0-2-5" id="h0-2-5" class="i">+  }
+</a><a href="#h0-2-6" id="h0-2-6" class="i">+
+</a><a href="#h0-2-7" id="h0-2-7" class="i">+  shouldComponentUpdate(nextProps) {
+</a><a href="#h0-2-8" id="h0-2-8" class="i">+    // Skip render updates when loading a new fallback response for visual consistency with the
+</a><a href="#h0-2-9" id="h0-2-9" class="i">+    // non-fallback path. This prevents a flash of empty results when a new fallback request is
+</a><a href="#h0-2-10" id="h0-2-10" class="i">+    // dispatched.
+</a><a href="#h0-2-11" id="h0-2-11" class="i">+    return !(this.props.fallback.isLoaded &amp;&amp; !nextProps.fallback.isLoaded);
+</a><a href="#h0-2-12" id="h0-2-12" class="i">+  }
+</a><a href="#h0-2-13" id="h0-2-13" class="i">+
+</a>   componentDidUpdate(prevProps) {
+<a href="#h0-2-15" id="h0-2-15" class="d">-    const { results, recordTelemetryEvent } = this.props;
+</a><a href="#h0-2-16" id="h0-2-16" class="i">+    const { primary, recordTelemetryEvent } = this.props;
+</a> 
+     // Trigger another search request if the connection state changed from disconnected to connected
+<a href="#h0-2-19" id="h0-2-19" class="d">-    if (results.isConnected &amp;&amp; !prevProps.results.isConnected) {
+</a><a href="#h0-2-20" id="h0-2-20" class="i">+    if (primary.isConnected &amp;&amp; !prevProps.primary.isConnected) {
+</a>       this.invoke();
+       recordTelemetryEvent(TELEMETRY_ACTIONS.SEARCH_CONNECT);
+     }
+<a href="#h0-3" id="h0-3" class="h">@@ -141,7 +159,15 @@ class SearchContainer extends Component {
+</a>   }
+ 
+   _invoke(overrides = {}, cb) {
+<a href="#h0-3-3" id="h0-3-3" class="d">-    const { results, form, indexIdentity, contextLines, initialMatchLimit } = this.props;
+</a><a href="#h0-3-4" id="h0-3-4" class="i">+    const {
+</a><a href="#h0-3-5" id="h0-3-5" class="i">+      primary,
+</a><a href="#h0-3-6" id="h0-3-6" class="i">+      fallback,
+</a><a href="#h0-3-7" id="h0-3-7" class="i">+      form,
+</a><a href="#h0-3-8" id="h0-3-8" class="i">+      indexIdentity,
+</a><a href="#h0-3-9" id="h0-3-9" class="i">+      contextLines,
+</a><a href="#h0-3-10" id="h0-3-10" class="i">+      initialMatchLimit,
+</a><a href="#h0-3-11" id="h0-3-11" class="i">+    } = this.props;
+</a><a href="#h0-3-12" id="h0-3-12" class="i">+
+</a>     const searchParams = { ...form, ...overrides };
+ 
+     // Only re-encode URL state when a form parameter changes
+<a href="#h0-4" id="h0-4" class="h">@@ -176,7 +202,12 @@ class SearchContainer extends Component {
+</a>       context: contextLines,
+     };
+ 
+<a href="#h0-4-3" id="h0-4-3" class="d">-    results.sendMessage(request);
+</a><a href="#h0-4-4" id="h0-4-4" class="i">+    primary.sendMessage(request);
+</a><a href="#h0-4-5" id="h0-4-5" class="i">+
+</a><a href="#h0-4-6" id="h0-4-6" class="i">+    // Dispatch a fallback request only if the live endpoint is not connected.
+</a><a href="#h0-4-7" id="h0-4-7" class="i">+    if (!primary.err &amp;&amp; !primary.isConnected) {
+</a><a href="#h0-4-8" id="h0-4-8" class="i">+      fallback.invoke(request);
+</a><a href="#h0-4-9" id="h0-4-9" class="i">+    }
+</a> 
+     if (cb) {
+       this.forceUpdate(cb);
+<a href="#h0-5" id="h0-5" class="h">@@ -184,21 +215,40 @@ class SearchContainer extends Component {
+</a>   }
+ 
+   render() {
+<a href="#h0-5-3" id="h0-5-3" class="d">-    const { results, form, title, width, actions } = this.props;
+</a><a href="#h0-5-4" id="h0-5-4" class="i">+    const {
+</a><a href="#h0-5-5" id="h0-5-5" class="i">+      primary,
+</a><a href="#h0-5-6" id="h0-5-6" class="i">+      fallback,
+</a><a href="#h0-5-7" id="h0-5-7" class="i">+      form,
+</a><a href="#h0-5-8" id="h0-5-8" class="i">+      title,
+</a><a href="#h0-5-9" id="h0-5-9" class="i">+      width,
+</a><a href="#h0-5-10" id="h0-5-10" class="i">+      actions,
+</a><a href="#h0-5-11" id="h0-5-11" class="i">+    } = this.props;
+</a><a href="#h0-5-12" id="h0-5-12" class="i">+
+</a>     const searchTitle = form.query ? `${form.query} - ${title}` : title;
+     const isCompact = breakpoints.reduce((acc, breakpoint) =&gt;
+       (width &lt; breakpoint.threshold ? breakpoint.compact : acc), false);
+     const connectivity = (() =&gt; {
+<a href="#h0-5-17" id="h0-5-17" class="d">-      if (results.err) {
+</a><a href="#h0-5-18" id="h0-5-18" class="i">+      if (primary.err) {
+</a>         return CONNECTIVITY_STATE.DISCONNECTED;
+       }
+ 
+<a href="#h0-5-22" id="h0-5-22" class="d">-      if (results.isConnected) {
+</a><a href="#h0-5-23" id="h0-5-23" class="i">+      if (primary.isConnected) {
+</a>         return CONNECTIVITY_STATE.CONNECTED;
+       }
+ 
+       return CONNECTIVITY_STATE.CONNECTING;
+     })();
+<a href="#h0-5-29" id="h0-5-29" class="i">+    const results = (() =&gt; {
+</a><a href="#h0-5-30" id="h0-5-30" class="i">+      if (primary.message) {
+</a><a href="#h0-5-31" id="h0-5-31" class="i">+        return primary.message;
+</a><a href="#h0-5-32" id="h0-5-32" class="i">+      }
+</a><a href="#h0-5-33" id="h0-5-33" class="i">+
+</a><a href="#h0-5-34" id="h0-5-34" class="i">+      if (!fallback.err &amp;&amp; fallback.isLoaded) {
+</a><a href="#h0-5-35" id="h0-5-35" class="i">+        return fallback;
+</a><a href="#h0-5-36" id="h0-5-36" class="i">+      }
+</a><a href="#h0-5-37" id="h0-5-37" class="i">+
+</a><a href="#h0-5-38" id="h0-5-38" class="i">+      return null;
+</a><a href="#h0-5-39" id="h0-5-39" class="i">+    })();
+</a> 
+     return (
+       &lt;Fragment&gt;
+<a href="#h0-6" id="h0-6" class="h">@@ -218,7 +268,7 @@ class SearchContainer extends Component {
+</a>                 maxMatches={form.maxMatches}
+                 filePath={form.file}
+                 filteredRepos={form.repos}
+<a href="#h0-6-3" id="h0-6-3" class="d">-                results={results.message}
+</a><a href="#h0-6-4" id="h0-6-4" class="i">+                results={results}
+</a>                 onQueryChange={this.handleQueryChange}
+                 onRegexChange={this.handleRegexChange}
+                 onCaseSensitivityChange={this.handleCaseSensitivityChange}
+<a href="#h0-7" id="h0-7" class="h">@@ -235,7 +285,7 @@ class SearchContainer extends Component {
+</a>           &lt;Spacing size=&quot;huge&quot; bottom&gt;
+             &lt;SearchResultsContainer
+               maxMatches={form.maxMatches}
+<a href="#h0-7-3" id="h0-7-3" class="d">-              results={results.message}
+</a><a href="#h0-7-4" id="h0-7-4" class="i">+              results={results}
+</a>               onQueryChange={this.handleQueryChange}
+               onQueryRecord={actions.recordSearchHistoryItem}
+               onMaxMatchesChange={this.handleMaxMatchesChange}
+<a href="#h0-8" id="h0-8" class="h">@@ -284,8 +334,13 @@ export default compose(
+</a>     }),
+   }),
+   withTelemetry,
+<a href="#h0-8-3" id="h0-8-3" class="i">+  withResource({
+</a><a href="#h0-8-4" id="h0-8-4" class="i">+    key: &#39;fallback&#39;,
+</a><a href="#h0-8-5" id="h0-8-5" class="i">+    endpoint: &#39;/api/search&#39;,
+</a><a href="#h0-8-6" id="h0-8-6" class="i">+    invokeOnMount: false,
+</a><a href="#h0-8-7" id="h0-8-7" class="i">+  }),
+</a>   withTransactionalTunnel({
+<a href="#h0-8-9" id="h0-8-9" class="d">-    key: &#39;results&#39;,
+</a><a href="#h0-8-10" id="h0-8-10" class="i">+    key: &#39;primary&#39;,
+</a>     endpoint: &#39;/api/search&#39;,
+     messageBufferSize: 1,
+   }),
+</pre>
+</div>
+</body>
+</html>

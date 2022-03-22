@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"net"
 	"net/http"
+	"os"
 	"sync"
 	"sync/atomic"
 
@@ -148,7 +149,7 @@ func (i *instance) serve() error {
 	zap.L().Debug(
 		"created server listener",
 		zap.String("name", i.cfg.Name),
-		zap.String("net", listenNet),
+		zap.String("network", listenNet),
 		zap.String("address", listenAddr),
 	)
 
@@ -165,6 +166,11 @@ func (i *instance) serve() error {
 		}
 	}
 
+	// Properly clean up the listener in event of an error that occurs before the HTTP server
+	// starts serving on this listener. Note that the HTTP server Serve routine does not return
+	// until explicitly shut down by Close.
+	defer ln.Close()
+
 	if i.cfg.Connection.ActiveLimit > 0 {
 		zap.L().Debug(
 			"enabling active connections limit for listener",
@@ -175,8 +181,8 @@ func (i *instance) serve() error {
 		ln = netutil.LimitListener(ln, i.cfg.Connection.ActiveLimit)
 	}
 
-	if len(i.cfg.AuthorizedSources) > 0 {
-		for _, source := range i.cfg.AuthorizedSources {
+	if len(i.cfg.Authorization.Sources) > 0 {
+		for _, source := range i.cfg.Authorization.Sources {
 			zap.L().Debug(
 				"enabling restricted IP source for listener",
 				zap.String("name", i.cfg.Name),
@@ -184,7 +190,27 @@ func (i *instance) serve() error {
 			)
 		}
 
-		ln = newRestrictedListener(i.cfg.Name, i.cfg.AuthorizedSources, ln)
+		ln = newRestrictedListener(i.cfg.Name, i.cfg.Authorization.Sources, ln)
+	}
+
+	if listenNet == "unix" {
+		socketFileMode := i.cfg.Authorization.SocketFileMode
+		if socketFileMode == 0 {
+			socketFileMode = 0600 // User R/W only
+		}
+
+		if err := os.Chmod(listenAddr, socketFileMode); err != nil {
+			return &util.Error{
+				Namespace: "server",
+				Message:   "error setting file ownership on Unix socket",
+				Tags: map[string]interface{}{
+					"name":    i.cfg.Name,
+					"address": i.cfg.Address.String(),
+					"mode":    socketFileMode,
+				},
+				StackedError: err,
+			}
+		}
 	}
 
 	switch i.cfg.Protocol {

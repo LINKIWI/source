@@ -79,3 +79,47 @@ func (i *InterceptedIOStream) BytesRead() int {
 func (i *InterceptedIOStream) BytesWritten() int {
 	return i.nwritten
 }
+
+// MultiReadCloser is a io.ReadCloser that abstracts over multiple io.ReadCloser instances. It is
+// similar in spirit to the io.Reader returned by io.MultiReader but also implements io.Closer.
+type MultiReadCloser struct {
+	rc []io.ReadCloser
+	io.Reader
+}
+
+// NewMultiReadCloser creates a new MultiReadCloser from zero or more io.ReadCloser instances.
+func NewMultiReadCloser(rc ...io.ReadCloser) io.ReadCloser {
+	readers := make([]io.Reader, len(rc))
+
+	for i, reader := range rc {
+		readers[i] = reader.(io.Reader)
+	}
+
+	return &MultiReadCloser{
+		rc:     rc,
+		Reader: io.MultiReader(readers...),
+	}
+}
+
+// Close attempts to close all underlying read closers, collecting all errors as applicable.
+func (m *MultiReadCloser) Close() error {
+	var errs []error
+
+	for _, reader := range m.rc {
+		if err := reader.Close(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	if len(errs) == 0 {
+		return nil
+	}
+
+	return &Error{
+		Namespace: "util",
+		Message:   "error closing multiple read closers",
+		Tags: map[string]interface{}{
+			"errors": errs,
+		},
+	}
+}

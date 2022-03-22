@@ -1,6 +1,7 @@
 package config
 
 import (
+	"io/fs"
 	"net/http"
 	"time"
 
@@ -21,6 +22,7 @@ var (
 		"metadata":        true,
 		"redirect":        true,
 		"rewrite":         true,
+		"size":            true,
 		"static":          true,
 	}
 	metricSerializers = map[string]bool{
@@ -163,14 +165,20 @@ type TLSContext struct {
 	ProtocolVersion  string            `yaml:"protocol_version"`
 }
 
+// Authorization describes listener connection authorization of clients.
+type Authorization struct {
+	Sources        []CIDR      `yaml:"sources"`
+	SocketFileMode fs.FileMode `yaml:"socket_file_mode"`
+}
+
 // Listener describes a single bound listener for the server.
 type Listener struct {
-	Name              string           `yaml:"name"`
-	Address           *Address         `yaml:"address"`
-	Protocol          string           `yaml:"protocol"`
-	Connection        ServerConnection `yaml:"connection"`
-	TLSContext        *TLSContext      `yaml:"tls_context"`
-	AuthorizedSources []CIDR           `yaml:"authorized_sources"`
+	Name          string           `yaml:"name"`
+	Address       *Address         `yaml:"address"`
+	Protocol      string           `yaml:"protocol"`
+	Connection    ServerConnection `yaml:"connection"`
+	TLSContext    *TLSContext      `yaml:"tls_context"`
+	Authorization Authorization    `yaml:"authorization"`
 }
 
 // Proxy describes proxy behavior options.
