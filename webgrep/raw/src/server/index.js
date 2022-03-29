@@ -16,26 +16,16 @@ const main = () => {
       default: 'config.yaml',
       description: 'Path to the configuration file on disk',
     })
-    .option('verbosity', {
-      alias: 'v',
-      default: 'info',
-      description: 'Log verbosity level',
-      choices: ['error', 'warn', 'info', 'debug'],
-    })
     .version(VERSION)
     .argv;
 
   const app = Express();
-  const ctx = new Context({
-    config: params.config,
-    verbosity: params.verbosity,
-  });
+  const ctx = new Context({ config: params.config });
 
   ctx.log.info(
-    'main: starting webgrep: version=%s config=%s verbosity=%s',
-    VERSION,
-    params.config,
-    params.verbosity,
+    'main',
+    'starting webgrep',
+    { version: VERSION, config: params.config },
   );
 
   const sentryDSN = ctx.config.get('server.sentry_dsn');
@@ -44,7 +34,7 @@ const main = () => {
     Sentry.configureScope((scope) => {
       scope.setTag('version', VERSION);
     });
-    ctx.log.debug('main: enabled Sentry reporting: dsn=%s', sentryDSN);
+    ctx.log.debug('main', 'enabled Sentry reporting', { dsn: sentryDSN });
   }
 
   app.use(Sentry.Handlers.requestHandler());
@@ -52,6 +42,7 @@ const main = () => {
   supercharge(app, handlers, {
     createHandler: (HandlerClass) => (...args) => new HandlerClass(ctx, ...args),
     ws: { perMessageDeflate: true },
+    ...ctx.config.get('server.logging.supercharged.enabled') && { logger: ctx.log },
   });
   app.use(Sentry.Handlers.errorHandler());
 
@@ -60,16 +51,16 @@ const main = () => {
   switch (transport) {
     case 'tcp': {
       const [host, port] = address.split(':', 2);
-      ctx.log.info('main: serving indefinitely over TCP: host=%s port=%d', host, port);
+      ctx.log.info('main', 'serving indefinitely over TCP', { host, port });
       app.listen(port, host);
       return 0;
     }
     case 'unix':
-      ctx.log.info('main: serving indefinitely over Unix domain socket: socket=%s', address);
+      ctx.log.info('main', 'serving indefinitely over Unix domain socket', { socket: address });
       app.listen(address);
       return 0;
     default:
-      ctx.log.error('main: unsupported server listen transport: transport=%s', transport);
+      ctx.log.error('main', 'unsupported server listen transport', { transport });
       return 1;
   }
 };

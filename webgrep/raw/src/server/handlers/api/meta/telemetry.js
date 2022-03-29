@@ -1,10 +1,11 @@
-import { route, withRequestSchema } from 'supercharged/server';
+import { route, withRequestLog, withRequestSchema } from 'supercharged/server';
 import { WebSocketTransactionHandler } from 'server/handlers/base';
 import { withEndpointInstrumentation } from 'server/util/instrumentation';
 import { TELEMETRY_ACTIONS, TELEMETRY_TAGS } from 'shared/constants/telemetry';
 
 @route('/api/meta/telemetry')
 export default class MetaTelemetryHandler extends WebSocketTransactionHandler {
+  @withRequestLog
   @withEndpointInstrumentation
   @withRequestSchema({
     type: 'object',

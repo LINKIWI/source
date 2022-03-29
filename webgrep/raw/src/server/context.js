@@ -4,6 +4,7 @@ import winston from 'winston';
 import CacheClient, { MemoryCache, NoopCache, RedisCache } from 'server/clients/cache';
 import ConfigClient from 'server/clients/config';
 import GRPCClient, { RoundRobinGRPCLoadBalancer, FailoverGRPCLoadBalancer, StaticGRPCLoadBalancer } from 'server/clients/grpc';
+import LoggerClient, { NoopLogger, WinstonLogger } from 'server/clients/logger';
 import MetricsClient, { NoopMetricsClient, StatsdMetricsClient } from 'server/clients/metrics';
 import SourceClient, { NoopSourceBackend, LocalSourceBackend, GitlabSourceBackend } from 'server/clients/source';
 import AdminLogic from 'server/logic/admin';
@@ -144,6 +145,43 @@ export default class Context {
       }
     })();
 
+    this.log = (() => {
+      const noop = new LoggerClient(new NoopLogger());
+
+      const backends = Object.keys(this.config.get('server.logging') || {})
+        .filter((backend) => backend !== 'supercharged');
+      if (!backends.length) {
+        return noop;
+      }
+
+      const [backend] = backends;
+
+      switch (backend) {
+        case 'winston':
+          return new LoggerClient(
+            new WinstonLogger({
+              level: this.config.get('server.logging.winston.level') || 'info',
+              format: winston.format.combine(
+                winston.format.timestamp(),
+                winston.format.splat(),
+                winston.format.printf((fmt) =>
+                  `${fmt.timestamp} ${fmt.level.toUpperCase()}\t${fmt.message}`),
+              ),
+              transports: [
+                new winston.transports.Console({
+                  timestamp: () => Date.now(),
+                  ...this.config.get('server.logging.winston.output') === 'stderr' && {
+                    stderrLevels: ['debug', 'info', 'warn', 'error'],
+                  },
+                }),
+              ],
+            }),
+          );
+        default:
+          return noop;
+      }
+    })();
+
     this.logic = {
       admin: new AdminLogic(this),
       meta: new MetaLogic(this),
@@ -151,20 +189,5 @@ export default class Context {
       source: new SourceLogic(this),
       view: new ViewLogic(this),
     };
-
-    this.log = winston.createLogger({
-      level: options.verbosity,
-      format: winston.format.combine(
-        winston.format.timestamp(),
-        winston.format.splat(),
-        winston.format.printf((fmt) =>
-          `${fmt.timestamp} ${fmt.level.toUpperCase()}\t${fmt.message}`),
-      ),
-      transports: [
-        new winston.transports.Console({
-          timestamp: () => Date.now(),
-        }),
-      ],
-    });
   }
 }

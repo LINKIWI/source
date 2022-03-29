@@ -81,13 +81,6 @@ class SearchContainer extends Component {
     }
   }
 
-  shouldComponentUpdate(nextProps) {
-    // Skip render updates when loading a new fallback response for visual consistency with the
-    // non-fallback path. This prevents a flash of empty results when a new fallback request is
-    // dispatched.
-    return !(this.props.fallback.isLoaded && !nextProps.fallback.isLoaded);
-  }
-
   componentDidUpdate(prevProps) {
     const { primary, recordTelemetryEvent } = this.props;
 
@@ -261,7 +254,7 @@ class SearchContainer extends Component {
         return primary.message;
       }
 
-      if (!fallback.err && fallback.isLoaded && fallback.data) {
+      if (!fallback.err && fallback.data) {
         return fallback;
       }
 
@@ -357,6 +350,7 @@ export default compose(
     key: 'fallback',
     endpoint: '/api/search',
     invokeOnMount: false,
+    eagerState: false,
   }),
   withTransactionalTunnel({
     key: 'primary',

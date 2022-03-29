@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Enable configuration-based customization of Winston and Supercharged logging behavior - webgrep - Web client for livegrep</title>
+<meta name="description" content="Web client for livegrep" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="webgrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="webgrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>webgrep</h1><span class="desc">Web client for livegrep</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/webgrep.git">https://source.static.kevinlin.info/webgrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/LICENSE">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/496ad67970653b2df9e71e039c1e3c1fe8f3c30a">496ad67970653b2df9e71e039c1e3c1fe8f3c30a</a>
+<b>parent</b> <a href="../commit/d6811fc883f5fcef438c4a2bed831d3bd73092b3">d6811fc883f5fcef438c4a2bed831d3bd73092b3</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sun 27 Mar 2022 23:44:10 -0700
+
+Enable configuration-based customization of Winston and Supercharged logging behavior
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">README.md</a></td><td> | </td><td class="num">2</td><td><span class="i">++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">config.example.yaml</a></td><td> | </td><td class="num">5</td><td><span class="i">+++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">src/server/clients/logger.js</a></td><td> | </td><td class="num">5</td><td><span class="i">+++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">src/server/context.js</a></td><td> | </td><td class="num">56</td><td><span class="i">++++++++++++++++++++++++++++++++++++++</span><span class="d">------------------</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h4">src/server/index.js</a></td><td> | </td><td class="num">2</td><td><span class="i">+</span><span class="d">-</span></td></tr>
+</table></pre><pre>5 files changed, 51 insertions(+), 19 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/README.md">README.md</a> b/<a href="../file/README.md">README.md</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -29,6 +29,8 @@ The following documents each field and its expected value:
+</a> |`server.metrics.statsd.addr`|No|Address of the statsd server or listener for metrics reporting (default disabled)|
+ |`server.metrics.statsd.prefix`|No|String prefix for all emitted statsd metrics (default `webgrep`)|
+ |`server.metrics.statsd.sample_rate`|No|statsd reporting sample rate (default `1.0`)|
+<a href="#h0-0-3" id="h0-0-3" class="i">+|`server.logging.winston.output`|No|Winston console output file descriptor (default `stdout`)|
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+|`server.logging.supercharged.enabled`|No|Enable Supercharged-internal framework logging (default `false`)|
+</a> |`server.cache.redis.ttl`|No|TTL for Redis cache keys in milliseconds (default 10 minutes)|
+ |`server.cache.redis.timeout`|No|Timeout for all Redis requests (default disabled)|
+ |`server.cache.redis.prefix`|No|Prefix to apply to Redis cache keys (default `webgrep`)|
+<b>diff --git a/<a id="h1" href="../file/config.example.yaml">config.example.yaml</a> b/<a href="../file/config.example.yaml">config.example.yaml</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -14,6 +14,11 @@ server:
+</a>       addr: localhost:8125
+       prefix: webgrep
+       sample_rate: 1.0
+<a href="#h1-0-3" id="h1-0-3" class="i">+  logging:
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+    winston:
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+      output: stdout
+</a><a href="#h1-0-6" id="h1-0-6" class="i">+    supercharged:
+</a><a href="#h1-0-7" id="h1-0-7" class="i">+      enabled: false
+</a>   cache:
+     # Only include one of the blocks below, indicating the cache backend to use
+     # Omit this block to disable cache
+<b>diff --git a/<a id="h2" href="../file/src/server/clients/logger.js">src/server/clients/logger.js</a> b/<a href="../file/src/server/clients/logger.js">src/server/clients/logger.js</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -35,6 +35,11 @@ class LoggerBackend {
+</a> }
+ 
+ /**
+<a href="#h2-0-3" id="h2-0-3" class="i">+ * Logger implementation that noops on all logs.
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+ */
+</a><a href="#h2-0-5" id="h2-0-5" class="i">+export class NoopLogger extends LoggerBackend {}
+</a><a href="#h2-0-6" id="h2-0-6" class="i">+
+</a><a href="#h2-0-7" id="h2-0-7" class="i">+/**
+</a>  * Logger implementation backed by the Winston logging library.
+  */
+ export class WinstonLogger extends LoggerBackend {
+<b>diff --git a/<a id="h3" href="../file/src/server/context.js">src/server/context.js</a> b/<a href="../file/src/server/context.js">src/server/context.js</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -4,7 +4,7 @@ import winston from &#39;winston&#39;;
+</a> import CacheClient, { MemoryCache, NoopCache, RedisCache } from &#39;server/clients/cache&#39;;
+ import ConfigClient from &#39;server/clients/config&#39;;
+ import GRPCClient, { RoundRobinGRPCLoadBalancer, FailoverGRPCLoadBalancer, StaticGRPCLoadBalancer } from &#39;server/clients/grpc&#39;;
+<a href="#h3-0-3" id="h3-0-3" class="d">-import LoggerClient, { WinstonLogger } from &#39;server/clients/logger&#39;;
+</a><a href="#h3-0-4" id="h3-0-4" class="i">+import LoggerClient, { NoopLogger, WinstonLogger } from &#39;server/clients/logger&#39;;
+</a> import MetricsClient, { NoopMetricsClient, StatsdMetricsClient } from &#39;server/clients/metrics&#39;;
+ import SourceClient, { NoopSourceBackend, LocalSourceBackend, GitlabSourceBackend } from &#39;server/clients/source&#39;;
+ import AdminLogic from &#39;server/logic/admin&#39;;
+<a href="#h3-1" id="h3-1" class="h">@@ -145,6 +145,43 @@ export default class Context {
+</a>       }
+     })();
+ 
+<a href="#h3-1-3" id="h3-1-3" class="i">+    this.log = (() =&gt; {
+</a><a href="#h3-1-4" id="h3-1-4" class="i">+      const noop = new LoggerClient(new NoopLogger());
+</a><a href="#h3-1-5" id="h3-1-5" class="i">+
+</a><a href="#h3-1-6" id="h3-1-6" class="i">+      const backends = Object.keys(this.config.get(&#39;server.logging&#39;) || {})
+</a><a href="#h3-1-7" id="h3-1-7" class="i">+        .filter((backend) =&gt; backend !== &#39;supercharged&#39;);
+</a><a href="#h3-1-8" id="h3-1-8" class="i">+      if (!backends.length) {
+</a><a href="#h3-1-9" id="h3-1-9" class="i">+        return noop;
+</a><a href="#h3-1-10" id="h3-1-10" class="i">+      }
+</a><a href="#h3-1-11" id="h3-1-11" class="i">+
+</a><a href="#h3-1-12" id="h3-1-12" class="i">+      const [backend] = backends;
+</a><a href="#h3-1-13" id="h3-1-13" class="i">+
+</a><a href="#h3-1-14" id="h3-1-14" class="i">+      switch (backend) {
+</a><a href="#h3-1-15" id="h3-1-15" class="i">+        case &#39;winston&#39;:
+</a><a href="#h3-1-16" id="h3-1-16" class="i">+          return new LoggerClient(
+</a><a href="#h3-1-17" id="h3-1-17" class="i">+            new WinstonLogger({
+</a><a href="#h3-1-18" id="h3-1-18" class="i">+              level: options.verbosity,
+</a><a href="#h3-1-19" id="h3-1-19" class="i">+              format: winston.format.combine(
+</a><a href="#h3-1-20" id="h3-1-20" class="i">+                winston.format.timestamp(),
+</a><a href="#h3-1-21" id="h3-1-21" class="i">+                winston.format.splat(),
+</a><a href="#h3-1-22" id="h3-1-22" class="i">+                winston.format.printf((fmt) =&gt;
+</a><a href="#h3-1-23" id="h3-1-23" class="i">+                  `${fmt.timestamp} ${fmt.level.toUpperCase()}\t${fmt.message}`),
+</a><a href="#h3-1-24" id="h3-1-24" class="i">+              ),
+</a><a href="#h3-1-25" id="h3-1-25" class="i">+              transports: [
+</a><a href="#h3-1-26" id="h3-1-26" class="i">+                new winston.transports.Console({
+</a><a href="#h3-1-27" id="h3-1-27" class="i">+                  timestamp: () =&gt; Date.now(),
+</a><a href="#h3-1-28" id="h3-1-28" class="i">+                  ...this.config.get(&#39;server.logging.winston.output&#39;) === &#39;stderr&#39; &amp;&amp; {
+</a><a href="#h3-1-29" id="h3-1-29" class="i">+                    stderrLevels: [&#39;debug&#39;, &#39;info&#39;, &#39;warn&#39;, &#39;error&#39;],
+</a><a href="#h3-1-30" id="h3-1-30" class="i">+                  },
+</a><a href="#h3-1-31" id="h3-1-31" class="i">+                }),
+</a><a href="#h3-1-32" id="h3-1-32" class="i">+              ],
+</a><a href="#h3-1-33" id="h3-1-33" class="i">+            }),
+</a><a href="#h3-1-34" id="h3-1-34" class="i">+          );
+</a><a href="#h3-1-35" id="h3-1-35" class="i">+        default:
+</a><a href="#h3-1-36" id="h3-1-36" class="i">+          return noop;
+</a><a href="#h3-1-37" id="h3-1-37" class="i">+      }
+</a><a href="#h3-1-38" id="h3-1-38" class="i">+    })();
+</a><a href="#h3-1-39" id="h3-1-39" class="i">+
+</a>     this.logic = {
+       admin: new AdminLogic(this),
+       meta: new MetaLogic(this),
+<a href="#h3-2" id="h3-2" class="h">@@ -152,22 +189,5 @@ export default class Context {
+</a>       source: new SourceLogic(this),
+       view: new ViewLogic(this),
+     };
+<a href="#h3-2-3" id="h3-2-3" class="d">-
+</a><a href="#h3-2-4" id="h3-2-4" class="d">-    this.log = new LoggerClient(
+</a><a href="#h3-2-5" id="h3-2-5" class="d">-      new WinstonLogger({
+</a><a href="#h3-2-6" id="h3-2-6" class="d">-        level: options.verbosity,
+</a><a href="#h3-2-7" id="h3-2-7" class="d">-        format: winston.format.combine(
+</a><a href="#h3-2-8" id="h3-2-8" class="d">-          winston.format.timestamp(),
+</a><a href="#h3-2-9" id="h3-2-9" class="d">-          winston.format.splat(),
+</a><a href="#h3-2-10" id="h3-2-10" class="d">-          winston.format.printf((fmt) =&gt;
+</a><a href="#h3-2-11" id="h3-2-11" class="d">-            `${fmt.timestamp} ${fmt.level.toUpperCase()}\t${fmt.message}`),
+</a><a href="#h3-2-12" id="h3-2-12" class="d">-        ),
+</a><a href="#h3-2-13" id="h3-2-13" class="d">-        transports: [
+</a><a href="#h3-2-14" id="h3-2-14" class="d">-          new winston.transports.Console({
+</a><a href="#h3-2-15" id="h3-2-15" class="d">-            timestamp: () =&gt; Date.now(),
+</a><a href="#h3-2-16" id="h3-2-16" class="d">-          }),
+</a><a href="#h3-2-17" id="h3-2-17" class="d">-        ],
+</a><a href="#h3-2-18" id="h3-2-18" class="d">-      }),
+</a><a href="#h3-2-19" id="h3-2-19" class="d">-    );
+</a>   }
+ }
+<b>diff --git a/<a id="h4" href="../file/src/server/index.js">src/server/index.js</a> b/<a href="../file/src/server/index.js">src/server/index.js</a></b>
+<a href="#h4-0" id="h4-0" class="h">@@ -51,7 +51,7 @@ const main = () =&gt; {
+</a>   supercharge(app, handlers, {
+     createHandler: (HandlerClass) =&gt; (...args) =&gt; new HandlerClass(ctx, ...args),
+     ws: { perMessageDeflate: true },
+<a href="#h4-0-3" id="h4-0-3" class="d">-    logger: ctx.log,
+</a><a href="#h4-0-4" id="h4-0-4" class="i">+    ...ctx.config.get(&#39;server.logging.supercharged.enabled&#39;) &amp;&amp; { logger: ctx.log },
+</a>   });
+   app.use(Sentry.Handlers.errorHandler());
+ 
+</pre>
+</div>
+</body>
+</html>

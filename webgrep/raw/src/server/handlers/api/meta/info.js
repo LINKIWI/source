@@ -1,9 +1,10 @@
-import { route, withRequestSchema } from 'supercharged/server';
+import { route, withRequestLog, withRequestSchema } from 'supercharged/server';
 import { HTTPHandler, WebSocketTransactionHandler } from 'server/handlers/base';
 import { withEndpointInstrumentation } from 'server/util/instrumentation';
 
 @route('/api/meta/info')
 export class MetaInfoHandler extends HTTPHandler {
+  @withRequestLog
   @withEndpointInstrumentation
   get() {
     return this.ctx.logic.meta.info((err, resp) => (err ? this.error(err) : this.success(resp)));
@@ -12,6 +13,7 @@ export class MetaInfoHandler extends HTTPHandler {
 
 @route('/api/meta/info')
 export class MetaInfoLiveHandler extends WebSocketTransactionHandler {
+  @withRequestLog
   @withEndpointInstrumentation
   @withRequestSchema({
     type: 'object',

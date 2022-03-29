@@ -14,10 +14,9 @@ export default class SourceLogic extends BaseLogic {
    */
   read(repo, version, file, cb) {
     this.ctx.log.debug(
-      'source: serving file preview: repo=%s version=%s file=%s',
-      repo,
-      version,
-      file,
+      'source',
+      'serving file preview',
+      { repo, version, file },
     );
 
     const transaction = this.ctx.cache.transaction(

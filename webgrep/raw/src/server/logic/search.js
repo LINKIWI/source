@@ -26,13 +26,16 @@ export default class SearchLogic extends BaseLogic {
     };
 
     this.ctx.log.debug(
-      'search: serving query: line=%s file=%s repos=%s case=%s matches=%d context=%d',
-      req.line,
-      params.file || '(none)',
-      params.repos.length ? params.repos : '(all)',
-      params.caseSensitive,
-      params.maxMatches,
-      params.context,
+      'search',
+      'serving query',
+      {
+        line: req.line,
+        file: params.line || '(none)',
+        repos: params.repos.length ? params.repos : '(all)',
+        case: params.caseSensitive,
+        matches: params.maxMatches,
+        context: params.context,
+      },
     );
 
     const transaction = this.ctx.cache.transaction(
@@ -70,10 +73,9 @@ export default class SearchLogic extends BaseLogic {
       return this.ctx.service.codesearch.rpc('search', query, (rpcErr, rpcResp) => {
         if (rpcErr) {
           this.ctx.log.error(
-            'search: encountered RPC error: method=search code=%d details=%s request=%s',
-            rpcErr.code,
-            rpcErr.details,
-            JSON.stringify(req),
+            'search',
+            'encountered RPC error',
+            { method: 'search', code: rpcErr.code, details: rpcErr.details, request: req },
           );
           return cb(this.formatErr(rpcErr));
         }

@@ -15,9 +15,9 @@ export default class MetaLogic extends BaseLogic {
     return this.ctx.service.codesearch.rpc('info', new InfoRequest(), (err, resp) => {
       if (err) {
         this.ctx.log.error(
-          'meta: encountered RPC error: method=info code=%d details=%s',
-          err.code,
-          err.details,
+          'meta',
+          'encountered RPC error',
+          { method: 'info', code: err.code, details: err.details },
         );
         return cb(this.formatErr(err));
       }
@@ -52,10 +52,9 @@ export default class MetaLogic extends BaseLogic {
    */
   reportTelemetryMetrics(action, value, tags) {
     this.ctx.log.debug(
-      'meta: reporting client telemetry event: action=%s value=%s tags=%o',
-      action,
-      value,
-      tags,
+      'meta',
+      'reporting client telemetry event',
+      { action, value, tags },
     );
 
     switch (action) {

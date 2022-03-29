@@ -1,9 +1,10 @@
-import { route, withRequestSchema } from 'supercharged/server';
+import { route, withRequestLog, withRequestSchema } from 'supercharged/server';
 import { HTTPHandler } from 'server/handlers/base';
 import { withEndpointInstrumentation } from 'server/util/instrumentation';
 
 @route('/api/source')
 export default class SourceHandler extends HTTPHandler {
+  @withRequestLog
   @withEndpointInstrumentation
   @withRequestSchema({
     type: 'object',

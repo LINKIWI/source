@@ -29,6 +29,9 @@ The following documents each field and its expected value:
 |`server.metrics.statsd.addr`|No|Address of the statsd server or listener for metrics reporting (default disabled)|
 |`server.metrics.statsd.prefix`|No|String prefix for all emitted statsd metrics (default `webgrep`)|
 |`server.metrics.statsd.sample_rate`|No|statsd reporting sample rate (default `1.0`)|
+|`server.logging.winston.level`|No|Winston console output log level (default `info`)|
+|`server.logging.winston.output`|No|Winston console output file descriptor (default `stdout`)|
+|`server.logging.supercharged.enabled`|No|Enable Supercharged-internal framework logging (default `false`)|
 |`server.cache.redis.ttl`|No|TTL for Redis cache keys in milliseconds (default 10 minutes)|
 |`server.cache.redis.timeout`|No|Timeout for all Redis requests (default disabled)|
 |`server.cache.redis.prefix`|No|Prefix to apply to Redis cache keys (default `webgrep`)|

@@ -1,4 +1,4 @@
-import { route, withRequestSchema } from 'supercharged/server';
+import { route, withRequestLog, withRequestSchema } from 'supercharged/server';
 import { HTTPHandler, WebSocketTransactionHandler } from 'server/handlers/base';
 import { withEndpointInstrumentation } from 'server/util/instrumentation';
 
@@ -67,6 +67,7 @@ const schema = {
 
 @route('/api/search')
 export class SearchHandler extends HTTPHandler {
+  @withRequestLog
   @withEndpointInstrumentation
   @withRequestSchema(schema)
   get(params) {
@@ -77,6 +78,7 @@ export class SearchHandler extends HTTPHandler {
 
 @route('/api/search')
 export class SearchLiveHandler extends WebSocketTransactionHandler {
+  @withRequestLog
   @withEndpointInstrumentation
   @withRequestSchema(schema)
   invoke({ id, ...params }) {
