@@ -96,7 +96,7 @@ export default compose(
   withToast,
   withResource({
     key: 'info',
-    cacheKey: 'admin:meta',
+    cacheKey: () => 'admin:meta',
     endpoint: '/api/meta/info',
   }),
 )(AdminIndexRepositoriesContainer);

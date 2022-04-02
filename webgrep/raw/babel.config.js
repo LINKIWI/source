@@ -3,7 +3,7 @@ module.exports = {
     development: {
       presets: [
         '@babel/preset-env',
-        '@babel/preset-react',
+        ['@babel/preset-react', { runtime: 'automatic' }],
       ],
       plugins: [
         ['@babel/plugin-proposal-decorators', { legacy: true }],
@@ -16,7 +16,7 @@ module.exports = {
     test: {
       presets: [
         '@babel/preset-env',
-        '@babel/preset-react',
+        ['@babel/preset-react', { runtime: 'automatic' }],
       ],
       plugins: [
         ['@babel/plugin-proposal-decorators', { legacy: true }],
@@ -29,7 +29,7 @@ module.exports = {
     production: {
       presets: [
         '@babel/preset-env',
-        '@babel/preset-react',
+        ['@babel/preset-react', { runtime: 'automatic' }],
       ],
       plugins: [
         ['@babel/plugin-proposal-decorators', { legacy: true }],

@@ -106,7 +106,7 @@ export default compose(
   connect(mapStateToProps),
   withResource({
     key: 'info',
-    cacheKey: 'admin:meta',
+    cacheKey: () => 'admin:meta',
     endpoint: '/api/meta/info',
   }),
 )(AdminIndexInfoContainer);
