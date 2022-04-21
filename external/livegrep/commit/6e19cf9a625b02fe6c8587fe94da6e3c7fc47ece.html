@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Encode index creation timestamp into dump file (#333) - livegrep - Fast, regular expression code search service</title>
+<meta name="description" content="Fast, regular expression code search service" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/6e19cf9a625b02fe6c8587fe94da6e3c7fc47ece">6e19cf9a625b02fe6c8587fe94da6e3c7fc47ece</a>
+<b>parent</b> <a href="../commit/b977c9f56d3f173da69c398bc62c7b1e041cd048">b977c9f56d3f173da69c398bc62c7b1e041cd048</a>
+<b>Author:</b> LINKIWI &lt;<a href="mailto:LINKIWI@users.noreply.github.com">LINKIWI@users.noreply.github.com</a>&gt;
+<b>Date:</b>   Wed 20 Apr 2022 07:09:25 -0700
+
+Encode index creation timestamp into dump file (#333)
+
+* Encode index timestamp into dump
+
+* Store timestamp directly inline rather than as a binary blob
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">src/codesearch.cc</a></td><td> | </td><td class="num">5</td><td><span class="i">+++</span><span class="d">--</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">src/codesearch.h</a></td><td> | </td><td class="num">3</td><td><span class="i">+++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">src/dump_load.cc</a></td><td> | </td><td class="num">6</td><td><span class="i">++</span><span class="d">----</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">src/dump_load.h</a></td><td> | </td><td class="num">3</td><td><span class="i">++</span><span class="d">-</span></td></tr>
+</table></pre><pre>4 files changed, 10 insertions(+), 7 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/src/codesearch.cc">src/codesearch.cc</a> b/<a href="../file/src/codesearch.cc">src/codesearch.cc</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -505,13 +505,14 @@ void code_searcher::index_filenames() {
+</a> void code_searcher::finalize() {
+     assert(!finalized_);
+     finalized_ = true;
+<a href="#h0-0-3" id="h0-0-3" class="d">-    index_filenames();
+</a><a href="#h0-0-4" id="h0-0-4" class="d">-    alloc_-&gt;finalize();
+</a> 
+     timeval now;
+     gettimeofday(&amp;now, NULL);
+     index_timestamp_ = now.tv_sec;
+ 
+<a href="#h0-0-10" id="h0-0-10" class="i">+    index_filenames();
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+    alloc_-&gt;finalize();
+</a><a href="#h0-0-12" id="h0-0-12" class="i">+
+</a>     idx_data_chunks.inc(alloc_-&gt;end() - alloc_-&gt;begin());
+     idx_content_chunks.inc(alloc_-&gt;end_content() - alloc_-&gt;begin_content());
+ }
+<b>diff --git a/<a id="h1" href="../file/src/codesearch.h">src/codesearch.h</a> b/<a href="../file/src/codesearch.h">src/codesearch.h</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -163,6 +163,9 @@ public:
+</a>     int64_t index_timestamp() {
+         return index_timestamp_;
+     }
+<a href="#h1-0-3" id="h1-0-3" class="i">+    void set_index_timestamp(int64_t index_timestamp) {
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+        index_timestamp_ = index_timestamp;
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+    }
+</a> 
+     class search_thread {
+     public:
+<b>diff --git a/<a id="h2" href="../file/src/dump_load.cc">src/dump_load.cc</a> b/<a href="../file/src/dump_load.cc">src/dump_load.cc</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -305,6 +305,7 @@ void codesearch_index::dump_metadata() {
+</a>     hdr_.nfiles   = cs_-&gt;files_.size();
+     hdr_.nchunks  = cs_-&gt;alloc_-&gt;size();
+     hdr_.ncontent = content_.size();
+<a href="#h2-0-3" id="h2-0-3" class="i">+    hdr_.timestamp = cs_-&gt;index_timestamp();
+</a> 
+     hdr_.name_off = stream_.tellp();
+     dump_string(cs_-&gt;name());
+<a href="#h2-1" id="h2-1" class="h">@@ -437,6 +438,7 @@ load_allocator::load_allocator(code_searcher *cs, const string&amp; path) {
+</a>     hdr_ = consume&lt;index_header&gt;();
+     set_chunk_size(hdr_-&gt;chunk_size);
+     chunks_hdr_ = next_chunk_ = ptr&lt;chunk_header&gt;(hdr_-&gt;chunks_off);
+<a href="#h2-1-3" id="h2-1-3" class="i">+    cs-&gt;set_index_timestamp((int64_t) hdr_-&gt;timestamp);
+</a> 
+     p_ = ptr&lt;unsigned char&gt;(hdr_-&gt;name_off);
+     cs-&gt;set_name(load_string());
+<a href="#h2-2" id="h2-2" class="h">@@ -561,10 +563,6 @@ void load_allocator::load(code_searcher *cs) {
+</a>         cs-&gt;filename_positions_.push_back(make_pair(pos, sf));
+     }
+ 
+<a href="#h2-2-3" id="h2-2-3" class="d">-    struct stat st;
+</a><a href="#h2-2-4" id="h2-2-4" class="d">-    assert(fstat(fd_, &amp;st) == 0);
+</a><a href="#h2-2-5" id="h2-2-5" class="d">-    cs-&gt;index_timestamp_ = st.st_mtime;
+</a><a href="#h2-2-6" id="h2-2-6" class="d">-
+</a>     cs-&gt;finalized_ = true;
+ }
+ 
+<b>diff --git a/<a id="h3" href="../file/src/dump_load.h">src/dump_load.h</a> b/<a href="../file/src/dump_load.h">src/dump_load.h</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -11,7 +11,7 @@
+</a> #include &lt;stdint.h&gt;
+ 
+ const uint32_t kIndexMagic   = 0xc0d35eac;
+<a href="#h3-0-3" id="h3-0-3" class="d">-const uint32_t kIndexVersion = 15;
+</a><a href="#h3-0-4" id="h3-0-4" class="i">+const uint32_t kIndexVersion = 16;
+</a> 
+ // 16k is the page size on Apple M1 macs, which is the largest page
+ // size of supported platforms. We use a consistent page size
+<a href="#h3-1" id="h3-1" class="h">@@ -22,6 +22,7 @@ struct index_header {
+</a>     uint32_t magic;
+     uint32_t version;
+     uint32_t chunk_size;
+<a href="#h3-1-3" id="h3-1-3" class="i">+    uint64_t timestamp;
+</a> 
+     uint64_t name_off;
+ 
+</pre>
+</div>
+</body>
+</html>

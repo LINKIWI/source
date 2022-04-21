@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Allocate maximum possible inotify event size to fix stack overflow during read (#332) - livegrep - Fast, regular expression code search service</title>
+<meta name="description" content="Fast, regular expression code search service" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/b977c9f56d3f173da69c398bc62c7b1e041cd048">b977c9f56d3f173da69c398bc62c7b1e041cd048</a>
+<b>parent</b> <a href="../commit/f85d03ea4ae4fbb814a7703998edc11e862d37b6">f85d03ea4ae4fbb814a7703998edc11e862d37b6</a>
+<b>Author:</b> LINKIWI &lt;<a href="mailto:LINKIWI@users.noreply.github.com">LINKIWI@users.noreply.github.com</a>&gt;
+<b>Date:</b>   Tue 19 Apr 2022 08:16:20 -0700
+
+Allocate maximum possible inotify event size to fix stack overflow during read (#332)
+
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">src/lib/fs_linux.cc</a></td><td> | </td><td class="num">8</td><td><span class="i">+++++</span><span class="d">---</span></td></tr>
+</table></pre><pre>1 file changed, 5 insertions(+), 3 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/src/lib/fs_linux.cc">src/lib/fs_linux.cc</a> b/<a href="../file/src/lib/fs_linux.cc">src/lib/fs_linux.cc</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -11,6 +11,8 @@
+</a> #include &lt;sys/inotify.h&gt;
+ #include &lt;unistd.h&gt;
+ 
+<a href="#h0-0-3" id="h0-0-3" class="i">+const ssize_t max_event_len = sizeof(struct inotify_event) + NAME_MAX + 1;
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+
+</a> namespace {
+     int fd = -1;
+     int wd = -1;
+<a href="#h0-1" id="h0-1" class="h">@@ -29,8 +31,8 @@ fswatcher::~fswatcher() {
+</a> }
+ 
+ bool fswatcher::wait_for_event() {
+<a href="#h0-1-3" id="h0-1-3" class="d">-    struct inotify_event event;
+</a><a href="#h0-1-4" id="h0-1-4" class="d">-    int n = 0;
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+    char buf[max_event_len];
+</a><a href="#h0-1-6" id="h0-1-6" class="i">+    ssize_t n = 0;
+</a> 
+     if (fd == -1 || wd == -1) {
+         return false;
+<a href="#h0-2" id="h0-2" class="h">@@ -38,7 +40,7 @@ bool fswatcher::wait_for_event() {
+</a> 
+     // The read syscall is blocking; it returns after one eligible event (i.e., matching the mask) is received.
+     while (n &lt;= 0) {
+<a href="#h0-2-3" id="h0-2-3" class="d">-        n = read(fd, &amp;event, sizeof(struct inotify_event) + NAME_MAX + 1);
+</a><a href="#h0-2-4" id="h0-2-4" class="i">+        n = read(fd, &amp;buf, max_event_len);
+</a>     }
+ 
+     return true;
+</pre>
+</div>
+</body>
+</html>

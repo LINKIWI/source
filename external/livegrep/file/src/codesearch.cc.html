@@ -18,7 +18,7 @@ body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{fo
 <a href="../../log">Log</a> | <a href="../../files">Files</a> | <a href="../../refs">Refs</a> | <a href="../../file/README.md">README</a> | <a href="../../file/COPYING">LICENSE</a></td></tr></table>
 <hr/>
 <div id="content">
-<p>src/<strong>codesearch.cc</strong> (35812B) (<a href="../../raw/src/codesearch.cc">raw</a>) (<a href="../../blame/src/codesearch.cc">blame</a>)</p><hr/>
+<p>src/<strong>codesearch.cc</strong> (35813B) (<a href="../../raw/src/codesearch.cc">raw</a>) (<a href="../../blame/src/codesearch.cc">blame</a>)</p><hr/>
 <pre id="blob">
 <a href="#l1" class="line" id="l1">      1</a> /********************************************************************
 <a href="#l2" class="line" id="l2">      2</a>  * livegrep -- codesearch.cc
@@ -527,689 +527,690 @@ body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{fo
 <a href="#l505" class="line" id="l505">    505</a> void code_searcher::finalize() {
 <a href="#l506" class="line" id="l506">    506</a>     assert(!finalized_);
 <a href="#l507" class="line" id="l507">    507</a>     finalized_ = true;
-<a href="#l508" class="line" id="l508">    508</a>     index_filenames();
-<a href="#l509" class="line" id="l509">    509</a>     alloc_-&gt;finalize();
-<a href="#l510" class="line" id="l510">    510</a> 
-<a href="#l511" class="line" id="l511">    511</a>     timeval now;
-<a href="#l512" class="line" id="l512">    512</a>     gettimeofday(&amp;now, NULL);
-<a href="#l513" class="line" id="l513">    513</a>     index_timestamp_ = now.tv_sec;
-<a href="#l514" class="line" id="l514">    514</a> 
-<a href="#l515" class="line" id="l515">    515</a>     idx_data_chunks.inc(alloc_-&gt;end() - alloc_-&gt;begin());
-<a href="#l516" class="line" id="l516">    516</a>     idx_content_chunks.inc(alloc_-&gt;end_content() - alloc_-&gt;begin_content());
-<a href="#l517" class="line" id="l517">    517</a> }
-<a href="#l518" class="line" id="l518">    518</a> 
-<a href="#l519" class="line" id="l519">    519</a> vector&lt;indexed_tree&gt; code_searcher::trees() const {
-<a href="#l520" class="line" id="l520">    520</a>     vector&lt;indexed_tree&gt; out;
-<a href="#l521" class="line" id="l521">    521</a>     out.reserve(trees_.size());
-<a href="#l522" class="line" id="l522">    522</a>     for (auto it = trees_.begin(); it != trees_.end(); ++it)
-<a href="#l523" class="line" id="l523">    523</a>         out.push_back(**it);
-<a href="#l524" class="line" id="l524">    524</a>     return out;
-<a href="#l525" class="line" id="l525">    525</a> }
-<a href="#l526" class="line" id="l526">    526</a> 
-<a href="#l527" class="line" id="l527">    527</a> const indexed_tree* code_searcher::open_tree(const string &amp;name,
-<a href="#l528" class="line" id="l528">    528</a>                                              const Metadata &amp;metadata,
-<a href="#l529" class="line" id="l529">    529</a>                                              const string &amp;version) {
-<a href="#l530" class="line" id="l530">    530</a>     auto tree = std::make_unique&lt;indexed_tree&gt;();
-<a href="#l531" class="line" id="l531">    531</a>     tree-&gt;name = name;
-<a href="#l532" class="line" id="l532">    532</a>     tree-&gt;version = version;
-<a href="#l533" class="line" id="l533">    533</a>     tree-&gt;metadata = metadata;
-<a href="#l534" class="line" id="l534">    534</a>     trees_.push_back(move(tree));
-<a href="#l535" class="line" id="l535">    535</a>     return trees_.back().get();
-<a href="#l536" class="line" id="l536">    536</a> }
-<a href="#l537" class="line" id="l537">    537</a> 
-<a href="#l538" class="line" id="l538">    538</a> const indexed_tree* code_searcher::open_tree(const string &amp;name,
-<a href="#l539" class="line" id="l539">    539</a>                                              const string &amp;version) {
-<a href="#l540" class="line" id="l540">    540</a>     return open_tree(name, Metadata(), version);
-<a href="#l541" class="line" id="l541">    541</a> }
-<a href="#l542" class="line" id="l542">    542</a> 
-<a href="#l543" class="line" id="l543">    543</a> void code_searcher::index_file(const indexed_tree *tree,
-<a href="#l544" class="line" id="l544">    544</a>                                const string&amp; path,
-<a href="#l545" class="line" id="l545">    545</a>                                StringPiece contents) {
-<a href="#l546" class="line" id="l546">    546</a>     assert(!finalized_);
-<a href="#l547" class="line" id="l547">    547</a>     assert(alloc_);
-<a href="#l548" class="line" id="l548">    548</a>     size_t len = contents.size();
-<a href="#l549" class="line" id="l549">    549</a>     const char *p = contents.data();
-<a href="#l550" class="line" id="l550">    550</a>     const char *end = p + len;
-<a href="#l551" class="line" id="l551">    551</a>     const char *f;
-<a href="#l552" class="line" id="l552">    552</a>     chunk *c;
-<a href="#l553" class="line" id="l553">    553</a>     chunk *prev = NULL;
-<a href="#l554" class="line" id="l554">    554</a>     StringPiece line;
-<a href="#l555" class="line" id="l555">    555</a> 
-<a href="#l556" class="line" id="l556">    556</a>     if (memchr(p, 0, len) != NULL)
-<a href="#l557" class="line" id="l557">    557</a>         return;
-<a href="#l558" class="line" id="l558">    558</a> 
-<a href="#l559" class="line" id="l559">    559</a>     idx_bytes.inc(len);
-<a href="#l560" class="line" id="l560">    560</a>     idx_files.inc();
-<a href="#l561" class="line" id="l561">    561</a> 
-<a href="#l562" class="line" id="l562">    562</a>     auto file = std::make_unique&lt;indexed_file&gt;();
-<a href="#l563" class="line" id="l563">    563</a>     file-&gt;tree = tree;
-<a href="#l564" class="line" id="l564">    564</a>     file-&gt;path = path;
-<a href="#l565" class="line" id="l565">    565</a>     file-&gt;no  = files_.size();
-<a href="#l566" class="line" id="l566">    566</a>     auto *sf = file.get();
-<a href="#l567" class="line" id="l567">    567</a>     files_.push_back(move(file));
-<a href="#l568" class="line" id="l568">    568</a> 
-<a href="#l569" class="line" id="l569">    569</a>     uint32_t lines = count(p, end, &#39;\n&#39;);
-<a href="#l570" class="line" id="l570">    570</a> 
-<a href="#l571" class="line" id="l571">    571</a>     file_contents_builder content;
-<a href="#l572" class="line" id="l572">    572</a> 
-<a href="#l573" class="line" id="l573">    573</a>     while ((f = static_cast&lt;const char*&gt;(memchr(p, &#39;\n&#39;, end - p))) != 0) {
-<a href="#l574" class="line" id="l574">    574</a>     final:
-<a href="#l575" class="line" id="l575">    575</a>         idx_lines.inc();
-<a href="#l576" class="line" id="l576">    576</a>         if (f - p + 1 &gt;= FLAGS_line_limit) {
-<a href="#l577" class="line" id="l577">    577</a>             // Don&#39;t index the long line, but do index an empty
-<a href="#l578" class="line" id="l578">    578</a>             // line so that line number of future lines are
-<a href="#l579" class="line" id="l579">    579</a>             // preserved.
-<a href="#l580" class="line" id="l580">    580</a>             p = f;
-<a href="#l581" class="line" id="l581">    581</a>         }
-<a href="#l582" class="line" id="l582">    582</a>         decltype(lines_)::iterator it = lines_.end();
-<a href="#l583" class="line" id="l583">    583</a>         if (FLAGS_compress) {
-<a href="#l584" class="line" id="l584">    584</a>             it = lines_.find(StringPiece(p, f - p));
-<a href="#l585" class="line" id="l585">    585</a>         }
-<a href="#l586" class="line" id="l586">    586</a>         if (it == lines_.end()) {
-<a href="#l587" class="line" id="l587">    587</a>             idx_bytes_dedup.inc((f - p) + 1);
-<a href="#l588" class="line" id="l588">    588</a>             idx_lines_dedup.inc();
-<a href="#l589" class="line" id="l589">    589</a> 
-<a href="#l590" class="line" id="l590">    590</a>             unsigned char *alloc = alloc_-&gt;alloc(f - p + 1);
-<a href="#l591" class="line" id="l591">    591</a>             memcpy(alloc, p, f - p);
-<a href="#l592" class="line" id="l592">    592</a>             alloc[f - p] = &#39;\n&#39;;
-<a href="#l593" class="line" id="l593">    593</a>             line = StringPiece((char*)alloc, f - p);
-<a href="#l594" class="line" id="l594">    594</a>             if (FLAGS_compress) {
-<a href="#l595" class="line" id="l595">    595</a>                 if (alloc_-&gt;current_chunk() != prev)
-<a href="#l596" class="line" id="l596">    596</a>                     lines_.clear();
-<a href="#l597" class="line" id="l597">    597</a>                 lines_.insert(line);
-<a href="#l598" class="line" id="l598">    598</a>             }
-<a href="#l599" class="line" id="l599">    599</a>             prev = c = alloc_-&gt;current_chunk();
-<a href="#l600" class="line" id="l600">    600</a>         } else {
-<a href="#l601" class="line" id="l601">    601</a>             line = *it;
-<a href="#l602" class="line" id="l602">    602</a>             c = alloc_-&gt;chunk_from_string
-<a href="#l603" class="line" id="l603">    603</a>                 (reinterpret_cast&lt;const unsigned char*&gt;(line.data()));
-<a href="#l604" class="line" id="l604">    604</a>         }
-<a href="#l605" class="line" id="l605">    605</a>         {
-<a href="#l606" class="line" id="l606">    606</a>             c-&gt;add_chunk_file(sf, line);
-<a href="#l607" class="line" id="l607">    607</a>         }
-<a href="#l608" class="line" id="l608">    608</a>         content.extend(c, line);
-<a href="#l609" class="line" id="l609">    609</a>         p = min(end, f + 1);
-<a href="#l610" class="line" id="l610">    610</a>     }
-<a href="#l611" class="line" id="l611">    611</a>     if (p &lt; end - 1) {
-<a href="#l612" class="line" id="l612">    612</a>         // Handle files with no trailing newline by jumping back and
-<a href="#l613" class="line" id="l613">    613</a>         // adding the final line.
-<a href="#l614" class="line" id="l614">    614</a>         assert(*(end-1) != &#39;\n&#39;);
-<a href="#l615" class="line" id="l615">    615</a>         f = end;
-<a href="#l616" class="line" id="l616">    616</a>         lines++;
-<a href="#l617" class="line" id="l617">    617</a>         goto final;
-<a href="#l618" class="line" id="l618">    618</a>     }
-<a href="#l619" class="line" id="l619">    619</a> 
-<a href="#l620" class="line" id="l620">    620</a>     sf-&gt;content = content.build(alloc_.get());
-<a href="#l621" class="line" id="l621">    621</a>     if (sf-&gt;content == 0) {
-<a href="#l622" class="line" id="l622">    622</a>         fprintf(stderr, &quot;WARN: %s:%s:%s is too large to be indexed.\n&quot;,
-<a href="#l623" class="line" id="l623">    623</a>                 tree-&gt;name.c_str(), tree-&gt;version.c_str(), path.c_str());
-<a href="#l624" class="line" id="l624">    624</a>         file_contents_builder dummy;
-<a href="#l625" class="line" id="l625">    625</a>         sf-&gt;content = dummy.build(alloc_.get());
-<a href="#l626" class="line" id="l626">    626</a>     }
-<a href="#l627" class="line" id="l627">    627</a>     idx_content_ranges.inc(sf-&gt;content-&gt;size());
-<a href="#l628" class="line" id="l628">    628</a>     assert(sf-&gt;content-&gt;size() &lt;= 3*lines);
-<a href="#l629" class="line" id="l629">    629</a> 
-<a href="#l630" class="line" id="l630">    630</a>     for (auto it = alloc_-&gt;begin();
-<a href="#l631" class="line" id="l631">    631</a>          it != alloc_-&gt;end(); it++) {
-<a href="#l632" class="line" id="l632">    632</a>         (*it)-&gt;finish_file();
-<a href="#l633" class="line" id="l633">    633</a>     }
-<a href="#l634" class="line" id="l634">    634</a> }
-<a href="#l635" class="line" id="l635">    635</a> 
-<a href="#l636" class="line" id="l636">    636</a> bool searcher::should_search_chunk(const chunk *chunk) {
-<a href="#l637" class="line" id="l637">    637</a>     if (!query_-&gt;tree_pat) {
-<a href="#l638" class="line" id="l638">    638</a>         return true;
-<a href="#l639" class="line" id="l639">    639</a>     }
-<a href="#l640" class="line" id="l640">    640</a> 
-<a href="#l641" class="line" id="l641">    641</a>     // skip chunks that don&#39;t contain any repos we&#39;re looking for
-<a href="#l642" class="line" id="l642">    642</a>     for (auto it = chunk-&gt;tree_names.begin(); it != chunk-&gt;tree_names.end(); it++) {
-<a href="#l643" class="line" id="l643">    643</a>         if (query_-&gt;tree_pat-&gt;Match(*it, 0,
-<a href="#l644" class="line" id="l644">    644</a>                                     it-&gt;size(),
-<a href="#l645" class="line" id="l645">    645</a>                                     RE2::UNANCHORED, 0, 0)) {
-<a href="#l646" class="line" id="l646">    646</a>             return true;
-<a href="#l647" class="line" id="l647">    647</a>         }
-<a href="#l648" class="line" id="l648">    648</a>     }
-<a href="#l649" class="line" id="l649">    649</a>     return false;
-<a href="#l650" class="line" id="l650">    650</a> }
-<a href="#l651" class="line" id="l651">    651</a> 
-<a href="#l652" class="line" id="l652">    652</a> void searcher::operator()(const chunk *chunk)
-<a href="#l653" class="line" id="l653">    653</a> {
-<a href="#l654" class="line" id="l654">    654</a>     if (limiter_.exit_early())
-<a href="#l655" class="line" id="l655">    655</a>         return;
-<a href="#l656" class="line" id="l656">    656</a> 
-<a href="#l657" class="line" id="l657">    657</a>     if (!should_search_chunk(chunk))
-<a href="#l658" class="line" id="l658">    658</a>         return;
-<a href="#l659" class="line" id="l659">    659</a> 
-<a href="#l660" class="line" id="l660">    660</a>     if (FLAGS_index &amp;&amp; index_key_ &amp;&amp; !index_key_-&gt;empty())
-<a href="#l661" class="line" id="l661">    661</a>         filtered_search(chunk);
-<a href="#l662" class="line" id="l662">    662</a>     else
-<a href="#l663" class="line" id="l663">    663</a>         full_search(chunk);
-<a href="#l664" class="line" id="l664">    664</a> }
-<a href="#l665" class="line" id="l665">    665</a> 
-<a href="#l666" class="line" id="l666">    666</a> struct walk_state {
-<a href="#l667" class="line" id="l667">    667</a>     const uint32_t *left, *right;
-<a href="#l668" class="line" id="l668">    668</a>     intrusive_ptr&lt;QueryPlan&gt; key;
-<a href="#l669" class="line" id="l669">    669</a>     int depth;
-<a href="#l670" class="line" id="l670">    670</a> };
-<a href="#l671" class="line" id="l671">    671</a> 
-<a href="#l672" class="line" id="l672">    672</a> struct lt_index {
-<a href="#l673" class="line" id="l673">    673</a>     const unsigned char *data_;
-<a href="#l674" class="line" id="l674">    674</a>     int idx_;
-<a href="#l675" class="line" id="l675">    675</a> 
-<a href="#l676" class="line" id="l676">    676</a>     bool operator()(uint32_t lhs, unsigned char rhs) {
-<a href="#l677" class="line" id="l677">    677</a>         return cmp(lhs, rhs) &lt; 0;
-<a href="#l678" class="line" id="l678">    678</a>     }
-<a href="#l679" class="line" id="l679">    679</a> 
-<a href="#l680" class="line" id="l680">    680</a>     bool operator()(unsigned char lhs, uint32_t rhs) {
-<a href="#l681" class="line" id="l681">    681</a>         return cmp(rhs, lhs) &gt; 0;
-<a href="#l682" class="line" id="l682">    682</a>     }
-<a href="#l683" class="line" id="l683">    683</a> 
-<a href="#l684" class="line" id="l684">    684</a>     int cmp(uint32_t lhs, unsigned char rhs) {
-<a href="#l685" class="line" id="l685">    685</a>         unsigned char lc = data_[lhs + idx_];
-<a href="#l686" class="line" id="l686">    686</a>         if (lc == &#39;\n&#39;)
-<a href="#l687" class="line" id="l687">    687</a>             return -1;
-<a href="#l688" class="line" id="l688">    688</a>         return (int)lc - (int)rhs;
-<a href="#l689" class="line" id="l689">    689</a>     }
-<a href="#l690" class="line" id="l690">    690</a> };
-<a href="#l691" class="line" id="l691">    691</a> 
-<a href="#l692" class="line" id="l692">    692</a> int suffix_search(const unsigned char *data,
-<a href="#l693" class="line" id="l693">    693</a>                   const uint32_t *suffixes,
-<a href="#l694" class="line" id="l694">    694</a>                   int size,
-<a href="#l695" class="line" id="l695">    695</a>                   intrusive_ptr&lt;QueryPlan&gt; index,
-<a href="#l696" class="line" id="l696">    696</a>                   vector&lt;uint32_t&gt; &amp;indexes_out) {
-<a href="#l697" class="line" id="l697">    697</a>     int count = 0;
-<a href="#l698" class="line" id="l698">    698</a>     vector&lt;walk_state&gt; stack;
-<a href="#l699" class="line" id="l699">    699</a>     stack.push_back((walk_state){
-<a href="#l700" class="line" id="l700">    700</a>             suffixes, suffixes + size, index, 0});
-<a href="#l701" class="line" id="l701">    701</a> 
-<a href="#l702" class="line" id="l702">    702</a>     while (!stack.empty()) {
-<a href="#l703" class="line" id="l703">    703</a>         walk_state st = stack.back();
-<a href="#l704" class="line" id="l704">    704</a>         stack.pop_back();
-<a href="#l705" class="line" id="l705">    705</a>         if (!st.key || st.key-&gt;empty() || (st.right - st.left) &lt;= 100) {
-<a href="#l706" class="line" id="l706">    706</a>             if ((count + st.right - st.left) &gt; indexes_out.size()) {
-<a href="#l707" class="line" id="l707">    707</a>                 count = indexes_out.size() + 1;
-<a href="#l708" class="line" id="l708">    708</a>                 break;
-<a href="#l709" class="line" id="l709">    709</a>             }
-<a href="#l710" class="line" id="l710">    710</a>             memcpy(&amp;indexes_out[count], st.left,
-<a href="#l711" class="line" id="l711">    711</a>                    (st.right - st.left) * sizeof(uint32_t));
-<a href="#l712" class="line" id="l712">    712</a>             count += (st.right - st.left);
-<a href="#l713" class="line" id="l713">    713</a>             continue;
-<a href="#l714" class="line" id="l714">    714</a>         }
-<a href="#l715" class="line" id="l715">    715</a>         lt_index lt = {data, st.depth};
-<a href="#l716" class="line" id="l716">    716</a>         for (QueryPlan::iterator it = st.key-&gt;begin();
-<a href="#l717" class="line" id="l717">    717</a>              it != st.key-&gt;end(); ++it) {
-<a href="#l718" class="line" id="l718">    718</a>             const uint32_t *l, *r;
-<a href="#l719" class="line" id="l719">    719</a>             l = lower_bound(st.left, st.right, it-&gt;first.first, lt);
-<a href="#l720" class="line" id="l720">    720</a>             const uint32_t *right = lower_bound(l, st.right,
-<a href="#l721" class="line" id="l721">    721</a>                                           (unsigned char)(it-&gt;first.second + 1),
-<a href="#l722" class="line" id="l722">    722</a>                                           lt);
-<a href="#l723" class="line" id="l723">    723</a>             if (l == right)
-<a href="#l724" class="line" id="l724">    724</a>                 continue;
-<a href="#l725" class="line" id="l725">    725</a> 
-<a href="#l726" class="line" id="l726">    726</a>             if (st.depth)
-<a href="#l727" class="line" id="l727">    727</a>                 assert(data[*l + st.depth - 1] ==
-<a href="#l728" class="line" id="l728">    728</a>                        data[*(right - 1) + st.depth - 1]);
-<a href="#l729" class="line" id="l729">    729</a> 
-<a href="#l730" class="line" id="l730">    730</a>             assert(l == st.left ||
-<a href="#l731" class="line" id="l731">    731</a>                    data[*(l-1) + st.depth] == &#39;\n&#39; ||
-<a href="#l732" class="line" id="l732">    732</a>                    data[*(l-1) + st.depth] &lt; it-&gt;first.first);
-<a href="#l733" class="line" id="l733">    733</a>             assert(data[*l + st.depth] &gt;= it-&gt;first.first);
-<a href="#l734" class="line" id="l734">    734</a>             assert(right == st.right ||
-<a href="#l735" class="line" id="l735">    735</a>                    data[*right + st.depth] &gt; it-&gt;first.second);
-<a href="#l736" class="line" id="l736">    736</a> 
-<a href="#l737" class="line" id="l737">    737</a>             for (unsigned char ch = it-&gt;first.first; ch &lt;= it-&gt;first.second;
-<a href="#l738" class="line" id="l738">    738</a>                  ch++, l = r) {
-<a href="#l739" class="line" id="l739">    739</a>                 r = lower_bound(l, right, (unsigned char)(ch + 1), lt);
-<a href="#l740" class="line" id="l740">    740</a> 
-<a href="#l741" class="line" id="l741">    741</a>                 if (r != l) {
-<a href="#l742" class="line" id="l742">    742</a>                     stack.push_back((walk_state){l, r, it-&gt;second, st.depth + 1});
-<a href="#l743" class="line" id="l743">    743</a>                 }
-<a href="#l744" class="line" id="l744">    744</a>             }
-<a href="#l745" class="line" id="l745">    745</a>         }
-<a href="#l746" class="line" id="l746">    746</a>     }
-<a href="#l747" class="line" id="l747">    747</a>     return count;
-<a href="#l748" class="line" id="l748">    748</a> }
-<a href="#l749" class="line" id="l749">    749</a> 
-<a href="#l750" class="line" id="l750">    750</a> void searcher::filtered_search(const chunk *chunk)
-<a href="#l751" class="line" id="l751">    751</a> {
-<a href="#l752" class="line" id="l752">    752</a>     static per_thread&lt;vector&lt;uint32_t&gt; &gt; indexes;
-<a href="#l753" class="line" id="l753">    753</a>     if (!indexes.get()) {
-<a href="#l754" class="line" id="l754">    754</a>         indexes.put(new vector&lt;uint32_t&gt;(cc_-&gt;alloc_-&gt;chunk_size() / kMinFilterRatio));
-<a href="#l755" class="line" id="l755">    755</a>     }
-<a href="#l756" class="line" id="l756">    756</a>     int count;
-<a href="#l757" class="line" id="l757">    757</a>     {
-<a href="#l758" class="line" id="l758">    758</a>         run_timer run(index_time_);
-<a href="#l759" class="line" id="l759">    759</a>         count = suffix_search(chunk-&gt;data, chunk-&gt;suffixes, chunk-&gt;size, index_key_, *indexes);
-<a href="#l760" class="line" id="l760">    760</a>     }
-<a href="#l761" class="line" id="l761">    761</a> 
-<a href="#l762" class="line" id="l762">    762</a>     search_lines(&amp;(*indexes)[0], count, chunk);
-<a href="#l763" class="line" id="l763">    763</a> }
-<a href="#l764" class="line" id="l764">    764</a> 
-<a href="#l765" class="line" id="l765">    765</a> struct match_finger {
-<a href="#l766" class="line" id="l766">    766</a>     const chunk *chunk_;
-<a href="#l767" class="line" id="l767">    767</a>     vector&lt;chunk_file&gt;::const_iterator it_;
-<a href="#l768" class="line" id="l768">    768</a>     match_finger(const chunk *chunk) :
-<a href="#l769" class="line" id="l769">    769</a>         chunk_(chunk), it_(chunk-&gt;files.begin()) {};
-<a href="#l770" class="line" id="l770">    770</a> };
-<a href="#l771" class="line" id="l771">    771</a> 
-<a href="#l772" class="line" id="l772">    772</a> void searcher::search_lines(uint32_t *indexes, int count,
-<a href="#l773" class="line" id="l773">    773</a>                             const chunk *chunk)
-<a href="#l774" class="line" id="l774">    774</a> {
-<a href="#l775" class="line" id="l775">    775</a>     debug(kDebugProfile, &quot;search_lines: Searching %d/%d indexes.&quot;, count, chunk-&gt;size);
-<a href="#l776" class="line" id="l776">    776</a> 
-<a href="#l777" class="line" id="l777">    777</a>     if (count == 0)
-<a href="#l778" class="line" id="l778">    778</a>         return;
-<a href="#l779" class="line" id="l779">    779</a> 
-<a href="#l780" class="line" id="l780">    780</a>     if (count * kMinFilterRatio &gt; chunk-&gt;size) {
-<a href="#l781" class="line" id="l781">    781</a>         full_search(chunk);
-<a href="#l782" class="line" id="l782">    782</a>         return;
-<a href="#l783" class="line" id="l783">    783</a>     }
-<a href="#l784" class="line" id="l784">    784</a> 
-<a href="#l785" class="line" id="l785">    785</a>     if ((query_-&gt;file_pat || query_-&gt;tree_pat) &amp;&amp;
-<a href="#l786" class="line" id="l786">    786</a>         double(count * 30) / chunk-&gt;size &gt; files_density()) {
-<a href="#l787" class="line" id="l787">    787</a>         full_search(chunk);
-<a href="#l788" class="line" id="l788">    788</a>         return;
-<a href="#l789" class="line" id="l789">    789</a>     }
-<a href="#l790" class="line" id="l790">    790</a> 
-<a href="#l791" class="line" id="l791">    791</a>     {
-<a href="#l792" class="line" id="l792">    792</a>         run_timer run(sort_time_);
-<a href="#l793" class="line" id="l793">    793</a>         lsd_radix_sort(indexes, indexes + count);
-<a href="#l794" class="line" id="l794">    794</a>     }
-<a href="#l795" class="line" id="l795">    795</a> 
-<a href="#l796" class="line" id="l796">    796</a>     match_finger finger(chunk);
-<a href="#l797" class="line" id="l797">    797</a> 
-<a href="#l798" class="line" id="l798">    798</a>     StringPiece search((char*)chunk-&gt;data, chunk-&gt;size);
-<a href="#l799" class="line" id="l799">    799</a>     uint32_t max = indexes[0];
-<a href="#l800" class="line" id="l800">    800</a>     uint32_t min = line_start(chunk, indexes[0]);
-<a href="#l801" class="line" id="l801">    801</a>     for (int i = 0; i &lt;= count &amp;&amp; !limiter_.exit_early(); i++) {
-<a href="#l802" class="line" id="l802">    802</a>         if (i != count) {
-<a href="#l803" class="line" id="l803">    803</a>             if (indexes[i] &lt; max) continue;
-<a href="#l804" class="line" id="l804">    804</a>             if (indexes[i] &lt; max + kMinSkip) {
-<a href="#l805" class="line" id="l805">    805</a>                 max = indexes[i];
-<a href="#l806" class="line" id="l806">    806</a>                 continue;
-<a href="#l807" class="line" id="l807">    807</a>             }
-<a href="#l808" class="line" id="l808">    808</a>         }
-<a href="#l809" class="line" id="l809">    809</a> 
-<a href="#l810" class="line" id="l810">    810</a>         int end = line_end(chunk, max);
-<a href="#l811" class="line" id="l811">    811</a>         full_search(&amp;finger, chunk, min, end);
-<a href="#l812" class="line" id="l812">    812</a> 
-<a href="#l813" class="line" id="l813">    813</a>         if (i != count) {
-<a href="#l814" class="line" id="l814">    814</a>             max = indexes[i];
-<a href="#l815" class="line" id="l815">    815</a>             min = line_start(chunk, max);
-<a href="#l816" class="line" id="l816">    816</a>         }
-<a href="#l817" class="line" id="l817">    817</a>     }
-<a href="#l818" class="line" id="l818">    818</a> }
-<a href="#l819" class="line" id="l819">    819</a> 
-<a href="#l820" class="line" id="l820">    820</a> void searcher::full_search(const chunk *chunk)
-<a href="#l821" class="line" id="l821">    821</a> {
-<a href="#l822" class="line" id="l822">    822</a>     match_finger finger(chunk);
-<a href="#l823" class="line" id="l823">    823</a>     full_search(&amp;finger, chunk, 0, chunk-&gt;size - 1);
-<a href="#l824" class="line" id="l824">    824</a> }
-<a href="#l825" class="line" id="l825">    825</a> 
-<a href="#l826" class="line" id="l826">    826</a> void searcher::next_range(match_finger *finger,
-<a href="#l827" class="line" id="l827">    827</a>                           int&amp; pos, int&amp; endpos, int maxpos)
-<a href="#l828" class="line" id="l828">    828</a> {
-<a href="#l829" class="line" id="l829">    829</a>     if ((!query_-&gt;file_pat &amp;&amp; !query_-&gt;tree_pat) || !FLAGS_index)
-<a href="#l830" class="line" id="l830">    830</a>         return;
-<a href="#l831" class="line" id="l831">    831</a> 
-<a href="#l832" class="line" id="l832">    832</a>     debug(kDebugSearch, &quot;next_range(%d, %d, %d)&quot;, pos, endpos, maxpos);
-<a href="#l833" class="line" id="l833">    833</a> 
-<a href="#l834" class="line" id="l834">    834</a>     vector&lt;chunk_file&gt;::const_iterator&amp; it = finger-&gt;it_;
-<a href="#l835" class="line" id="l835">    835</a>     const vector&lt;chunk_file&gt;::const_iterator&amp; end = finger-&gt;chunk_-&gt;files.end();
-<a href="#l836" class="line" id="l836">    836</a> 
-<a href="#l837" class="line" id="l837">    837</a>     /* Find the first matching range that intersects [pos, maxpos) */
-<a href="#l838" class="line" id="l838">    838</a>     while (it != end &amp;&amp;
-<a href="#l839" class="line" id="l839">    839</a>            (it-&gt;right &lt; pos || !accept(query_, it-&gt;files)) &amp;&amp;
-<a href="#l840" class="line" id="l840">    840</a>            it-&gt;left &lt; maxpos)
-<a href="#l841" class="line" id="l841">    841</a>         ++it;
-<a href="#l842" class="line" id="l842">    842</a> 
-<a href="#l843" class="line" id="l843">    843</a>     if (it == end || it-&gt;left &gt;= maxpos) {
-<a href="#l844" class="line" id="l844">    844</a>         pos = endpos = maxpos;
-<a href="#l845" class="line" id="l845">    845</a>         return;
-<a href="#l846" class="line" id="l846">    846</a>     }
-<a href="#l847" class="line" id="l847">    847</a> 
-<a href="#l848" class="line" id="l848">    848</a>     pos    = max(pos, it-&gt;left);
-<a href="#l849" class="line" id="l849">    849</a>     endpos = it-&gt;right;
-<a href="#l850" class="line" id="l850">    850</a> 
-<a href="#l851" class="line" id="l851">    851</a>     /*
-<a href="#l852" class="line" id="l852">    852</a>      * Now scan until we either:
-<a href="#l853" class="line" id="l853">    853</a>      * - prove that [pos, maxpos) is all in range,
-<a href="#l854" class="line" id="l854">    854</a>      * - find a gap greater than kMinSkip, or
-<a href="#l855" class="line" id="l855">    855</a>      * - pass maxpos entirely.
-<a href="#l856" class="line" id="l856">    856</a>      */
-<a href="#l857" class="line" id="l857">    857</a>     do {
-<a href="#l858" class="line" id="l858">    858</a>         if (it-&gt;left &gt;= endpos + kMinSkip)
-<a href="#l859" class="line" id="l859">    859</a>             break;
-<a href="#l860" class="line" id="l860">    860</a>         if (it-&gt;right &gt;= endpos &amp;&amp; accept(query_, it-&gt;files)) {
-<a href="#l861" class="line" id="l861">    861</a>             endpos = max(endpos, it-&gt;right);
-<a href="#l862" class="line" id="l862">    862</a>             if (endpos &gt;= maxpos)
-<a href="#l863" class="line" id="l863">    863</a>                 /*
-<a href="#l864" class="line" id="l864">    864</a>                  * We&#39;ve accepted the entire range. No point in going on.
-<a href="#l865" class="line" id="l865">    865</a>                  */
-<a href="#l866" class="line" id="l866">    866</a>                 break;
-<a href="#l867" class="line" id="l867">    867</a>         }
-<a href="#l868" class="line" id="l868">    868</a>         ++it;
-<a href="#l869" class="line" id="l869">    869</a>     } while (it != end &amp;&amp; it-&gt;left &lt; maxpos);
-<a href="#l870" class="line" id="l870">    870</a> 
-<a href="#l871" class="line" id="l871">    871</a>     endpos = min(endpos, maxpos);
-<a href="#l872" class="line" id="l872">    872</a> }
-<a href="#l873" class="line" id="l873">    873</a> 
-<a href="#l874" class="line" id="l874">    874</a> void searcher::full_search(match_finger *finger,
-<a href="#l875" class="line" id="l875">    875</a>                            const chunk *chunk, size_t minpos, size_t maxpos)
-<a href="#l876" class="line" id="l876">    876</a> {
-<a href="#l877" class="line" id="l877">    877</a>     StringPiece str((char*)chunk-&gt;data, chunk-&gt;size);
-<a href="#l878" class="line" id="l878">    878</a>     StringPiece match;
-<a href="#l879" class="line" id="l879">    879</a>     int pos = minpos, new_pos, end = minpos;
-<a href="#l880" class="line" id="l880">    880</a>     while (pos &lt; maxpos &amp;&amp; !limiter_.exit_early()) {
-<a href="#l881" class="line" id="l881">    881</a>         if (pos &gt;= end) {
-<a href="#l882" class="line" id="l882">    882</a>             end = maxpos;
-<a href="#l883" class="line" id="l883">    883</a>             next_range(finger, pos, end, maxpos);
-<a href="#l884" class="line" id="l884">    884</a>             assert(pos &lt;= end);
-<a href="#l885" class="line" id="l885">    885</a>         }
-<a href="#l886" class="line" id="l886">    886</a>         if (pos &gt;= maxpos)
-<a href="#l887" class="line" id="l887">    887</a>             break;
-<a href="#l888" class="line" id="l888">    888</a> 
-<a href="#l889" class="line" id="l889">    889</a>         debug(kDebugSearch, &quot;[%p] range:%d-%d/%d-%d&quot;,
-<a href="#l890" class="line" id="l890">    890</a>               (void*)(chunk), pos, end, int(minpos), int(maxpos));
-<a href="#l891" class="line" id="l891">    891</a> 
-<a href="#l892" class="line" id="l892">    892</a>         {
-<a href="#l893" class="line" id="l893">    893</a>             int limit = end;
-<a href="#l894" class="line" id="l894">    894</a>             if (limit - pos &gt; kMaxScan)
-<a href="#l895" class="line" id="l895">    895</a>                 limit = line_end(chunk, pos + kMaxScan);
-<a href="#l896" class="line" id="l896">    896</a>             run_timer run(re2_time_);
-<a href="#l897" class="line" id="l897">    897</a>             if (!query_-&gt;line_pat-&gt;Match(str, pos, limit, RE2::UNANCHORED, &amp;match, 1)) {
-<a href="#l898" class="line" id="l898">    898</a>                 pos = limit + 1;
-<a href="#l899" class="line" id="l899">    899</a>                 continue;
-<a href="#l900" class="line" id="l900">    900</a>             }
-<a href="#l901" class="line" id="l901">    901</a>         }
-<a href="#l902" class="line" id="l902">    902</a>         assert(memchr(match.data(), &#39;\n&#39;, match.size()) == NULL);
-<a href="#l903" class="line" id="l903">    903</a>         StringPiece line = find_line(str, match);
-<a href="#l904" class="line" id="l904">    904</a>         if (utf8::is_valid(line.data(), line.data() + line.size()))
-<a href="#l905" class="line" id="l905">    905</a>             find_match(chunk, match, line);
-<a href="#l906" class="line" id="l906">    906</a>         new_pos = line.size() + line.data() - str.data() + 1;
-<a href="#l907" class="line" id="l907">    907</a>         assert(new_pos &gt; pos);
-<a href="#l908" class="line" id="l908">    908</a>         pos = new_pos;
-<a href="#l909" class="line" id="l909">    909</a>     }
-<a href="#l910" class="line" id="l910">    910</a> }
-<a href="#l911" class="line" id="l911">    911</a> 
-<a href="#l912" class="line" id="l912">    912</a> void searcher::find_match_brute(const chunk *chunk,
-<a href="#l913" class="line" id="l913">    913</a>                                 const StringPiece&amp; match,
-<a href="#l914" class="line" id="l914">    914</a>                                 const StringPiece&amp; line) {
-<a href="#l915" class="line" id="l915">    915</a>     run_timer run(git_time_);
-<a href="#l916" class="line" id="l916">    916</a>     timer tm;
-<a href="#l917" class="line" id="l917">    917</a>     int off = (unsigned char*)line.data() - chunk-&gt;data;
-<a href="#l918" class="line" id="l918">    918</a>     int searched = 0;
-<a href="#l919" class="line" id="l919">    919</a> 
-<a href="#l920" class="line" id="l920">    920</a>     for(vector&lt;chunk_file&gt;::const_iterator it = chunk-&gt;files.begin();
-<a href="#l921" class="line" id="l921">    921</a>         it != chunk-&gt;files.end(); it++) {
-<a href="#l922" class="line" id="l922">    922</a>         if (off &gt;= it-&gt;left &amp;&amp; off &lt;= it-&gt;right) {
-<a href="#l923" class="line" id="l923">    923</a>             for (list&lt;indexed_file *&gt;::const_iterator fit = it-&gt;files.begin();
-<a href="#l924" class="line" id="l924">    924</a>                  fit != it-&gt;files.end(); ++fit) {
-<a href="#l925" class="line" id="l925">    925</a>                 if (!accept(query_, *fit))
-<a href="#l926" class="line" id="l926">    926</a>                     continue;
-<a href="#l927" class="line" id="l927">    927</a>                 searched++;
-<a href="#l928" class="line" id="l928">    928</a>                 if (limiter_.exit_early())
-<a href="#l929" class="line" id="l929">    929</a>                     break;
-<a href="#l930" class="line" id="l930">    930</a>                 try_match(line, match, *fit);
-<a href="#l931" class="line" id="l931">    931</a>             }
-<a href="#l932" class="line" id="l932">    932</a>         }
-<a href="#l933" class="line" id="l933">    933</a>     }
-<a href="#l934" class="line" id="l934">    934</a> 
-<a href="#l935" class="line" id="l935">    935</a>     tm.pause();
-<a href="#l936" class="line" id="l936">    936</a>     debug(kDebugProfile, &quot;Searched %d files in %d.%06ds&quot;,
-<a href="#l937" class="line" id="l937">    937</a>           searched,
-<a href="#l938" class="line" id="l938">    938</a>           int(tm.elapsed().tv_sec),
-<a href="#l939" class="line" id="l939">    939</a>           int(tm.elapsed().tv_usec));
-<a href="#l940" class="line" id="l940">    940</a> }
-<a href="#l941" class="line" id="l941">    941</a> 
-<a href="#l942" class="line" id="l942">    942</a> void searcher::find_match(const chunk *chunk,
-<a href="#l943" class="line" id="l943">    943</a>                           const StringPiece&amp; match,
-<a href="#l944" class="line" id="l944">    944</a>                           const StringPiece&amp; line) {
-<a href="#l945" class="line" id="l945">    945</a>     if (!FLAGS_index) {
-<a href="#l946" class="line" id="l946">    946</a>         find_match_brute(chunk, match, line);
-<a href="#l947" class="line" id="l947">    947</a>         return;
-<a href="#l948" class="line" id="l948">    948</a>     }
-<a href="#l949" class="line" id="l949">    949</a> 
-<a href="#l950" class="line" id="l950">    950</a>     run_timer run(git_time_);
-<a href="#l951" class="line" id="l951">    951</a>     int loff = (unsigned char*)line.data() - chunk-&gt;data;
-<a href="#l952" class="line" id="l952">    952</a> 
-<a href="#l953" class="line" id="l953">    953</a>     vector&lt;chunk_file_node *&gt; stack;
-<a href="#l954" class="line" id="l954">    954</a>     assert(chunk-&gt;cf_root);
-<a href="#l955" class="line" id="l955">    955</a>     stack.push_back(chunk-&gt;cf_root.get());
-<a href="#l956" class="line" id="l956">    956</a> 
-<a href="#l957" class="line" id="l957">    957</a>     debug(kDebugSearch, &quot;find_match(%d)&quot;, loff);
-<a href="#l958" class="line" id="l958">    958</a> 
-<a href="#l959" class="line" id="l959">    959</a>     while (!stack.empty() &amp;&amp; !limiter_.exit_early()) {
-<a href="#l960" class="line" id="l960">    960</a>         chunk_file_node *n = stack.back();
-<a href="#l961" class="line" id="l961">    961</a>         stack.pop_back();
-<a href="#l962" class="line" id="l962">    962</a> 
-<a href="#l963" class="line" id="l963">    963</a>         debug(kDebugSearch,
-<a href="#l964" class="line" id="l964">    964</a>               &quot;walk &lt;%d-%d&gt; - %d&quot;, n-&gt;chunk-&gt;left, n-&gt;chunk-&gt;right,
-<a href="#l965" class="line" id="l965">    965</a>               n-&gt;right_limit);
-<a href="#l966" class="line" id="l966">    966</a> 
-<a href="#l967" class="line" id="l967">    967</a>         if (loff &gt; n-&gt;right_limit)
-<a href="#l968" class="line" id="l968">    968</a>             continue;
-<a href="#l969" class="line" id="l969">    969</a>         if (loff &gt;= n-&gt;chunk-&gt;left) {
-<a href="#l970" class="line" id="l970">    970</a>             if (n-&gt;right)
-<a href="#l971" class="line" id="l971">    971</a>                 stack.push_back(n-&gt;right.get());
-<a href="#l972" class="line" id="l972">    972</a>             if (loff &lt;= n-&gt;chunk-&gt;right) {
-<a href="#l973" class="line" id="l973">    973</a>                 debug(kDebugSearch, &quot;visit &lt;%d-%d&gt;&quot;, n-&gt;chunk-&gt;left, n-&gt;chunk-&gt;right);
-<a href="#l974" class="line" id="l974">    974</a>                 assert(loff &gt;= n-&gt;chunk-&gt;left &amp;&amp; loff &lt;= n-&gt;chunk-&gt;right);
-<a href="#l975" class="line" id="l975">    975</a>                 for (list&lt;indexed_file *&gt;::const_iterator it = n-&gt;chunk-&gt;files.begin();
-<a href="#l976" class="line" id="l976">    976</a>                      it != n-&gt;chunk-&gt;files.end(); ++it) {
-<a href="#l977" class="line" id="l977">    977</a>                     if (!accept(query_, *it))
-<a href="#l978" class="line" id="l978">    978</a>                         continue;
-<a href="#l979" class="line" id="l979">    979</a>                     if (limiter_.exit_early())
-<a href="#l980" class="line" id="l980">    980</a>                         break;
-<a href="#l981" class="line" id="l981">    981</a>                     try_match(line, match, *it);
-<a href="#l982" class="line" id="l982">    982</a>                 }
-<a href="#l983" class="line" id="l983">    983</a>             }
-<a href="#l984" class="line" id="l984">    984</a>         }
-<a href="#l985" class="line" id="l985">    985</a>         if (n-&gt;left)
-<a href="#l986" class="line" id="l986">    986</a>             stack.push_back(n-&gt;left.get());
-<a href="#l987" class="line" id="l987">    987</a>     }
-<a href="#l988" class="line" id="l988">    988</a> }
-<a href="#l989" class="line" id="l989">    989</a> 
+<a href="#l508" class="line" id="l508">    508</a> 
+<a href="#l509" class="line" id="l509">    509</a>     timeval now;
+<a href="#l510" class="line" id="l510">    510</a>     gettimeofday(&amp;now, NULL);
+<a href="#l511" class="line" id="l511">    511</a>     index_timestamp_ = now.tv_sec;
+<a href="#l512" class="line" id="l512">    512</a> 
+<a href="#l513" class="line" id="l513">    513</a>     index_filenames();
+<a href="#l514" class="line" id="l514">    514</a>     alloc_-&gt;finalize();
+<a href="#l515" class="line" id="l515">    515</a> 
+<a href="#l516" class="line" id="l516">    516</a>     idx_data_chunks.inc(alloc_-&gt;end() - alloc_-&gt;begin());
+<a href="#l517" class="line" id="l517">    517</a>     idx_content_chunks.inc(alloc_-&gt;end_content() - alloc_-&gt;begin_content());
+<a href="#l518" class="line" id="l518">    518</a> }
+<a href="#l519" class="line" id="l519">    519</a> 
+<a href="#l520" class="line" id="l520">    520</a> vector&lt;indexed_tree&gt; code_searcher::trees() const {
+<a href="#l521" class="line" id="l521">    521</a>     vector&lt;indexed_tree&gt; out;
+<a href="#l522" class="line" id="l522">    522</a>     out.reserve(trees_.size());
+<a href="#l523" class="line" id="l523">    523</a>     for (auto it = trees_.begin(); it != trees_.end(); ++it)
+<a href="#l524" class="line" id="l524">    524</a>         out.push_back(**it);
+<a href="#l525" class="line" id="l525">    525</a>     return out;
+<a href="#l526" class="line" id="l526">    526</a> }
+<a href="#l527" class="line" id="l527">    527</a> 
+<a href="#l528" class="line" id="l528">    528</a> const indexed_tree* code_searcher::open_tree(const string &amp;name,
+<a href="#l529" class="line" id="l529">    529</a>                                              const Metadata &amp;metadata,
+<a href="#l530" class="line" id="l530">    530</a>                                              const string &amp;version) {
+<a href="#l531" class="line" id="l531">    531</a>     auto tree = std::make_unique&lt;indexed_tree&gt;();
+<a href="#l532" class="line" id="l532">    532</a>     tree-&gt;name = name;
+<a href="#l533" class="line" id="l533">    533</a>     tree-&gt;version = version;
+<a href="#l534" class="line" id="l534">    534</a>     tree-&gt;metadata = metadata;
+<a href="#l535" class="line" id="l535">    535</a>     trees_.push_back(move(tree));
+<a href="#l536" class="line" id="l536">    536</a>     return trees_.back().get();
+<a href="#l537" class="line" id="l537">    537</a> }
+<a href="#l538" class="line" id="l538">    538</a> 
+<a href="#l539" class="line" id="l539">    539</a> const indexed_tree* code_searcher::open_tree(const string &amp;name,
+<a href="#l540" class="line" id="l540">    540</a>                                              const string &amp;version) {
+<a href="#l541" class="line" id="l541">    541</a>     return open_tree(name, Metadata(), version);
+<a href="#l542" class="line" id="l542">    542</a> }
+<a href="#l543" class="line" id="l543">    543</a> 
+<a href="#l544" class="line" id="l544">    544</a> void code_searcher::index_file(const indexed_tree *tree,
+<a href="#l545" class="line" id="l545">    545</a>                                const string&amp; path,
+<a href="#l546" class="line" id="l546">    546</a>                                StringPiece contents) {
+<a href="#l547" class="line" id="l547">    547</a>     assert(!finalized_);
+<a href="#l548" class="line" id="l548">    548</a>     assert(alloc_);
+<a href="#l549" class="line" id="l549">    549</a>     size_t len = contents.size();
+<a href="#l550" class="line" id="l550">    550</a>     const char *p = contents.data();
+<a href="#l551" class="line" id="l551">    551</a>     const char *end = p + len;
+<a href="#l552" class="line" id="l552">    552</a>     const char *f;
+<a href="#l553" class="line" id="l553">    553</a>     chunk *c;
+<a href="#l554" class="line" id="l554">    554</a>     chunk *prev = NULL;
+<a href="#l555" class="line" id="l555">    555</a>     StringPiece line;
+<a href="#l556" class="line" id="l556">    556</a> 
+<a href="#l557" class="line" id="l557">    557</a>     if (memchr(p, 0, len) != NULL)
+<a href="#l558" class="line" id="l558">    558</a>         return;
+<a href="#l559" class="line" id="l559">    559</a> 
+<a href="#l560" class="line" id="l560">    560</a>     idx_bytes.inc(len);
+<a href="#l561" class="line" id="l561">    561</a>     idx_files.inc();
+<a href="#l562" class="line" id="l562">    562</a> 
+<a href="#l563" class="line" id="l563">    563</a>     auto file = std::make_unique&lt;indexed_file&gt;();
+<a href="#l564" class="line" id="l564">    564</a>     file-&gt;tree = tree;
+<a href="#l565" class="line" id="l565">    565</a>     file-&gt;path = path;
+<a href="#l566" class="line" id="l566">    566</a>     file-&gt;no  = files_.size();
+<a href="#l567" class="line" id="l567">    567</a>     auto *sf = file.get();
+<a href="#l568" class="line" id="l568">    568</a>     files_.push_back(move(file));
+<a href="#l569" class="line" id="l569">    569</a> 
+<a href="#l570" class="line" id="l570">    570</a>     uint32_t lines = count(p, end, &#39;\n&#39;);
+<a href="#l571" class="line" id="l571">    571</a> 
+<a href="#l572" class="line" id="l572">    572</a>     file_contents_builder content;
+<a href="#l573" class="line" id="l573">    573</a> 
+<a href="#l574" class="line" id="l574">    574</a>     while ((f = static_cast&lt;const char*&gt;(memchr(p, &#39;\n&#39;, end - p))) != 0) {
+<a href="#l575" class="line" id="l575">    575</a>     final:
+<a href="#l576" class="line" id="l576">    576</a>         idx_lines.inc();
+<a href="#l577" class="line" id="l577">    577</a>         if (f - p + 1 &gt;= FLAGS_line_limit) {
+<a href="#l578" class="line" id="l578">    578</a>             // Don&#39;t index the long line, but do index an empty
+<a href="#l579" class="line" id="l579">    579</a>             // line so that line number of future lines are
+<a href="#l580" class="line" id="l580">    580</a>             // preserved.
+<a href="#l581" class="line" id="l581">    581</a>             p = f;
+<a href="#l582" class="line" id="l582">    582</a>         }
+<a href="#l583" class="line" id="l583">    583</a>         decltype(lines_)::iterator it = lines_.end();
+<a href="#l584" class="line" id="l584">    584</a>         if (FLAGS_compress) {
+<a href="#l585" class="line" id="l585">    585</a>             it = lines_.find(StringPiece(p, f - p));
+<a href="#l586" class="line" id="l586">    586</a>         }
+<a href="#l587" class="line" id="l587">    587</a>         if (it == lines_.end()) {
+<a href="#l588" class="line" id="l588">    588</a>             idx_bytes_dedup.inc((f - p) + 1);
+<a href="#l589" class="line" id="l589">    589</a>             idx_lines_dedup.inc();
+<a href="#l590" class="line" id="l590">    590</a> 
+<a href="#l591" class="line" id="l591">    591</a>             unsigned char *alloc = alloc_-&gt;alloc(f - p + 1);
+<a href="#l592" class="line" id="l592">    592</a>             memcpy(alloc, p, f - p);
+<a href="#l593" class="line" id="l593">    593</a>             alloc[f - p] = &#39;\n&#39;;
+<a href="#l594" class="line" id="l594">    594</a>             line = StringPiece((char*)alloc, f - p);
+<a href="#l595" class="line" id="l595">    595</a>             if (FLAGS_compress) {
+<a href="#l596" class="line" id="l596">    596</a>                 if (alloc_-&gt;current_chunk() != prev)
+<a href="#l597" class="line" id="l597">    597</a>                     lines_.clear();
+<a href="#l598" class="line" id="l598">    598</a>                 lines_.insert(line);
+<a href="#l599" class="line" id="l599">    599</a>             }
+<a href="#l600" class="line" id="l600">    600</a>             prev = c = alloc_-&gt;current_chunk();
+<a href="#l601" class="line" id="l601">    601</a>         } else {
+<a href="#l602" class="line" id="l602">    602</a>             line = *it;
+<a href="#l603" class="line" id="l603">    603</a>             c = alloc_-&gt;chunk_from_string
+<a href="#l604" class="line" id="l604">    604</a>                 (reinterpret_cast&lt;const unsigned char*&gt;(line.data()));
+<a href="#l605" class="line" id="l605">    605</a>         }
+<a href="#l606" class="line" id="l606">    606</a>         {
+<a href="#l607" class="line" id="l607">    607</a>             c-&gt;add_chunk_file(sf, line);
+<a href="#l608" class="line" id="l608">    608</a>         }
+<a href="#l609" class="line" id="l609">    609</a>         content.extend(c, line);
+<a href="#l610" class="line" id="l610">    610</a>         p = min(end, f + 1);
+<a href="#l611" class="line" id="l611">    611</a>     }
+<a href="#l612" class="line" id="l612">    612</a>     if (p &lt; end - 1) {
+<a href="#l613" class="line" id="l613">    613</a>         // Handle files with no trailing newline by jumping back and
+<a href="#l614" class="line" id="l614">    614</a>         // adding the final line.
+<a href="#l615" class="line" id="l615">    615</a>         assert(*(end-1) != &#39;\n&#39;);
+<a href="#l616" class="line" id="l616">    616</a>         f = end;
+<a href="#l617" class="line" id="l617">    617</a>         lines++;
+<a href="#l618" class="line" id="l618">    618</a>         goto final;
+<a href="#l619" class="line" id="l619">    619</a>     }
+<a href="#l620" class="line" id="l620">    620</a> 
+<a href="#l621" class="line" id="l621">    621</a>     sf-&gt;content = content.build(alloc_.get());
+<a href="#l622" class="line" id="l622">    622</a>     if (sf-&gt;content == 0) {
+<a href="#l623" class="line" id="l623">    623</a>         fprintf(stderr, &quot;WARN: %s:%s:%s is too large to be indexed.\n&quot;,
+<a href="#l624" class="line" id="l624">    624</a>                 tree-&gt;name.c_str(), tree-&gt;version.c_str(), path.c_str());
+<a href="#l625" class="line" id="l625">    625</a>         file_contents_builder dummy;
+<a href="#l626" class="line" id="l626">    626</a>         sf-&gt;content = dummy.build(alloc_.get());
+<a href="#l627" class="line" id="l627">    627</a>     }
+<a href="#l628" class="line" id="l628">    628</a>     idx_content_ranges.inc(sf-&gt;content-&gt;size());
+<a href="#l629" class="line" id="l629">    629</a>     assert(sf-&gt;content-&gt;size() &lt;= 3*lines);
+<a href="#l630" class="line" id="l630">    630</a> 
+<a href="#l631" class="line" id="l631">    631</a>     for (auto it = alloc_-&gt;begin();
+<a href="#l632" class="line" id="l632">    632</a>          it != alloc_-&gt;end(); it++) {
+<a href="#l633" class="line" id="l633">    633</a>         (*it)-&gt;finish_file();
+<a href="#l634" class="line" id="l634">    634</a>     }
+<a href="#l635" class="line" id="l635">    635</a> }
+<a href="#l636" class="line" id="l636">    636</a> 
+<a href="#l637" class="line" id="l637">    637</a> bool searcher::should_search_chunk(const chunk *chunk) {
+<a href="#l638" class="line" id="l638">    638</a>     if (!query_-&gt;tree_pat) {
+<a href="#l639" class="line" id="l639">    639</a>         return true;
+<a href="#l640" class="line" id="l640">    640</a>     }
+<a href="#l641" class="line" id="l641">    641</a> 
+<a href="#l642" class="line" id="l642">    642</a>     // skip chunks that don&#39;t contain any repos we&#39;re looking for
+<a href="#l643" class="line" id="l643">    643</a>     for (auto it = chunk-&gt;tree_names.begin(); it != chunk-&gt;tree_names.end(); it++) {
+<a href="#l644" class="line" id="l644">    644</a>         if (query_-&gt;tree_pat-&gt;Match(*it, 0,
+<a href="#l645" class="line" id="l645">    645</a>                                     it-&gt;size(),
+<a href="#l646" class="line" id="l646">    646</a>                                     RE2::UNANCHORED, 0, 0)) {
+<a href="#l647" class="line" id="l647">    647</a>             return true;
+<a href="#l648" class="line" id="l648">    648</a>         }
+<a href="#l649" class="line" id="l649">    649</a>     }
+<a href="#l650" class="line" id="l650">    650</a>     return false;
+<a href="#l651" class="line" id="l651">    651</a> }
+<a href="#l652" class="line" id="l652">    652</a> 
+<a href="#l653" class="line" id="l653">    653</a> void searcher::operator()(const chunk *chunk)
+<a href="#l654" class="line" id="l654">    654</a> {
+<a href="#l655" class="line" id="l655">    655</a>     if (limiter_.exit_early())
+<a href="#l656" class="line" id="l656">    656</a>         return;
+<a href="#l657" class="line" id="l657">    657</a> 
+<a href="#l658" class="line" id="l658">    658</a>     if (!should_search_chunk(chunk))
+<a href="#l659" class="line" id="l659">    659</a>         return;
+<a href="#l660" class="line" id="l660">    660</a> 
+<a href="#l661" class="line" id="l661">    661</a>     if (FLAGS_index &amp;&amp; index_key_ &amp;&amp; !index_key_-&gt;empty())
+<a href="#l662" class="line" id="l662">    662</a>         filtered_search(chunk);
+<a href="#l663" class="line" id="l663">    663</a>     else
+<a href="#l664" class="line" id="l664">    664</a>         full_search(chunk);
+<a href="#l665" class="line" id="l665">    665</a> }
+<a href="#l666" class="line" id="l666">    666</a> 
+<a href="#l667" class="line" id="l667">    667</a> struct walk_state {
+<a href="#l668" class="line" id="l668">    668</a>     const uint32_t *left, *right;
+<a href="#l669" class="line" id="l669">    669</a>     intrusive_ptr&lt;QueryPlan&gt; key;
+<a href="#l670" class="line" id="l670">    670</a>     int depth;
+<a href="#l671" class="line" id="l671">    671</a> };
+<a href="#l672" class="line" id="l672">    672</a> 
+<a href="#l673" class="line" id="l673">    673</a> struct lt_index {
+<a href="#l674" class="line" id="l674">    674</a>     const unsigned char *data_;
+<a href="#l675" class="line" id="l675">    675</a>     int idx_;
+<a href="#l676" class="line" id="l676">    676</a> 
+<a href="#l677" class="line" id="l677">    677</a>     bool operator()(uint32_t lhs, unsigned char rhs) {
+<a href="#l678" class="line" id="l678">    678</a>         return cmp(lhs, rhs) &lt; 0;
+<a href="#l679" class="line" id="l679">    679</a>     }
+<a href="#l680" class="line" id="l680">    680</a> 
+<a href="#l681" class="line" id="l681">    681</a>     bool operator()(unsigned char lhs, uint32_t rhs) {
+<a href="#l682" class="line" id="l682">    682</a>         return cmp(rhs, lhs) &gt; 0;
+<a href="#l683" class="line" id="l683">    683</a>     }
+<a href="#l684" class="line" id="l684">    684</a> 
+<a href="#l685" class="line" id="l685">    685</a>     int cmp(uint32_t lhs, unsigned char rhs) {
+<a href="#l686" class="line" id="l686">    686</a>         unsigned char lc = data_[lhs + idx_];
+<a href="#l687" class="line" id="l687">    687</a>         if (lc == &#39;\n&#39;)
+<a href="#l688" class="line" id="l688">    688</a>             return -1;
+<a href="#l689" class="line" id="l689">    689</a>         return (int)lc - (int)rhs;
+<a href="#l690" class="line" id="l690">    690</a>     }
+<a href="#l691" class="line" id="l691">    691</a> };
+<a href="#l692" class="line" id="l692">    692</a> 
+<a href="#l693" class="line" id="l693">    693</a> int suffix_search(const unsigned char *data,
+<a href="#l694" class="line" id="l694">    694</a>                   const uint32_t *suffixes,
+<a href="#l695" class="line" id="l695">    695</a>                   int size,
+<a href="#l696" class="line" id="l696">    696</a>                   intrusive_ptr&lt;QueryPlan&gt; index,
+<a href="#l697" class="line" id="l697">    697</a>                   vector&lt;uint32_t&gt; &amp;indexes_out) {
+<a href="#l698" class="line" id="l698">    698</a>     int count = 0;
+<a href="#l699" class="line" id="l699">    699</a>     vector&lt;walk_state&gt; stack;
+<a href="#l700" class="line" id="l700">    700</a>     stack.push_back((walk_state){
+<a href="#l701" class="line" id="l701">    701</a>             suffixes, suffixes + size, index, 0});
+<a href="#l702" class="line" id="l702">    702</a> 
+<a href="#l703" class="line" id="l703">    703</a>     while (!stack.empty()) {
+<a href="#l704" class="line" id="l704">    704</a>         walk_state st = stack.back();
+<a href="#l705" class="line" id="l705">    705</a>         stack.pop_back();
+<a href="#l706" class="line" id="l706">    706</a>         if (!st.key || st.key-&gt;empty() || (st.right - st.left) &lt;= 100) {
+<a href="#l707" class="line" id="l707">    707</a>             if ((count + st.right - st.left) &gt; indexes_out.size()) {
+<a href="#l708" class="line" id="l708">    708</a>                 count = indexes_out.size() + 1;
+<a href="#l709" class="line" id="l709">    709</a>                 break;
+<a href="#l710" class="line" id="l710">    710</a>             }
+<a href="#l711" class="line" id="l711">    711</a>             memcpy(&amp;indexes_out[count], st.left,
+<a href="#l712" class="line" id="l712">    712</a>                    (st.right - st.left) * sizeof(uint32_t));
+<a href="#l713" class="line" id="l713">    713</a>             count += (st.right - st.left);
+<a href="#l714" class="line" id="l714">    714</a>             continue;
+<a href="#l715" class="line" id="l715">    715</a>         }
+<a href="#l716" class="line" id="l716">    716</a>         lt_index lt = {data, st.depth};
+<a href="#l717" class="line" id="l717">    717</a>         for (QueryPlan::iterator it = st.key-&gt;begin();
+<a href="#l718" class="line" id="l718">    718</a>              it != st.key-&gt;end(); ++it) {
+<a href="#l719" class="line" id="l719">    719</a>             const uint32_t *l, *r;
+<a href="#l720" class="line" id="l720">    720</a>             l = lower_bound(st.left, st.right, it-&gt;first.first, lt);
+<a href="#l721" class="line" id="l721">    721</a>             const uint32_t *right = lower_bound(l, st.right,
+<a href="#l722" class="line" id="l722">    722</a>                                           (unsigned char)(it-&gt;first.second + 1),
+<a href="#l723" class="line" id="l723">    723</a>                                           lt);
+<a href="#l724" class="line" id="l724">    724</a>             if (l == right)
+<a href="#l725" class="line" id="l725">    725</a>                 continue;
+<a href="#l726" class="line" id="l726">    726</a> 
+<a href="#l727" class="line" id="l727">    727</a>             if (st.depth)
+<a href="#l728" class="line" id="l728">    728</a>                 assert(data[*l + st.depth - 1] ==
+<a href="#l729" class="line" id="l729">    729</a>                        data[*(right - 1) + st.depth - 1]);
+<a href="#l730" class="line" id="l730">    730</a> 
+<a href="#l731" class="line" id="l731">    731</a>             assert(l == st.left ||
+<a href="#l732" class="line" id="l732">    732</a>                    data[*(l-1) + st.depth] == &#39;\n&#39; ||
+<a href="#l733" class="line" id="l733">    733</a>                    data[*(l-1) + st.depth] &lt; it-&gt;first.first);
+<a href="#l734" class="line" id="l734">    734</a>             assert(data[*l + st.depth] &gt;= it-&gt;first.first);
+<a href="#l735" class="line" id="l735">    735</a>             assert(right == st.right ||
+<a href="#l736" class="line" id="l736">    736</a>                    data[*right + st.depth] &gt; it-&gt;first.second);
+<a href="#l737" class="line" id="l737">    737</a> 
+<a href="#l738" class="line" id="l738">    738</a>             for (unsigned char ch = it-&gt;first.first; ch &lt;= it-&gt;first.second;
+<a href="#l739" class="line" id="l739">    739</a>                  ch++, l = r) {
+<a href="#l740" class="line" id="l740">    740</a>                 r = lower_bound(l, right, (unsigned char)(ch + 1), lt);
+<a href="#l741" class="line" id="l741">    741</a> 
+<a href="#l742" class="line" id="l742">    742</a>                 if (r != l) {
+<a href="#l743" class="line" id="l743">    743</a>                     stack.push_back((walk_state){l, r, it-&gt;second, st.depth + 1});
+<a href="#l744" class="line" id="l744">    744</a>                 }
+<a href="#l745" class="line" id="l745">    745</a>             }
+<a href="#l746" class="line" id="l746">    746</a>         }
+<a href="#l747" class="line" id="l747">    747</a>     }
+<a href="#l748" class="line" id="l748">    748</a>     return count;
+<a href="#l749" class="line" id="l749">    749</a> }
+<a href="#l750" class="line" id="l750">    750</a> 
+<a href="#l751" class="line" id="l751">    751</a> void searcher::filtered_search(const chunk *chunk)
+<a href="#l752" class="line" id="l752">    752</a> {
+<a href="#l753" class="line" id="l753">    753</a>     static per_thread&lt;vector&lt;uint32_t&gt; &gt; indexes;
+<a href="#l754" class="line" id="l754">    754</a>     if (!indexes.get()) {
+<a href="#l755" class="line" id="l755">    755</a>         indexes.put(new vector&lt;uint32_t&gt;(cc_-&gt;alloc_-&gt;chunk_size() / kMinFilterRatio));
+<a href="#l756" class="line" id="l756">    756</a>     }
+<a href="#l757" class="line" id="l757">    757</a>     int count;
+<a href="#l758" class="line" id="l758">    758</a>     {
+<a href="#l759" class="line" id="l759">    759</a>         run_timer run(index_time_);
+<a href="#l760" class="line" id="l760">    760</a>         count = suffix_search(chunk-&gt;data, chunk-&gt;suffixes, chunk-&gt;size, index_key_, *indexes);
+<a href="#l761" class="line" id="l761">    761</a>     }
+<a href="#l762" class="line" id="l762">    762</a> 
+<a href="#l763" class="line" id="l763">    763</a>     search_lines(&amp;(*indexes)[0], count, chunk);
+<a href="#l764" class="line" id="l764">    764</a> }
+<a href="#l765" class="line" id="l765">    765</a> 
+<a href="#l766" class="line" id="l766">    766</a> struct match_finger {
+<a href="#l767" class="line" id="l767">    767</a>     const chunk *chunk_;
+<a href="#l768" class="line" id="l768">    768</a>     vector&lt;chunk_file&gt;::const_iterator it_;
+<a href="#l769" class="line" id="l769">    769</a>     match_finger(const chunk *chunk) :
+<a href="#l770" class="line" id="l770">    770</a>         chunk_(chunk), it_(chunk-&gt;files.begin()) {};
+<a href="#l771" class="line" id="l771">    771</a> };
+<a href="#l772" class="line" id="l772">    772</a> 
+<a href="#l773" class="line" id="l773">    773</a> void searcher::search_lines(uint32_t *indexes, int count,
+<a href="#l774" class="line" id="l774">    774</a>                             const chunk *chunk)
+<a href="#l775" class="line" id="l775">    775</a> {
+<a href="#l776" class="line" id="l776">    776</a>     debug(kDebugProfile, &quot;search_lines: Searching %d/%d indexes.&quot;, count, chunk-&gt;size);
+<a href="#l777" class="line" id="l777">    777</a> 
+<a href="#l778" class="line" id="l778">    778</a>     if (count == 0)
+<a href="#l779" class="line" id="l779">    779</a>         return;
+<a href="#l780" class="line" id="l780">    780</a> 
+<a href="#l781" class="line" id="l781">    781</a>     if (count * kMinFilterRatio &gt; chunk-&gt;size) {
+<a href="#l782" class="line" id="l782">    782</a>         full_search(chunk);
+<a href="#l783" class="line" id="l783">    783</a>         return;
+<a href="#l784" class="line" id="l784">    784</a>     }
+<a href="#l785" class="line" id="l785">    785</a> 
+<a href="#l786" class="line" id="l786">    786</a>     if ((query_-&gt;file_pat || query_-&gt;tree_pat) &amp;&amp;
+<a href="#l787" class="line" id="l787">    787</a>         double(count * 30) / chunk-&gt;size &gt; files_density()) {
+<a href="#l788" class="line" id="l788">    788</a>         full_search(chunk);
+<a href="#l789" class="line" id="l789">    789</a>         return;
+<a href="#l790" class="line" id="l790">    790</a>     }
+<a href="#l791" class="line" id="l791">    791</a> 
+<a href="#l792" class="line" id="l792">    792</a>     {
+<a href="#l793" class="line" id="l793">    793</a>         run_timer run(sort_time_);
+<a href="#l794" class="line" id="l794">    794</a>         lsd_radix_sort(indexes, indexes + count);
+<a href="#l795" class="line" id="l795">    795</a>     }
+<a href="#l796" class="line" id="l796">    796</a> 
+<a href="#l797" class="line" id="l797">    797</a>     match_finger finger(chunk);
+<a href="#l798" class="line" id="l798">    798</a> 
+<a href="#l799" class="line" id="l799">    799</a>     StringPiece search((char*)chunk-&gt;data, chunk-&gt;size);
+<a href="#l800" class="line" id="l800">    800</a>     uint32_t max = indexes[0];
+<a href="#l801" class="line" id="l801">    801</a>     uint32_t min = line_start(chunk, indexes[0]);
+<a href="#l802" class="line" id="l802">    802</a>     for (int i = 0; i &lt;= count &amp;&amp; !limiter_.exit_early(); i++) {
+<a href="#l803" class="line" id="l803">    803</a>         if (i != count) {
+<a href="#l804" class="line" id="l804">    804</a>             if (indexes[i] &lt; max) continue;
+<a href="#l805" class="line" id="l805">    805</a>             if (indexes[i] &lt; max + kMinSkip) {
+<a href="#l806" class="line" id="l806">    806</a>                 max = indexes[i];
+<a href="#l807" class="line" id="l807">    807</a>                 continue;
+<a href="#l808" class="line" id="l808">    808</a>             }
+<a href="#l809" class="line" id="l809">    809</a>         }
+<a href="#l810" class="line" id="l810">    810</a> 
+<a href="#l811" class="line" id="l811">    811</a>         int end = line_end(chunk, max);
+<a href="#l812" class="line" id="l812">    812</a>         full_search(&amp;finger, chunk, min, end);
+<a href="#l813" class="line" id="l813">    813</a> 
+<a href="#l814" class="line" id="l814">    814</a>         if (i != count) {
+<a href="#l815" class="line" id="l815">    815</a>             max = indexes[i];
+<a href="#l816" class="line" id="l816">    816</a>             min = line_start(chunk, max);
+<a href="#l817" class="line" id="l817">    817</a>         }
+<a href="#l818" class="line" id="l818">    818</a>     }
+<a href="#l819" class="line" id="l819">    819</a> }
+<a href="#l820" class="line" id="l820">    820</a> 
+<a href="#l821" class="line" id="l821">    821</a> void searcher::full_search(const chunk *chunk)
+<a href="#l822" class="line" id="l822">    822</a> {
+<a href="#l823" class="line" id="l823">    823</a>     match_finger finger(chunk);
+<a href="#l824" class="line" id="l824">    824</a>     full_search(&amp;finger, chunk, 0, chunk-&gt;size - 1);
+<a href="#l825" class="line" id="l825">    825</a> }
+<a href="#l826" class="line" id="l826">    826</a> 
+<a href="#l827" class="line" id="l827">    827</a> void searcher::next_range(match_finger *finger,
+<a href="#l828" class="line" id="l828">    828</a>                           int&amp; pos, int&amp; endpos, int maxpos)
+<a href="#l829" class="line" id="l829">    829</a> {
+<a href="#l830" class="line" id="l830">    830</a>     if ((!query_-&gt;file_pat &amp;&amp; !query_-&gt;tree_pat) || !FLAGS_index)
+<a href="#l831" class="line" id="l831">    831</a>         return;
+<a href="#l832" class="line" id="l832">    832</a> 
+<a href="#l833" class="line" id="l833">    833</a>     debug(kDebugSearch, &quot;next_range(%d, %d, %d)&quot;, pos, endpos, maxpos);
+<a href="#l834" class="line" id="l834">    834</a> 
+<a href="#l835" class="line" id="l835">    835</a>     vector&lt;chunk_file&gt;::const_iterator&amp; it = finger-&gt;it_;
+<a href="#l836" class="line" id="l836">    836</a>     const vector&lt;chunk_file&gt;::const_iterator&amp; end = finger-&gt;chunk_-&gt;files.end();
+<a href="#l837" class="line" id="l837">    837</a> 
+<a href="#l838" class="line" id="l838">    838</a>     /* Find the first matching range that intersects [pos, maxpos) */
+<a href="#l839" class="line" id="l839">    839</a>     while (it != end &amp;&amp;
+<a href="#l840" class="line" id="l840">    840</a>            (it-&gt;right &lt; pos || !accept(query_, it-&gt;files)) &amp;&amp;
+<a href="#l841" class="line" id="l841">    841</a>            it-&gt;left &lt; maxpos)
+<a href="#l842" class="line" id="l842">    842</a>         ++it;
+<a href="#l843" class="line" id="l843">    843</a> 
+<a href="#l844" class="line" id="l844">    844</a>     if (it == end || it-&gt;left &gt;= maxpos) {
+<a href="#l845" class="line" id="l845">    845</a>         pos = endpos = maxpos;
+<a href="#l846" class="line" id="l846">    846</a>         return;
+<a href="#l847" class="line" id="l847">    847</a>     }
+<a href="#l848" class="line" id="l848">    848</a> 
+<a href="#l849" class="line" id="l849">    849</a>     pos    = max(pos, it-&gt;left);
+<a href="#l850" class="line" id="l850">    850</a>     endpos = it-&gt;right;
+<a href="#l851" class="line" id="l851">    851</a> 
+<a href="#l852" class="line" id="l852">    852</a>     /*
+<a href="#l853" class="line" id="l853">    853</a>      * Now scan until we either:
+<a href="#l854" class="line" id="l854">    854</a>      * - prove that [pos, maxpos) is all in range,
+<a href="#l855" class="line" id="l855">    855</a>      * - find a gap greater than kMinSkip, or
+<a href="#l856" class="line" id="l856">    856</a>      * - pass maxpos entirely.
+<a href="#l857" class="line" id="l857">    857</a>      */
+<a href="#l858" class="line" id="l858">    858</a>     do {
+<a href="#l859" class="line" id="l859">    859</a>         if (it-&gt;left &gt;= endpos + kMinSkip)
+<a href="#l860" class="line" id="l860">    860</a>             break;
+<a href="#l861" class="line" id="l861">    861</a>         if (it-&gt;right &gt;= endpos &amp;&amp; accept(query_, it-&gt;files)) {
+<a href="#l862" class="line" id="l862">    862</a>             endpos = max(endpos, it-&gt;right);
+<a href="#l863" class="line" id="l863">    863</a>             if (endpos &gt;= maxpos)
+<a href="#l864" class="line" id="l864">    864</a>                 /*
+<a href="#l865" class="line" id="l865">    865</a>                  * We&#39;ve accepted the entire range. No point in going on.
+<a href="#l866" class="line" id="l866">    866</a>                  */
+<a href="#l867" class="line" id="l867">    867</a>                 break;
+<a href="#l868" class="line" id="l868">    868</a>         }
+<a href="#l869" class="line" id="l869">    869</a>         ++it;
+<a href="#l870" class="line" id="l870">    870</a>     } while (it != end &amp;&amp; it-&gt;left &lt; maxpos);
+<a href="#l871" class="line" id="l871">    871</a> 
+<a href="#l872" class="line" id="l872">    872</a>     endpos = min(endpos, maxpos);
+<a href="#l873" class="line" id="l873">    873</a> }
+<a href="#l874" class="line" id="l874">    874</a> 
+<a href="#l875" class="line" id="l875">    875</a> void searcher::full_search(match_finger *finger,
+<a href="#l876" class="line" id="l876">    876</a>                            const chunk *chunk, size_t minpos, size_t maxpos)
+<a href="#l877" class="line" id="l877">    877</a> {
+<a href="#l878" class="line" id="l878">    878</a>     StringPiece str((char*)chunk-&gt;data, chunk-&gt;size);
+<a href="#l879" class="line" id="l879">    879</a>     StringPiece match;
+<a href="#l880" class="line" id="l880">    880</a>     int pos = minpos, new_pos, end = minpos;
+<a href="#l881" class="line" id="l881">    881</a>     while (pos &lt; maxpos &amp;&amp; !limiter_.exit_early()) {
+<a href="#l882" class="line" id="l882">    882</a>         if (pos &gt;= end) {
+<a href="#l883" class="line" id="l883">    883</a>             end = maxpos;
+<a href="#l884" class="line" id="l884">    884</a>             next_range(finger, pos, end, maxpos);
+<a href="#l885" class="line" id="l885">    885</a>             assert(pos &lt;= end);
+<a href="#l886" class="line" id="l886">    886</a>         }
+<a href="#l887" class="line" id="l887">    887</a>         if (pos &gt;= maxpos)
+<a href="#l888" class="line" id="l888">    888</a>             break;
+<a href="#l889" class="line" id="l889">    889</a> 
+<a href="#l890" class="line" id="l890">    890</a>         debug(kDebugSearch, &quot;[%p] range:%d-%d/%d-%d&quot;,
+<a href="#l891" class="line" id="l891">    891</a>               (void*)(chunk), pos, end, int(minpos), int(maxpos));
+<a href="#l892" class="line" id="l892">    892</a> 
+<a href="#l893" class="line" id="l893">    893</a>         {
+<a href="#l894" class="line" id="l894">    894</a>             int limit = end;
+<a href="#l895" class="line" id="l895">    895</a>             if (limit - pos &gt; kMaxScan)
+<a href="#l896" class="line" id="l896">    896</a>                 limit = line_end(chunk, pos + kMaxScan);
+<a href="#l897" class="line" id="l897">    897</a>             run_timer run(re2_time_);
+<a href="#l898" class="line" id="l898">    898</a>             if (!query_-&gt;line_pat-&gt;Match(str, pos, limit, RE2::UNANCHORED, &amp;match, 1)) {
+<a href="#l899" class="line" id="l899">    899</a>                 pos = limit + 1;
+<a href="#l900" class="line" id="l900">    900</a>                 continue;
+<a href="#l901" class="line" id="l901">    901</a>             }
+<a href="#l902" class="line" id="l902">    902</a>         }
+<a href="#l903" class="line" id="l903">    903</a>         assert(memchr(match.data(), &#39;\n&#39;, match.size()) == NULL);
+<a href="#l904" class="line" id="l904">    904</a>         StringPiece line = find_line(str, match);
+<a href="#l905" class="line" id="l905">    905</a>         if (utf8::is_valid(line.data(), line.data() + line.size()))
+<a href="#l906" class="line" id="l906">    906</a>             find_match(chunk, match, line);
+<a href="#l907" class="line" id="l907">    907</a>         new_pos = line.size() + line.data() - str.data() + 1;
+<a href="#l908" class="line" id="l908">    908</a>         assert(new_pos &gt; pos);
+<a href="#l909" class="line" id="l909">    909</a>         pos = new_pos;
+<a href="#l910" class="line" id="l910">    910</a>     }
+<a href="#l911" class="line" id="l911">    911</a> }
+<a href="#l912" class="line" id="l912">    912</a> 
+<a href="#l913" class="line" id="l913">    913</a> void searcher::find_match_brute(const chunk *chunk,
+<a href="#l914" class="line" id="l914">    914</a>                                 const StringPiece&amp; match,
+<a href="#l915" class="line" id="l915">    915</a>                                 const StringPiece&amp; line) {
+<a href="#l916" class="line" id="l916">    916</a>     run_timer run(git_time_);
+<a href="#l917" class="line" id="l917">    917</a>     timer tm;
+<a href="#l918" class="line" id="l918">    918</a>     int off = (unsigned char*)line.data() - chunk-&gt;data;
+<a href="#l919" class="line" id="l919">    919</a>     int searched = 0;
+<a href="#l920" class="line" id="l920">    920</a> 
+<a href="#l921" class="line" id="l921">    921</a>     for(vector&lt;chunk_file&gt;::const_iterator it = chunk-&gt;files.begin();
+<a href="#l922" class="line" id="l922">    922</a>         it != chunk-&gt;files.end(); it++) {
+<a href="#l923" class="line" id="l923">    923</a>         if (off &gt;= it-&gt;left &amp;&amp; off &lt;= it-&gt;right) {
+<a href="#l924" class="line" id="l924">    924</a>             for (list&lt;indexed_file *&gt;::const_iterator fit = it-&gt;files.begin();
+<a href="#l925" class="line" id="l925">    925</a>                  fit != it-&gt;files.end(); ++fit) {
+<a href="#l926" class="line" id="l926">    926</a>                 if (!accept(query_, *fit))
+<a href="#l927" class="line" id="l927">    927</a>                     continue;
+<a href="#l928" class="line" id="l928">    928</a>                 searched++;
+<a href="#l929" class="line" id="l929">    929</a>                 if (limiter_.exit_early())
+<a href="#l930" class="line" id="l930">    930</a>                     break;
+<a href="#l931" class="line" id="l931">    931</a>                 try_match(line, match, *fit);
+<a href="#l932" class="line" id="l932">    932</a>             }
+<a href="#l933" class="line" id="l933">    933</a>         }
+<a href="#l934" class="line" id="l934">    934</a>     }
+<a href="#l935" class="line" id="l935">    935</a> 
+<a href="#l936" class="line" id="l936">    936</a>     tm.pause();
+<a href="#l937" class="line" id="l937">    937</a>     debug(kDebugProfile, &quot;Searched %d files in %d.%06ds&quot;,
+<a href="#l938" class="line" id="l938">    938</a>           searched,
+<a href="#l939" class="line" id="l939">    939</a>           int(tm.elapsed().tv_sec),
+<a href="#l940" class="line" id="l940">    940</a>           int(tm.elapsed().tv_usec));
+<a href="#l941" class="line" id="l941">    941</a> }
+<a href="#l942" class="line" id="l942">    942</a> 
+<a href="#l943" class="line" id="l943">    943</a> void searcher::find_match(const chunk *chunk,
+<a href="#l944" class="line" id="l944">    944</a>                           const StringPiece&amp; match,
+<a href="#l945" class="line" id="l945">    945</a>                           const StringPiece&amp; line) {
+<a href="#l946" class="line" id="l946">    946</a>     if (!FLAGS_index) {
+<a href="#l947" class="line" id="l947">    947</a>         find_match_brute(chunk, match, line);
+<a href="#l948" class="line" id="l948">    948</a>         return;
+<a href="#l949" class="line" id="l949">    949</a>     }
+<a href="#l950" class="line" id="l950">    950</a> 
+<a href="#l951" class="line" id="l951">    951</a>     run_timer run(git_time_);
+<a href="#l952" class="line" id="l952">    952</a>     int loff = (unsigned char*)line.data() - chunk-&gt;data;
+<a href="#l953" class="line" id="l953">    953</a> 
+<a href="#l954" class="line" id="l954">    954</a>     vector&lt;chunk_file_node *&gt; stack;
+<a href="#l955" class="line" id="l955">    955</a>     assert(chunk-&gt;cf_root);
+<a href="#l956" class="line" id="l956">    956</a>     stack.push_back(chunk-&gt;cf_root.get());
+<a href="#l957" class="line" id="l957">    957</a> 
+<a href="#l958" class="line" id="l958">    958</a>     debug(kDebugSearch, &quot;find_match(%d)&quot;, loff);
+<a href="#l959" class="line" id="l959">    959</a> 
+<a href="#l960" class="line" id="l960">    960</a>     while (!stack.empty() &amp;&amp; !limiter_.exit_early()) {
+<a href="#l961" class="line" id="l961">    961</a>         chunk_file_node *n = stack.back();
+<a href="#l962" class="line" id="l962">    962</a>         stack.pop_back();
+<a href="#l963" class="line" id="l963">    963</a> 
+<a href="#l964" class="line" id="l964">    964</a>         debug(kDebugSearch,
+<a href="#l965" class="line" id="l965">    965</a>               &quot;walk &lt;%d-%d&gt; - %d&quot;, n-&gt;chunk-&gt;left, n-&gt;chunk-&gt;right,
+<a href="#l966" class="line" id="l966">    966</a>               n-&gt;right_limit);
+<a href="#l967" class="line" id="l967">    967</a> 
+<a href="#l968" class="line" id="l968">    968</a>         if (loff &gt; n-&gt;right_limit)
+<a href="#l969" class="line" id="l969">    969</a>             continue;
+<a href="#l970" class="line" id="l970">    970</a>         if (loff &gt;= n-&gt;chunk-&gt;left) {
+<a href="#l971" class="line" id="l971">    971</a>             if (n-&gt;right)
+<a href="#l972" class="line" id="l972">    972</a>                 stack.push_back(n-&gt;right.get());
+<a href="#l973" class="line" id="l973">    973</a>             if (loff &lt;= n-&gt;chunk-&gt;right) {
+<a href="#l974" class="line" id="l974">    974</a>                 debug(kDebugSearch, &quot;visit &lt;%d-%d&gt;&quot;, n-&gt;chunk-&gt;left, n-&gt;chunk-&gt;right);
+<a href="#l975" class="line" id="l975">    975</a>                 assert(loff &gt;= n-&gt;chunk-&gt;left &amp;&amp; loff &lt;= n-&gt;chunk-&gt;right);
+<a href="#l976" class="line" id="l976">    976</a>                 for (list&lt;indexed_file *&gt;::const_iterator it = n-&gt;chunk-&gt;files.begin();
+<a href="#l977" class="line" id="l977">    977</a>                      it != n-&gt;chunk-&gt;files.end(); ++it) {
+<a href="#l978" class="line" id="l978">    978</a>                     if (!accept(query_, *it))
+<a href="#l979" class="line" id="l979">    979</a>                         continue;
+<a href="#l980" class="line" id="l980">    980</a>                     if (limiter_.exit_early())
+<a href="#l981" class="line" id="l981">    981</a>                         break;
+<a href="#l982" class="line" id="l982">    982</a>                     try_match(line, match, *it);
+<a href="#l983" class="line" id="l983">    983</a>                 }
+<a href="#l984" class="line" id="l984">    984</a>             }
+<a href="#l985" class="line" id="l985">    985</a>         }
+<a href="#l986" class="line" id="l986">    986</a>         if (n-&gt;left)
+<a href="#l987" class="line" id="l987">    987</a>             stack.push_back(n-&gt;left.get());
+<a href="#l988" class="line" id="l988">    988</a>     }
+<a href="#l989" class="line" id="l989">    989</a> }
 <a href="#l990" class="line" id="l990">    990</a> 
-<a href="#l991" class="line" id="l991">    991</a> void searcher::try_match(const StringPiece&amp; line,
-<a href="#l992" class="line" id="l992">    992</a>                          const StringPiece&amp; match,
-<a href="#l993" class="line" id="l993">    993</a>                          indexed_file *sf) {
-<a href="#l994" class="line" id="l994">    994</a> 
-<a href="#l995" class="line" id="l995">    995</a>     int lno = 1;
-<a href="#l996" class="line" id="l996">    996</a>     auto it = sf-&gt;content-&gt;begin(cc_-&gt;alloc_.get());
-<a href="#l997" class="line" id="l997">    997</a> 
-<a href="#l998" class="line" id="l998">    998</a>     while (true) {
-<a href="#l999" class="line" id="l999">    999</a>         for (;it != sf-&gt;content-&gt;end(cc_-&gt;alloc_.get()); ++it) {
-<a href="#l1000" class="line" id="l1000">   1000</a>             if (line.data() &gt;= it-&gt;data() &amp;&amp;
-<a href="#l1001" class="line" id="l1001">   1001</a>                 line.data() &lt;= it-&gt;data() + it-&gt;size()) {
-<a href="#l1002" class="line" id="l1002">   1002</a>                 lno += count(it-&gt;data(), line.data(), &#39;\n&#39;);
-<a href="#l1003" class="line" id="l1003">   1003</a>                 break;
-<a href="#l1004" class="line" id="l1004">   1004</a>             } else {
-<a href="#l1005" class="line" id="l1005">   1005</a>                 lno += count(it-&gt;data(), it-&gt;data() + it-&gt;size(), &#39;\n&#39;) + 1;
-<a href="#l1006" class="line" id="l1006">   1006</a>             }
-<a href="#l1007" class="line" id="l1007">   1007</a>         }
-<a href="#l1008" class="line" id="l1008">   1008</a> 
-<a href="#l1009" class="line" id="l1009">   1009</a>         debug(kDebugSearch, &quot;found match on %s:%d&quot;, sf-&gt;path.c_str(), lno);
-<a href="#l1010" class="line" id="l1010">   1010</a> 
-<a href="#l1011" class="line" id="l1011">   1011</a>         if (it == sf-&gt;content-&gt;end(cc_-&gt;alloc_.get()))
-<a href="#l1012" class="line" id="l1012">   1012</a>             return;
-<a href="#l1013" class="line" id="l1013">   1013</a> 
-<a href="#l1014" class="line" id="l1014">   1014</a>         match_result *m = new match_result;
-<a href="#l1015" class="line" id="l1015">   1015</a>         m-&gt;file = sf;
-<a href="#l1016" class="line" id="l1016">   1016</a>         m-&gt;lno  = lno;
-<a href="#l1017" class="line" id="l1017">   1017</a>         m-&gt;line = line;
-<a href="#l1018" class="line" id="l1018">   1018</a>         m-&gt;matchleft = utf8::distance(line.data(), match.data());
-<a href="#l1019" class="line" id="l1019">   1019</a>         m-&gt;matchright = m-&gt;matchleft +
-<a href="#l1020" class="line" id="l1020">   1020</a>             utf8::distance(match.data(), match.data() + match.size());
-<a href="#l1021" class="line" id="l1021">   1021</a> 
-<a href="#l1022" class="line" id="l1022">   1022</a>         // iterators for forward and backward context
-<a href="#l1023" class="line" id="l1023">   1023</a>         auto fit = it, bit = it;
-<a href="#l1024" class="line" id="l1024">   1024</a>         StringPiece l = line;
-<a href="#l1025" class="line" id="l1025">   1025</a>         int i = 0;
-<a href="#l1026" class="line" id="l1026">   1026</a> 
-<a href="#l1027" class="line" id="l1027">   1027</a>         for (i = 0; i &lt; query_-&gt;context_lines; i++) {
-<a href="#l1028" class="line" id="l1028">   1028</a>             if (l.data() == bit-&gt;data()) {
-<a href="#l1029" class="line" id="l1029">   1029</a>                 if (bit == sf-&gt;content-&gt;begin(cc_-&gt;alloc_.get()))
-<a href="#l1030" class="line" id="l1030">   1030</a>                     break;
-<a href="#l1031" class="line" id="l1031">   1031</a>                 --bit;
-<a href="#l1032" class="line" id="l1032">   1032</a>                 l = StringPiece(bit-&gt;data() + bit-&gt;size() + 1, 0);
-<a href="#l1033" class="line" id="l1033">   1033</a>             }
-<a href="#l1034" class="line" id="l1034">   1034</a>             l = find_line(*bit, StringPiece(l.data() - 1, 0));
-<a href="#l1035" class="line" id="l1035">   1035</a>             m-&gt;context_before.push_back(l);
-<a href="#l1036" class="line" id="l1036">   1036</a>         }
-<a href="#l1037" class="line" id="l1037">   1037</a> 
-<a href="#l1038" class="line" id="l1038">   1038</a>         l = line;
-<a href="#l1039" class="line" id="l1039">   1039</a> 
-<a href="#l1040" class="line" id="l1040">   1040</a>         for (i = 0; i &lt; query_-&gt;context_lines; i++) {
-<a href="#l1041" class="line" id="l1041">   1041</a>             if (l.data() + l.size() == fit-&gt;data() + fit-&gt;size()) {
-<a href="#l1042" class="line" id="l1042">   1042</a>                 if (++fit == sf-&gt;content-&gt;end(cc_-&gt;alloc_.get()))
-<a href="#l1043" class="line" id="l1043">   1043</a>                     break;
-<a href="#l1044" class="line" id="l1044">   1044</a>                 l = StringPiece(fit-&gt;data() - 1, 0);
-<a href="#l1045" class="line" id="l1045">   1045</a>             }
-<a href="#l1046" class="line" id="l1046">   1046</a>             l = find_line(*fit, StringPiece(l.data() + l.size() + 1, 0));
-<a href="#l1047" class="line" id="l1047">   1047</a>             m-&gt;context_after.push_back(l);
-<a href="#l1048" class="line" id="l1048">   1048</a>         }
-<a href="#l1049" class="line" id="l1049">   1049</a> 
-<a href="#l1050" class="line" id="l1050">   1050</a>         if (!transform_ || transform_(m)) {
-<a href="#l1051" class="line" id="l1051">   1051</a>             queue_.push(m);
-<a href="#l1052" class="line" id="l1052">   1052</a>             limiter_.record_match();
-<a href="#l1053" class="line" id="l1053">   1053</a>         }
-<a href="#l1054" class="line" id="l1054">   1054</a>         if (limiter_.exit_early())
-<a href="#l1055" class="line" id="l1055">   1055</a>             break;
-<a href="#l1056" class="line" id="l1056">   1056</a> 
-<a href="#l1057" class="line" id="l1057">   1057</a>         ++it;
-<a href="#l1058" class="line" id="l1058">   1058</a>         ++lno;
-<a href="#l1059" class="line" id="l1059">   1059</a>     }
-<a href="#l1060" class="line" id="l1060">   1060</a> }
-<a href="#l1061" class="line" id="l1061">   1061</a> 
-<a href="#l1062" class="line" id="l1062">   1062</a> code_searcher::search_thread::search_thread(code_searcher *cs)
-<a href="#l1063" class="line" id="l1063">   1063</a>     : cs_(cs) {
-<a href="#l1064" class="line" id="l1064">   1064</a>     if (FLAGS_search) {
-<a href="#l1065" class="line" id="l1065">   1065</a>         for (int i = 0; i &lt; FLAGS_threads; ++i) {
-<a href="#l1066" class="line" id="l1066">   1066</a>             threads_.emplace_back(search_one, this);
-<a href="#l1067" class="line" id="l1067">   1067</a>         }
-<a href="#l1068" class="line" id="l1068">   1068</a>         threads_.emplace_back(search_file_one, this);
-<a href="#l1069" class="line" id="l1069">   1069</a>     }
-<a href="#l1070" class="line" id="l1070">   1070</a> }
-<a href="#l1071" class="line" id="l1071">   1071</a> 
-<a href="#l1072" class="line" id="l1072">   1072</a> void code_searcher::search_thread::match(const query &amp;q,
-<a href="#l1073" class="line" id="l1073">   1073</a>                                          const callback_func&amp; cb,
-<a href="#l1074" class="line" id="l1074">   1074</a>                                          const file_callback_func&amp; fcb,
-<a href="#l1075" class="line" id="l1075">   1075</a>                                          const transform_func&amp; func,
-<a href="#l1076" class="line" id="l1076">   1076</a>                                          match_stats *stats) {
-<a href="#l1077" class="line" id="l1077">   1077</a>     match_result *m;
-<a href="#l1078" class="line" id="l1078">   1078</a>     file_result *f;
-<a href="#l1079" class="line" id="l1079">   1079</a>     int matches = 0, file_matches = 0;
-<a href="#l1080" class="line" id="l1080">   1080</a> 
-<a href="#l1081" class="line" id="l1081">   1081</a>     assert(cs_-&gt;finalized_);
-<a href="#l1082" class="line" id="l1082">   1082</a> 
-<a href="#l1083" class="line" id="l1083">   1083</a>     if (!FLAGS_search) {
-<a href="#l1084" class="line" id="l1084">   1084</a>         return;
-<a href="#l1085" class="line" id="l1085">   1085</a>     }
-<a href="#l1086" class="line" id="l1086">   1086</a> 
-<a href="#l1087" class="line" id="l1087">   1087</a>     if (FLAGS_drop_cache) {
-<a href="#l1088" class="line" id="l1088">   1088</a>         cs_-&gt;alloc_-&gt;drop_caches();
-<a href="#l1089" class="line" id="l1089">   1089</a>     }
-<a href="#l1090" class="line" id="l1090">   1090</a> 
-<a href="#l1091" class="line" id="l1091">   1091</a>     timer analyze_time(false);
-<a href="#l1092" class="line" id="l1092">   1092</a>     intrusive_ptr&lt;QueryPlan&gt; index_key;
-<a href="#l1093" class="line" id="l1093">   1093</a>     {
-<a href="#l1094" class="line" id="l1094">   1094</a>         run_timer run(analyze_time);
-<a href="#l1095" class="line" id="l1095">   1095</a>         index_key = constructQueryPlan(*q.line_pat);
-<a href="#l1096" class="line" id="l1096">   1096</a>     }
-<a href="#l1097" class="line" id="l1097">   1097</a>     debug(kDebugProfile, &quot;analyze time: %d.%06ds&quot;,
-<a href="#l1098" class="line" id="l1098">   1098</a>           int(analyze_time.elapsed().tv_sec),
-<a href="#l1099" class="line" id="l1099">   1099</a>           int(analyze_time.elapsed().tv_usec));
-<a href="#l1100" class="line" id="l1100">   1100</a> 
-<a href="#l1101" class="line" id="l1101">   1101</a>     searcher search(cs_, q, index_key, func);
-<a href="#l1102" class="line" id="l1102">   1102</a>     filename_searcher file_search(cs_, q, index_key);
-<a href="#l1103" class="line" id="l1103">   1103</a>     job j;
-<a href="#l1104" class="line" id="l1104">   1104</a>     j.trace_id = current_trace_id();
-<a href="#l1105" class="line" id="l1105">   1105</a>     j.search = &amp;search;
-<a href="#l1106" class="line" id="l1106">   1106</a>     j.file_search = &amp;file_search;
-<a href="#l1107" class="line" id="l1107">   1107</a>     j.pending = 0;
-<a href="#l1108" class="line" id="l1108">   1108</a> 
-<a href="#l1109" class="line" id="l1109">   1109</a>     if (!q.filename_only) {
-<a href="#l1110" class="line" id="l1110">   1110</a>         for (int i = 0; i &lt; FLAGS_threads; ++i) {
-<a href="#l1111" class="line" id="l1111">   1111</a>             ++j.pending;
-<a href="#l1112" class="line" id="l1112">   1112</a>             queue_.push(&amp;j);
-<a href="#l1113" class="line" id="l1113">   1113</a>         }
-<a href="#l1114" class="line" id="l1114">   1114</a> 
-<a href="#l1115" class="line" id="l1115">   1115</a>         for (auto it = cs_-&gt;alloc_-&gt;begin(); it != cs_-&gt;alloc_-&gt;end(); it++) {
-<a href="#l1116" class="line" id="l1116">   1116</a>             j.chunks.push(*it);
-<a href="#l1117" class="line" id="l1117">   1117</a>         }
-<a href="#l1118" class="line" id="l1118">   1118</a>         j.chunks.close();
-<a href="#l1119" class="line" id="l1119">   1119</a>     }
-<a href="#l1120" class="line" id="l1120">   1120</a> 
-<a href="#l1121" class="line" id="l1121">   1121</a>     file_queue_.push(&amp;j);
-<a href="#l1122" class="line" id="l1122">   1122</a> 
-<a href="#l1123" class="line" id="l1123">   1123</a>     if (!q.filename_only) {
-<a href="#l1124" class="line" id="l1124">   1124</a>         while (search.queue_.pop(&amp;m)) {
-<a href="#l1125" class="line" id="l1125">   1125</a>             matches++;
-<a href="#l1126" class="line" id="l1126">   1126</a>             cb(m);
-<a href="#l1127" class="line" id="l1127">   1127</a>             delete m;
-<a href="#l1128" class="line" id="l1128">   1128</a>         }
-<a href="#l1129" class="line" id="l1129">   1129</a>     }
-<a href="#l1130" class="line" id="l1130">   1130</a> 
-<a href="#l1131" class="line" id="l1131">   1131</a>     while (file_search.queue_.pop(&amp;f)) {
-<a href="#l1132" class="line" id="l1132">   1132</a>         file_matches++;
-<a href="#l1133" class="line" id="l1133">   1133</a>         fcb(f);
-<a href="#l1134" class="line" id="l1134">   1134</a>         delete f;
-<a href="#l1135" class="line" id="l1135">   1135</a>     }
-<a href="#l1136" class="line" id="l1136">   1136</a> 
-<a href="#l1137" class="line" id="l1137">   1137</a>     if (q.filename_only) {
-<a href="#l1138" class="line" id="l1138">   1138</a>         stats-&gt;why = file_search.why();
-<a href="#l1139" class="line" id="l1139">   1139</a>         stats-&gt;matches += file_matches;
-<a href="#l1140" class="line" id="l1140">   1140</a>     } else {
-<a href="#l1141" class="line" id="l1141">   1141</a>         search.get_stats(stats);
-<a href="#l1142" class="line" id="l1142">   1142</a>         stats-&gt;why = search.why();
-<a href="#l1143" class="line" id="l1143">   1143</a>         stats-&gt;matches += matches;
-<a href="#l1144" class="line" id="l1144">   1144</a>     }
-<a href="#l1145" class="line" id="l1145">   1145</a> 
-<a href="#l1146" class="line" id="l1146">   1146</a>     struct timeval t = analyze_time.elapsed();
-<a href="#l1147" class="line" id="l1147">   1147</a>     timeradd(&amp;stats-&gt;analyze_time, &amp;t, &amp;stats-&gt;analyze_time);
-<a href="#l1148" class="line" id="l1148">   1148</a> }
-<a href="#l1149" class="line" id="l1149">   1149</a> 
+<a href="#l991" class="line" id="l991">    991</a> 
+<a href="#l992" class="line" id="l992">    992</a> void searcher::try_match(const StringPiece&amp; line,
+<a href="#l993" class="line" id="l993">    993</a>                          const StringPiece&amp; match,
+<a href="#l994" class="line" id="l994">    994</a>                          indexed_file *sf) {
+<a href="#l995" class="line" id="l995">    995</a> 
+<a href="#l996" class="line" id="l996">    996</a>     int lno = 1;
+<a href="#l997" class="line" id="l997">    997</a>     auto it = sf-&gt;content-&gt;begin(cc_-&gt;alloc_.get());
+<a href="#l998" class="line" id="l998">    998</a> 
+<a href="#l999" class="line" id="l999">    999</a>     while (true) {
+<a href="#l1000" class="line" id="l1000">   1000</a>         for (;it != sf-&gt;content-&gt;end(cc_-&gt;alloc_.get()); ++it) {
+<a href="#l1001" class="line" id="l1001">   1001</a>             if (line.data() &gt;= it-&gt;data() &amp;&amp;
+<a href="#l1002" class="line" id="l1002">   1002</a>                 line.data() &lt;= it-&gt;data() + it-&gt;size()) {
+<a href="#l1003" class="line" id="l1003">   1003</a>                 lno += count(it-&gt;data(), line.data(), &#39;\n&#39;);
+<a href="#l1004" class="line" id="l1004">   1004</a>                 break;
+<a href="#l1005" class="line" id="l1005">   1005</a>             } else {
+<a href="#l1006" class="line" id="l1006">   1006</a>                 lno += count(it-&gt;data(), it-&gt;data() + it-&gt;size(), &#39;\n&#39;) + 1;
+<a href="#l1007" class="line" id="l1007">   1007</a>             }
+<a href="#l1008" class="line" id="l1008">   1008</a>         }
+<a href="#l1009" class="line" id="l1009">   1009</a> 
+<a href="#l1010" class="line" id="l1010">   1010</a>         debug(kDebugSearch, &quot;found match on %s:%d&quot;, sf-&gt;path.c_str(), lno);
+<a href="#l1011" class="line" id="l1011">   1011</a> 
+<a href="#l1012" class="line" id="l1012">   1012</a>         if (it == sf-&gt;content-&gt;end(cc_-&gt;alloc_.get()))
+<a href="#l1013" class="line" id="l1013">   1013</a>             return;
+<a href="#l1014" class="line" id="l1014">   1014</a> 
+<a href="#l1015" class="line" id="l1015">   1015</a>         match_result *m = new match_result;
+<a href="#l1016" class="line" id="l1016">   1016</a>         m-&gt;file = sf;
+<a href="#l1017" class="line" id="l1017">   1017</a>         m-&gt;lno  = lno;
+<a href="#l1018" class="line" id="l1018">   1018</a>         m-&gt;line = line;
+<a href="#l1019" class="line" id="l1019">   1019</a>         m-&gt;matchleft = utf8::distance(line.data(), match.data());
+<a href="#l1020" class="line" id="l1020">   1020</a>         m-&gt;matchright = m-&gt;matchleft +
+<a href="#l1021" class="line" id="l1021">   1021</a>             utf8::distance(match.data(), match.data() + match.size());
+<a href="#l1022" class="line" id="l1022">   1022</a> 
+<a href="#l1023" class="line" id="l1023">   1023</a>         // iterators for forward and backward context
+<a href="#l1024" class="line" id="l1024">   1024</a>         auto fit = it, bit = it;
+<a href="#l1025" class="line" id="l1025">   1025</a>         StringPiece l = line;
+<a href="#l1026" class="line" id="l1026">   1026</a>         int i = 0;
+<a href="#l1027" class="line" id="l1027">   1027</a> 
+<a href="#l1028" class="line" id="l1028">   1028</a>         for (i = 0; i &lt; query_-&gt;context_lines; i++) {
+<a href="#l1029" class="line" id="l1029">   1029</a>             if (l.data() == bit-&gt;data()) {
+<a href="#l1030" class="line" id="l1030">   1030</a>                 if (bit == sf-&gt;content-&gt;begin(cc_-&gt;alloc_.get()))
+<a href="#l1031" class="line" id="l1031">   1031</a>                     break;
+<a href="#l1032" class="line" id="l1032">   1032</a>                 --bit;
+<a href="#l1033" class="line" id="l1033">   1033</a>                 l = StringPiece(bit-&gt;data() + bit-&gt;size() + 1, 0);
+<a href="#l1034" class="line" id="l1034">   1034</a>             }
+<a href="#l1035" class="line" id="l1035">   1035</a>             l = find_line(*bit, StringPiece(l.data() - 1, 0));
+<a href="#l1036" class="line" id="l1036">   1036</a>             m-&gt;context_before.push_back(l);
+<a href="#l1037" class="line" id="l1037">   1037</a>         }
+<a href="#l1038" class="line" id="l1038">   1038</a> 
+<a href="#l1039" class="line" id="l1039">   1039</a>         l = line;
+<a href="#l1040" class="line" id="l1040">   1040</a> 
+<a href="#l1041" class="line" id="l1041">   1041</a>         for (i = 0; i &lt; query_-&gt;context_lines; i++) {
+<a href="#l1042" class="line" id="l1042">   1042</a>             if (l.data() + l.size() == fit-&gt;data() + fit-&gt;size()) {
+<a href="#l1043" class="line" id="l1043">   1043</a>                 if (++fit == sf-&gt;content-&gt;end(cc_-&gt;alloc_.get()))
+<a href="#l1044" class="line" id="l1044">   1044</a>                     break;
+<a href="#l1045" class="line" id="l1045">   1045</a>                 l = StringPiece(fit-&gt;data() - 1, 0);
+<a href="#l1046" class="line" id="l1046">   1046</a>             }
+<a href="#l1047" class="line" id="l1047">   1047</a>             l = find_line(*fit, StringPiece(l.data() + l.size() + 1, 0));
+<a href="#l1048" class="line" id="l1048">   1048</a>             m-&gt;context_after.push_back(l);
+<a href="#l1049" class="line" id="l1049">   1049</a>         }
+<a href="#l1050" class="line" id="l1050">   1050</a> 
+<a href="#l1051" class="line" id="l1051">   1051</a>         if (!transform_ || transform_(m)) {
+<a href="#l1052" class="line" id="l1052">   1052</a>             queue_.push(m);
+<a href="#l1053" class="line" id="l1053">   1053</a>             limiter_.record_match();
+<a href="#l1054" class="line" id="l1054">   1054</a>         }
+<a href="#l1055" class="line" id="l1055">   1055</a>         if (limiter_.exit_early())
+<a href="#l1056" class="line" id="l1056">   1056</a>             break;
+<a href="#l1057" class="line" id="l1057">   1057</a> 
+<a href="#l1058" class="line" id="l1058">   1058</a>         ++it;
+<a href="#l1059" class="line" id="l1059">   1059</a>         ++lno;
+<a href="#l1060" class="line" id="l1060">   1060</a>     }
+<a href="#l1061" class="line" id="l1061">   1061</a> }
+<a href="#l1062" class="line" id="l1062">   1062</a> 
+<a href="#l1063" class="line" id="l1063">   1063</a> code_searcher::search_thread::search_thread(code_searcher *cs)
+<a href="#l1064" class="line" id="l1064">   1064</a>     : cs_(cs) {
+<a href="#l1065" class="line" id="l1065">   1065</a>     if (FLAGS_search) {
+<a href="#l1066" class="line" id="l1066">   1066</a>         for (int i = 0; i &lt; FLAGS_threads; ++i) {
+<a href="#l1067" class="line" id="l1067">   1067</a>             threads_.emplace_back(search_one, this);
+<a href="#l1068" class="line" id="l1068">   1068</a>         }
+<a href="#l1069" class="line" id="l1069">   1069</a>         threads_.emplace_back(search_file_one, this);
+<a href="#l1070" class="line" id="l1070">   1070</a>     }
+<a href="#l1071" class="line" id="l1071">   1071</a> }
+<a href="#l1072" class="line" id="l1072">   1072</a> 
+<a href="#l1073" class="line" id="l1073">   1073</a> void code_searcher::search_thread::match(const query &amp;q,
+<a href="#l1074" class="line" id="l1074">   1074</a>                                          const callback_func&amp; cb,
+<a href="#l1075" class="line" id="l1075">   1075</a>                                          const file_callback_func&amp; fcb,
+<a href="#l1076" class="line" id="l1076">   1076</a>                                          const transform_func&amp; func,
+<a href="#l1077" class="line" id="l1077">   1077</a>                                          match_stats *stats) {
+<a href="#l1078" class="line" id="l1078">   1078</a>     match_result *m;
+<a href="#l1079" class="line" id="l1079">   1079</a>     file_result *f;
+<a href="#l1080" class="line" id="l1080">   1080</a>     int matches = 0, file_matches = 0;
+<a href="#l1081" class="line" id="l1081">   1081</a> 
+<a href="#l1082" class="line" id="l1082">   1082</a>     assert(cs_-&gt;finalized_);
+<a href="#l1083" class="line" id="l1083">   1083</a> 
+<a href="#l1084" class="line" id="l1084">   1084</a>     if (!FLAGS_search) {
+<a href="#l1085" class="line" id="l1085">   1085</a>         return;
+<a href="#l1086" class="line" id="l1086">   1086</a>     }
+<a href="#l1087" class="line" id="l1087">   1087</a> 
+<a href="#l1088" class="line" id="l1088">   1088</a>     if (FLAGS_drop_cache) {
+<a href="#l1089" class="line" id="l1089">   1089</a>         cs_-&gt;alloc_-&gt;drop_caches();
+<a href="#l1090" class="line" id="l1090">   1090</a>     }
+<a href="#l1091" class="line" id="l1091">   1091</a> 
+<a href="#l1092" class="line" id="l1092">   1092</a>     timer analyze_time(false);
+<a href="#l1093" class="line" id="l1093">   1093</a>     intrusive_ptr&lt;QueryPlan&gt; index_key;
+<a href="#l1094" class="line" id="l1094">   1094</a>     {
+<a href="#l1095" class="line" id="l1095">   1095</a>         run_timer run(analyze_time);
+<a href="#l1096" class="line" id="l1096">   1096</a>         index_key = constructQueryPlan(*q.line_pat);
+<a href="#l1097" class="line" id="l1097">   1097</a>     }
+<a href="#l1098" class="line" id="l1098">   1098</a>     debug(kDebugProfile, &quot;analyze time: %d.%06ds&quot;,
+<a href="#l1099" class="line" id="l1099">   1099</a>           int(analyze_time.elapsed().tv_sec),
+<a href="#l1100" class="line" id="l1100">   1100</a>           int(analyze_time.elapsed().tv_usec));
+<a href="#l1101" class="line" id="l1101">   1101</a> 
+<a href="#l1102" class="line" id="l1102">   1102</a>     searcher search(cs_, q, index_key, func);
+<a href="#l1103" class="line" id="l1103">   1103</a>     filename_searcher file_search(cs_, q, index_key);
+<a href="#l1104" class="line" id="l1104">   1104</a>     job j;
+<a href="#l1105" class="line" id="l1105">   1105</a>     j.trace_id = current_trace_id();
+<a href="#l1106" class="line" id="l1106">   1106</a>     j.search = &amp;search;
+<a href="#l1107" class="line" id="l1107">   1107</a>     j.file_search = &amp;file_search;
+<a href="#l1108" class="line" id="l1108">   1108</a>     j.pending = 0;
+<a href="#l1109" class="line" id="l1109">   1109</a> 
+<a href="#l1110" class="line" id="l1110">   1110</a>     if (!q.filename_only) {
+<a href="#l1111" class="line" id="l1111">   1111</a>         for (int i = 0; i &lt; FLAGS_threads; ++i) {
+<a href="#l1112" class="line" id="l1112">   1112</a>             ++j.pending;
+<a href="#l1113" class="line" id="l1113">   1113</a>             queue_.push(&amp;j);
+<a href="#l1114" class="line" id="l1114">   1114</a>         }
+<a href="#l1115" class="line" id="l1115">   1115</a> 
+<a href="#l1116" class="line" id="l1116">   1116</a>         for (auto it = cs_-&gt;alloc_-&gt;begin(); it != cs_-&gt;alloc_-&gt;end(); it++) {
+<a href="#l1117" class="line" id="l1117">   1117</a>             j.chunks.push(*it);
+<a href="#l1118" class="line" id="l1118">   1118</a>         }
+<a href="#l1119" class="line" id="l1119">   1119</a>         j.chunks.close();
+<a href="#l1120" class="line" id="l1120">   1120</a>     }
+<a href="#l1121" class="line" id="l1121">   1121</a> 
+<a href="#l1122" class="line" id="l1122">   1122</a>     file_queue_.push(&amp;j);
+<a href="#l1123" class="line" id="l1123">   1123</a> 
+<a href="#l1124" class="line" id="l1124">   1124</a>     if (!q.filename_only) {
+<a href="#l1125" class="line" id="l1125">   1125</a>         while (search.queue_.pop(&amp;m)) {
+<a href="#l1126" class="line" id="l1126">   1126</a>             matches++;
+<a href="#l1127" class="line" id="l1127">   1127</a>             cb(m);
+<a href="#l1128" class="line" id="l1128">   1128</a>             delete m;
+<a href="#l1129" class="line" id="l1129">   1129</a>         }
+<a href="#l1130" class="line" id="l1130">   1130</a>     }
+<a href="#l1131" class="line" id="l1131">   1131</a> 
+<a href="#l1132" class="line" id="l1132">   1132</a>     while (file_search.queue_.pop(&amp;f)) {
+<a href="#l1133" class="line" id="l1133">   1133</a>         file_matches++;
+<a href="#l1134" class="line" id="l1134">   1134</a>         fcb(f);
+<a href="#l1135" class="line" id="l1135">   1135</a>         delete f;
+<a href="#l1136" class="line" id="l1136">   1136</a>     }
+<a href="#l1137" class="line" id="l1137">   1137</a> 
+<a href="#l1138" class="line" id="l1138">   1138</a>     if (q.filename_only) {
+<a href="#l1139" class="line" id="l1139">   1139</a>         stats-&gt;why = file_search.why();
+<a href="#l1140" class="line" id="l1140">   1140</a>         stats-&gt;matches += file_matches;
+<a href="#l1141" class="line" id="l1141">   1141</a>     } else {
+<a href="#l1142" class="line" id="l1142">   1142</a>         search.get_stats(stats);
+<a href="#l1143" class="line" id="l1143">   1143</a>         stats-&gt;why = search.why();
+<a href="#l1144" class="line" id="l1144">   1144</a>         stats-&gt;matches += matches;
+<a href="#l1145" class="line" id="l1145">   1145</a>     }
+<a href="#l1146" class="line" id="l1146">   1146</a> 
+<a href="#l1147" class="line" id="l1147">   1147</a>     struct timeval t = analyze_time.elapsed();
+<a href="#l1148" class="line" id="l1148">   1148</a>     timeradd(&amp;stats-&gt;analyze_time, &amp;t, &amp;stats-&gt;analyze_time);
+<a href="#l1149" class="line" id="l1149">   1149</a> }
 <a href="#l1150" class="line" id="l1150">   1150</a> 
-<a href="#l1151" class="line" id="l1151">   1151</a> code_searcher::search_thread::~search_thread() {
-<a href="#l1152" class="line" id="l1152">   1152</a>     queue_.close();
-<a href="#l1153" class="line" id="l1153">   1153</a>     file_queue_.close();
-<a href="#l1154" class="line" id="l1154">   1154</a>     for (auto it = threads_.begin(); it != threads_.end(); ++it)
-<a href="#l1155" class="line" id="l1155">   1155</a>         it-&gt;join();
-<a href="#l1156" class="line" id="l1156">   1156</a> }
-<a href="#l1157" class="line" id="l1157">   1157</a> 
-<a href="#l1158" class="line" id="l1158">   1158</a> void code_searcher::search_thread::search_one(search_thread *me) {
-<a href="#l1159" class="line" id="l1159">   1159</a>     job *j;
-<a href="#l1160" class="line" id="l1160">   1160</a>     while (me-&gt;queue_.pop(&amp;j)) {
-<a href="#l1161" class="line" id="l1161">   1161</a>         scoped_trace_id trace(j-&gt;trace_id);
-<a href="#l1162" class="line" id="l1162">   1162</a> 
-<a href="#l1163" class="line" id="l1163">   1163</a>         chunk *c;
-<a href="#l1164" class="line" id="l1164">   1164</a>         while (j-&gt;chunks.pop(&amp;c)) {
-<a href="#l1165" class="line" id="l1165">   1165</a>             (*j-&gt;search)(c);
-<a href="#l1166" class="line" id="l1166">   1166</a>         }
-<a href="#l1167" class="line" id="l1167">   1167</a> 
-<a href="#l1168" class="line" id="l1168">   1168</a>         if (--j-&gt;pending == 0)
-<a href="#l1169" class="line" id="l1169">   1169</a>             j-&gt;search-&gt;queue_.close();
-<a href="#l1170" class="line" id="l1170">   1170</a>     }
-<a href="#l1171" class="line" id="l1171">   1171</a> }
-<a href="#l1172" class="line" id="l1172">   1172</a> 
-<a href="#l1173" class="line" id="l1173">   1173</a> void code_searcher::search_thread::search_file_one(search_thread *me) {
-<a href="#l1174" class="line" id="l1174">   1174</a>     job *j;
-<a href="#l1175" class="line" id="l1175">   1175</a>     while (me-&gt;file_queue_.pop(&amp;j)) {
-<a href="#l1176" class="line" id="l1176">   1176</a>         scoped_trace_id trace(j-&gt;trace_id);
-<a href="#l1177" class="line" id="l1177">   1177</a>         (*j-&gt;file_search)();
-<a href="#l1178" class="line" id="l1178">   1178</a>         j-&gt;file_search-&gt;queue_.close();
-<a href="#l1179" class="line" id="l1179">   1179</a>     }
-<a href="#l1180" class="line" id="l1180">   1180</a> }
-<a href="#l1181" class="line" id="l1181">   1181</a> 
-<a href="#l1182" class="line" id="l1182">   1182</a> void default_re2_options(RE2::Options &amp;opts) {
-<a href="#l1183" class="line" id="l1183">   1183</a>     opts.set_never_nl(true);
-<a href="#l1184" class="line" id="l1184">   1184</a>     opts.set_one_line(false);
-<a href="#l1185" class="line" id="l1185">   1185</a>     opts.set_perl_classes(true);
-<a href="#l1186" class="line" id="l1186">   1186</a>     opts.set_word_boundary(true);
-<a href="#l1187" class="line" id="l1187">   1187</a>     opts.set_posix_syntax(true);
-<a href="#l1188" class="line" id="l1188">   1188</a>     opts.set_word_boundary(true);
-<a href="#l1189" class="line" id="l1189">   1189</a>     opts.set_log_errors(false);
-<a href="#l1190" class="line" id="l1190">   1190</a> }
+<a href="#l1151" class="line" id="l1151">   1151</a> 
+<a href="#l1152" class="line" id="l1152">   1152</a> code_searcher::search_thread::~search_thread() {
+<a href="#l1153" class="line" id="l1153">   1153</a>     queue_.close();
+<a href="#l1154" class="line" id="l1154">   1154</a>     file_queue_.close();
+<a href="#l1155" class="line" id="l1155">   1155</a>     for (auto it = threads_.begin(); it != threads_.end(); ++it)
+<a href="#l1156" class="line" id="l1156">   1156</a>         it-&gt;join();
+<a href="#l1157" class="line" id="l1157">   1157</a> }
+<a href="#l1158" class="line" id="l1158">   1158</a> 
+<a href="#l1159" class="line" id="l1159">   1159</a> void code_searcher::search_thread::search_one(search_thread *me) {
+<a href="#l1160" class="line" id="l1160">   1160</a>     job *j;
+<a href="#l1161" class="line" id="l1161">   1161</a>     while (me-&gt;queue_.pop(&amp;j)) {
+<a href="#l1162" class="line" id="l1162">   1162</a>         scoped_trace_id trace(j-&gt;trace_id);
+<a href="#l1163" class="line" id="l1163">   1163</a> 
+<a href="#l1164" class="line" id="l1164">   1164</a>         chunk *c;
+<a href="#l1165" class="line" id="l1165">   1165</a>         while (j-&gt;chunks.pop(&amp;c)) {
+<a href="#l1166" class="line" id="l1166">   1166</a>             (*j-&gt;search)(c);
+<a href="#l1167" class="line" id="l1167">   1167</a>         }
+<a href="#l1168" class="line" id="l1168">   1168</a> 
+<a href="#l1169" class="line" id="l1169">   1169</a>         if (--j-&gt;pending == 0)
+<a href="#l1170" class="line" id="l1170">   1170</a>             j-&gt;search-&gt;queue_.close();
+<a href="#l1171" class="line" id="l1171">   1171</a>     }
+<a href="#l1172" class="line" id="l1172">   1172</a> }
+<a href="#l1173" class="line" id="l1173">   1173</a> 
+<a href="#l1174" class="line" id="l1174">   1174</a> void code_searcher::search_thread::search_file_one(search_thread *me) {
+<a href="#l1175" class="line" id="l1175">   1175</a>     job *j;
+<a href="#l1176" class="line" id="l1176">   1176</a>     while (me-&gt;file_queue_.pop(&amp;j)) {
+<a href="#l1177" class="line" id="l1177">   1177</a>         scoped_trace_id trace(j-&gt;trace_id);
+<a href="#l1178" class="line" id="l1178">   1178</a>         (*j-&gt;file_search)();
+<a href="#l1179" class="line" id="l1179">   1179</a>         j-&gt;file_search-&gt;queue_.close();
+<a href="#l1180" class="line" id="l1180">   1180</a>     }
+<a href="#l1181" class="line" id="l1181">   1181</a> }
+<a href="#l1182" class="line" id="l1182">   1182</a> 
+<a href="#l1183" class="line" id="l1183">   1183</a> void default_re2_options(RE2::Options &amp;opts) {
+<a href="#l1184" class="line" id="l1184">   1184</a>     opts.set_never_nl(true);
+<a href="#l1185" class="line" id="l1185">   1185</a>     opts.set_one_line(false);
+<a href="#l1186" class="line" id="l1186">   1186</a>     opts.set_perl_classes(true);
+<a href="#l1187" class="line" id="l1187">   1187</a>     opts.set_word_boundary(true);
+<a href="#l1188" class="line" id="l1188">   1188</a>     opts.set_posix_syntax(true);
+<a href="#l1189" class="line" id="l1189">   1189</a>     opts.set_word_boundary(true);
+<a href="#l1190" class="line" id="l1190">   1190</a>     opts.set_log_errors(false);
+<a href="#l1191" class="line" id="l1191">   1191</a> }
 </pre>
 </div>
 </body>

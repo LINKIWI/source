@@ -18,7 +18,7 @@ body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{fo
 <a href="../../../log">Log</a> | <a href="../../../files">Files</a> | <a href="../../../refs">Refs</a> | <a href="../../../file/README.md">README</a> | <a href="../../../file/COPYING">LICENSE</a></td></tr></table>
 <hr/>
 <div id="content">
-<p>src/lib/<strong>fs_linux.cc</strong> (1122B) (<a href="../../../raw/src/lib/fs_linux.cc">raw</a>) (<a href="../../../blame/src/lib/fs_linux.cc">blame</a>)</p><hr/>
+<p>src/lib/<strong>fs_linux.cc</strong> (1167B) (<a href="../../../raw/src/lib/fs_linux.cc">raw</a>) (<a href="../../../blame/src/lib/fs_linux.cc">blame</a>)</p><hr/>
 <pre id="blob">
 <a href="#l1" class="line" id="l1">      1</a> /********************************************************************
 <a href="#l2" class="line" id="l2">      2</a>  * livegrep -- fs_linux.cc
@@ -33,38 +33,40 @@ body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{fo
 <a href="#l11" class="line" id="l11">     11</a> #include &lt;sys/inotify.h&gt;
 <a href="#l12" class="line" id="l12">     12</a> #include &lt;unistd.h&gt;
 <a href="#l13" class="line" id="l13">     13</a> 
-<a href="#l14" class="line" id="l14">     14</a> namespace {
-<a href="#l15" class="line" id="l15">     15</a>     int fd = -1;
-<a href="#l16" class="line" id="l16">     16</a>     int wd = -1;
-<a href="#l17" class="line" id="l17">     17</a> }
-<a href="#l18" class="line" id="l18">     18</a> 
-<a href="#l19" class="line" id="l19">     19</a> fswatcher::fswatcher(const std::string &amp;path) : path_(path) {
-<a href="#l20" class="line" id="l20">     20</a>     if ((fd = inotify_init()) &gt; 0) {
-<a href="#l21" class="line" id="l21">     21</a>         wd = inotify_add_watch(fd, path.c_str(), IN_ATTRIB | IN_CLOSE_WRITE | IN_MOVE_SELF);
-<a href="#l22" class="line" id="l22">     22</a>     }
-<a href="#l23" class="line" id="l23">     23</a> }
-<a href="#l24" class="line" id="l24">     24</a> 
-<a href="#l25" class="line" id="l25">     25</a> fswatcher::~fswatcher() {
-<a href="#l26" class="line" id="l26">     26</a>     if (fd != -1) {
-<a href="#l27" class="line" id="l27">     27</a>         close(fd);
-<a href="#l28" class="line" id="l28">     28</a>     }
-<a href="#l29" class="line" id="l29">     29</a> }
-<a href="#l30" class="line" id="l30">     30</a> 
-<a href="#l31" class="line" id="l31">     31</a> bool fswatcher::wait_for_event() {
-<a href="#l32" class="line" id="l32">     32</a>     struct inotify_event event;
-<a href="#l33" class="line" id="l33">     33</a>     int n = 0;
-<a href="#l34" class="line" id="l34">     34</a> 
-<a href="#l35" class="line" id="l35">     35</a>     if (fd == -1 || wd == -1) {
-<a href="#l36" class="line" id="l36">     36</a>         return false;
-<a href="#l37" class="line" id="l37">     37</a>     }
-<a href="#l38" class="line" id="l38">     38</a> 
-<a href="#l39" class="line" id="l39">     39</a>     // The read syscall is blocking; it returns after one eligible event (i.e., matching the mask) is received.
-<a href="#l40" class="line" id="l40">     40</a>     while (n &lt;= 0) {
-<a href="#l41" class="line" id="l41">     41</a>         n = read(fd, &amp;event, sizeof(struct inotify_event) + NAME_MAX + 1);
-<a href="#l42" class="line" id="l42">     42</a>     }
-<a href="#l43" class="line" id="l43">     43</a> 
-<a href="#l44" class="line" id="l44">     44</a>     return true;
-<a href="#l45" class="line" id="l45">     45</a> }
+<a href="#l14" class="line" id="l14">     14</a> const ssize_t max_event_len = sizeof(struct inotify_event) + NAME_MAX + 1;
+<a href="#l15" class="line" id="l15">     15</a> 
+<a href="#l16" class="line" id="l16">     16</a> namespace {
+<a href="#l17" class="line" id="l17">     17</a>     int fd = -1;
+<a href="#l18" class="line" id="l18">     18</a>     int wd = -1;
+<a href="#l19" class="line" id="l19">     19</a> }
+<a href="#l20" class="line" id="l20">     20</a> 
+<a href="#l21" class="line" id="l21">     21</a> fswatcher::fswatcher(const std::string &amp;path) : path_(path) {
+<a href="#l22" class="line" id="l22">     22</a>     if ((fd = inotify_init()) &gt; 0) {
+<a href="#l23" class="line" id="l23">     23</a>         wd = inotify_add_watch(fd, path.c_str(), IN_ATTRIB | IN_CLOSE_WRITE | IN_MOVE_SELF);
+<a href="#l24" class="line" id="l24">     24</a>     }
+<a href="#l25" class="line" id="l25">     25</a> }
+<a href="#l26" class="line" id="l26">     26</a> 
+<a href="#l27" class="line" id="l27">     27</a> fswatcher::~fswatcher() {
+<a href="#l28" class="line" id="l28">     28</a>     if (fd != -1) {
+<a href="#l29" class="line" id="l29">     29</a>         close(fd);
+<a href="#l30" class="line" id="l30">     30</a>     }
+<a href="#l31" class="line" id="l31">     31</a> }
+<a href="#l32" class="line" id="l32">     32</a> 
+<a href="#l33" class="line" id="l33">     33</a> bool fswatcher::wait_for_event() {
+<a href="#l34" class="line" id="l34">     34</a>     char buf[max_event_len];
+<a href="#l35" class="line" id="l35">     35</a>     ssize_t n = 0;
+<a href="#l36" class="line" id="l36">     36</a> 
+<a href="#l37" class="line" id="l37">     37</a>     if (fd == -1 || wd == -1) {
+<a href="#l38" class="line" id="l38">     38</a>         return false;
+<a href="#l39" class="line" id="l39">     39</a>     }
+<a href="#l40" class="line" id="l40">     40</a> 
+<a href="#l41" class="line" id="l41">     41</a>     // The read syscall is blocking; it returns after one eligible event (i.e., matching the mask) is received.
+<a href="#l42" class="line" id="l42">     42</a>     while (n &lt;= 0) {
+<a href="#l43" class="line" id="l43">     43</a>         n = read(fd, &amp;buf, max_event_len);
+<a href="#l44" class="line" id="l44">     44</a>     }
+<a href="#l45" class="line" id="l45">     45</a> 
+<a href="#l46" class="line" id="l46">     46</a>     return true;
+<a href="#l47" class="line" id="l47">     47</a> }
 </pre>
 </div>
 </body>
