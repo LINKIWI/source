@@ -14,6 +14,7 @@ const RepositoryFilter = ({
   forwardedRef,
   form,
   repositories,
+  selectedRepos,
   onHide,
   onRepositoryToggle,
   handleFormChange,
@@ -26,24 +27,24 @@ const RepositoryFilter = ({
         before={<MdSearch style={{ color: colors.primary, fontSize: '20px' }} />}
         placeholder="Filter repositories…"
         autoComplete="off"
-        value={form.filterRepoName}
-        onChange={handleFormChange('filterRepoName')}
+        value={form.filterRepoQuery}
+        onChange={handleFormChange('filterRepoQuery')}
       />
     </Spacing>
 
     <Spacing style={{ flexGrow: 1, overflow: 'auto' }} bottom>
       {repositories
         .filter((repo) =>
-          !form.filterRepoName.length ||
-          repo.name.includes(form.filterRepoName) ||
-          repo.remote.includes(form.filterRepoName))
+          !form.filterRepoQuery.length ||
+          repo.name.includes(form.filterRepoQuery) ||
+          repo.remote.includes(form.filterRepoQuery))
         .map((repo) => (
           <RepositorySelector
             key={repo.name}
             name={repo.name}
-            remote={repo.remote}
-            isSelected={repo.isSelected}
-            onClick={() => onRepositoryToggle(repo)}
+            description={repo.remote}
+            isSelected={selectedRepos.has(repo.name)}
+            onClick={() => onRepositoryToggle(repo.name)}
           />
         ))}
     </Spacing>
@@ -53,7 +54,7 @@ const RepositoryFilter = ({
         <Button
           text="Reset"
           onClick={() => {
-            handleFormChange('filterRepoName')({ target: { value: '' } });
+            handleFormChange('filterRepoQuery')({ target: { value: '' } });
             onRepositoryToggle();
           }}
           style={{ border: 0 }}
@@ -74,8 +75,8 @@ RepositoryFilter.propTypes = {
   repositories: PropTypes.arrayOf(PropTypes.shape({
     name: PropTypes.string.isRequired,
     remote: PropTypes.string.isRequired,
-    isSelected: PropTypes.bool.isRequired,
   }).isRequired).isRequired,
+  selectedRepos: PropTypes.instanceOf(Set).isRequired,
   onHide: PropTypes.func.isRequired,
   onRepositoryToggle: PropTypes.func.isRequired,
   // HOC props
@@ -84,7 +85,7 @@ RepositoryFilter.propTypes = {
     PropTypes.func,
   ]),
   form: PropTypes.shape({
-    filterRepoName: PropTypes.string.isRequired,
+    filterRepoQuery: PropTypes.string.isRequired,
   }).isRequired,
   handleFormChange: PropTypes.func.isRequired,
 };
@@ -96,6 +97,6 @@ RepositoryFilter.defaultProps = {
 export default compose(
   withForwardedRef,
   withForm({
-    initial: () => ({ filterRepoName: '' }),
+    initial: () => ({ filterRepoQuery: '' }),
   }),
 )(RepositoryFilter);

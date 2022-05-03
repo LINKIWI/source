@@ -11,7 +11,7 @@ import { transition } from 'client/app/util/style/transition';
  */
 const RepositorySelector = ({
   name,
-  remote,
+  description,
   isSelected,
   onClick,
   isHighlighted,
@@ -73,14 +73,17 @@ const RepositorySelector = ({
         </Spacing>
 
         <div>
-          <Spacing size="2px" bottom>
-            <Text size="kilo">
-              {name}
-            </Text>
-          </Spacing>
-          <Text color={text.dark.GAMMA} style={{ wordBreak: 'break-word' }} size="kilo">
-            {remote}
+          <Text size="kilo">
+            {name}
           </Text>
+
+          {description && (
+            <Spacing size="2px" top>
+              <Text color={text.dark.GAMMA} style={{ wordBreak: 'break-word' }} size="kilo">
+                {description}
+              </Text>
+            </Spacing>
+          )}
         </div>
       </div>
     </button>
@@ -89,13 +92,17 @@ const RepositorySelector = ({
 
 RepositorySelector.propTypes = {
   name: PropTypes.string.isRequired,
-  remote: PropTypes.string.isRequired,
+  description: PropTypes.string,
   isSelected: PropTypes.bool.isRequired,
   onClick: PropTypes.func.isRequired,
   // HOC props
   isHighlighted: PropTypes.bool.isRequired,
   handleHighlightStart: PropTypes.func.isRequired,
   handleHighlightEnd: PropTypes.func.isRequired,
+};
+
+RepositorySelector.defaultProps = {
+  description: null,
 };
 
 export default withToggleState({

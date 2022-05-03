@@ -23,6 +23,7 @@ class QueryOptionControls extends Component {
     maxMatches: PropTypes.number.isRequired,
     filePath: PropTypes.string.isRequired,
     repositories: PropTypes.array.isRequired,
+    filteredRepos: PropTypes.arrayOf(PropTypes.string.isRequired).isRequired,
     searchResults: PropTypes.arrayOf(PropTypes.shape({
       path: PropTypes.string.isRequired,
     })).isRequired,
@@ -40,6 +41,35 @@ class QueryOptionControls extends Component {
     showRepositoriesFlyout: PropTypes.func.isRequired,
     hideRepositoriesFlyout: PropTypes.func.isRequired,
   };
+
+  shouldComponentUpdate(nextProps) {
+    const { searchResults, isPathPatternFlyoutVisible } = this.props;
+
+    // Search results are expected to change frequently, since they are updated on every new query.
+    // However, search results are only used to render suggestions in the path pattern flyout, so
+    // unnecessary re-renders can be avoided by updating the component in response to a different
+    // set of search results only when the path pattern flyout is visible.
+    // This logic should only run when the search results change, the detection of which is
+    // unfortunately a potentially expensive operation if there are many search results. A
+    // reasonably high-signal heuristic to capture most (but not all) of the cases in which search
+    // results change is examining whether the length of the search results have changed, or, in the
+    // case that the length is unchanged, whether the first results have different paths.
+    const searchResultsLikelyChanged =
+      searchResults.length !== nextProps.searchResults.length ||
+      (
+        searchResults.length > 0 &&
+        nextProps.searchResults > 0 &&
+        searchResults[0].path !== nextProps.searchResults[0].path
+      );
+
+    if (searchResultsLikelyChanged) {
+      if (!isPathPatternFlyoutVisible && !nextProps.isPathPatternFlyoutVisible) {
+        return false;
+      }
+    }
+
+    return true;
+  }
 
   componentDidUpdate(prevProps) {
     // Automatically focus the file path and repository filter fields when the flyout is opened.
@@ -78,6 +108,7 @@ class QueryOptionControls extends Component {
       maxMatches,
       filePath,
       repositories,
+      filteredRepos,
       searchResults,
       onRegexChange,
       onCaseSensitivityChange,
@@ -92,8 +123,6 @@ class QueryOptionControls extends Component {
       hidePathPatternFlyout,
       isCompact,
     } = this.props;
-
-    const filteredRepos = repositories.filter((repo) => repo.isSelected);
 
     const suggestions = isPathPatternFlyoutVisible && (() => {
       // Data manipulation routine to match each result path against a regular expression, and order
@@ -223,6 +252,7 @@ class QueryOptionControls extends Component {
             <RepositoryFilter
               ref={this.repositoriesFieldRef}
               repositories={repositories}
+              selectedRepos={new Set(filteredRepos)}
               onRepositoryToggle={onRepositoryToggle}
               onHide={hideRepositoriesFlyout}
             />

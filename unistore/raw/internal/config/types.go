@@ -69,10 +69,11 @@ type Threshold struct {
 
 // Connection describes connection options for remote backends.
 type Connection struct {
-	Identity       string        `yaml:"identity"`
-	ConnectTimeout time.Duration `yaml:"connect_timeout"`
-	RequestTimeout time.Duration `yaml:"request_timeout"`
-	TLSContext     *TLSContext   `yaml:"tls_context"`
+	Identity        string        `yaml:"identity"`
+	ConnectAttempts int           `yaml:"connect_attempts"`
+	ConnectTimeout  time.Duration `yaml:"connect_timeout"`
+	RequestTimeout  time.Duration `yaml:"request_timeout"`
+	TLSContext      *TLSContext   `yaml:"tls_context"`
 }
 
 // Composite describes options for the composite object storage backend, which in itself combines

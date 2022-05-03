@@ -18,6 +18,7 @@ class SearchQueryContainer extends Component {
     maxMatches: PropTypes.number.isRequired,
     filePath: PropTypes.string.isRequired,
     repositories: PropTypes.array.isRequired,
+    filteredRepos: PropTypes.arrayOf(PropTypes.string.isRequired).isRequired,
     results: PropTypes.shape({
       err: PropTypes.object,
       data: PropTypes.object,
@@ -48,18 +49,22 @@ class SearchQueryContainer extends Component {
   }
 
   _handleRepositoryToggle(toggled) {
-    const { repositories, onRepositoriesChange } = this.props;
+    const { filteredRepos: existingRepos, onRepositoriesChange } = this.props;
 
-    // Reset filter list entirely
+    // Reset repository filter list entirely
     if (!toggled) {
       return onRepositoriesChange([]);
     }
 
-    const filteredRepos = repositories
-      .filter((repo) => (repo.name === toggled.name ? !repo.isSelected : repo.isSelected))
-      .map((repo) => repo.name);
+    const filteredRepos = new Set(existingRepos);
 
-    return onRepositoriesChange(filteredRepos);
+    if (filteredRepos.has(toggled)) {
+      filteredRepos.delete(toggled);
+    } else {
+      filteredRepos.add(toggled);
+    }
+
+    return onRepositoriesChange([...filteredRepos]);
   }
 
   render() {
@@ -71,6 +76,7 @@ class SearchQueryContainer extends Component {
       filePath,
       repositories,
       results,
+      filteredRepos,
       onQueryChange,
       onRegexChange,
       onCaseSensitivityChange,
@@ -104,6 +110,7 @@ class SearchQueryContainer extends Component {
               filePath={filePath}
               repositories={repositories}
               searchResults={searchResults}
+              filteredRepos={filteredRepos}
               onRegexChange={onRegexChange}
               onCaseSensitivityChange={onCaseSensitivityChange}
               onMaxMatchesChange={onMaxMatchesChange}
@@ -124,11 +131,11 @@ class SearchQueryContainer extends Component {
   }
 }
 
-const mapStateToProps = ({ meta }, { filteredRepos }) => ({
+const mapStateToProps = ({ meta }) => ({
   repositories: Object.values(meta.repositories).map((repo) => ({
     name: repo.name,
     remote: repo.remote,
-    isSelected: filteredRepos.includes(repo.name),
+    labels: repo.labels,
   })),
 });
 

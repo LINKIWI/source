@@ -37,6 +37,7 @@ export default class MetaLogic extends BaseLogic {
             version: tree.version,
             url: tree.metadata.urlPattern,
             remote: tree.metadata.remote,
+            labels: tree.metadata.labelsList,
           })),
         },
       });

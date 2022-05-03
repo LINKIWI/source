@@ -23,6 +23,7 @@ import (
 	"unistore/internal/config"
 	"unistore/internal/meta"
 	"unistore/internal/schemas"
+	"unistore/internal/util"
 	"unistore/pkg/client/b2"
 	"unistore/schemas/common"
 	"unistore/schemas/service"
@@ -65,7 +66,11 @@ type B2 struct {
 func NewB2(cfg *config.B2) (Backend, error) {
 	var opts []b2.Option
 
-	dialer := &net.Dialer{Timeout: cfg.Connection.ConnectTimeout}
+	dialer := util.NewRetryDialer(
+		net.Dialer{Timeout: cfg.Connection.ConnectTimeout},
+		cfg.Connection.ConnectAttempts,
+		cfg.Connection.ConnectTimeout/2,
+	)
 	transport := &http.Transport{
 		DialContext:           dialer.DialContext,
 		TLSHandshakeTimeout:   cfg.Connection.ConnectTimeout,
