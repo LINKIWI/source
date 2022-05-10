@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>internal/metrics: Use native Aperture async transport in favor of per-emission spawned goroutines - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/4baf02d795303ab5a872e71e854cce0f44d37ac9">4baf02d795303ab5a872e71e854cce0f44d37ac9</a>
+<b>parent</b> <a href="../commit/e8150694b6cff08d202c539eaa194941238830ef">e8150694b6cff08d202c539eaa194941238830ef</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sat  7 May 2022 19:47:18 -0700
+
+internal/metrics: Use native Aperture async transport in favor of per-emission spawned goroutines
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">go.mod</a></td><td> | </td><td class="num">2</td><td><span class="i">+</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">internal/metrics/client.go</a></td><td> | </td><td class="num">3</td><td><span class="i">+</span><span class="d">--</span></td></tr>
+</table></pre><pre>2 files changed, 2 insertions(+), 3 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/go.mod">go.mod</a> b/<a href="../file/go.mod">go.mod</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -18,7 +18,7 @@ require (
+</a> 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.2.0
+ 	google.golang.org/protobuf v1.28.0
+ 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
+<a href="#h0-0-3" id="h0-0-3" class="d">-	lib.kevinlin.info/aperture v0.0.0-20220507160455-2b78129d0a70
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+	lib.kevinlin.info/aperture v0.0.0-20220507194238-d4485a53c969
+</a> )
+ 
+ require (
+<b>diff --git a/<a id="h1" href="../file/internal/metrics/client.go">internal/metrics/client.go</a> b/<a href="../file/internal/metrics/client.go">internal/metrics/client.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -40,6 +40,7 @@ func Init(cfg *config.Metrics) error {
+</a> 		Prefix:                      cfg.Prefix,
+ 		Proxy:                       cfg.Proxy,
+ 		Serializer:                  serializers[cfg.Serializer],
+<a href="#h1-0-3" id="h1-0-3" class="i">+		AsyncQueueSize:              1024,
+</a> 		TransportProbeInterval:      10 * time.Second,
+ 		LazyTransportInitialization: true,
+ 		DefaultTags: map[string]interface{}{
+<a href="#h1-1" id="h1-1" class="h">@@ -50,8 +51,6 @@ func Init(cfg *config.Metrics) error {
+</a> 		return fmt.Errorf(&quot;metrics: error creating Aperture client: err=%v&quot;, err)
+ 	}
+ 
+<a href="#h1-1-3" id="h1-1-3" class="d">-	Client = lib.NewAsyncStatsd(Client)
+</a><a href="#h1-1-4" id="h1-1-4" class="d">-
+</a> 	heartbeats := []lib.Heartbeat{
+ 		lib.NewUptimeHeartbeat(Client),
+ 		lib.NewRuntimeStatsHeartbeat(Client),
+</pre>
+</div>
+</body>
+</html>

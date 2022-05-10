@@ -128,6 +128,16 @@ func NewClient(cfg *Config) (*Client, error) {
 		}
 	}
 
+	if cfg.AsyncQueueSize > 0 {
+		backendTFactory := tFactory
+		tFactory = func() (transport.Transport, error) {
+			return transport.NewAsync(
+				backendTFactory,
+				cfg.AsyncQueueSize,
+			)
+		}
+	}
+
 	if cfg.BufferSize > 0 {
 		backendTFactory := tFactory
 		tFactory = func() (transport.Transport, error) {

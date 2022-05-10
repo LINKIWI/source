@@ -11,7 +11,7 @@ type UDS struct {
 	conn *net.UnixConn
 }
 
-// NewUDS creates a Unix datagram socket transport for a a Unix socket at the target disk path.
+// NewUDS creates a Unix datagram socket transport for a Unix socket at the target disk path.
 func NewUDS(path string) (Transport, error) {
 	conn, err := net.DialUnix("unixgram", nil, &net.UnixAddr{Name: path, Net: "unixgram"})
 	if err != nil {
@@ -26,12 +26,12 @@ func NewUDS(path string) (Transport, error) {
 	return &UDS{conn}, nil
 }
 
-// Send initiates a fire-and-forget transmission of an arbitrary payload.
+// Send transmits the payload over the Unix datagram socket.
 func (t *UDS) Send(data []byte) (int, error) {
 	return t.conn.Write(data)
 }
 
-// Close closes the underlying UDP socket.
+// Close closes the underlying Unix datagram socket.
 func (t *UDS) Close() error {
 	return t.conn.Close()
 }

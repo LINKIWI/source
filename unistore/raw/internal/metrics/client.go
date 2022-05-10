@@ -40,6 +40,7 @@ func Init(cfg *config.Metrics) error {
 		Prefix:                      cfg.Prefix,
 		Proxy:                       cfg.Proxy,
 		Serializer:                  serializers[cfg.Serializer],
+		AsyncQueueSize:              1024,
 		TransportProbeInterval:      10 * time.Second,
 		LazyTransportInitialization: true,
 		DefaultTags: map[string]interface{}{
@@ -50,7 +51,15 @@ func Init(cfg *config.Metrics) error {
 		return fmt.Errorf("metrics: error creating Aperture client: err=%v", err)
 	}
 
-	Client = lib.NewAsyncStatsd(Client)
+	heartbeats := []lib.Heartbeat{
+		lib.NewUptimeHeartbeat(Client),
+		lib.NewRuntimeStatsHeartbeat(Client),
+		lib.NewResourceUsageHeartbeat(Client),
+	}
+
+	for _, hb := range heartbeats {
+		lib.RegisterHeartbeat(hb, lib.DefaultHeartbeatInterval, lib.DefaultHeartbeatJitter)
+	}
 
 	return nil
 }

@@ -9,6 +9,7 @@
 * Rich networking abstractions including SOCKS-proxied transports and automatic reconnects
 * Built-in logging of metrics emissions
 * Configurable metric buffering/batching
+* Opt-in asynchronous delivery for improved throughput performance
 * Pluggable statsd protocol serialization implementations
 
 Aperture doesn't claim to offer better throughput or resource efficiency compared to other statsd

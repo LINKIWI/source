@@ -101,19 +101,26 @@ func runServer(cmd *cobra.Command, args []string) error {
 
 		sig := <-shutdown
 		zap.L().Info("initiating graceful server shutdown", zap.Stringer("signal", sig))
+
+		go func() {
+			sig = <-shutdown
+			zap.L().Warn(
+				"received shutdown signal during graceful shutdown phase; "+
+					"forcing immediate ungraceful shutdown",
+				zap.Stringer("signal", sig),
+			)
+			os.Exit(1)
+		}()
+
 		if err := srv.Close(); err != nil {
 			zap.L().Error("error during server close", zap.Error(err))
 		}
 
-		closed <- true
+		if err := metrics.Client.Close(); err != nil {
+			zap.L().Error("error during metrics client close", zap.Error(err))
+		}
 
-		sig = <-shutdown
-		zap.L().Warn(
-			"received shutdown signal during graceful shutdown phase; "+
-				"forcing immediate ungraceful shutdown",
-			zap.Stringer("signal", sig),
-		)
-		os.Exit(1)
+		closed <- true
 	}()
 
 	if err := srv.Serve(context.Background()); err != nil {

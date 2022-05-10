@@ -35,7 +35,7 @@ func NewBuffered(backendFactory Factory, size int) (Transport, error) {
 }
 
 // Send asynchronously queues the payload for transmission. If the queue size has reached the batch
-// size, all queued payloads are flushed.
+// size, all queued payloads are synchronously flushed.
 func (t *Buffered) Send(data []byte) (int, error) {
 	t.buf <- data
 

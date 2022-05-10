@@ -20,23 +20,10 @@ type MockTransport struct {
 	state         MockTransportState
 }
 
-// ErrorTransport is a fake transport.Transport implementation that mimics MockTransport but
-// deliberately fails every send with an error.
-type ErrorTransport struct {
-	*MockTransport
-}
-
 // NewMockTransport creates a new mock transport.
 func NewMockTransport() *MockTransport {
 	return &MockTransport{
 		state: ActiveTransport,
-	}
-}
-
-// NewErrorTransport creates a new mock error transport.
-func NewErrorTransport() *ErrorTransport {
-	return &ErrorTransport{
-		MockTransport: NewMockTransport(),
 	}
 }
 
@@ -69,9 +56,44 @@ func (t *MockTransport) State() MockTransportState {
 	return t.state
 }
 
+// ErrorTransport is a fake transport.Transport implementation that mimics MockTransport but
+// deliberately fails every send with an error.
+type ErrorTransport struct {
+	*MockTransport
+}
+
+// NewErrorTransport creates a new mock error transport.
+func NewErrorTransport() *ErrorTransport {
+	return &ErrorTransport{
+		MockTransport: NewMockTransport(),
+	}
+}
+
 // Send records the attempted transmission but always returns a static error.
-func (t *ErrorTransport) Send(data []byte) (int, error) {
-	t.MockTransport.Send(data)
+func (e *ErrorTransport) Send(data []byte) (int, error) {
+	e.MockTransport.Send(data)
 
 	return 0, fmt.Errorf("")
+}
+
+// StalledTransport is a fake transport.Transport implementation that mimics MockTransport but
+// hangs indefinitely on every send to simulate a stalled connection.
+type StalledTransport struct {
+	*MockTransport
+}
+
+// NewStalledTransport creates a new mock stalled transport.
+func NewStalledTransport() *StalledTransport {
+	return &StalledTransport{
+		MockTransport: NewMockTransport(),
+	}
+}
+
+// Send records the attempted transmission but stalls indefinitely.
+func (s *StalledTransport) Send(data []byte) (int, error) {
+	s.MockTransport.Send(data)
+
+	<-make(chan struct{})
+
+	return 0, nil
 }

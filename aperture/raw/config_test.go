@@ -36,6 +36,11 @@ func TestConfigValidationFailure(t *testing.T) {
 			Address:    "udp://localhost:8125",
 			BufferSize: -1,
 		},
+		// Invalid async queue size
+		{
+			Address:        "udp://localhost:8125",
+			AsyncQueueSize: -1,
+		},
 		// Proxy address parse failure
 		{
 			Address: "udp://localhost:8125",

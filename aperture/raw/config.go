@@ -55,6 +55,12 @@ type Config struct {
 	// negative, buffering is disabled; each metric is sent over the transport immediately.
 	BufferSize int
 
+	// Used for asynchronous delivery of metrics. When non-negative, an asynchronous transport
+	// is used that buffers outbound metrics into a bounded queue that is asynchronously drained
+	// to the underlying transport. When zero or negative, asynchronous delivery is disabled;
+	// each metric is sent over the transport immediately.
+	AsyncQueueSize int
+
 	// URI describing the address of a SOCKS5 proxy server through which the transport should be
 	// established. Supported schemes are "tcp" and "unix" for TCP and Unix domain socket proxy
 	// server listeners, respectively.
@@ -228,6 +234,14 @@ func (c *Config) validate() error {
 			"config",
 			"buffer size must be non-negative",
 			errors.Tag{Key: "buffer_size", Value: c.BufferSize},
+		)
+	}
+
+	if c.AsyncQueueSize < 0 {
+		return errors.New(
+			"config",
+			"async queue size must be non-negative",
+			errors.Tag{Key: "async_queue_size", Value: c.AsyncQueueSize},
 		)
 	}
 
