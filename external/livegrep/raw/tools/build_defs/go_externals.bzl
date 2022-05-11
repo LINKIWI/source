@@ -34,7 +34,7 @@ def _gopkg(repo, commit):
     )
 
 _externals = [
-    _golang_x("crypto", "4b2356b1ed79e6be3deca3737a3db3d132d2847a"),
+    _golang_x("crypto", "2cf3adece1227c48e1673f1c37d70357e1a6b9d"),
     _golang_x("net", "244492dfa37ae2ce87222fd06250a03160745faa"),
     _golang_x("text", "a9a820217f98f7c8a207ec1e45a874e1fe12c478"),
     _golang_x("oauth2", "a6bd8cefa1811bd24b86f8902872e4e8225f74c4"),
@@ -70,8 +70,8 @@ _externals = [
     _gopkg("yaml.v3", "a6ecf24a6d716d933bcbc255a2f5d492285b54f5"),
     struct(
         name = "in_gopkg_src_d_go_git_v4",
-        version = "v0.0.0-20210509073045-5623572584f2",
-        sum = "h1:s+zKHYk7gSXj5SEy3wCL5BrlmZAUQQHodKWp78vM3SQ=",
+        version = "v0.0.0-20220510202010-50b56a84fa20",
+        sum = "h1:2LKmaHNhuoD4K7oMScceNc/OcqJA2JezS1QZsZFSegI=",
         importpath = "gopkg.in/src-d/go-git.v4",
         replace = "lib.kevinlin.info/external/go-git",
     ),

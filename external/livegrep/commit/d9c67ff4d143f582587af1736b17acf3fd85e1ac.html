@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>cmd/livegrep-index-builder: Support SSH certificates during Git authentication - livegrep - Fast, regular expression code search service</title>
+<meta name="description" content="Fast, regular expression code search service" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="livegrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>livegrep</h1><span class="desc">Fast, regular expression code search service</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/external/livegrep.git">https://source.static.kevinlin.info/external/livegrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/COPYING">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/d9c67ff4d143f582587af1736b17acf3fd85e1ac">d9c67ff4d143f582587af1736b17acf3fd85e1ac</a>
+<b>parent</b> <a href="../commit/2fec7f35b34c5635e8e15511f8e75d25971dff27">2fec7f35b34c5635e8e15511f8e75d25971dff27</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Tue 10 May 2022 21:44:44 -0700
+
+cmd/livegrep-index-builder: Support SSH certificates during Git authentication
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">cmd/livegrep-index-builder/main.go</a></td><td> | </td><td class="num">6</td><td><span class="i">++++</span><span class="d">--</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">cmd/livegrep-index-builder/vcs.go</a></td><td> | </td><td class="num">22</td><td><span class="i">++++++++++++++++++++</span><span class="d">--</span></td></tr>
+</table></pre><pre>2 files changed, 24 insertions(+), 4 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/cmd/livegrep-index-builder/main.go">cmd/livegrep-index-builder/main.go</a> b/<a href="../file/cmd/livegrep-index-builder/main.go">cmd/livegrep-index-builder/main.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -15,6 +15,7 @@ var (
+</a> 	flagRepoBasePath        = flag.String(&quot;repo-base-path&quot;, &quot;/tmp&quot;, &quot;working directory on disk for storing repositories&quot;)
+ 	flagOutIndexConfig      = flag.String(&quot;out-index-config&quot;, &quot;index.json&quot;, &quot;path on disk to save the livegrep index config&quot;)
+ 	flagSSHPrivateKeyPath   = flag.String(&quot;ssh-private-key-path&quot;, &quot;&quot;, &quot;path to the private key for SSH authentication; defers to the SSH agent if empty&quot;)
+<a href="#h0-0-3" id="h0-0-3" class="i">+	flagSSHCertificatePath  = flag.String(&quot;ssh-certificate-path&quot;, &quot;&quot;, &quot;path to the certificate for SSH authentication&quot;)
+</a> 	flagSSHSkipHostVerify   = flag.Bool(&quot;ssh-skip-host-verify&quot;, false, &quot;skip server host identity verification for SSH authentication&quot;)
+ 	flagRepoSyncConcurrency = flag.Int(&quot;repo-sync-concurrency&quot;, 5, &quot;concurrency limit for repository synchronization&quot;)
+ 	flagCodeHost            = newChoicesFlag([]string{codehost.Gitlab, codehost.Static}, &quot;&quot;)
+<a href="#h0-1" id="h0-1" class="h">@@ -84,8 +85,9 @@ func main() {
+</a> 				)
+ 
+ 				opts := &amp;authenticationOptions{
+<a href="#h0-1-3" id="h0-1-3" class="d">-					sshPrivateKeyPath: *flagSSHPrivateKeyPath,
+</a><a href="#h0-1-4" id="h0-1-4" class="d">-					sshSkipHostVerify: *flagSSHSkipHostVerify,
+</a><a href="#h0-1-5" id="h0-1-5" class="i">+					sshPrivateKeyPath:  *flagSSHPrivateKeyPath,
+</a><a href="#h0-1-6" id="h0-1-6" class="i">+					sshCertificatePath: *flagSSHCertificatePath,
+</a><a href="#h0-1-7" id="h0-1-7" class="i">+					sshSkipHostVerify:  *flagSSHSkipHostVerify,
+</a> 				}
+ 
+ 				err := syncRepository(project, *flagRepoBasePath, opts)
+<b>diff --git a/<a id="h1" href="../file/cmd/livegrep-index-builder/vcs.go">cmd/livegrep-index-builder/vcs.go</a> b/<a href="../file/cmd/livegrep-index-builder/vcs.go">cmd/livegrep-index-builder/vcs.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -14,8 +14,9 @@ import (
+</a> // authenticationOptions formalizes optional repository authentication options
+ // to use while synchronizing the remote repository.
+ type authenticationOptions struct {
+<a href="#h1-0-3" id="h1-0-3" class="d">-	sshPrivateKeyPath string
+</a><a href="#h1-0-4" id="h1-0-4" class="d">-	sshSkipHostVerify bool
+</a><a href="#h1-0-5" id="h1-0-5" class="i">+	sshPrivateKeyPath  string
+</a><a href="#h1-0-6" id="h1-0-6" class="i">+	sshCertificatePath string
+</a><a href="#h1-0-7" id="h1-0-7" class="i">+	sshSkipHostVerify  bool
+</a> }
+ 
+ // syncRepository clones a new repository or fetches an existing repository on disk.
+<a href="#h1-1" id="h1-1" class="h">@@ -47,6 +48,23 @@ func syncRepository(project *codehost.Project, basePath string, opts *authentica
+</a> 			return err
+ 		}
+ 
+<a href="#h1-1-3" id="h1-1-3" class="i">+		if opts.sshCertificatePath != &quot;&quot; {
+</a><a href="#h1-1-4" id="h1-1-4" class="i">+			sshCert, err := os.ReadFile(opts.sshCertificatePath)
+</a><a href="#h1-1-5" id="h1-1-5" class="i">+			if err != nil {
+</a><a href="#h1-1-6" id="h1-1-6" class="i">+				return err
+</a><a href="#h1-1-7" id="h1-1-7" class="i">+			}
+</a><a href="#h1-1-8" id="h1-1-8" class="i">+
+</a><a href="#h1-1-9" id="h1-1-9" class="i">+			cert, _, _, _, err := ssh.ParseAuthorizedKey(sshCert)
+</a><a href="#h1-1-10" id="h1-1-10" class="i">+			if err != nil {
+</a><a href="#h1-1-11" id="h1-1-11" class="i">+				return err
+</a><a href="#h1-1-12" id="h1-1-12" class="i">+			}
+</a><a href="#h1-1-13" id="h1-1-13" class="i">+
+</a><a href="#h1-1-14" id="h1-1-14" class="i">+			signer, err = ssh.NewCertSigner(cert.(*ssh.Certificate), signer)
+</a><a href="#h1-1-15" id="h1-1-15" class="i">+			if err != nil {
+</a><a href="#h1-1-16" id="h1-1-16" class="i">+				return err
+</a><a href="#h1-1-17" id="h1-1-17" class="i">+			}
+</a><a href="#h1-1-18" id="h1-1-18" class="i">+		}
+</a><a href="#h1-1-19" id="h1-1-19" class="i">+
+</a> 		hostVerificationCallback := gitssh.HostKeyCallbackHelper{}
+ 		if opts.sshSkipHostVerify {
+ 			hostVerificationCallback.HostKeyCallback = ssh.InsecureIgnoreHostKey()
+</pre>
+</div>
+</body>
+</html>

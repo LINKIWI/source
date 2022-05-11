@@ -14,8 +14,9 @@ import (
 // authenticationOptions formalizes optional repository authentication options
 // to use while synchronizing the remote repository.
 type authenticationOptions struct {
-	sshPrivateKeyPath string
-	sshSkipHostVerify bool
+	sshPrivateKeyPath  string
+	sshCertificatePath string
+	sshSkipHostVerify  bool
 }
 
 // syncRepository clones a new repository or fetches an existing repository on disk.
@@ -24,9 +25,21 @@ func syncRepository(project *codehost.Project, basePath string, opts *authentica
 
 	repoPath := project.RepositoryPath(basePath)
 
+	endpoint, err := transport.NewEndpoint(project.Remote)
+	if err != nil {
+		return err
+	}
+
+	username := gitssh.DefaultUsername
+	if endpoint.User != "" {
+		username = endpoint.User
+	}
+
 	// Use an explicit private key for authentication when supplied; otherwise, use the
 	// session SSH agent
 	if opts != nil && opts.sshPrivateKeyPath != "" {
+		var signers []ssh.Signer
+
 		sshKey, err := os.ReadFile(opts.sshPrivateKeyPath)
 		if err != nil {
 			return err
@@ -37,18 +50,46 @@ func syncRepository(project *codehost.Project, basePath string, opts *authentica
 			return err
 		}
 
+		if opts.sshCertificatePath != "" {
+			sshCert, err := os.ReadFile(opts.sshCertificatePath)
+			if err != nil {
+				return err
+			}
+
+			cert, _, _, _, err := ssh.ParseAuthorizedKey(sshCert)
+			if err != nil {
+				return err
+			}
+
+			certSigner, err := ssh.NewCertSigner(cert.(*ssh.Certificate), signer)
+			if err != nil {
+				return err
+			}
+
+			signers = append(signers, certSigner)
+		}
+
+		signers = append(signers, signer)
+
+		publicKeysCallback := func() ([]ssh.Signer, error) {
+			// Prefer the certificate signer when available, but also allow fallback to
+			// the plain signer. This allows compatibility with servers that reject
+			// certificate-based SSH due to lack of capabilities.
+			return signers, nil
+		}
+
 		hostVerificationCallback := gitssh.HostKeyCallbackHelper{}
 		if opts.sshSkipHostVerify {
 			hostVerificationCallback.HostKeyCallback = ssh.InsecureIgnoreHostKey()
 		}
 
-		auth = &gitssh.PublicKeys{
-			User:                  gitssh.DefaultUsername,
-			Signer:                signer,
+		auth = &gitssh.PublicKeysCallback{
+			User:                  username,
+			Callback:              publicKeysCallback,
 			HostKeyCallbackHelper: hostVerificationCallback,
 		}
 	} else {
-		agentAuth, err := gitssh.NewSSHAgentAuth(gitssh.DefaultUsername)
+		agentAuth, err := gitssh.NewSSHAgentAuth(username)
 		if err != nil {
 			return err
 		}

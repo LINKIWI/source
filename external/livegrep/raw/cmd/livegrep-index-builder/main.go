@@ -15,6 +15,7 @@ var (
 	flagRepoBasePath        = flag.String("repo-base-path", "/tmp", "working directory on disk for storing repositories")
 	flagOutIndexConfig      = flag.String("out-index-config", "index.json", "path on disk to save the livegrep index config")
 	flagSSHPrivateKeyPath   = flag.String("ssh-private-key-path", "", "path to the private key for SSH authentication; defers to the SSH agent if empty")
+	flagSSHCertificatePath  = flag.String("ssh-certificate-path", "", "path to the certificate for SSH authentication")
 	flagSSHSkipHostVerify   = flag.Bool("ssh-skip-host-verify", false, "skip server host identity verification for SSH authentication")
 	flagRepoSyncConcurrency = flag.Int("repo-sync-concurrency", 5, "concurrency limit for repository synchronization")
 	flagCodeHost            = newChoicesFlag([]string{codehost.Gitlab, codehost.Static}, "")
@@ -84,8 +85,9 @@ func main() {
 				)
 
 				opts := &authenticationOptions{
-					sshPrivateKeyPath: *flagSSHPrivateKeyPath,
-					sshSkipHostVerify: *flagSSHSkipHostVerify,
+					sshPrivateKeyPath:  *flagSSHPrivateKeyPath,
+					sshCertificatePath: *flagSSHCertificatePath,
+					sshSkipHostVerify:  *flagSSHSkipHostVerify,
 				}
 
 				err := syncRepository(project, *flagRepoBasePath, opts)
