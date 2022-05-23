@@ -32,6 +32,7 @@ func initClient(cfg *config.Config) error {
 		Prefix:                      cfg.Application.Metrics.Prefix,
 		Proxy:                       cfg.Application.Metrics.Proxy,
 		Serializer:                  serializers[cfg.Application.Metrics.Serializer],
+		AsyncQueueSize:              1024,
 		TransportProbeInterval:      10 * time.Second,
 		LazyTransportInitialization: true,
 		DefaultTags: map[string]interface{}{
@@ -46,8 +47,6 @@ func initClient(cfg *config.Config) error {
 			StackedError: err,
 		}
 	}
-
-	Client = lib.NewAsyncStatsd(Client)
 
 	return nil
 }

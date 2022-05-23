@@ -11,15 +11,16 @@ import (
 )
 
 var (
-	flagIndexName           = flag.String("index-name", "livegrep-index", "name of the generated index")
-	flagRepoBasePath        = flag.String("repo-base-path", "/tmp", "working directory on disk for storing repositories")
-	flagOutIndexConfig      = flag.String("out-index-config", "index.json", "path on disk to save the livegrep index config")
-	flagSSHPrivateKeyPath   = flag.String("ssh-private-key-path", "", "path to the private key for SSH authentication; defers to the SSH agent if empty")
-	flagSSHCertificatePath  = flag.String("ssh-certificate-path", "", "path to the certificate for SSH authentication")
-	flagSSHSkipHostVerify   = flag.Bool("ssh-skip-host-verify", false, "skip server host identity verification for SSH authentication")
-	flagRepoSyncConcurrency = flag.Int("repo-sync-concurrency", 5, "concurrency limit for repository synchronization")
-	flagCodeHost            = newChoicesFlag([]string{codehost.Gitlab, codehost.Static}, "")
-	flagCodeHostParams      = newStringMapFlag()
+	flagIndexName              = flag.String("index-name", "livegrep-index", "name of the generated index")
+	flagRepoBasePath           = flag.String("repo-base-path", "/tmp", "working directory on disk for storing repositories")
+	flagOutIndexConfig         = flag.String("out-index-config", "index.json", "path on disk to save the livegrep index config")
+	flagSSHPrivateKeyPath      = flag.String("ssh-private-key-path", "", "path to the private key for SSH authentication; defers to the SSH agent if empty")
+	flagSSHCertificatePath     = flag.String("ssh-certificate-path", "", "path to the certificate for SSH authentication")
+	flagSSHSkipHostVerify      = flag.Bool("ssh-skip-host-verify", false, "skip server host identity verification for SSH authentication")
+	flagRepoSyncConcurrency    = flag.Int("repo-sync-concurrency", 5, "concurrency limit for repository synchronization")
+	flagRepoSyncErrorThreshold = flag.Int("repo-sync-error-threshold", 0, "threshold number of repository synchronization errors to consider the synchronization to have failed")
+	flagCodeHost               = newChoicesFlag([]string{codehost.Gitlab, codehost.Static}, "")
+	flagCodeHostParams         = newStringMapFlag()
 
 	codehostBackends = map[string]codehost.Factory{
 		codehost.Gitlab: codehost.NewGitLabCodeHost,
@@ -92,7 +93,14 @@ func main() {
 
 				err := syncRepository(project, *flagRepoBasePath, opts)
 				if err != nil {
-					log.Printf("encountered synchronization error: name=%s err=%v", project.Name, err)
+					log.Printf(
+						"encountered synchronization error: name=%s remote=%s revision=%s path=%s err=%v",
+						project.Name,
+						project.Remote,
+						project.Revision,
+						project.RepositoryPath(*flagRepoBasePath),
+						err,
+					)
 				}
 
 				return err
@@ -101,7 +109,13 @@ func main() {
 	}
 
 	if errs := executeTasks(syncTasks, *flagRepoSyncConcurrency); len(errs) > 0 {
-		panic(fmt.Errorf("repository synchronization encountered nonzero errors: errs=%d", len(errs)))
+		log.Printf("repository synchronization encountered nonzero errors: errs=%d", len(errs))
+
+		if len(errs) > *flagRepoSyncErrorThreshold {
+			log.Printf("repository synchronization errors exceeds threshold: threshold=%d", *flagRepoSyncErrorThreshold)
+			os.Exit(1)
+			return
+		}
 	}
 
 	log.Printf("repository synchronization complete")
