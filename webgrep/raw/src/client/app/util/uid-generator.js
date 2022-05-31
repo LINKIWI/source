@@ -12,4 +12,11 @@ export default class UIDGenerator {
   next() {
     return this.id++;  // eslint-disable-line no-plusplus
   }
+
+  /**
+   * Reset the UID generator.
+   */
+  reset() {
+    this.id = 0;
+  }
 }

@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Transactional resource wrapper for request/response consistency in fallback search request path - webgrep - Web client for livegrep</title>
+<meta name="description" content="Web client for livegrep" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="webgrep Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="webgrep Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>webgrep</h1><span class="desc">Web client for livegrep</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/webgrep.git">https://source.static.kevinlin.info/webgrep.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a> | <a href="../file/LICENSE">LICENSE</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/845a275287f26b7fa53f8024f5628a5a45a6864a">845a275287f26b7fa53f8024f5628a5a45a6864a</a>
+<b>parent</b> <a href="../commit/b30c3eb589ee5f4d0d444753643bccb383e90ea6">b30c3eb589ee5f4d0d444753643bccb383e90ea6</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sun 29 May 2022 21:09:12 -0700
+
+Transactional resource wrapper for request/response consistency in fallback search request path
+
+<b>Diffstat:</b>
+<table><tr><td class="A">A</td><td><a href="#h0">src/client/app/react/containers/hoc/with-transactional-resource.js</a></td><td> | </td><td class="num">70</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</span><span class="d"></span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">src/client/app/react/containers/hoc/with-transactional-tunnel.js</a></td><td> | </td><td class="num">2</td><td><span class="i">+</span><span class="d">-</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">src/client/app/react/containers/search/index.js</a></td><td> | </td><td class="num">4</td><td><span class="i">++</span><span class="d">--</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h3">src/server/handlers/api/search.js</a></td><td> | </td><td class="num">4</td><td><span class="i">++</span><span class="d">--</span></td></tr>
+</table></pre><pre>4 files changed, 75 insertions(+), 5 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/src/client/app/react/containers/hoc/with-transactional-resource.js">src/client/app/react/containers/hoc/with-transactional-resource.js</a> b/<a href="../file/src/client/app/react/containers/hoc/with-transactional-resource.js">src/client/app/react/containers/hoc/with-transactional-resource.js</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -0,0 +1,70 @@
+</a><a href="#h0-0-0" id="h0-0-0" class="i">+import { withResource } from &#39;supercharged/client&#39;;
+</a><a href="#h0-0-1" id="h0-0-1" class="i">+import UIDGenerator from &#39;client/app/util/uid-generator&#39;;
+</a><a href="#h0-0-2" id="h0-0-2" class="i">+
+</a><a href="#h0-0-3" id="h0-0-3" class="i">+/**
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+ * Factory for an HOC that wraps a resource fetcher that automatically handles request/response
+</a><a href="#h0-0-5" id="h0-0-5" class="i">+ * &quot;transactions&quot; across invocations.
+</a><a href="#h0-0-6" id="h0-0-6" class="i">+ *
+</a><a href="#h0-0-7" id="h0-0-7" class="i">+ * @param {Object} opts Options object passed directly to the underlying Supercharged resource
+</a><a href="#h0-0-8" id="h0-0-8" class="i">+ *                      client.
+</a><a href="#h0-0-9" id="h0-0-9" class="i">+ * @returns {Function} HOC factory providing the same API as the Supercharged resource client.
+</a><a href="#h0-0-10" id="h0-0-10" class="i">+ */
+</a><a href="#h0-0-11" id="h0-0-11" class="i">+const withTransactionalResource = (opts) =&gt; (WrappedComponent) =&gt; {
+</a><a href="#h0-0-12" id="h0-0-12" class="i">+  const transactionIDGenerator = new UIDGenerator();
+</a><a href="#h0-0-13" id="h0-0-13" class="i">+  const WithResourceHOC = withResource(opts)(WrappedComponent);
+</a><a href="#h0-0-14" id="h0-0-14" class="i">+
+</a><a href="#h0-0-15" id="h0-0-15" class="i">+  return class WithTransactionalResourceHOC extends WithResourceHOC {
+</a><a href="#h0-0-16" id="h0-0-16" class="i">+    txID = null;
+</a><a href="#h0-0-17" id="h0-0-17" class="i">+
+</a><a href="#h0-0-18" id="h0-0-18" class="i">+    shouldComponentUpdate(nextProps, nextState) {
+</a><a href="#h0-0-19" id="h0-0-19" class="i">+      const { respData } = this.state;
+</a><a href="#h0-0-20" id="h0-0-20" class="i">+      const { respData: nextRespData } = nextState;
+</a><a href="#h0-0-21" id="h0-0-21" class="i">+
+</a><a href="#h0-0-22" id="h0-0-22" class="i">+      // Transitioning empty data to populated data; ensure that the first response is consistent
+</a><a href="#h0-0-23" id="h0-0-23" class="i">+      // with the current client transaction ID.
+</a><a href="#h0-0-24" id="h0-0-24" class="i">+      if (!respData &amp;&amp; nextRespData) {
+</a><a href="#h0-0-25" id="h0-0-25" class="i">+        if (nextRespData.id === undefined) {
+</a><a href="#h0-0-26" id="h0-0-26" class="i">+          return true;
+</a><a href="#h0-0-27" id="h0-0-27" class="i">+        }
+</a><a href="#h0-0-28" id="h0-0-28" class="i">+
+</a><a href="#h0-0-29" id="h0-0-29" class="i">+        if (nextRespData.id !== this.txID) {
+</a><a href="#h0-0-30" id="h0-0-30" class="i">+          return false;
+</a><a href="#h0-0-31" id="h0-0-31" class="i">+        }
+</a><a href="#h0-0-32" id="h0-0-32" class="i">+      }
+</a><a href="#h0-0-33" id="h0-0-33" class="i">+
+</a><a href="#h0-0-34" id="h0-0-34" class="i">+      // Transitioning from one populated data state to another; transaction consistency only needs
+</a><a href="#h0-0-35" id="h0-0-35" class="i">+      // to be checked if the server-reported response has changed since the last render.
+</a><a href="#h0-0-36" id="h0-0-36" class="i">+      if (respData &amp;&amp; nextRespData) {
+</a><a href="#h0-0-37" id="h0-0-37" class="i">+        if (nextRespData.id === undefined) {
+</a><a href="#h0-0-38" id="h0-0-38" class="i">+          return true;
+</a><a href="#h0-0-39" id="h0-0-39" class="i">+        }
+</a><a href="#h0-0-40" id="h0-0-40" class="i">+
+</a><a href="#h0-0-41" id="h0-0-41" class="i">+        if (respData.id !== nextRespData.id) {
+</a><a href="#h0-0-42" id="h0-0-42" class="i">+          if (nextRespData.id !== this.txID) {
+</a><a href="#h0-0-43" id="h0-0-43" class="i">+            return false;
+</a><a href="#h0-0-44" id="h0-0-44" class="i">+          }
+</a><a href="#h0-0-45" id="h0-0-45" class="i">+        }
+</a><a href="#h0-0-46" id="h0-0-46" class="i">+      }
+</a><a href="#h0-0-47" id="h0-0-47" class="i">+
+</a><a href="#h0-0-48" id="h0-0-48" class="i">+      return true;
+</a><a href="#h0-0-49" id="h0-0-49" class="i">+    }
+</a><a href="#h0-0-50" id="h0-0-50" class="i">+
+</a><a href="#h0-0-51" id="h0-0-51" class="i">+    componentDidUpdate(prevProps, prevState) {
+</a><a href="#h0-0-52" id="h0-0-52" class="i">+      // After a transition from a non-error state to an error state, reset the transaction ID so
+</a><a href="#h0-0-53" id="h0-0-53" class="i">+      // that any potential future populated responses are rejected. This is fundamentally a
+</a><a href="#h0-0-54" id="h0-0-54" class="i">+      // workaround for the fact that the transaction ID is not relayed to the client for error
+</a><a href="#h0-0-55" id="h0-0-55" class="i">+      // responses.
+</a><a href="#h0-0-56" id="h0-0-56" class="i">+      if (!prevState.err &amp;&amp; this.state.err) {
+</a><a href="#h0-0-57" id="h0-0-57" class="i">+        transactionIDGenerator.reset();
+</a><a href="#h0-0-58" id="h0-0-58" class="i">+        this.txID = transactionIDGenerator.next();
+</a><a href="#h0-0-59" id="h0-0-59" class="i">+      }
+</a><a href="#h0-0-60" id="h0-0-60" class="i">+    }
+</a><a href="#h0-0-61" id="h0-0-61" class="i">+
+</a><a href="#h0-0-62" id="h0-0-62" class="i">+    _invokeResource(data, cb) {
+</a><a href="#h0-0-63" id="h0-0-63" class="i">+      this.txID = transactionIDGenerator.next();
+</a><a href="#h0-0-64" id="h0-0-64" class="i">+      super._invokeResource({ id: this.txID, ...data }, cb);
+</a><a href="#h0-0-65" id="h0-0-65" class="i">+    }
+</a><a href="#h0-0-66" id="h0-0-66" class="i">+  };
+</a><a href="#h0-0-67" id="h0-0-67" class="i">+};
+</a><a href="#h0-0-68" id="h0-0-68" class="i">+
+</a><a href="#h0-0-69" id="h0-0-69" class="i">+export default withTransactionalResource;
+</a><b>diff --git a/<a id="h1" href="../file/src/client/app/react/containers/hoc/with-transactional-tunnel.js">src/client/app/react/containers/hoc/with-transactional-tunnel.js</a> b/<a href="../file/src/client/app/react/containers/hoc/with-transactional-tunnel.js">src/client/app/react/containers/hoc/with-transactional-tunnel.js</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -7,7 +7,7 @@ import UIDGenerator from &#39;client/app/util/uid-generator&#39;;
+</a>  * &quot;transactions&quot; for messages.
+  *
+  * @param {Object} opts Options object passed directly to the underlying Supercharged tunnel client.
+<a href="#h1-0-3" id="h1-0-3" class="d">- * @returns {Function} HOC factory providing same API as the Supercharged tunnel client.
+</a><a href="#h1-0-4" id="h1-0-4" class="i">+ * @returns {Function} HOC factory providing the same API as the Supercharged tunnel client.
+</a>  */
+ const withTransactionalTunnel = (opts) =&gt; (WrappedComponent) =&gt; {
+   const transactionIDGenerator = new UIDGenerator();
+<b>diff --git a/<a id="h2" href="../file/src/client/app/react/containers/search/index.js">src/client/app/react/containers/search/index.js</a> b/<a href="../file/src/client/app/react/containers/search/index.js">src/client/app/react/containers/search/index.js</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -4,9 +4,9 @@ import { Spacing } from &#39;react-elemental&#39;;
+</a> import { Helmet } from &#39;react-helmet&#39;;
+ import { connect } from &#39;react-redux&#39;;
+ import { bindActionCreators } from &#39;redux&#39;;
+<a href="#h2-0-3" id="h2-0-3" class="d">-import { withResource } from &#39;supercharged/client&#39;;
+</a> import { compose, withForm } from &#39;@linkiwi/hoc&#39;;
+ import withTelemetry from &#39;client/app/react/containers/hoc/with-telemetry&#39;;
+<a href="#h2-0-6" id="h2-0-6" class="i">+import withTransactionalResource from &#39;client/app/react/containers/hoc/with-transactional-resource&#39;;
+</a> import withTransactionalTunnel from &#39;client/app/react/containers/hoc/with-transactional-tunnel&#39;;
+ import SearchResultsContainer from &#39;client/app/react/containers/search/results&#39;;
+ import SearchQueryContainer from &#39;client/app/react/containers/search/query&#39;;
+<a href="#h2-1" id="h2-1" class="h">@@ -346,7 +346,7 @@ export default compose(
+</a>     }),
+   }),
+   withTelemetry,
+<a href="#h2-1-3" id="h2-1-3" class="d">-  withResource({
+</a><a href="#h2-1-4" id="h2-1-4" class="i">+  withTransactionalResource({
+</a>     key: &#39;fallback&#39;,
+     endpoint: &#39;/api/search&#39;,
+     invokeOnMount: false,
+<b>diff --git a/<a id="h3" href="../file/src/server/handlers/api/search.js">src/server/handlers/api/search.js</a> b/<a href="../file/src/server/handlers/api/search.js">src/server/handlers/api/search.js</a></b>
+<a href="#h3-0" id="h3-0" class="h">@@ -70,9 +70,9 @@ export class SearchHandler extends HTTPHandler {
+</a>   @withRequestLog
+   @withEndpointInstrumentation
+   @withRequestSchema(schema)
+<a href="#h3-0-3" id="h3-0-3" class="d">-  get(params) {
+</a><a href="#h3-0-4" id="h3-0-4" class="i">+  get({ id, ...params }) {
+</a>     return this.ctx.logic.search.executeSearch(params, (err, resp) =&gt;
+<a href="#h3-0-6" id="h3-0-6" class="d">-      (err ? this.error(err) : this.success(resp)));
+</a><a href="#h3-0-7" id="h3-0-7" class="i">+      (err ? this.error(err) : this.success({ data: { id, ...resp.data } })));
+</a>   }
+ }
+ 
+</pre>
+</div>
+</body>
+</html>

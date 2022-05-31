@@ -7,7 +7,7 @@ import UIDGenerator from 'client/app/util/uid-generator';
  * "transactions" for messages.
  *
  * @param {Object} opts Options object passed directly to the underlying Supercharged tunnel client.
- * @returns {Function} HOC factory providing same API as the Supercharged tunnel client.
+ * @returns {Function} HOC factory providing the same API as the Supercharged tunnel client.
  */
 const withTransactionalTunnel = (opts) => (WrappedComponent) => {
   const transactionIDGenerator = new UIDGenerator();

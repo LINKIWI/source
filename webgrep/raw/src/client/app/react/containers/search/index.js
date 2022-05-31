@@ -4,9 +4,9 @@ import { Spacing } from 'react-elemental';
 import { Helmet } from 'react-helmet';
 import { connect } from 'react-redux';
 import { bindActionCreators } from 'redux';
-import { withResource } from 'supercharged/client';
 import { compose, withForm } from '@linkiwi/hoc';
 import withTelemetry from 'client/app/react/containers/hoc/with-telemetry';
+import withTransactionalResource from 'client/app/react/containers/hoc/with-transactional-resource';
 import withTransactionalTunnel from 'client/app/react/containers/hoc/with-transactional-tunnel';
 import SearchResultsContainer from 'client/app/react/containers/search/results';
 import SearchQueryContainer from 'client/app/react/containers/search/query';
@@ -346,7 +346,7 @@ export default compose(
     }),
   }),
   withTelemetry,
-  withResource({
+  withTransactionalResource({
     key: 'fallback',
     endpoint: '/api/search',
     invokeOnMount: false,

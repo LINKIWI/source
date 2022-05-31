@@ -70,9 +70,9 @@ export class SearchHandler extends HTTPHandler {
   @withRequestLog
   @withEndpointInstrumentation
   @withRequestSchema(schema)
-  get(params) {
+  get({ id, ...params }) {
     return this.ctx.logic.search.executeSearch(params, (err, resp) =>
-      (err ? this.error(err) : this.success(resp)));
+      (err ? this.error(err) : this.success({ data: { id, ...resp.data } })));
   }
 }
 
