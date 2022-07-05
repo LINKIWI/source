@@ -37,7 +37,8 @@ _externals = [
     _golang_x("crypto", "2cf3adece1227c48e1673f1c37d70357e1a6b9d"),
     _golang_x("net", "244492dfa37ae2ce87222fd06250a03160745faa"),
     _golang_x("text", "a9a820217f98f7c8a207ec1e45a874e1fe12c478"),
-    _golang_x("oauth2", "a6bd8cefa1811bd24b86f8902872e4e8225f74c4"),
+    _golang_x("oauth2", "2104d58473e0869996f17ef05fb7e0cc9bd19312"),
+    _golang_x("sync", "0de741cfad7ff3874b219dfbc1b9195b58c7c490"),
     _golang_x("sys", "33540a1f603772f9d4b761f416f5c10dade23e96"),
     struct(
         name = "org_golang_google_appengine",
@@ -63,6 +64,7 @@ _externals = [
     _github("src-d/gcfg", "1ac3a1ac202429a54835fe8408a92880156b489d"),
     _github("xanzy/ssh-agent", "6a3e2ff9e7c564f36873c2e36413f634534f1c44"),
     _github("xanzy/go-gitlab", "3f1f63decbcbf8e2ec9bbe1417863a8d51718cd5"),
+    _github("google/go-github", "fd22ee93382e50d36592170f63c6a08d7c35ed8d"),
     _gopkg("alexcesaro/statsd.v2", "7fea3f0d2fab1ad973e641e51dba45443a311a90"),
     _gopkg("check.v1", "20d25e2804050c1cd24a7eea1e7a6447dd0e74ec"),
     _gopkg("src-d/go-billy.v4", "780403cfc1bc95ff4d07e7b26db40a6186c5326e"),

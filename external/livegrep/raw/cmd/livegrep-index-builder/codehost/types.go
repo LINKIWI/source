@@ -1,6 +1,8 @@
 package codehost
 
 const (
+	// Github is the identifier for the Github codehost backend.
+	Github = "github"
 	// Gitlab is the identifier for the Gitlab codehost backend.
 	Gitlab = "gitlab"
 	// Static is the identifier for the static codehost backend.

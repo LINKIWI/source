@@ -19,10 +19,11 @@ var (
 	flagSSHSkipHostVerify      = flag.Bool("ssh-skip-host-verify", false, "skip server host identity verification for SSH authentication")
 	flagRepoSyncConcurrency    = flag.Int("repo-sync-concurrency", 5, "concurrency limit for repository synchronization")
 	flagRepoSyncErrorThreshold = flag.Int("repo-sync-error-threshold", 0, "threshold number of repository synchronization errors to consider the synchronization to have failed")
-	flagCodeHost               = newChoicesFlag([]string{codehost.Gitlab, codehost.Static}, "")
+	flagCodeHost               = newChoicesFlag([]string{codehost.Github, codehost.Gitlab, codehost.Static}, "")
 	flagCodeHostParams         = newStringMapFlag()
 
 	codehostBackends = map[string]codehost.Factory{
+		codehost.Github: codehost.NewGithubCodeHost,
 		codehost.Gitlab: codehost.NewGitLabCodeHost,
 		codehost.Static: codehost.NewStaticCodeHost,
 	}
