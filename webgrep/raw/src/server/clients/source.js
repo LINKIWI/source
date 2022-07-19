@@ -1,6 +1,7 @@
 import fs from 'fs';
 import { Gitlab } from 'gitlab';
 import git from 'isomorphic-git';
+import { Octokit } from '@octokit/rest';
 import { stopwatch } from 'shared/util/instrumentation';
 
 /**
@@ -53,6 +54,43 @@ export class LocalSourceBackend extends SourceBackend {
 
     return git.readBlob({ fs, dir: this.repos[repo], oid: version, filepath: path })
       .then((blob) => cb(null, Buffer.from(blob.blob).toString('base64')))
+      .catch((err) => cb(err));
+  }
+}
+
+/**
+ * Source code viewer backed by Github.
+ */
+export class GithubSourceBackend extends SourceBackend {
+  /**
+   * Create a client instance.
+   *
+   * @param {String} accessToken Github personal access token.
+   */
+  constructor(accessToken) {
+    super();
+
+    this.client = new Octokit({ auth: accessToken });
+  }
+
+  read(repo, version, path, cb) {
+    const [owner, name] = repo.split('/');
+    if (!owner || !name) {
+      return cb(new Error('unable to parse repository owner and name'));
+    }
+
+    const params = {
+      owner,
+      repo: name,
+      path,
+      ref: version,
+      mediaType: {
+        format: 'raw',
+      },
+    };
+
+    return this.client.rest.repos.getContent(params)
+      .then((resp) => cb(null, Buffer.from(resp.data).toString('base64')))
       .catch((err) => cb(err));
   }
 }

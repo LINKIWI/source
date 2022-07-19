@@ -6,7 +6,7 @@ import ConfigClient from 'server/clients/config';
 import GRPCClient, { RoundRobinGRPCLoadBalancer, FailoverGRPCLoadBalancer, StaticGRPCLoadBalancer } from 'server/clients/grpc';
 import LoggerClient, { NoopLogger, WinstonLogger } from 'server/clients/logger';
 import MetricsClient, { NoopMetricsClient, StatsdMetricsClient } from 'server/clients/metrics';
-import SourceClient, { NoopSourceBackend, LocalSourceBackend, GitlabSourceBackend } from 'server/clients/source';
+import SourceClient, { NoopSourceBackend, LocalSourceBackend, GithubSourceBackend, GitlabSourceBackend } from 'server/clients/source';
 import AdminLogic from 'server/logic/admin';
 import MetaLogic from 'server/logic/meta';
 import SearchLogic from 'server/logic/search';
@@ -124,6 +124,11 @@ export default class Context {
         case 'local':
           return new SourceClient(
             new LocalSourceBackend(this.config.get('server.source.local.repositories') || []),
+            this.metrics,
+          );
+        case 'github':
+          return new SourceClient(
+            new GithubSourceBackend(this.config.get('server.source.github.access_token')),
             this.metrics,
           );
         case 'gitlab':
