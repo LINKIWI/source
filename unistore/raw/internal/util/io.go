@@ -1,6 +1,7 @@
 package util
 
 import (
+	"context"
 	"fmt"
 	"io"
 )
@@ -43,10 +44,10 @@ func NewMultiWriteCloser(wc ...io.WriteCloser) io.WriteCloser {
 }
 
 // Close attempts to close all underlying write closers, collecting all errors as applicable.
-func (m *multiWriteCloser) Close() error {
+func (mwc *multiWriteCloser) Close() error {
 	var errs []error
 
-	for _, writer := range m.wc {
+	for _, writer := range mwc.wc {
 		if err := writer.Close(); err != nil {
 			errs = append(errs, err)
 		}
@@ -57,4 +58,46 @@ func (m *multiWriteCloser) Close() error {
 	}
 
 	return fmt.Errorf("util: error closing multiple write closers: errs=%v", errs)
+}
+
+// contextReader is a context-aware io.Reader simulating cancelable, asynchronous I/O over an
+// existing io.Reader.
+type contextReader struct {
+	ctx context.Context
+	io.Reader
+}
+
+// NewContextReader creates a new io.Reader wrapper with the provided context and reader.
+func NewContextReader(ctx context.Context, reader io.Reader) io.Reader {
+	return &contextReader{
+		ctx:    ctx,
+		Reader: reader,
+	}
+}
+
+// Read passes the read to the child io.Reader while respecting context cancellations.
+func (cr *contextReader) Read(p []byte) (int, error) {
+	type ioResult struct {
+		n   int
+		err error
+	}
+
+	if cr.ctx.Err() != nil {
+		return 0, cr.ctx.Err()
+	}
+
+	result := make(chan ioResult)
+
+	go func() {
+		r := ioResult{}
+		r.n, r.err = cr.Reader.Read(p)
+		result <- r
+	}()
+
+	select {
+	case <-cr.ctx.Done():
+		return 0, cr.ctx.Err()
+	case r := <-result:
+		return r.n, r.err
+	}
 }

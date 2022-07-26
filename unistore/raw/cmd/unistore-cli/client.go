@@ -38,7 +38,7 @@ func newClientConfig(path string, store string) (*config.Store, *config.RPC, err
 }
 
 // newUnistoreClient initializes a Unistore gRPC client based on the client configuration.
-func newUnistoreClient(store *config.Store, rpc *config.RPC) (*unistore.Client, error) {
+func newUnistoreClient(ctx context.Context, store *config.Store, rpc *config.RPC) (*unistore.Client, error) {
 	var cancel context.CancelFunc
 	var opts []grpc.DialOption
 
@@ -76,7 +76,6 @@ func newUnistoreClient(store *config.Store, rpc *config.RPC) (*unistore.Client, 
 		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	}
 
-	ctx := context.Background()
 	if store.Connection.ConnectTimeout > 0 {
 		ctx, cancel = context.WithTimeout(ctx, store.Connection.ConnectTimeout)
 		defer cancel()

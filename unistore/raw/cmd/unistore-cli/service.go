@@ -14,9 +14,36 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"unistore/internal/config"
+	"unistore/internal/util"
 	"unistore/schemas/common"
 	"unistore/schemas/service"
 )
+
+// preRunGlobalTimeout is a pre-run routine executed on all commands that assigns a context to the
+// command with an optional timeout.
+func preRunGlobalTimeout(cmd *cobra.Command, args []string) error {
+	base := context.Background()
+
+	if flagTimeout == 0 {
+		cmd.SetContext(base)
+		return nil
+	}
+
+	ctx, cancel := context.WithCancel(base)
+	cmd.SetContext(ctx)
+
+	go func() {
+		select {
+		case <-time.After(flagTimeout):
+			cancel()
+		// Propagate cancellation of the base context to the child context to avoid leaks
+		case <-base.Done():
+			cancel()
+		}
+	}()
+
+	return nil
+}
 
 // runInfo prints server metadata information via the Meta service Info RPC.
 func runInfo(cmd *cobra.Command, args []string) error {
@@ -27,7 +54,7 @@ func runInfo(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	client, err := newUnistoreClient(store, rpc)
+	client, err := newUnistoreClient(cmd.Context(), store, rpc)
 	if err != nil {
 		return err
 	}
@@ -38,7 +65,7 @@ func runInfo(cmd *cobra.Command, args []string) error {
 		rdr.proto(request)
 	}
 
-	response, err := client.Meta().Info(context.Background(), request)
+	response, err := client.Meta().Info(cmd.Context(), request)
 	if err != nil {
 		return err
 	}
@@ -70,7 +97,7 @@ func runHeadBucket(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	client, err := newUnistoreClient(store, rpc)
+	client, err := newUnistoreClient(cmd.Context(), store, rpc)
 	if err != nil {
 		return err
 	}
@@ -86,7 +113,7 @@ func runHeadBucket(cmd *cobra.Command, args []string) error {
 		rdr.proto(request)
 	}
 
-	response, err := client.HeadBucket(context.Background(), request)
+	response, err := client.HeadBucket(cmd.Context(), request)
 	if err != nil {
 		return err
 	}
@@ -104,7 +131,7 @@ func runHeadObject(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	client, err := newUnistoreClient(store, rpc)
+	client, err := newUnistoreClient(cmd.Context(), store, rpc)
 	if err != nil {
 		return err
 	}
@@ -121,7 +148,7 @@ func runHeadObject(cmd *cobra.Command, args []string) error {
 		rdr.proto(request)
 	}
 
-	response, err := client.HeadObject(context.Background(), request)
+	response, err := client.HeadObject(cmd.Context(), request)
 	if err != nil {
 		return err
 	}
@@ -144,7 +171,7 @@ func runDownload(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	client, err := newUnistoreClient(store, rpc)
+	client, err := newUnistoreClient(cmd.Context(), store, rpc)
 	if err != nil {
 		return err
 	}
@@ -170,7 +197,7 @@ func runDownload(cmd *cobra.Command, args []string) error {
 			rdr.proto(get)
 		}
 
-		response, err := client.GetObject(context.Background(), get)
+		response, err := client.GetObject(cmd.Context(), get)
 		if err != nil {
 			return err
 		}
@@ -192,7 +219,7 @@ func runDownload(cmd *cobra.Command, args []string) error {
 		rdr.proto(request)
 	}
 
-	response, err := client.StreamGetObject(context.Background(), request)
+	response, err := client.StreamGetObject(cmd.Context(), request)
 	if err != nil {
 		return err
 	}
@@ -268,7 +295,7 @@ func runUpload(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	client, err := newUnistoreClient(store, rpc)
+	client, err := newUnistoreClient(cmd.Context(), store, rpc)
 	if err != nil {
 		return err
 	}
@@ -288,8 +315,12 @@ func runUpload(cmd *cobra.Command, args []string) error {
 		Attributes: attributes,
 	}
 
+	// Wrap os.Stdin with a context-aware reader, so that stdin reads respect any potential
+	// downstream context cancellations (e.g. if stdin produces no bytes and thus blocks I/O).
+	stdin := util.NewContextReader(cmd.Context(), os.Stdin)
+
 	if !stream {
-		data, err := io.ReadAll(os.Stdin)
+		data, err := io.ReadAll(stdin)
 		if err != nil {
 			return err
 		}
@@ -300,7 +331,7 @@ func runUpload(cmd *cobra.Command, args []string) error {
 			rdr.proto(put)
 		}
 
-		response, err := client.PutObject(context.Background(), put)
+		response, err := client.PutObject(cmd.Context(), put)
 		if err != nil {
 			return err
 		}
@@ -308,7 +339,7 @@ func runUpload(cmd *cobra.Command, args []string) error {
 		return rdr.proto(response)
 	}
 
-	request, err := client.StreamPutObject(context.Background())
+	request, err := client.StreamPutObject(cmd.Context())
 	if err != nil {
 		return err
 	}
@@ -339,7 +370,7 @@ func runUpload(cmd *cobra.Command, args []string) error {
 
 	for {
 		chunk := make([]byte, chunkSize)
-		n, err := os.Stdin.Read(chunk)
+		n, err := stdin.Read(chunk)
 		if err == io.EOF {
 			break
 		} else if err != nil {
@@ -387,7 +418,7 @@ func runDelete(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	client, err := newUnistoreClient(store, rpc)
+	client, err := newUnistoreClient(cmd.Context(), store, rpc)
 	if err != nil {
 		return err
 	}
@@ -405,7 +436,7 @@ func runDelete(cmd *cobra.Command, args []string) error {
 		rdr.proto(request)
 	}
 
-	response, err := client.DeleteObject(context.Background(), request)
+	response, err := client.DeleteObject(cmd.Context(), request)
 	if err != nil {
 		return err
 	}
@@ -422,7 +453,7 @@ func runListBuckets(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	client, err := newUnistoreClient(store, rpc)
+	client, err := newUnistoreClient(cmd.Context(), store, rpc)
 	if err != nil {
 		return err
 	}
@@ -437,7 +468,7 @@ func runListBuckets(cmd *cobra.Command, args []string) error {
 		rdr.proto(request)
 	}
 
-	response, err := client.ListBuckets(context.Background(), request)
+	response, err := client.ListBuckets(cmd.Context(), request)
 	if err != nil {
 		return err
 	}
@@ -461,7 +492,7 @@ func runListObjects(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	client, err := newUnistoreClient(store, rpc)
+	client, err := newUnistoreClient(cmd.Context(), store, rpc)
 	if err != nil {
 		return err
 	}
@@ -479,7 +510,7 @@ func runListObjects(cmd *cobra.Command, args []string) error {
 		rdr.proto(request)
 	}
 
-	response, err := client.ListObjects(context.Background(), request)
+	response, err := client.ListObjects(cmd.Context(), request)
 	if err != nil {
 		return err
 	}

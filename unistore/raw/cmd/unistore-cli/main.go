@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -14,15 +15,17 @@ var (
 	flagFormat  string
 	flagConfig  string
 	flagStore   string
+	flagTimeout time.Duration
 	flagVerbose bool
 )
 
 var (
 	rootCmd = &cobra.Command{
-		Use:     "uni",
-		Short:   "Command line client for Unistore",
-		Long:    "Command line interfaces for create, read, update, and deletion of objects in a remote Unistore gRPC server",
-		Version: meta.Version,
+		Use:               "uni",
+		Short:             "Command line client for Unistore",
+		Long:              "Command line interfaces for create, read, update, and deletion of objects in a remote Unistore gRPC server",
+		Version:           meta.Version,
+		PersistentPreRunE: preRunGlobalTimeout,
 	}
 	infoCmd = &cobra.Command{
 		Use:   "info",
@@ -191,6 +194,13 @@ func init() {
 		"s",
 		os.Getenv("UNI_STORE"),
 		"server store alias in configuration",
+	)
+	rootCmd.PersistentFlags().DurationVarP(
+		&flagTimeout,
+		"timeout",
+		"w",
+		0,
+		"global timeout for all operations",
 	)
 	rootCmd.PersistentFlags().BoolVarP(
 		&flagVerbose,

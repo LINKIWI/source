@@ -18,7 +18,7 @@ body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{fo
 <a href="../../../log">Log</a> | <a href="../../../files">Files</a> | <a href="../../../refs">Refs</a> | <a href="../../../file/README.md">README</a></td></tr></table>
 <hr/>
 <div id="content">
-<p>cmd/unistore-cli/<strong>client.go</strong> (4555B) (<a href="../../../raw/cmd/unistore-cli/client.go">raw</a>) (<a href="../../../blame/cmd/unistore-cli/client.go">blame</a>)</p><hr/>
+<p>cmd/unistore-cli/<strong>client.go</strong> (4547B) (<a href="../../../raw/cmd/unistore-cli/client.go">raw</a>) (<a href="../../../blame/cmd/unistore-cli/client.go">blame</a>)</p><hr/>
 <pre id="blob">
 <a href="#l1" class="line" id="l1">      1</a> package main
 <a href="#l2" class="line" id="l2">      2</a> 
@@ -60,7 +60,7 @@ body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{fo
 <a href="#l38" class="line" id="l38">     38</a> }
 <a href="#l39" class="line" id="l39">     39</a> 
 <a href="#l40" class="line" id="l40">     40</a> // newUnistoreClient initializes a Unistore gRPC client based on the client configuration.
-<a href="#l41" class="line" id="l41">     41</a> func newUnistoreClient(store *config.Store, rpc *config.RPC) (*unistore.Client, error) {
+<a href="#l41" class="line" id="l41">     41</a> func newUnistoreClient(ctx context.Context, store *config.Store, rpc *config.RPC) (*unistore.Client, error) {
 <a href="#l42" class="line" id="l42">     42</a> 	var cancel context.CancelFunc
 <a href="#l43" class="line" id="l43">     43</a> 	var opts []grpc.DialOption
 <a href="#l44" class="line" id="l44">     44</a> 
@@ -98,108 +98,107 @@ body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{fo
 <a href="#l76" class="line" id="l76">     76</a> 		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 <a href="#l77" class="line" id="l77">     77</a> 	}
 <a href="#l78" class="line" id="l78">     78</a> 
-<a href="#l79" class="line" id="l79">     79</a> 	ctx := context.Background()
-<a href="#l80" class="line" id="l80">     80</a> 	if store.Connection.ConnectTimeout &gt; 0 {
-<a href="#l81" class="line" id="l81">     81</a> 		ctx, cancel = context.WithTimeout(ctx, store.Connection.ConnectTimeout)
-<a href="#l82" class="line" id="l82">     82</a> 		defer cancel()
-<a href="#l83" class="line" id="l83">     83</a> 	}
-<a href="#l84" class="line" id="l84">     84</a> 
-<a href="#l85" class="line" id="l85">     85</a> 	return unistore.New(ctx, store.Address, opts...)
-<a href="#l86" class="line" id="l86">     86</a> }
-<a href="#l87" class="line" id="l87">     87</a> 
-<a href="#l88" class="line" id="l88">     88</a> // newTLSConfig creates a new *tls.Config from the configuration-declared TLS context.
-<a href="#l89" class="line" id="l89">     89</a> func newTLSConfig(cfg *config.TLSContext) (*tls.Config, error) {
-<a href="#l90" class="line" id="l90">     90</a> 	var certificates []tls.Certificate
-<a href="#l91" class="line" id="l91">     91</a> 
-<a href="#l92" class="line" id="l92">     92</a> 	caPool, err := x509.SystemCertPool()
-<a href="#l93" class="line" id="l93">     93</a> 	if err != nil {
-<a href="#l94" class="line" id="l94">     94</a> 		return nil, fmt.Errorf(
-<a href="#l95" class="line" id="l95">     95</a> 			&quot;error retrieving system CA certificate pool: err=%v&quot;,
-<a href="#l96" class="line" id="l96">     96</a> 			err,
-<a href="#l97" class="line" id="l97">     97</a> 		)
-<a href="#l98" class="line" id="l98">     98</a> 	}
-<a href="#l99" class="line" id="l99">     99</a> 
-<a href="#l100" class="line" id="l100">    100</a> 	for _, cert := range cfg.Certificates {
-<a href="#l101" class="line" id="l101">    101</a> 		keypair, err := tls.LoadX509KeyPair(cert.Certificate, cert.Key)
-<a href="#l102" class="line" id="l102">    102</a> 		if err != nil {
-<a href="#l103" class="line" id="l103">    103</a> 			return nil, fmt.Errorf(
-<a href="#l104" class="line" id="l104">    104</a> 				&quot;error loading client keypair: key=%s cert=%s err=%v&quot;,
-<a href="#l105" class="line" id="l105">    105</a> 				cert.Key,
-<a href="#l106" class="line" id="l106">    106</a> 				cert.Certificate,
-<a href="#l107" class="line" id="l107">    107</a> 				err,
-<a href="#l108" class="line" id="l108">    108</a> 			)
-<a href="#l109" class="line" id="l109">    109</a> 		}
-<a href="#l110" class="line" id="l110">    110</a> 
-<a href="#l111" class="line" id="l111">    111</a> 		if cert.Authority != &quot;&quot; {
-<a href="#l112" class="line" id="l112">    112</a> 			ca, err := os.ReadFile(cert.Authority)
-<a href="#l113" class="line" id="l113">    113</a> 			if err != nil {
-<a href="#l114" class="line" id="l114">    114</a> 				return nil, fmt.Errorf(
-<a href="#l115" class="line" id="l115">    115</a> 					&quot;error reading CA certificate: cert=%s err=%v&quot;,
-<a href="#l116" class="line" id="l116">    116</a> 					cert.Authority,
-<a href="#l117" class="line" id="l117">    117</a> 					err,
-<a href="#l118" class="line" id="l118">    118</a> 				)
-<a href="#l119" class="line" id="l119">    119</a> 			}
-<a href="#l120" class="line" id="l120">    120</a> 
-<a href="#l121" class="line" id="l121">    121</a> 			caPool.AppendCertsFromPEM(ca)
-<a href="#l122" class="line" id="l122">    122</a> 		}
-<a href="#l123" class="line" id="l123">    123</a> 
-<a href="#l124" class="line" id="l124">    124</a> 		certificates = append(certificates, keypair)
-<a href="#l125" class="line" id="l125">    125</a> 	}
-<a href="#l126" class="line" id="l126">    126</a> 
-<a href="#l127" class="line" id="l127">    127</a> 	tlsCfg := &amp;tls.Config{
-<a href="#l128" class="line" id="l128">    128</a> 		Certificates: certificates,
-<a href="#l129" class="line" id="l129">    129</a> 		RootCAs:      caPool,
-<a href="#l130" class="line" id="l130">    130</a> 	}
-<a href="#l131" class="line" id="l131">    131</a> 
-<a href="#l132" class="line" id="l132">    132</a> 	if cfg.VerifyPeer != &quot;&quot; {
-<a href="#l133" class="line" id="l133">    133</a> 		tlsCfg.InsecureSkipVerify = true
-<a href="#l134" class="line" id="l134">    134</a> 		tlsCfg.VerifyConnection = func(state tls.ConnectionState) error {
-<a href="#l135" class="line" id="l135">    135</a> 			verifyOpts := x509.VerifyOptions{
-<a href="#l136" class="line" id="l136">    136</a> 				Intermediates: x509.NewCertPool(),
-<a href="#l137" class="line" id="l137">    137</a> 				Roots:         caPool,
-<a href="#l138" class="line" id="l138">    138</a> 			}
-<a href="#l139" class="line" id="l139">    139</a> 
-<a href="#l140" class="line" id="l140">    140</a> 			for _, cert := range state.PeerCertificates[1:] {
-<a href="#l141" class="line" id="l141">    141</a> 				verifyOpts.Intermediates.AddCert(cert)
-<a href="#l142" class="line" id="l142">    142</a> 			}
-<a href="#l143" class="line" id="l143">    143</a> 
-<a href="#l144" class="line" id="l144">    144</a> 			if _, err := state.PeerCertificates[0].Verify(verifyOpts); err != nil {
-<a href="#l145" class="line" id="l145">    145</a> 				return fmt.Errorf(
-<a href="#l146" class="line" id="l146">    146</a> 					&quot;native server certificate verification failed: err=%v&quot;,
-<a href="#l147" class="line" id="l147">    147</a> 					err,
-<a href="#l148" class="line" id="l148">    148</a> 				)
-<a href="#l149" class="line" id="l149">    149</a> 			}
-<a href="#l150" class="line" id="l150">    150</a> 
-<a href="#l151" class="line" id="l151">    151</a> 			return state.PeerCertificates[0].VerifyHostname(cfg.VerifyPeer)
-<a href="#l152" class="line" id="l152">    152</a> 		}
-<a href="#l153" class="line" id="l153">    153</a> 	}
-<a href="#l154" class="line" id="l154">    154</a> 
-<a href="#l155" class="line" id="l155">    155</a> 	return tlsCfg, nil
-<a href="#l156" class="line" id="l156">    156</a> }
-<a href="#l157" class="line" id="l157">    157</a> 
-<a href="#l158" class="line" id="l158">    158</a> // newRequestTimeoutUnaryInterceptor creates a new grpc.UnaryClientInterceptor that automatically
-<a href="#l159" class="line" id="l159">    159</a> // applies a request timeout on all unary requests by augmenting the parent context passed to the
-<a href="#l160" class="line" id="l160">    160</a> // invoker.
-<a href="#l161" class="line" id="l161">    161</a> func newRequestTimeoutUnaryInterceptor(timeout time.Duration) grpc.UnaryClientInterceptor {
-<a href="#l162" class="line" id="l162">    162</a> 	return func(
-<a href="#l163" class="line" id="l163">    163</a> 		ctx context.Context,
-<a href="#l164" class="line" id="l164">    164</a> 		method string,
-<a href="#l165" class="line" id="l165">    165</a> 		req interface{},
-<a href="#l166" class="line" id="l166">    166</a> 		reply interface{},
-<a href="#l167" class="line" id="l167">    167</a> 		cc *grpc.ClientConn,
-<a href="#l168" class="line" id="l168">    168</a> 		invoker grpc.UnaryInvoker,
-<a href="#l169" class="line" id="l169">    169</a> 		opts ...grpc.CallOption,
-<a href="#l170" class="line" id="l170">    170</a> 	) error {
-<a href="#l171" class="line" id="l171">    171</a> 		var cancel context.CancelFunc
-<a href="#l172" class="line" id="l172">    172</a> 
-<a href="#l173" class="line" id="l173">    173</a> 		if timeout &gt; 0 {
-<a href="#l174" class="line" id="l174">    174</a> 			ctx, cancel = context.WithTimeout(ctx, timeout)
-<a href="#l175" class="line" id="l175">    175</a> 			defer cancel()
-<a href="#l176" class="line" id="l176">    176</a> 		}
-<a href="#l177" class="line" id="l177">    177</a> 
-<a href="#l178" class="line" id="l178">    178</a> 		return invoker(ctx, method, req, reply, cc, opts...)
-<a href="#l179" class="line" id="l179">    179</a> 	}
-<a href="#l180" class="line" id="l180">    180</a> }
+<a href="#l79" class="line" id="l79">     79</a> 	if store.Connection.ConnectTimeout &gt; 0 {
+<a href="#l80" class="line" id="l80">     80</a> 		ctx, cancel = context.WithTimeout(ctx, store.Connection.ConnectTimeout)
+<a href="#l81" class="line" id="l81">     81</a> 		defer cancel()
+<a href="#l82" class="line" id="l82">     82</a> 	}
+<a href="#l83" class="line" id="l83">     83</a> 
+<a href="#l84" class="line" id="l84">     84</a> 	return unistore.New(ctx, store.Address, opts...)
+<a href="#l85" class="line" id="l85">     85</a> }
+<a href="#l86" class="line" id="l86">     86</a> 
+<a href="#l87" class="line" id="l87">     87</a> // newTLSConfig creates a new *tls.Config from the configuration-declared TLS context.
+<a href="#l88" class="line" id="l88">     88</a> func newTLSConfig(cfg *config.TLSContext) (*tls.Config, error) {
+<a href="#l89" class="line" id="l89">     89</a> 	var certificates []tls.Certificate
+<a href="#l90" class="line" id="l90">     90</a> 
+<a href="#l91" class="line" id="l91">     91</a> 	caPool, err := x509.SystemCertPool()
+<a href="#l92" class="line" id="l92">     92</a> 	if err != nil {
+<a href="#l93" class="line" id="l93">     93</a> 		return nil, fmt.Errorf(
+<a href="#l94" class="line" id="l94">     94</a> 			&quot;error retrieving system CA certificate pool: err=%v&quot;,
+<a href="#l95" class="line" id="l95">     95</a> 			err,
+<a href="#l96" class="line" id="l96">     96</a> 		)
+<a href="#l97" class="line" id="l97">     97</a> 	}
+<a href="#l98" class="line" id="l98">     98</a> 
+<a href="#l99" class="line" id="l99">     99</a> 	for _, cert := range cfg.Certificates {
+<a href="#l100" class="line" id="l100">    100</a> 		keypair, err := tls.LoadX509KeyPair(cert.Certificate, cert.Key)
+<a href="#l101" class="line" id="l101">    101</a> 		if err != nil {
+<a href="#l102" class="line" id="l102">    102</a> 			return nil, fmt.Errorf(
+<a href="#l103" class="line" id="l103">    103</a> 				&quot;error loading client keypair: key=%s cert=%s err=%v&quot;,
+<a href="#l104" class="line" id="l104">    104</a> 				cert.Key,
+<a href="#l105" class="line" id="l105">    105</a> 				cert.Certificate,
+<a href="#l106" class="line" id="l106">    106</a> 				err,
+<a href="#l107" class="line" id="l107">    107</a> 			)
+<a href="#l108" class="line" id="l108">    108</a> 		}
+<a href="#l109" class="line" id="l109">    109</a> 
+<a href="#l110" class="line" id="l110">    110</a> 		if cert.Authority != &quot;&quot; {
+<a href="#l111" class="line" id="l111">    111</a> 			ca, err := os.ReadFile(cert.Authority)
+<a href="#l112" class="line" id="l112">    112</a> 			if err != nil {
+<a href="#l113" class="line" id="l113">    113</a> 				return nil, fmt.Errorf(
+<a href="#l114" class="line" id="l114">    114</a> 					&quot;error reading CA certificate: cert=%s err=%v&quot;,
+<a href="#l115" class="line" id="l115">    115</a> 					cert.Authority,
+<a href="#l116" class="line" id="l116">    116</a> 					err,
+<a href="#l117" class="line" id="l117">    117</a> 				)
+<a href="#l118" class="line" id="l118">    118</a> 			}
+<a href="#l119" class="line" id="l119">    119</a> 
+<a href="#l120" class="line" id="l120">    120</a> 			caPool.AppendCertsFromPEM(ca)
+<a href="#l121" class="line" id="l121">    121</a> 		}
+<a href="#l122" class="line" id="l122">    122</a> 
+<a href="#l123" class="line" id="l123">    123</a> 		certificates = append(certificates, keypair)
+<a href="#l124" class="line" id="l124">    124</a> 	}
+<a href="#l125" class="line" id="l125">    125</a> 
+<a href="#l126" class="line" id="l126">    126</a> 	tlsCfg := &amp;tls.Config{
+<a href="#l127" class="line" id="l127">    127</a> 		Certificates: certificates,
+<a href="#l128" class="line" id="l128">    128</a> 		RootCAs:      caPool,
+<a href="#l129" class="line" id="l129">    129</a> 	}
+<a href="#l130" class="line" id="l130">    130</a> 
+<a href="#l131" class="line" id="l131">    131</a> 	if cfg.VerifyPeer != &quot;&quot; {
+<a href="#l132" class="line" id="l132">    132</a> 		tlsCfg.InsecureSkipVerify = true
+<a href="#l133" class="line" id="l133">    133</a> 		tlsCfg.VerifyConnection = func(state tls.ConnectionState) error {
+<a href="#l134" class="line" id="l134">    134</a> 			verifyOpts := x509.VerifyOptions{
+<a href="#l135" class="line" id="l135">    135</a> 				Intermediates: x509.NewCertPool(),
+<a href="#l136" class="line" id="l136">    136</a> 				Roots:         caPool,
+<a href="#l137" class="line" id="l137">    137</a> 			}
+<a href="#l138" class="line" id="l138">    138</a> 
+<a href="#l139" class="line" id="l139">    139</a> 			for _, cert := range state.PeerCertificates[1:] {
+<a href="#l140" class="line" id="l140">    140</a> 				verifyOpts.Intermediates.AddCert(cert)
+<a href="#l141" class="line" id="l141">    141</a> 			}
+<a href="#l142" class="line" id="l142">    142</a> 
+<a href="#l143" class="line" id="l143">    143</a> 			if _, err := state.PeerCertificates[0].Verify(verifyOpts); err != nil {
+<a href="#l144" class="line" id="l144">    144</a> 				return fmt.Errorf(
+<a href="#l145" class="line" id="l145">    145</a> 					&quot;native server certificate verification failed: err=%v&quot;,
+<a href="#l146" class="line" id="l146">    146</a> 					err,
+<a href="#l147" class="line" id="l147">    147</a> 				)
+<a href="#l148" class="line" id="l148">    148</a> 			}
+<a href="#l149" class="line" id="l149">    149</a> 
+<a href="#l150" class="line" id="l150">    150</a> 			return state.PeerCertificates[0].VerifyHostname(cfg.VerifyPeer)
+<a href="#l151" class="line" id="l151">    151</a> 		}
+<a href="#l152" class="line" id="l152">    152</a> 	}
+<a href="#l153" class="line" id="l153">    153</a> 
+<a href="#l154" class="line" id="l154">    154</a> 	return tlsCfg, nil
+<a href="#l155" class="line" id="l155">    155</a> }
+<a href="#l156" class="line" id="l156">    156</a> 
+<a href="#l157" class="line" id="l157">    157</a> // newRequestTimeoutUnaryInterceptor creates a new grpc.UnaryClientInterceptor that automatically
+<a href="#l158" class="line" id="l158">    158</a> // applies a request timeout on all unary requests by augmenting the parent context passed to the
+<a href="#l159" class="line" id="l159">    159</a> // invoker.
+<a href="#l160" class="line" id="l160">    160</a> func newRequestTimeoutUnaryInterceptor(timeout time.Duration) grpc.UnaryClientInterceptor {
+<a href="#l161" class="line" id="l161">    161</a> 	return func(
+<a href="#l162" class="line" id="l162">    162</a> 		ctx context.Context,
+<a href="#l163" class="line" id="l163">    163</a> 		method string,
+<a href="#l164" class="line" id="l164">    164</a> 		req interface{},
+<a href="#l165" class="line" id="l165">    165</a> 		reply interface{},
+<a href="#l166" class="line" id="l166">    166</a> 		cc *grpc.ClientConn,
+<a href="#l167" class="line" id="l167">    167</a> 		invoker grpc.UnaryInvoker,
+<a href="#l168" class="line" id="l168">    168</a> 		opts ...grpc.CallOption,
+<a href="#l169" class="line" id="l169">    169</a> 	) error {
+<a href="#l170" class="line" id="l170">    170</a> 		var cancel context.CancelFunc
+<a href="#l171" class="line" id="l171">    171</a> 
+<a href="#l172" class="line" id="l172">    172</a> 		if timeout &gt; 0 {
+<a href="#l173" class="line" id="l173">    173</a> 			ctx, cancel = context.WithTimeout(ctx, timeout)
+<a href="#l174" class="line" id="l174">    174</a> 			defer cancel()
+<a href="#l175" class="line" id="l175">    175</a> 		}
+<a href="#l176" class="line" id="l176">    176</a> 
+<a href="#l177" class="line" id="l177">    177</a> 		return invoker(ctx, method, req, reply, cc, opts...)
+<a href="#l178" class="line" id="l178">    178</a> 	}
+<a href="#l179" class="line" id="l179">    179</a> }
 </pre>
 </div>
 </body>

@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>cmd/unistore-cli: Global CLI timeout in context for all network I/O - unistore - Universal object storage server with pluggable backends</title>
+<meta name="description" content="Universal object storage server with pluggable backends" />
+<meta name="author" content="Kevin Lin" />
+<link rel="icon" type="image/png" href="https://static.kevinlin.info/favicon.png" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed" href="../atom.xml" />
+<link rel="alternate" type="application/atom+xml" title="unistore Atom Feed (tags)" href="../tags.xml" />
+<style type="text/css">
+body{color:#000;background-color:#fff;font-family:monospace}h1,h2,h3,h4,h5,h6{font-size:1em;margin:0}img,h1,h2{vertical-align:middle}img{border:0}a:target{background-color:#ccc}a.d,a.h,a.i{text-decoration:none}a.line{text-decoration:none;user-select:none}#blob a{color:#555}#blob a:hover{color:blue;text-decoration:none}table thead td{font-weight:bold}table td{padding:0 .4em}table td pre{margin:0}#content table td{vertical-align:top;white-space:nowrap}#branches tr:hover td,#tags tr:hover td,#index tr:hover td,#log tr:hover td,#files tr:hover td{background-color:#eee}#index tr td:nth-child(2),#tags tr td:nth-child(3),#branches tr td:nth-child(3),#log tr td:nth-child(2){white-space:normal}td.num{text-align:right}.desc{color:#555}hr{border:0;border-top:1px solid #555;height:1px}pre{font-family:monospace}pre a.h{color:#00a}.A,span.i,pre a.i{color:#070}.D,span.d,pre a.d{color:#e00}pre a.h:hover,pre a.i:hover,pre a.d:hover{text-decoration:none}
+</style>
+</head>
+<body>
+<table><tr><td><a href="/"><img src="https://static.kevinlin.info/favicon.png" alt="" width="32" height="32" /></a></td><td><h1>unistore</h1><span class="desc">Universal object storage server with pluggable backends</span></td></tr><tr class="url"><td></td><td>git clone <a href="https://source.static.kevinlin.info/unistore.git">https://source.static.kevinlin.info/unistore.git</a></td></tr><tr><td></td><td>
+<a href="../log">Log</a> | <a href="../files">Files</a> | <a href="../refs">Refs</a> | <a href="../file/README.md">README</a></td></tr></table>
+<hr/>
+<div id="content">
+<pre><b>commit</b> <a href="../commit/a1b25f1ec264f002fd6ea03c60530a3c363f941b">a1b25f1ec264f002fd6ea03c60530a3c363f941b</a>
+<b>parent</b> <a href="../commit/ab224e046d08d1001afd5d2f95f6466290a257bd">ab224e046d08d1001afd5d2f95f6466290a257bd</a>
+<b>Author:</b> Kevin Lin &lt;<a href="mailto:developer@kevinlin.info">developer@kevinlin.info</a>&gt;
+<b>Date:</b>   Sun 24 Jul 2022 20:23:01 -0700
+
+cmd/unistore-cli: Global CLI timeout in context for all network I/O
+
+<b>Diffstat:</b>
+<table><tr><td class="M">M</td><td><a href="#h0">cmd/unistore-cli/client.go</a></td><td> | </td><td class="num">3</td><td><span class="i">+</span><span class="d">--</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h1">cmd/unistore-cli/main.go</a></td><td> | </td><td class="num">18</td><td><span class="i">++++++++++++++</span><span class="d">----</span></td></tr>
+<tr><td class="M">M</td><td><a href="#h2">cmd/unistore-cli/service.go</a></td><td> | </td><td class="num">62</td><td><span class="i">++++++++++++++++++++++++++++++++++++++++++++</span><span class="d">------------------</span></td></tr>
+</table></pre><pre>3 files changed, 59 insertions(+), 24 deletions(-)
+<hr/><b>diff --git a/<a id="h0" href="../file/cmd/unistore-cli/client.go">cmd/unistore-cli/client.go</a> b/<a href="../file/cmd/unistore-cli/client.go">cmd/unistore-cli/client.go</a></b>
+<a href="#h0-0" id="h0-0" class="h">@@ -38,7 +38,7 @@ func newClientConfig(path string, store string) (*config.Store, *config.RPC, err
+</a> }
+ 
+ // newUnistoreClient initializes a Unistore gRPC client based on the client configuration.
+<a href="#h0-0-3" id="h0-0-3" class="d">-func newUnistoreClient(store *config.Store, rpc *config.RPC) (*unistore.Client, error) {
+</a><a href="#h0-0-4" id="h0-0-4" class="i">+func newUnistoreClient(ctx context.Context, store *config.Store, rpc *config.RPC) (*unistore.Client, error) {
+</a> 	var cancel context.CancelFunc
+ 	var opts []grpc.DialOption
+ 
+<a href="#h0-1" id="h0-1" class="h">@@ -76,7 +76,6 @@ func newUnistoreClient(store *config.Store, rpc *config.RPC) (*unistore.Client, 
+</a> 		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+ 	}
+ 
+<a href="#h0-1-3" id="h0-1-3" class="d">-	ctx := context.Background()
+</a> 	if store.Connection.ConnectTimeout &gt; 0 {
+ 		ctx, cancel = context.WithTimeout(ctx, store.Connection.ConnectTimeout)
+ 		defer cancel()
+<b>diff --git a/<a id="h1" href="../file/cmd/unistore-cli/main.go">cmd/unistore-cli/main.go</a> b/<a href="../file/cmd/unistore-cli/main.go">cmd/unistore-cli/main.go</a></b>
+<a href="#h1-0" id="h1-0" class="h">@@ -4,6 +4,7 @@ import (
+</a> 	&quot;fmt&quot;
+ 	&quot;os&quot;
+ 	&quot;strings&quot;
+<a href="#h1-0-3" id="h1-0-3" class="i">+	&quot;time&quot;
+</a> 
+ 	&quot;github.com/spf13/cobra&quot;
+ 
+<a href="#h1-1" id="h1-1" class="h">@@ -14,15 +15,17 @@ var (
+</a> 	flagFormat  string
+ 	flagConfig  string
+ 	flagStore   string
+<a href="#h1-1-3" id="h1-1-3" class="i">+	flagTimeout time.Duration
+</a> 	flagVerbose bool
+ )
+ 
+ var (
+ 	rootCmd = &amp;cobra.Command{
+<a href="#h1-1-9" id="h1-1-9" class="d">-		Use:     &quot;uni&quot;,
+</a><a href="#h1-1-10" id="h1-1-10" class="d">-		Short:   &quot;Command line client for Unistore&quot;,
+</a><a href="#h1-1-11" id="h1-1-11" class="d">-		Long:    &quot;Command line interfaces for create, read, update, and deletion of objects in a remote Unistore gRPC server&quot;,
+</a><a href="#h1-1-12" id="h1-1-12" class="d">-		Version: meta.Version,
+</a><a href="#h1-1-13" id="h1-1-13" class="i">+		Use:               &quot;uni&quot;,
+</a><a href="#h1-1-14" id="h1-1-14" class="i">+		Short:             &quot;Command line client for Unistore&quot;,
+</a><a href="#h1-1-15" id="h1-1-15" class="i">+		Long:              &quot;Command line interfaces for create, read, update, and deletion of objects in a remote Unistore gRPC server&quot;,
+</a><a href="#h1-1-16" id="h1-1-16" class="i">+		Version:           meta.Version,
+</a><a href="#h1-1-17" id="h1-1-17" class="i">+		PersistentPreRunE: preRunGlobalTimeout,
+</a> 	}
+ 	infoCmd = &amp;cobra.Command{
+ 		Use:   &quot;info&quot;,
+<a href="#h1-2" id="h1-2" class="h">@@ -192,6 +195,13 @@ func init() {
+</a> 		os.Getenv(&quot;UNI_STORE&quot;),
+ 		&quot;server store alias in configuration&quot;,
+ 	)
+<a href="#h1-2-3" id="h1-2-3" class="i">+	rootCmd.PersistentFlags().DurationVarP(
+</a><a href="#h1-2-4" id="h1-2-4" class="i">+		&amp;flagTimeout,
+</a><a href="#h1-2-5" id="h1-2-5" class="i">+		&quot;timeout&quot;,
+</a><a href="#h1-2-6" id="h1-2-6" class="i">+		&quot;w&quot;,
+</a><a href="#h1-2-7" id="h1-2-7" class="i">+		0,
+</a><a href="#h1-2-8" id="h1-2-8" class="i">+		&quot;global timeout for all operations&quot;,
+</a><a href="#h1-2-9" id="h1-2-9" class="i">+	)
+</a> 	rootCmd.PersistentFlags().BoolVarP(
+ 		&amp;flagVerbose,
+ 		&quot;verbose&quot;,
+<b>diff --git a/<a id="h2" href="../file/cmd/unistore-cli/service.go">cmd/unistore-cli/service.go</a> b/<a href="../file/cmd/unistore-cli/service.go">cmd/unistore-cli/service.go</a></b>
+<a href="#h2-0" id="h2-0" class="h">@@ -18,6 +18,32 @@ import (
+</a> 	&quot;unistore/schemas/service&quot;
+ )
+ 
+<a href="#h2-0-3" id="h2-0-3" class="i">+// preRunGlobalTimeout is a pre-run routine executed on all commands that assigns a context to the
+</a><a href="#h2-0-4" id="h2-0-4" class="i">+// command with an optional timeout.
+</a><a href="#h2-0-5" id="h2-0-5" class="i">+func preRunGlobalTimeout(cmd *cobra.Command, args []string) error {
+</a><a href="#h2-0-6" id="h2-0-6" class="i">+	base := context.Background()
+</a><a href="#h2-0-7" id="h2-0-7" class="i">+
+</a><a href="#h2-0-8" id="h2-0-8" class="i">+	if flagTimeout == 0 {
+</a><a href="#h2-0-9" id="h2-0-9" class="i">+		cmd.SetContext(base)
+</a><a href="#h2-0-10" id="h2-0-10" class="i">+		return nil
+</a><a href="#h2-0-11" id="h2-0-11" class="i">+	}
+</a><a href="#h2-0-12" id="h2-0-12" class="i">+
+</a><a href="#h2-0-13" id="h2-0-13" class="i">+	ctx, cancel := context.WithCancel(base)
+</a><a href="#h2-0-14" id="h2-0-14" class="i">+	cmd.SetContext(ctx)
+</a><a href="#h2-0-15" id="h2-0-15" class="i">+
+</a><a href="#h2-0-16" id="h2-0-16" class="i">+	go func() {
+</a><a href="#h2-0-17" id="h2-0-17" class="i">+		select {
+</a><a href="#h2-0-18" id="h2-0-18" class="i">+		case &lt;-time.After(flagTimeout):
+</a><a href="#h2-0-19" id="h2-0-19" class="i">+			cancel()
+</a><a href="#h2-0-20" id="h2-0-20" class="i">+		// Propagate cancellation of the base context to the child context to avoid leaks
+</a><a href="#h2-0-21" id="h2-0-21" class="i">+		case &lt;-base.Done():
+</a><a href="#h2-0-22" id="h2-0-22" class="i">+			cancel()
+</a><a href="#h2-0-23" id="h2-0-23" class="i">+		}
+</a><a href="#h2-0-24" id="h2-0-24" class="i">+	}()
+</a><a href="#h2-0-25" id="h2-0-25" class="i">+
+</a><a href="#h2-0-26" id="h2-0-26" class="i">+	return nil
+</a><a href="#h2-0-27" id="h2-0-27" class="i">+}
+</a><a href="#h2-0-28" id="h2-0-28" class="i">+
+</a> // runInfo prints server metadata information via the Meta service Info RPC.
+ func runInfo(cmd *cobra.Command, args []string) error {
+ 	rdr := newRenderer(flagFormat, os.Stdout)
+<a href="#h2-1" id="h2-1" class="h">@@ -27,7 +53,7 @@ func runInfo(cmd *cobra.Command, args []string) error {
+</a> 		return err
+ 	}
+ 
+<a href="#h2-1-3" id="h2-1-3" class="d">-	client, err := newUnistoreClient(store, rpc)
+</a><a href="#h2-1-4" id="h2-1-4" class="i">+	client, err := newUnistoreClient(cmd.Context(), store, rpc)
+</a> 	if err != nil {
+ 		return err
+ 	}
+<a href="#h2-2" id="h2-2" class="h">@@ -38,7 +64,7 @@ func runInfo(cmd *cobra.Command, args []string) error {
+</a> 		rdr.proto(request)
+ 	}
+ 
+<a href="#h2-2-3" id="h2-2-3" class="d">-	response, err := client.Meta().Info(context.Background(), request)
+</a><a href="#h2-2-4" id="h2-2-4" class="i">+	response, err := client.Meta().Info(cmd.Context(), request)
+</a> 	if err != nil {
+ 		return err
+ 	}
+<a href="#h2-3" id="h2-3" class="h">@@ -70,7 +96,7 @@ func runHeadBucket(cmd *cobra.Command, args []string) error {
+</a> 		return err
+ 	}
+ 
+<a href="#h2-3-3" id="h2-3-3" class="d">-	client, err := newUnistoreClient(store, rpc)
+</a><a href="#h2-3-4" id="h2-3-4" class="i">+	client, err := newUnistoreClient(cmd.Context(), store, rpc)
+</a> 	if err != nil {
+ 		return err
+ 	}
+<a href="#h2-4" id="h2-4" class="h">@@ -86,7 +112,7 @@ func runHeadBucket(cmd *cobra.Command, args []string) error {
+</a> 		rdr.proto(request)
+ 	}
+ 
+<a href="#h2-4-3" id="h2-4-3" class="d">-	response, err := client.HeadBucket(context.Background(), request)
+</a><a href="#h2-4-4" id="h2-4-4" class="i">+	response, err := client.HeadBucket(cmd.Context(), request)
+</a> 	if err != nil {
+ 		return err
+ 	}
+<a href="#h2-5" id="h2-5" class="h">@@ -104,7 +130,7 @@ func runHeadObject(cmd *cobra.Command, args []string) error {
+</a> 		return err
+ 	}
+ 
+<a href="#h2-5-3" id="h2-5-3" class="d">-	client, err := newUnistoreClient(store, rpc)
+</a><a href="#h2-5-4" id="h2-5-4" class="i">+	client, err := newUnistoreClient(cmd.Context(), store, rpc)
+</a> 	if err != nil {
+ 		return err
+ 	}
+<a href="#h2-6" id="h2-6" class="h">@@ -121,7 +147,7 @@ func runHeadObject(cmd *cobra.Command, args []string) error {
+</a> 		rdr.proto(request)
+ 	}
+ 
+<a href="#h2-6-3" id="h2-6-3" class="d">-	response, err := client.HeadObject(context.Background(), request)
+</a><a href="#h2-6-4" id="h2-6-4" class="i">+	response, err := client.HeadObject(cmd.Context(), request)
+</a> 	if err != nil {
+ 		return err
+ 	}
+<a href="#h2-7" id="h2-7" class="h">@@ -144,7 +170,7 @@ func runDownload(cmd *cobra.Command, args []string) error {
+</a> 		return err
+ 	}
+ 
+<a href="#h2-7-3" id="h2-7-3" class="d">-	client, err := newUnistoreClient(store, rpc)
+</a><a href="#h2-7-4" id="h2-7-4" class="i">+	client, err := newUnistoreClient(cmd.Context(), store, rpc)
+</a> 	if err != nil {
+ 		return err
+ 	}
+<a href="#h2-8" id="h2-8" class="h">@@ -170,7 +196,7 @@ func runDownload(cmd *cobra.Command, args []string) error {
+</a> 			rdr.proto(get)
+ 		}
+ 
+<a href="#h2-8-3" id="h2-8-3" class="d">-		response, err := client.GetObject(context.Background(), get)
+</a><a href="#h2-8-4" id="h2-8-4" class="i">+		response, err := client.GetObject(cmd.Context(), get)
+</a> 		if err != nil {
+ 			return err
+ 		}
+<a href="#h2-9" id="h2-9" class="h">@@ -192,7 +218,7 @@ func runDownload(cmd *cobra.Command, args []string) error {
+</a> 		rdr.proto(request)
+ 	}
+ 
+<a href="#h2-9-3" id="h2-9-3" class="d">-	response, err := client.StreamGetObject(context.Background(), request)
+</a><a href="#h2-9-4" id="h2-9-4" class="i">+	response, err := client.StreamGetObject(cmd.Context(), request)
+</a> 	if err != nil {
+ 		return err
+ 	}
+<a href="#h2-10" id="h2-10" class="h">@@ -268,7 +294,7 @@ func runUpload(cmd *cobra.Command, args []string) error {
+</a> 		return err
+ 	}
+ 
+<a href="#h2-10-3" id="h2-10-3" class="d">-	client, err := newUnistoreClient(store, rpc)
+</a><a href="#h2-10-4" id="h2-10-4" class="i">+	client, err := newUnistoreClient(cmd.Context(), store, rpc)
+</a> 	if err != nil {
+ 		return err
+ 	}
+<a href="#h2-11" id="h2-11" class="h">@@ -300,7 +326,7 @@ func runUpload(cmd *cobra.Command, args []string) error {
+</a> 			rdr.proto(put)
+ 		}
+ 
+<a href="#h2-11-3" id="h2-11-3" class="d">-		response, err := client.PutObject(context.Background(), put)
+</a><a href="#h2-11-4" id="h2-11-4" class="i">+		response, err := client.PutObject(cmd.Context(), put)
+</a> 		if err != nil {
+ 			return err
+ 		}
+<a href="#h2-12" id="h2-12" class="h">@@ -308,7 +334,7 @@ func runUpload(cmd *cobra.Command, args []string) error {
+</a> 		return rdr.proto(response)
+ 	}
+ 
+<a href="#h2-12-3" id="h2-12-3" class="d">-	request, err := client.StreamPutObject(context.Background())
+</a><a href="#h2-12-4" id="h2-12-4" class="i">+	request, err := client.StreamPutObject(cmd.Context())
+</a> 	if err != nil {
+ 		return err
+ 	}
+<a href="#h2-13" id="h2-13" class="h">@@ -387,7 +413,7 @@ func runDelete(cmd *cobra.Command, args []string) error {
+</a> 		return err
+ 	}
+ 
+<a href="#h2-13-3" id="h2-13-3" class="d">-	client, err := newUnistoreClient(store, rpc)
+</a><a href="#h2-13-4" id="h2-13-4" class="i">+	client, err := newUnistoreClient(cmd.Context(), store, rpc)
+</a> 	if err != nil {
+ 		return err
+ 	}
+<a href="#h2-14" id="h2-14" class="h">@@ -405,7 +431,7 @@ func runDelete(cmd *cobra.Command, args []string) error {
+</a> 		rdr.proto(request)
+ 	}
+ 
+<a href="#h2-14-3" id="h2-14-3" class="d">-	response, err := client.DeleteObject(context.Background(), request)
+</a><a href="#h2-14-4" id="h2-14-4" class="i">+	response, err := client.DeleteObject(cmd.Context(), request)
+</a> 	if err != nil {
+ 		return err
+ 	}
+<a href="#h2-15" id="h2-15" class="h">@@ -422,7 +448,7 @@ func runListBuckets(cmd *cobra.Command, args []string) error {
+</a> 		return err
+ 	}
+ 
+<a href="#h2-15-3" id="h2-15-3" class="d">-	client, err := newUnistoreClient(store, rpc)
+</a><a href="#h2-15-4" id="h2-15-4" class="i">+	client, err := newUnistoreClient(cmd.Context(), store, rpc)
+</a> 	if err != nil {
+ 		return err
+ 	}
+<a href="#h2-16" id="h2-16" class="h">@@ -437,7 +463,7 @@ func runListBuckets(cmd *cobra.Command, args []string) error {
+</a> 		rdr.proto(request)
+ 	}
+ 
+<a href="#h2-16-3" id="h2-16-3" class="d">-	response, err := client.ListBuckets(context.Background(), request)
+</a><a href="#h2-16-4" id="h2-16-4" class="i">+	response, err := client.ListBuckets(cmd.Context(), request)
+</a> 	if err != nil {
+ 		return err
+ 	}
+<a href="#h2-17" id="h2-17" class="h">@@ -461,7 +487,7 @@ func runListObjects(cmd *cobra.Command, args []string) error {
+</a> 		return err
+ 	}
+ 
+<a href="#h2-17-3" id="h2-17-3" class="d">-	client, err := newUnistoreClient(store, rpc)
+</a><a href="#h2-17-4" id="h2-17-4" class="i">+	client, err := newUnistoreClient(cmd.Context(), store, rpc)
+</a> 	if err != nil {
+ 		return err
+ 	}
+<a href="#h2-18" id="h2-18" class="h">@@ -479,7 +505,7 @@ func runListObjects(cmd *cobra.Command, args []string) error {
+</a> 		rdr.proto(request)
+ 	}
+ 
+<a href="#h2-18-3" id="h2-18-3" class="d">-	response, err := client.ListObjects(context.Background(), request)
+</a><a href="#h2-18-4" id="h2-18-4" class="i">+	response, err := client.ListObjects(cmd.Context(), request)
+</a> 	if err != nil {
+ 		return err
+ 	}
+</pre>
+</div>
+</body>
+</html>
